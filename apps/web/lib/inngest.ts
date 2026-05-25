@@ -1,9 +1,25 @@
-import { Inngest } from 'inngest'
+import { Inngest, EventSchemas } from 'inngest'
 import { env } from './env'
+
+type XXMEvents = {
+  'xxm/debit.morning-warning': { data: { date: string } }
+  'xxm/debit.run': { data: { date: string } }
+  'xxm/debit.overdue-reminder': { data: { date: string } }
+  'xxm/contribution.month-rollover': { data: { month: number; year: number } }
+  'xxm/mandate.delay-handler': {
+    data: {
+      mandateId: string
+      userId: string
+      newDate: string
+      reason: string | null
+    }
+  }
+}
 
 export const inngest = new Inngest({
   id: 'xkimm-xa-mali',
   eventKey: env.INNGEST_EVENT_KEY,
+  schemas: new EventSchemas().fromRecord<XXMEvents>(),
 })
 
 export const InngestEvents = {
