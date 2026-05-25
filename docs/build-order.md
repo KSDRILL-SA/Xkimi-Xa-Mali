@@ -7,11 +7,33 @@ Each module has a definition of done. PR is not merged until DoD is met.
 
 ---
 
+## Build Status
+
+| Module | Status | Notes |
+|---|---|---|
+| M01 Foundation | ✅ Done | |
+| M02 Auth | ✅ Done | Will receive patch from M11a |
+| M03 Profile | ✅ Done | |
+| M04 Mandates | ✅ Merged (PR #7) | |
+| M05 Contributions | ✅ Merged (PR #8) | |
+| M06 Job Engine | ✅ Built — **PR needed** | Branch `feat/m06-job-engine`. Code review recommended before merge (touches live debit logic) |
+| M07 Notifications | ⬜ Next | Unblocks M06 — `queueNotification` stubs go nowhere until templates are seeded |
+| M08 Goals | ⬜ | |
+| M09 Reporting | ⬜ | |
+| M10 WhatsApp page | ⬜ | |
+| M11 Admin Dashboard | ⬜ | |
+| M11a Invite & Access Control | ⬜ Queued | Builds with M11. Patches M02 register flow + adds admin invite UI. Closes open registration |
+| M12 PWA + Optimisation | ⬜ | |
+
+**Progress: 6 of 13 modules complete (~15 of ~30 developer-days)**
+
+---
+
 ## Module Dependency Graph
 
 ```
 M01 Project Foundation
- └── M02 Auth System
+ └── M02 Auth System  ←──────────────────── patched by M11a
        └── M03 Member Profile
              ├── M04 Payment Mandates
              │     └── M05 Contribution Engine
@@ -21,7 +43,8 @@ M01 Project Foundation
              └── M08 Goals System
  └── M10 WhatsApp Integration Page (M01 only)
        └── M11 Admin Dashboard (M02–M10)
-             └── M12 PWA + Optimisation
+             └── M11a Invite & Access Control (M11 + M02 patch)
+                   └── M12 PWA + Optimisation
 ```
 
 ---
@@ -67,6 +90,9 @@ M01 Project Foundation
 - Founder seed: admin user with both roles
 - Auth middleware (`middleware.ts`) enforcing route tiers L0–L2
 - Rate limiting on auth routes (Upstash)
+
+> **Note:** Registration is currently open — any person with a valid SA ID/phone/email can sign up.
+> M11a closes this: once built, registration will require a valid invite code. See M11a.
 
 **DoD:** Registration → email verify → login → view dashboard → logout cycle works end-to-end. Role middleware blocks `/admin/*` for member-only session.
 
@@ -176,6 +202,7 @@ M01 Project Foundation
   - `welcome-email`
   - `email-verification`
   - `password-reset`
+  - `invite-created` (new — notify admin when invite is generated)
 - Notification inbox page (`/dashboard/notifications`)
 - BulkSMS delivery receipt webhook
 - Preference enforcement (member can opt out of non-critical channels)
@@ -260,9 +287,139 @@ M01 Project Foundation
 
 ---
 
+### M11a — Invite & Access Control
+
+**Depends on:** M11 (for admin UI) + patches M02 (register flow)
+
+**Purpose:** Close open registration. Only people with a valid, admin-issued invite code can create an account. Each invite is pre-loaded with member details and tied to a specific person by email + phone.
+
+---
+
+#### Design Decisions
+
+| Decision | Answer |
+|---|---|
+| Code delivery | Admin generates code; shares manually via WhatsApp/SMS |
+| Code format | `XKM-XXXX-XXXX` (Crockford base32, ~50-bit entropy) |
+| DB storage | sha256 hash of code + 4-char prefix (consistent with existing token hashing) |
+| Code expiry | **7 days** from creation |
+| Single-use | Yes — consumed atomically in same DB transaction as user creation |
+| Binding | Invite tied to specific **email + phone** — these fields are locked in the signup form |
+| Other fields | First name, last name, ID number — pre-filled but **editable** (member can correct typos; fills own SA ID) |
+| Monthly amount | Admin sets the **minimum floor** — member can choose that amount or higher, never below |
+| Admin ID number | Not collected on invite — member enters their own at signup |
+
+---
+
+#### Schema — new `Invitation` model
+
+Add to `packages/database/prisma/schema.prisma`:
+
+```prisma
+enum InvitationStatus {
+  PENDING    // created, not yet used
+  ACCEPTED   // a user signed up with it
+  REVOKED    // admin cancelled it
+  EXPIRED    // past expiresAt (enforced at validation time)
+}
+
+model Invitation {
+  id            String           @id @default(cuid())
+  codeHash      String           @unique          // sha256 of plaintext code
+  codePrefix    String                            // first 4 chars for admin list display
+  firstName     String
+  lastName      String
+  email         String           @unique          // binding — locked in signup form
+  phone         String           @unique          // binding — locked in signup form
+  minimumAmount Decimal          @db.Decimal(10, 2)  // floor; member picks >= this
+  status        InvitationStatus @default(PENDING)
+  invitedById   String
+  acceptedById  String?          @unique
+  expiresAt     DateTime                          // createdAt + 7 days
+  acceptedAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  invitedBy  User  @relation("InvitesSent",    fields: [invitedById],  references: [id])
+  acceptedBy User? @relation("InviteAccepted", fields: [acceptedById], references: [id])
+
+  @@map("invitations")
+}
+```
+
+Also add back-relations on `User`:
+```prisma
+invitesSent     Invitation[] @relation("InvitesSent")
+inviteAccepted  Invitation?  @relation("InviteAccepted")
+```
+
+---
+
+#### Two-step signup flow
+
+```
+Step 1 — Enter code
+  POST /api/v1/auth/invitations/validate
+  body: { code }
+  → validates: PENDING + not expired + not revoked
+  → returns: { firstName, lastName, email, phone, minimumAmount }
+  → rate-limited (reuse authRatelimit); added to middleware public-API allowlist
+
+Step 2 — Complete signup
+  email          (pre-filled, locked — binding)
+  phone          (pre-filled, locked — binding)
+  firstName      (pre-filled, editable)
+  lastName       (pre-filled, editable)
+  idNumber       (blank — member fills own SA ID)
+  monthlyAmount  (editable, min = minimumAmount enforced by Zod)
+  password       (member sets)
+  consentToPopia (member checks)
+
+  POST /api/v1/auth/register  (now requires inviteCode)
+  → re-validates code (anti-race)
+  → enforces submitted email + phone match invite (binding)
+  → creates User + marks Invitation ACCEPTED in one db.$transaction
+  → existing: email verification token + audit log
+```
+
+---
+
+#### Deliverables
+
+**Backend (new):**
+- `Invitation` model + Prisma migration
+- `services/invite.service.ts` — generate code, hash, create, validate, consume, revoke
+- `POST /api/v1/auth/invitations/validate` — public, rate-limited
+- `POST /api/v1/admin/invitations` — create invite (ADMIN only), returns one-time plaintext code
+- `GET  /api/v1/admin/invitations` — list with status + prefix (never full code)
+- `POST /api/v1/admin/invitations/[id]/revoke` — revoke an invite
+
+**Backend (patch):**
+- `packages/database/prisma/schema.prisma` — add `Invitation` model + `User` back-relations
+- `lib/validation/auth.ts` — add `inviteCode` to `RegisterSchema`; add `minimumAmount` floor enforcement
+- `services/auth.service.ts` — `registerUser` validates + consumes invite, enforces binding
+- `apps/web/app/api/v1/auth/register/route.ts` — pass invite code through
+- `middleware.ts` — add `/api/v1/auth/invitations/validate` to public-API allowlist
+
+**Frontend (new):**
+- `/auth/register` becomes 2-step: code entry → pre-filled form
+- `RegisterForm.tsx` refactored to multi-step
+- `/admin/invitations` page — list invites, create new, revoke
+
+**Security properties enforced:**
+- Hashed codes in DB (never stored plain)
+- Single-use (atomic consume in transaction)
+- 7-day expiry enforced at validate + consume
+- Binding enforcement (email + phone must match invite)
+- Rate-limited validate endpoint (leaked code useless without matching identity)
+- Audit log: invite creation, acceptance, revocation
+
+**DoD:** Founder can create an invite from `/admin/invitations`; system generates `XKM-XXXX-XXXX` code shown once; member uses code at `/auth/register`, sees pre-filled form, completes signup; invite status shows ACCEPTED; a second attempt with same code is rejected.
+
+---
+
 ### M12 — PWA + Optimisation
 
-**Depends on:** M11
+**Depends on:** M11a
 
 **Purpose:** Performance, PWA capability, and performance baseline for future zero-rating (v2).
 
@@ -286,18 +443,19 @@ M01 Project Foundation
 
 ## Time Estimates (Developer-Days)
 
-| Module | Estimate |
-|---|---|
-| M01 Foundation | 2 days |
-| M02 Auth | 3 days |
-| M03 Profile | 2 days |
-| M04 Mandates | 3 days |
-| M05 Contributions | 2 days |
-| M06 Job Engine | 3 days |
-| M07 Notifications | 2 days |
-| M08 Goals | 2 days |
-| M09 Reporting | 3 days |
-| M10 WhatsApp page | 1 day |
-| M11 Admin Dashboard | 3 days |
-| M12 PWA | 2 days |
-| **Total** | **~28 developer-days** |
+| Module | Estimate | Status |
+|---|---|---|
+| M01 Foundation | 2 days | ✅ Done |
+| M02 Auth | 3 days | ✅ Done |
+| M03 Profile | 2 days | ✅ Done |
+| M04 Mandates | 3 days | ✅ Done |
+| M05 Contributions | 2 days | ✅ Done |
+| M06 Job Engine | 3 days | ✅ Done (PR pending) |
+| M07 Notifications | 2 days | ⬜ |
+| M08 Goals | 2 days | ⬜ |
+| M09 Reporting | 3 days | ⬜ |
+| M10 WhatsApp page | 1 day | ⬜ |
+| M11 Admin Dashboard | 3 days | ⬜ |
+| M11a Invite & Access Control | 2 days | ⬜ |
+| M12 PWA | 2 days | ⬜ |
+| **Total** | **~30 developer-days** | **~15 done** |
