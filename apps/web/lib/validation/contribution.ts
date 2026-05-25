@@ -6,6 +6,10 @@ export const ManualContributionSchema = z.object({
   periodYear: z.number().int().min(2024),
 })
 
-export type ManualContributionInput = z.infer<typeof ManualContributionSchema>
+export const GenerateContributionsSchema = z.object({
+  month: z.number().int().min(1, 'Month must be 1–12').max(12, 'Month must be 1–12'),
+  year: z.number().int().min(2024, 'Year must be 2024 or later'),
+})
 
-// Bank account schemas live in ./profile (member-owned banking data).
+export type ManualContributionInput = z.infer<typeof ManualContributionSchema>
+export type GenerateContributionsInput = z.infer<typeof GenerateContributionsSchema>
