@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main, Dev]
+  pull_request:
+    branches: [main, Dev]
+
+jobs:
+  quality:
+    name: Type Check, Lint & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: xxm
+          POSTGRES_PASSWORD: xxm_test
+          POSTGRES_DB: xxm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
+      NEXTAUTH_SECRET: test_secret_32_chars_minimum_here
+      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY_TEST }}
+      NETCASH_SERVICE_KEY: test
+      NETCASH_WEBHOOK_SECRET: test
+      NETCASH_API_URL: https://ws.netcash.co.za/NSWSSX/NetcashTest.asmx
+      BULKSMS_USERNAME: test
+      BULKSMS_PASSWORD: test
+      RESEND_API_KEY: test
+      RESEND_FROM_EMAIL: test@test.com
+      INNGEST_EVENT_KEY: test
+      INNGEST_SIGNING_KEY: test
+      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL_TEST }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN_TEST }}
+      BLOB_READ_WRITE_TOKEN: test
+      WHATSAPP_GROUP_LINK: https://chat.whatsapp.com/test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run Prisma migrations
+        run: cd packages/database && npx prisma migrate deploy
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test
+
+      - name: Validate Prisma schema
+        run: cd packages/database && npx prisma validate
