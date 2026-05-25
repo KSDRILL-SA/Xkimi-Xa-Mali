@@ -5,7 +5,7 @@ import {
   createDebiCheckMandate,
   cancelDebiCheckMandate,
   delayMandate as netcashDelay,
-  updateMandateAmount,
+  updateDebiCheckMandate,
   mapNetcashStatus,
   getNextDebitDate,
   type NetcashWebhookEvent,
@@ -133,16 +133,28 @@ export async function createMandate(
     referenceNumber: `XXM-${userId.slice(-8).toUpperCase()}`,
   })
 
-  const mandate = await db.paymentMandate.create({
-    data: {
-      userId,
-      bankAccountId: data.bankAccountId,
-      debitDay: data.debitDay,
-      amount: data.amount,
-      status: 'PENDING',
-      netcashMandateId: netcashRes.mandateId,
-    },
-  })
+  // Persist the status Netcash actually returned (a 200 response may still carry
+  // a REJECTED/CANCELLED status), not an assumed PENDING.
+  const status = mapNetcashStatus(netcashRes.status)
+
+  // The DebiCheck mandate is already live at Netcash. If the local write fails we
+  // must cancel it, otherwise we orphan a debit authorisation with no local record.
+  let mandate
+  try {
+    mandate = await db.paymentMandate.create({
+      data: {
+        userId,
+        bankAccountId: data.bankAccountId,
+        debitDay: data.debitDay,
+        amount: data.amount,
+        status,
+        netcashMandateId: netcashRes.mandateId,
+      },
+    })
+  } catch (dbErr) {
+    await cancelDebiCheckMandate(netcashRes.mandateId).catch(() => {})
+    throw dbErr
+  }
 
   await writeAuditLog({
     userId,
@@ -171,10 +183,17 @@ export async function updateMandate(
     throw new ConflictError('Only active or pending mandates can be updated', 'MND_003')
   }
 
-  // Amount changes are pushed to Netcash effective next debit cycle
-  if (data.amount && mandate.netcashMandateId) {
-    const effectiveDate = getNextDebitDate(mandate.debitDay)
-    await updateMandateAmount(mandate.netcashMandateId, data.amount, effectiveDate)
+  // Push amount and/or debit-day changes to Netcash, effective next debit cycle.
+  // A debit-day change must reach Netcash too, otherwise the bank keeps debiting
+  // on the old day while our records show the new one.
+  const hasChange = data.amount !== undefined || data.debitDay !== undefined
+  if (hasChange && mandate.netcashMandateId) {
+    const effectiveDate = getNextDebitDate(data.debitDay ?? mandate.debitDay)
+    await updateDebiCheckMandate(
+      mandate.netcashMandateId,
+      { amount: data.amount, debitDay: data.debitDay },
+      effectiveDate,
+    )
   }
 
   const updated = await db.paymentMandate.update({
@@ -280,6 +299,14 @@ export async function processMandateWebhook(event: NetcashWebhookEvent) {
 
   const newStatus = mapNetcashStatus(event.status) as MandateStatus
 
+  // CANCELLED is terminal — never let a replayed or out-of-order event revive a
+  // cancelled mandate (which would resume debiting an account the member closed).
+  if (mandate.status === 'CANCELLED') return
+
+  // Idempotency: identical-status redeliveries are a no-op (no churn, no duplicate
+  // audit rows). Netcash retries on non-2xx and may also deliver duplicates.
+  if (mandate.status === newStatus) return
+
   await db.paymentMandate.update({
     where: { id: mandate.id },
     data: { status: newStatus },
@@ -291,6 +318,7 @@ export async function processMandateWebhook(event: NetcashWebhookEvent) {
     entityId: mandate.id,
     payload: {
       netcashMandateId: event.mandateId,
+      previousStatus: mandate.status,
       externalStatus: event.status,
       mappedStatus: newStatus,
       reason: event.reason ?? null,
