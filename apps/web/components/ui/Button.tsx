@@ -1,6 +1,6 @@
 'use client'
 
-import { forwardRef } from 'react'
+import { forwardRef, cloneElement, isValidElement } from 'react'
 import { clsx } from 'clsx'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -30,19 +30,24 @@ const sizes: Record<Size, string> = {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', loading, children, disabled, ...props }, ref) => (
-    <button
-      ref={ref}
-      className={clsx(base, variants[variant], sizes[size], className)}
-      disabled={disabled || loading}
-      {...props}
-    >
-      {loading && (
-        <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-      )}
-      {children}
-    </button>
-  ),
+  ({ className, variant = 'primary', size = 'md', loading, asChild, children, disabled, ...props }, ref) => {
+    const classes = clsx(base, variants[variant], sizes[size], className)
+
+    // Render the single child element with button styling applied (e.g. an <a> or <Link>)
+    if (asChild && isValidElement(children)) {
+      const child = children as React.ReactElement<{ className?: string }>
+      return cloneElement(child, { className: clsx(classes, child.props.className) })
+    }
+
+    return (
+      <button ref={ref} className={classes} disabled={disabled || loading} {...props}>
+        {loading && (
+          <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+        )}
+        {children}
+      </button>
+    )
+  },
 )
 
 Button.displayName = 'Button'
