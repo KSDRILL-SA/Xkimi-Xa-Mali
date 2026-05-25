@@ -14,6 +14,8 @@ import {
 import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '@/lib/validation/mandate'
 import { Prisma } from '@prisma/client'
 import type { MandateStatus, AccountType } from '@prisma/client'
+import { inngest, InngestEvents } from '@/lib/inngest'
+import { redis } from '@/lib/redis'
 
 // ─── Domain errors ─────────────────────────────────────────────────────────
 
@@ -275,6 +277,27 @@ export async function requestDelay(
   if (mandate.netcashMandateId) {
     await netcashDelay(mandate.netcashMandateId, data.newDate)
   }
+
+  // Mark this period's debit as delayed so the nightly debit-run skips it.
+  // Key derived from getNextDebitDate so it matches what debit-run checks.
+  const nextDebit = getNextDebitDate(mandate.debitDay)
+  const [periodYear, periodMonth] = nextDebit.split('-')
+  await redis.set(
+    `xxm:delay:${mandateId}:${periodYear}-${periodMonth}`,
+    '1',
+    { ex: 60 * 60 * 24 * 90 },
+  )
+
+  // Emit event so mandate-delay-handler sleeps until the new date and charges then.
+  await inngest.send({
+    name: InngestEvents.MANDATE_DELAY_HANDLER,
+    data: {
+      mandateId,
+      userId: mandate.userId,
+      newDate: data.newDate,
+      reason: data.reason ?? null,
+    },
+  })
 
   await writeAuditLog({
     userId: mandate.userId,
