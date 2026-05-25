@@ -41,6 +41,7 @@ export default async function MemberLayout({ children }: { children: React.React
         <nav className="flex items-center gap-1">
           <NavLink href="/dashboard">Dashboard</NavLink>
           <NavLink href="/dashboard/contributions">Contributions</NavLink>
+          <NavLink href="/dashboard/mandates">Mandates</NavLink>
           <NavLink href="/dashboard/goals">Goals</NavLink>
           <NavLink href="/dashboard/profile">Profile</NavLink>
           {isAdmin && <NavLink href="/admin">Admin</NavLink>}

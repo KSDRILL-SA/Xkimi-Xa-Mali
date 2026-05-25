@@ -3,7 +3,7 @@
 import { forwardRef, cloneElement, isValidElement } from 'react'
 import { clsx } from 'clsx'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline'
 type Size = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,6 +21,7 @@ const variants: Record<Variant, string> = {
   secondary: 'bg-xxm-gold text-xxm-green-900 hover:bg-xxm-gold-dark active:scale-[0.98]',
   ghost: 'text-xxm-green hover:bg-xxm-green-100 active:scale-[0.98]',
   danger: 'bg-red-600 text-white hover:bg-red-700 active:scale-[0.98]',
+  outline: 'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 active:scale-[0.98]',
 }
 
 const sizes: Record<Size, string> = {
