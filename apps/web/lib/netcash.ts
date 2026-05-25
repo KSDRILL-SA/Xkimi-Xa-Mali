@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { env } from './env'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -87,15 +87,18 @@ export async function cancelDebiCheckMandate(mandateId: string): Promise<Netcash
   })
 }
 
-export async function updateMandateAmount(
+// Amend an existing DebiCheck mandate. Both the collection amount and the
+// debit day can change; either takes effect from the supplied effectiveDate.
+export async function updateDebiCheckMandate(
   mandateId: string,
-  amount: number,
+  changes: { amount?: number; debitDay?: number },
   effectiveDate: string,
 ): Promise<NetcashMandateResponse> {
   return netcashPost<NetcashMandateResponse>('/mandate/update', {
     serviceKey: env.NETCASH_SERVICE_KEY,
     mandateId,
-    amount,
+    ...(changes.amount !== undefined && { amount: changes.amount }),
+    ...(changes.debitDay !== undefined && { debitDay: changes.debitDay }),
     effectiveDate,
   })
 }
@@ -121,11 +124,15 @@ export async function getMandateStatus(mandateId: string): Promise<NetcashStatus
 // ─── Webhook security ─────────────────────────────────────────────────────────
 
 // Netcash signs the raw request body with HMAC-SHA256 using the webhook secret.
+// Compared in constant time to avoid leaking the digest via a timing side-channel.
 export function verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean {
   const expected = createHmac('sha256', env.NETCASH_WEBHOOK_SECRET)
     .update(rawBody)
     .digest('hex')
-  return expected === signatureHeader
+  const expectedBuf = Buffer.from(expected, 'utf8')
+  const providedBuf = Buffer.from(signatureHeader, 'utf8')
+  if (expectedBuf.length !== providedBuf.length) return false
+  return timingSafeEqual(expectedBuf, providedBuf)
 }
 
 // Documented Netcash outbound IP addresses. Reject webhook calls from outside this set.
@@ -156,11 +163,21 @@ export function mapNetcashStatus(
   return map[raw.toUpperCase()] ?? 'SUSPENDED'
 }
 
-// Returns the next calendar occurrence of debitDay as YYYY-MM-DD
+// Returns the next calendar occurrence of debitDay as YYYY-MM-DD.
+// Built from local calendar components (not toISOString) so the date is correct
+// regardless of server timezone — SAST is UTC+2, where toISOString would roll
+// a local-midnight date back to the previous day.
 export function getNextDebitDate(debitDay: number): string {
   const now = new Date()
-  const candidate = new Date(now.getFullYear(), now.getMonth(), debitDay)
-  // If this month's debit day has already passed, roll to next month
-  const target = candidate > now ? candidate : new Date(now.getFullYear(), now.getMonth() + 1, debitDay)
-  return target.toISOString().slice(0, 10)
+  let year = now.getFullYear()
+  let month = now.getMonth() // 0-indexed
+  // If today is the debit day or later, the next debit is next month
+  if (now.getDate() >= debitDay) {
+    month += 1
+    if (month > 11) {
+      month = 0
+      year += 1
+    }
+  }
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(debitDay).padStart(2, '0')}`
 }

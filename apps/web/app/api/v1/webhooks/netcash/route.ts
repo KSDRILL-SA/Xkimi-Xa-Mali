@@ -4,18 +4,21 @@ import { processMandateWebhook } from '@/services/mandate.service'
 import type { NetcashWebhookEvent } from '@/lib/netcash'
 
 export async function POST(req: NextRequest) {
-  // IP allowlist check
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
-  if (!isAllowedNetcashIp(clientIp)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   const rawBody = await req.text()
 
-  // HMAC-SHA256 signature verification
+  // Primary gate: HMAC-SHA256 over the raw body. This is the authoritative check —
+  // it cannot be forged without the shared secret, unlike the IP header below.
   const signature = req.headers.get('x-netcash-signature') ?? ''
   if (!signature || !verifyWebhookSignature(rawBody, signature)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
+
+  // Defence-in-depth: reject IPs outside Netcash's documented range. x-forwarded-for
+  // is only trustworthy behind a trusted proxy (Vercel sets it), so this is a
+  // secondary filter, never the sole gate.
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
+  if (!isAllowedNetcashIp(clientIp)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   let event: NetcashWebhookEvent
@@ -32,8 +35,10 @@ export async function POST(req: NextRequest) {
   try {
     await processMandateWebhook(event)
     return NextResponse.json({ received: true }, { status: 200 })
-  } catch {
-    // Avoid leaking internal errors to Netcash — log via audit, return 200 to stop retries
-    return NextResponse.json({ received: true }, { status: 200 })
+  } catch (err) {
+    // Transient failure (e.g. DB unavailable). Return 500 so Netcash retries —
+    // swallowing with a 200 would permanently drop the status update.
+    console.error('[netcash-webhook] processing failed', err)
+    return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
   }
 }
