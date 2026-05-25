@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { db } from '@/lib/db'
 
 type AuditParams = {
@@ -5,18 +6,18 @@ type AuditParams = {
   action: string
   entity: string
   entityId: string
-  payload?: Record<string, unknown>
+  payload?: Prisma.InputJsonValue
   ipAddress?: string
 }
 
-export async function writeAuditLog({ userId, action, entity, entityId, payload = {}, ipAddress }: AuditParams) {
+export async function writeAuditLog({ userId, action, entity, entityId, payload, ipAddress }: AuditParams) {
   await db.auditLog.create({
     data: {
       userId: userId ?? null,
       action,
       entity,
       entityId,
-      payload,
+      payload: payload ?? {},
       ipAddress: ipAddress ?? null,
     },
   })
