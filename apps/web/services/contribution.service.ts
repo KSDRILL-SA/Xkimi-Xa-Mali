@@ -290,7 +290,7 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
 
 export async function generateMonthlyContributions(
   data: GenerateContributionsInput,
-  adminId: string,
+  adminId: string | undefined,
   adminRoles: string[],
 ) {
   if (!adminRoles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
