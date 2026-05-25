@@ -356,6 +356,8 @@ model NotificationPreference {
   email  Boolean @default(true)
   push   Boolean @default(true)
 
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("notification_preferences")
 }
 
