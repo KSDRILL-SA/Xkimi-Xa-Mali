@@ -1,45 +1,77 @@
+import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-import { getToken } from 'next-auth/jwt'
 
-const PUBLIC_PATHS = ['/', '/whatsapp', '/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password']
-const ADMIN_PREFIX = '/admin'
-const MEMBER_PREFIX = '/dashboard'
 const WEBHOOK_PREFIX = '/api/v1/webhooks'
 const HEALTH_PATH = '/api/v1/health'
+const AUTH_PREFIX = '/api/auth'
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl
+export default auth((req) => {
+  const { pathname } = req.nextUrl
 
-  // Health check and webhooks: always public (webhooks validate their own signatures)
-  if (pathname === HEALTH_PATH || pathname.startsWith(WEBHOOK_PREFIX)) {
+  // Always allow: health, webhooks (self-verifying), NextAuth internals
+  if (
+    pathname === HEALTH_PATH ||
+    pathname.startsWith(WEBHOOK_PREFIX) ||
+    pathname.startsWith(AUTH_PREFIX)
+  ) {
     return NextResponse.next()
   }
 
-  const isPublic = PUBLIC_PATHS.some((p) => pathname === p) || pathname.startsWith('/auth/')
-  if (isPublic) return NextResponse.next()
+  const session = req.auth
 
-  const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+  // Public routes — no session required
+  const isPublicPage =
+    pathname === '/' ||
+    pathname === '/whatsapp' ||
+    pathname.startsWith('/auth/')
 
-  if (!token) {
-    const loginUrl = new URL('/auth/login', request.url)
+  const isPublicApi =
+    pathname === '/api/v1/auth/register' ||
+    pathname === '/api/v1/auth/forgot-password' ||
+    pathname === '/api/v1/auth/reset-password' ||
+    pathname === '/api/v1/auth/verify-email'
+
+  if (isPublicPage || isPublicApi) {
+    // Redirect already-authed users away from auth pages
+    if (session && pathname.startsWith('/auth/')) {
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+    return NextResponse.next()
+  }
+
+  // All other routes require a session
+  if (!session) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: { code: 'SYS_002', message: 'Unauthorised', traceId: '' } },
+        { status: 401 },
+      )
+    }
+    const loginUrl = new URL('/auth/login', req.url)
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
   }
 
   // Admin routes require ADMIN role
-  if (pathname.startsWith(ADMIN_PREFIX) || pathname.startsWith('/api/v1/admin')) {
-    const roles = token.roles as string[] | undefined
+  const isAdminRoute =
+    pathname.startsWith('/admin') || pathname.startsWith('/api/v1/admin')
+
+  if (isAdminRoute) {
+    const roles = session.user?.roles as string[] | undefined
     if (!roles?.includes('ADMIN')) {
-      return NextResponse.json({ error: { code: 'SYS_003', message: 'Forbidden', traceId: '' } }, { status: 403 })
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json(
+          { error: { code: 'SYS_003', message: 'Forbidden', traceId: '' } },
+          { status: 403 },
+        )
+      }
+      return NextResponse.redirect(new URL('/dashboard', req.url))
     }
   }
 
   return NextResponse.next()
-}
+})
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/).*)'],
 }
