@@ -1,0 +1,132 @@
+This is a comprehensive idea. Let me break this down systematically and design a full system. Let me think through all the components:
+System Name: Xkimm Xa Mali (XXM)
+Core Features:
+
+Authentication (member + admin roles, double role for founder)
+Contribution management (R100 minimum, flexible amounts)
+Automated payment/stop order system with notifications
+Dashboard (member + admin)
+Transaction history + statement downloads
+Goals (monthly, yearly, custom)
+WhatsApp group integration page
+Zero-rated/data-free mode for basic features
+Notifications (SMS/push/email)
+Payment scheduling with user-controlled deduction dates
+
+
+Technical Decisions:
+
+This is content-driven + member-facing → Next.js App Router
+Financial data → PostgreSQL via Prisma
+Payment processing → need a South African payment gateway (PayFast, Peach Payments, or Ozow for EFT/debit orders)
+Stop orders/debit orders → South African banking integration
+SMS notifications → Twilio or BulkSMS (South African)
+Zero-rated → need to work with MTN, Vodacom, etc. (this is complex - Facebook Zero style)
+Auth → NextAuth.js
+
+Framework Assignment:
+
+
+
+This is a Next.js system (public-facing, content-driven, SEO for the homepage, member portal)
+
+Backend: Next.js API Routes + Node.js
+
+Database: PostgreSQL via Prisma
+
+Payment: Peach Payments or PayFast (South African, supports debit orders)
+
+SMS: BulkSMS or Clickatell (South African providers)
+
+Deployment: Vercel (frontend/API) + Railway (if 
+
+needed)
+
+
+
+Data-Free consideration:
+
+
+
+South African operators have zero-rating programs. To get zero-rated, you need to register with operators (Vodacom, MTN, Cell C, Telkom). This requires a formal application process. We should note this as an infrastructure concern.
+
+Implementation: Keep JS bundle minimal, use service workers for offline, optimize images, compress everything.
+
+
+
+South African specific:
+
+…Show less
+
+Now I have the design module loaded. Let me create a comprehensive system design for the Xkimm Xa Mali platform. This will be a large, structured response. Let me plan it:
+
+System classification & framework assignment
+Phase 0: Domain Modelling
+Phase 1: System Architecture (with diagram)
+Phase 2: Database Design (ERD)
+Phase 3: API Contract
+Phase 4: Security Model
+Phase 5: Infrastructure
+Phase 6: Build Order
+Recommendations & Improvements
+
+For the visual, I'll create a system architecture diagram showing the main components and their relationships.
+
+Let me think about the architecture diagram. Key components:
+
+Next.js App (frontend + API routes)
+PostgreSQL (Prisma)
+Payment Gateway (Peach Payments/Netcash for DebiCheck)
+SMS Provider (BulkSMS)
+Email Provider (Resend)
+File Storage (Vercel Blob)
+Redis (Upstash - for rate limiting, idempotency, caching)
+Cron Scheduler (Vercel Cron / Inngest)
+Notification Service
+
+Let me create a clean architecture diagram. I'll keep it simple but comprehensive.
+For the folder structure and full design, I'll write it all in the response text. The diagram will show the high-level architecture.
+
+Let me think about the South African specific things:
+
+Payment: For debit orders in SA, the main options are:
+
+Netcash - specialized in debit order management, NAEDO/DebiCheck
+Peach Payments - enterprise, supports DebiCheck
+PayFast - popular, but more for one-time payments
+I'll recommend Netcash for debit orders specifically since it's built for that use case in SA
+
+
+SMS: BulkSMS.com is the leading SA provider. Also Clickatell.
+Zero-rating: This requires working with SA operators. In the meantime, PWA with service workers.
+
+POPIA: Protection of Personal Information Act - SA's data privacy law, equivalent to GDPR.
+…
+Show lessDone
+
+
+This gets full pipeline treatment. Running all six phases.
+
+---
+
+## Xkimm Xa Mali — System Design v1.0
+
+### System Classification
+
+```
+Problem type:       Member-facing financial portal + automated payment management
+Framework:          Next.js App Router (PWA-capable, SEO public pages, member portal)
+Database:           PostgreSQL via Prisma (ACID compliance — non-negotiable for financial data)
+Auth:               NextAuth.js + JWT HTTP-only cookies
+Payment:            Netcash (SA-native DebiCheck debit order system)
+SMS:                BulkSMS (leading SA provider, zero-rated gateway eligible)
+Email:              Resend (transactional, developer-first)
+Jobs/Cron:          Inngest (durable functions, event-driven, retryable)
+Deployment:         Vercel (Next.js) + Neon (PostgreSQL) + Upstash (Redis)
+```
+
+**Why Netcash over PayFast:** Netcash is purpose-built for recurring debit order management in SA. It supports DebiCheck authenticated mandates, NAEDO, and batch collections. PayFast is optimized for once-off e-commerce payments.
+
+**Why Inngest over Vercel Cron:** The notification + payment pipeline needs durable, retryable, event-driven jobs with full execution history. Inngest provides this natively. Vercel Cron fires and forgets.
+
+---
