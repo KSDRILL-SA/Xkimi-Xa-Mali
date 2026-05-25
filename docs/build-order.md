@@ -264,7 +264,7 @@ M01 Project Foundation
 
 **Depends on:** M11
 
-**Purpose:** Performance, offline capability, zero-rating readiness.
+**Purpose:** Performance, PWA capability, and performance baseline for future zero-rating (v2).
 
 **Deliverables:**
 - `next-pwa` configured with service worker
@@ -273,9 +273,12 @@ M01 Project Foundation
 - `next/image` optimisation on all images
 - Lighthouse score ≥ 90 on mobile
 - Bundle analysis + code splitting audit
-- Zero-rating operator application checklist
+- Minimal API payload audit (groundwork for v2 zero-rating)
+- Brotli compression confirmed active on Vercel
 - Sentry release tracking configured
 - Better Stack uptime monitor configured
+
+**Note:** Zero-rating / data-free operator applications (Vodacom, MTN, Cell C, Telkom) are scoped to **v2**. The PWA + optimisation work in M12 lays the technical foundation that will make the v2 upgrade straightforward.
 
 **DoD:** Lighthouse mobile score ≥ 90; app installable as PWA; `/api/health` monitored with alerting.
 

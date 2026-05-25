@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Design tokens as CSS custom properties ────────────────────────────────
+   Single source of truth lives in tailwind.config.ts.
+   These vars mirror those tokens so custom CSS can reference them
+   without hardcoding raw hex values anywhere.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Brand */
+  --xxm-green:      #1b4332;
+  --xxm-green-50:   #f0fdf4;
+  --xxm-green-100:  #dcfce7;
+  --xxm-green-500:  #22c55e;
+  --xxm-green-700:  #15803d;
+  --xxm-green-900:  #14532d;
+  --xxm-gold:       #d4af37;
+  --xxm-gold-light: #f0d060;
+  --xxm-gold-dark:  #a88828;
+  --xxm-light:      #f0fdf4;
+
+  /* Semantic */
+  --success: #16a34a;
+  --warning: #d97706;
+  --danger:  #dc2626;
+  --info:    #2563eb;
+
+  /* Typography */
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+/* ─── Base resets ────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--xxm-green-50);
+  color: var(--xxm-green-900);
+  min-height: 100dvh;
+}
+
+/* ─── Custom component classes ───────────────────────────────────────────────
+   Use these for patterns that would produce unreadable Tailwind class stacks.
+   Always use CSS vars — never raw hex values.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Card with XXM brand shadow */
+.xxm-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 3px rgba(27, 67, 50, 0.08), 0 1px 2px rgba(27, 67, 50, 0.04);
+  border: 1px solid rgba(27, 67, 50, 0.08);
+}
+
+/* Gold accent underline for headings */
+.xxm-underline {
+  position: relative;
+  display: inline-block;
+}
+.xxm-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--xxm-gold);
+  border-radius: 1px;
+}
+
+/* Status pill — colour overrides via Tailwind classes on the element */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+/* Animated loading skeleton */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(27, 67, 50, 0.06) 25%,
+    rgba(27, 67, 50, 0.12) 50%,
+    rgba(27, 67, 50, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s infinite;
+  border-radius: 0.375rem;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Focus ring — consistent across all interactive elements */
+.focus-ring {
+  outline: 2px solid var(--xxm-gold);
+  outline-offset: 2px;
+}
+
+/* Amount display — financial figures */
+.amount {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ─── Print styles for statements ────────────────────────────────────────── */
+@media print {
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

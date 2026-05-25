@@ -21,7 +21,7 @@ Framework:    Next.js App Router  (public-facing + member portal, SEO homepage, 
 Database:     PostgreSQL via Prisma  (ACID compliance — non-negotiable for financial data)
 Auth:         NextAuth.js + JWT HTTP-only cookies
 Payment:      Netcash  (SA-native DebiCheck/NAEDO debit order management)
-SMS:          BulkSMS  (leading SA provider, zero-rating eligible)
+SMS:          BulkSMS  (leading SA provider)
 Email:        Resend  (transactional, developer-first)
 Jobs/Cron:    Inngest  (durable, retryable, event-driven — critical for payment pipeline)
 Cache/Rate:   Upstash Redis
@@ -151,7 +151,7 @@ User ──< AuditLog
    ┌──────────▼──────────┐   ┌───────────▼───────┐   ┌────────────▼──┐│
    │      NETCASH         │   │     BULKSMS       │   │    RESEND     ││
    │  (Debit orders)     │   │  (SMS notifs)     │   │   (Email)     ││
-   │  DebiCheck mandate  │   │  Zero-rated path  │   │  Transactional││
+   │  DebiCheck mandate  │   │  SMS delivery     │   │  Transactional││
    │  NAEDO collections  │   └───────────────────┘   └───────────────┘│
    │  Webhook callbacks  │                                             │
    └─────────────────────┘                              ┌─────────────┘
@@ -672,14 +672,11 @@ On merge to main:
   4. Sentry release notification
 ```
 
-### Zero-Rating / Data-Free Strategy
+### Data Access Strategy
 
-SA operator zero-rating requires formal application to Vodacom/MTN/Cell C/Telkom. Steps:
-1. Register domain and apply to each operator's zero-rating portal
-2. Keep API responses minimal (no images in API responses)
-3. PWA service worker caches static assets — repeat visits use zero data
-4. All images served via Vercel CDN with aggressive caching
-5. Compress all responses (gzip/brotli — Vercel default)
+**v1 (current):** Standard internet required. All features require an active data connection.
+
+**v2 (planned):** Zero-rating / data-free mode. SA operator zero-rating (Vodacom, MTN, Cell C, Telkom) requires a formal application process per operator. Deferred to v2 due to complexity of operator onboarding and network agreements. Foundation work (minimal API payloads, PWA caching, brotli compression) will be in place from v1 to ease the v2 upgrade path.
 
 ---
 
