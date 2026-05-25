@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum RoleName {
+  ADMIN
+  MEMBER
+}
+
+enum AccountType {
+  SAVINGS
+  CHEQUE
+  TRANSMISSION
+}
+
+enum MandateStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum ContributionStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+enum TransactionType {
+  DEBIT_ORDER
+  MANUAL
+  REVERSAL
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+enum GoalType {
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum GoalStatus {
+  DRAFT
+  ACTIVE
+  ACHIEVED
+  FAILED
+}
+
+enum NotifChannel {
+  SMS
+  EMAIL
+  PUSH
+}
+
+enum NotifStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+// ─── Identity ─────────────────────────────────────────────────────────────────
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  phone     String     @unique
+  firstName String
+  lastName  String
+  idNumber  String?    // AES-256-GCM encrypted at application layer
+  address   Json?
+  status    UserStatus @default(PENDING)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  roles                  UserRole[]
+  bankAccounts           BankAccount[]
+  mandates               PaymentMandate[]
+  contributions          Contribution[]
+  notifications          Notification[]
+  notificationPreference NotificationPreference?
+  auditLogs              AuditLog[]
+  lockedGoals            Goal[]                  @relation("GoalLocker")
+
+  @@map("users")
+}
+
+model Role {
+  id    String   @id @default(cuid())
+  name  RoleName @unique
+  users UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ─── Banking ──────────────────────────────────────────────────────────────────
+
+model BankAccount {
+  id            String      @id @default(cuid())
+  userId        String
+  bankName      String
+  accountNumber String      // AES-256-GCM encrypted at application layer
+  accountType   AccountType
+  branchCode    String
+  isPrimary     Boolean     @default(false)
+  verifiedAt    DateTime?
+  createdAt     DateTime    @default(now())
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mandates PaymentMandate[]
+
+  @@map("bank_accounts")
+}
+
+model PaymentMandate {
+  id               String        @id @default(cuid())
+  userId           String
+  bankAccountId    String
+  debitDay         Int
+  amount           Decimal       @db.Decimal(10, 2)
+  status           MandateStatus @default(PENDING)
+  netcashMandateId String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  bankAccount  BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  transactions Transaction[]
+
+  @@map("payment_mandates")
+}
+
+// ─── Contributions & Transactions ─────────────────────────────────────────────
+
+model Contribution {
+  id          String             @id @default(cuid())
+  userId      String
+  periodMonth Int
+  periodYear  Int
+  amountDue   Decimal            @db.Decimal(10, 2)
+  amountPaid  Decimal            @default(0) @db.Decimal(10, 2)
+  dueDate     DateTime
+  status      ContributionStatus @default(PENDING)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions Transaction[]
+
+  @@unique([userId, periodMonth, periodYear])
+  @@index([status, dueDate])
+  @@map("contributions")
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  contributionId  String
+  mandateId       String
+  amount          Decimal           @db.Decimal(10, 2)
+  type            TransactionType
+  status          TransactionStatus @default(PENDING)
+  gatewayRef      String?
+  gatewayResponse Json?
+  idempotencyKey  String            @unique
+  processedAt     DateTime?
+  createdAt       DateTime          @default(now())
+
+  contribution Contribution   @relation(fields: [contributionId], references: [id], onDelete: Restrict)
+  mandate      PaymentMandate @relation(fields: [mandateId], references: [id], onDelete: Restrict)
+
+  @@index([status, createdAt])
+  @@index([gatewayRef])
+  @@map("transactions")
+}
+
+// ─── Goals ────────────────────────────────────────────────────────────────────
+
+model Goal {
+  id            String     @id @default(cuid())
+  type          GoalType
+  title         String
+  description   String?
+  targetAmount  Decimal    @db.Decimal(10, 2)
+  currentAmount Decimal    @default(0) @db.Decimal(10, 2)
+  deadline      DateTime
+  status        GoalStatus @default(DRAFT)
+  lockedAt      DateTime?
+  lockedById    String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
+  progress GoalProgress[]
+
+  @@map("goals")
+}
+
+model GoalProgress {
+  id         String   @id @default(cuid())
+  goalId     String
+  amount     Decimal  @db.Decimal(10, 2)
+  recordedAt DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Restrict)
+
+  @@map("goal_progress")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model NotificationTemplate {
+  id      String       @id @default(cuid())
+  slug    String       @unique
+  channel NotifChannel
+  body    String
+
+  notifications Notification[]
+
+  @@map("notification_templates")
+}
+
+model Notification {
+  id         String       @id @default(cuid())
+  userId     String
+  templateId String
+  channel    NotifChannel
+  status     NotifStatus  @default(QUEUED)
+  payload    Json
+  sentAt     DateTime?
+  createdAt  DateTime     @default(now())
+
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template NotificationTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id     String  @id @default(cuid())
+  userId String  @unique
+  sms    Boolean @default(true)
+  email  Boolean @default(true)
+  push   Boolean @default(true)
+
+  @@map("notification_preferences")
+}
+
+// ─── Audit ────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  payload   Json
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
