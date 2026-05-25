@@ -152,6 +152,20 @@ export async function submitOnceOffDebit(payload: {
   })
 }
 
+// Submit a scheduled (monthly debit order) debit against an existing authorized mandate.
+// Used by the nightly debit-run job for regular monthly collections.
+export async function submitScheduledDebit(payload: {
+  mandateId: string
+  amount: number
+  reference: string
+  idempotencyKey: string
+}): Promise<NetcashDebitResponse> {
+  return netcashPost<NetcashDebitResponse>('/debit/scheduled', {
+    serviceKey: env.NETCASH_SERVICE_KEY,
+    ...payload,
+  })
+}
+
 // Map a raw Netcash transaction status string to our TransactionStatus enum values.
 export function mapNetcashTransactionStatus(
   raw: string,
