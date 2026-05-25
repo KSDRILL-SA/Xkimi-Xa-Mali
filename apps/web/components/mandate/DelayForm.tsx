@@ -40,9 +40,11 @@ export function DelayForm({ mandateId, onClose }: Props) {
     }
   }
 
+  // Build from local calendar parts, not toISOString — in SAST (UTC+2) a
+  // local-midnight toISOString rolls back a day, making "tomorrow" show as today.
   const tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
-  const minDate = tomorrow.toISOString().slice(0, 10)
+  const minDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

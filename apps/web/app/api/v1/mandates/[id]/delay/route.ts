@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
+import { apiRatelimit } from '@/lib/redis'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { requestDelay } from '@/services/mandate.service'
 import { DelayMandateSchema } from '@/lib/validation/mandate'
@@ -9,6 +10,9 @@ type Params = { params: Promise<{ id: string }> }
 export async function POST(req: NextRequest, { params }: Params) {
   const session = await auth()
   if (!session?.user) return apiError('SYS_001', 'Authentication required', 401)
+
+  const { success } = await apiRatelimit.limit(`mandate:${session.user.id}`)
+  if (!success) return apiError('SYS_005', 'Too many requests. Please try again later.', 429)
 
   const { id } = await params
   const body = await req.json().catch(() => null)

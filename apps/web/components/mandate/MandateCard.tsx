@@ -6,6 +6,7 @@ import { formatZAR } from '@/lib/formatters'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Alert } from '@/components/ui/Alert'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
 import { DelayForm } from './DelayForm'
 import { EditMandateForm } from './EditMandateForm'
@@ -42,6 +43,7 @@ export function MandateCard({ mandate }: Props) {
   const [showDelay, setShowDelay] = useState(false)
   const [showCancel, setShowCancel] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
 
   const status = STATUS_CONFIG[mandate.status] ?? STATUS_CONFIG.SUSPENDED
   const canManage = mandate.status === 'ACTIVE' || mandate.status === 'PENDING'
@@ -49,13 +51,18 @@ export function MandateCard({ mandate }: Props) {
 
   async function handleCancel() {
     setCancelling(true)
+    setCancelError('')
     try {
       await api.delete(`/api/v1/mandates/${mandate.id}`)
+      setShowCancel(false)
       router.refresh()
-    } catch {
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      setCancelError(e.message ?? 'Failed to cancel mandate. Please try again.')
+      setShowCancel(false)
+    } finally {
       setCancelling(false)
     }
-    setShowCancel(false)
   }
 
   return (
@@ -97,6 +104,12 @@ export function MandateCard({ mandate }: Props) {
               {mandate.bankAccount.accountType.toLowerCase()} account
             </p>
           </div>
+
+          {cancelError && (
+            <div className="mt-4">
+              <Alert variant="error">{cancelError}</Alert>
+            </div>
+          )}
 
           {/* Actions */}
           {canManage && (
