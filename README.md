@@ -142,7 +142,7 @@ See [build-order.md](docs/build-order.md) for the full dependency-ordered module
 |---|---|---|
 | M01 | Project Foundation | Complete |
 | M02 | Auth System | Complete |
-| M03 | Member Profile | Pending |
+| M03 | Member Profile | Complete |
 | M04 | Payment Mandates | Pending |
 | M05 | Contribution Engine | Pending |
 | M06 | Job Engine (Inngest) | Pending |
