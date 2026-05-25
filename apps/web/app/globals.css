@@ -123,6 +123,32 @@ body {
   letter-spacing: -0.01em;
 }
 
+/* ─── Auth layout background ─────────────────────────────────────────────── */
+.auth-bg {
+  background: linear-gradient(
+    135deg,
+    var(--xxm-green-900) 0%,
+    var(--xxm-green) 50%,
+    var(--xxm-green-700) 100%
+  );
+}
+
+.auth-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    circle at 20% 80%,
+    rgba(212, 175, 55, 0.12) 0%,
+    transparent 50%
+  ),
+  radial-gradient(
+    circle at 80% 20%,
+    rgba(212, 175, 55, 0.08) 0%,
+    transparent 50%
+  );
+}
+
 /* ─── Print styles for statements ────────────────────────────────────────── */
 @media print {
   body {

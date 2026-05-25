@@ -141,7 +141,7 @@ See [build-order.md](docs/build-order.md) for the full dependency-ordered module
 | Phase | Module | Status |
 |---|---|---|
 | M01 | Project Foundation | Complete |
-| M02 | Auth System | Next |
+| M02 | Auth System | Complete |
 | M03 | Member Profile | Pending |
 | M04 | Payment Mandates | Pending |
 | M05 | Contribution Engine | Pending |
