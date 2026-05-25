@@ -21,4 +21,5 @@ export const DelayMandateSchema = z.object({
 })
 
 export type CreateMandateInput = z.infer<typeof CreateMandateSchema>
+export type UpdateMandateInput = z.infer<typeof UpdateMandateSchema>
 export type DelayMandateInput = z.infer<typeof DelayMandateSchema>

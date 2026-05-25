@@ -1,0 +1,316 @@
+import { db } from '@/lib/db'
+import { decrypt } from '@/lib/encryption'
+import { writeAuditLog } from './audit.service'
+import {
+  createDebiCheckMandate,
+  cancelDebiCheckMandate,
+  delayMandate as netcashDelay,
+  updateMandateAmount,
+  mapNetcashStatus,
+  getNextDebitDate,
+  type NetcashWebhookEvent,
+  type NetcashAccountType,
+} from '@/lib/netcash'
+import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '@/lib/validation/mandate'
+import { Prisma } from '@prisma/client'
+import type { MandateStatus, AccountType } from '@prisma/client'
+
+// ─── Domain errors ─────────────────────────────────────────────────────────
+
+class NotFoundError extends Error {
+  code = 'MND_001'
+  status = 404
+}
+class ForbiddenError extends Error {
+  code = 'SYS_003'
+  status = 403
+}
+class ConflictError extends Error {
+  status = 409
+  constructor(message: string, public code: string) {
+    super(message)
+  }
+}
+
+// ─── Access control ────────────────────────────────────────────────────────
+
+function assertCanAccess(targetUserId: string, requesterId: string, requesterRoles: string[]) {
+  if (targetUserId !== requesterId && !requesterRoles.includes('ADMIN')) {
+    throw new ForbiddenError('Access denied')
+  }
+}
+
+// ─── Queries ───────────────────────────────────────────────────────────────
+
+export async function getMandates(userId: string, requesterId: string, requesterRoles: string[]) {
+  assertCanAccess(userId, requesterId, requesterRoles)
+
+  const mandates = await db.paymentMandate.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      bankAccount: {
+        select: { bankName: true, accountNumber: true, accountType: true, branchCode: true },
+      },
+    },
+  })
+
+  // Mask encrypted account numbers before returning
+  return mandates.map((m) => ({
+    ...m,
+    bankAccount: {
+      ...m.bankAccount,
+      accountNumberMasked: maskBankAccount(m.bankAccount.accountNumber),
+      accountNumber: undefined,
+    },
+  }))
+}
+
+export async function getMandate(mandateId: string, requesterId: string, requesterRoles: string[]) {
+  const mandate = await db.paymentMandate.findUnique({
+    where: { id: mandateId },
+    include: {
+      bankAccount: {
+        select: { bankName: true, accountNumber: true, accountType: true, branchCode: true },
+      },
+    },
+  })
+
+  if (!mandate) throw new NotFoundError('Mandate not found')
+  assertCanAccess(mandate.userId, requesterId, requesterRoles)
+
+  return {
+    ...mandate,
+    bankAccount: {
+      ...mandate.bankAccount,
+      accountNumberMasked: maskBankAccount(mandate.bankAccount.accountNumber),
+      accountNumber: undefined,
+    },
+  }
+}
+
+// ─── Mutations ─────────────────────────────────────────────────────────────
+
+export async function createMandate(
+  userId: string,
+  data: CreateMandateInput,
+  requesterId: string,
+  requesterRoles: string[],
+  ipAddress?: string,
+) {
+  assertCanAccess(userId, requesterId, requesterRoles)
+
+  const existingActive = await db.paymentMandate.findFirst({
+    where: { userId, status: { in: ['PENDING', 'ACTIVE'] } },
+  })
+  if (existingActive) {
+    throw new ConflictError('An active or pending mandate already exists', 'MND_002')
+  }
+
+  const bankAccount = await db.bankAccount.findUnique({
+    where: { id: data.bankAccountId },
+    include: { user: { select: { firstName: true, lastName: true, idNumber: true } } },
+  })
+  if (!bankAccount || bankAccount.userId !== userId) {
+    throw new NotFoundError('Bank account not found')
+  }
+
+  const decryptedAccountNumber = decrypt(bankAccount.accountNumber)
+  const accountType = mapAccountType(bankAccount.accountType)
+  const startDate = getNextDebitDate(data.debitDay)
+  const accountName = `${bankAccount.user.firstName} ${bankAccount.user.lastName}`
+  const idNumber = bankAccount.user.idNumber ? decrypt(bankAccount.user.idNumber) : undefined
+
+  const netcashRes = await createDebiCheckMandate({
+    accountNumber: decryptedAccountNumber,
+    branchCode: bankAccount.branchCode,
+    accountType,
+    accountName,
+    idNumber,
+    amount: data.amount,
+    debitDay: data.debitDay,
+    startDate,
+    referenceNumber: `XXM-${userId.slice(-8).toUpperCase()}`,
+  })
+
+  const mandate = await db.paymentMandate.create({
+    data: {
+      userId,
+      bankAccountId: data.bankAccountId,
+      debitDay: data.debitDay,
+      amount: data.amount,
+      status: 'PENDING',
+      netcashMandateId: netcashRes.mandateId,
+    },
+  })
+
+  await writeAuditLog({
+    userId,
+    action: 'MANDATE_CREATED',
+    entity: 'PaymentMandate',
+    entityId: mandate.id,
+    payload: { bankAccountId: data.bankAccountId, debitDay: data.debitDay, amount: data.amount },
+    ipAddress,
+  })
+
+  return mandate
+}
+
+export async function updateMandate(
+  mandateId: string,
+  data: UpdateMandateInput,
+  requesterId: string,
+  requesterRoles: string[],
+  ipAddress?: string,
+) {
+  const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
+  if (!mandate) throw new NotFoundError('Mandate not found')
+  assertCanAccess(mandate.userId, requesterId, requesterRoles)
+
+  if (mandate.status !== 'ACTIVE' && mandate.status !== 'PENDING') {
+    throw new ConflictError('Only active or pending mandates can be updated', 'MND_003')
+  }
+
+  // Amount changes are pushed to Netcash effective next debit cycle
+  if (data.amount && mandate.netcashMandateId) {
+    const effectiveDate = getNextDebitDate(mandate.debitDay)
+    await updateMandateAmount(mandate.netcashMandateId, data.amount, effectiveDate)
+  }
+
+  const updated = await db.paymentMandate.update({
+    where: { id: mandateId },
+    data: {
+      ...(data.debitDay !== undefined && { debitDay: data.debitDay }),
+      ...(data.amount !== undefined && { amount: data.amount }),
+    },
+  })
+
+  await writeAuditLog({
+    userId: mandate.userId,
+    action: 'MANDATE_UPDATED',
+    entity: 'PaymentMandate',
+    entityId: mandateId,
+    payload: data as Prisma.InputJsonValue,
+    ipAddress,
+  })
+
+  return updated
+}
+
+export async function cancelMandate(
+  mandateId: string,
+  requesterId: string,
+  requesterRoles: string[],
+  ipAddress?: string,
+) {
+  const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
+  if (!mandate) throw new NotFoundError('Mandate not found')
+  assertCanAccess(mandate.userId, requesterId, requesterRoles)
+
+  if (mandate.status === 'CANCELLED') {
+    throw new ConflictError('Mandate is already cancelled', 'MND_004')
+  }
+
+  if (mandate.netcashMandateId) {
+    await cancelDebiCheckMandate(mandate.netcashMandateId)
+  }
+
+  const updated = await db.paymentMandate.update({
+    where: { id: mandateId },
+    data: { status: 'CANCELLED' },
+  })
+
+  await writeAuditLog({
+    userId: mandate.userId,
+    action: 'MANDATE_CANCELLED',
+    entity: 'PaymentMandate',
+    entityId: mandateId,
+    payload: {},
+    ipAddress,
+  })
+
+  return updated
+}
+
+export async function requestDelay(
+  mandateId: string,
+  data: DelayMandateInput,
+  requesterId: string,
+  requesterRoles: string[],
+  ipAddress?: string,
+) {
+  const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
+  if (!mandate) throw new NotFoundError('Mandate not found')
+  assertCanAccess(mandate.userId, requesterId, requesterRoles)
+
+  if (mandate.status !== 'ACTIVE') {
+    throw new ConflictError('Only active mandates can be delayed', 'MND_005')
+  }
+
+  // Delay date must be in the future
+  const newDate = new Date(data.newDate)
+  if (newDate <= new Date()) {
+    throw new ConflictError('Delay date must be in the future', 'MND_006')
+  }
+
+  if (mandate.netcashMandateId) {
+    await netcashDelay(mandate.netcashMandateId, data.newDate)
+  }
+
+  await writeAuditLog({
+    userId: mandate.userId,
+    action: 'MANDATE_DELAY_REQUESTED',
+    entity: 'PaymentMandate',
+    entityId: mandateId,
+    payload: { newDate: data.newDate, reason: data.reason ?? null },
+    ipAddress,
+  })
+
+  return { success: true, newDate: data.newDate }
+}
+
+// ─── Webhook processing ────────────────────────────────────────────────────
+
+export async function processMandateWebhook(event: NetcashWebhookEvent) {
+  const mandate = await db.paymentMandate.findFirst({
+    where: { netcashMandateId: event.mandateId },
+  })
+
+  if (!mandate) return // unknown mandate ID — no-op
+
+  const newStatus = mapNetcashStatus(event.status) as MandateStatus
+
+  await db.paymentMandate.update({
+    where: { id: mandate.id },
+    data: { status: newStatus },
+  })
+
+  await writeAuditLog({
+    action: 'MANDATE_WEBHOOK_RECEIVED',
+    entity: 'PaymentMandate',
+    entityId: mandate.id,
+    payload: {
+      netcashMandateId: event.mandateId,
+      externalStatus: event.status,
+      mappedStatus: newStatus,
+      reason: event.reason ?? null,
+      transactionRef: event.transactionRef ?? null,
+    },
+  })
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+
+function maskBankAccount(encrypted: string): string {
+  const plain = decrypt(encrypted)
+  return plain.slice(-4).padStart(plain.length, '*')
+}
+
+function mapAccountType(type: AccountType): NetcashAccountType {
+  const map: Record<AccountType, NetcashAccountType> = {
+    CHEQUE: 'Cheque',
+    SAVINGS: 'Savings',
+    TRANSMISSION: 'Transmission',
+  }
+  return map[type]
+}
