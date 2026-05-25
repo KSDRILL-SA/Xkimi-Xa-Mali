@@ -48,6 +48,23 @@ export type NetcashWebhookEvent = {
   processedAt?: string
 }
 
+// Sent by Netcash when a once-off or scheduled debit settles or fails.
+export type NetcashTransactionEvent = {
+  transactionRef: string
+  status: 'SUCCESS' | 'FAILED' | 'REVERSED' | 'PENDING'
+  mandateId?: string
+  amount?: number
+  reason?: string
+  processedAt?: string
+}
+
+export type NetcashDebitResponse = {
+  transactionRef?: string
+  status: 'SUCCESS' | 'PENDING' | 'FAILED'
+  message?: string
+  errorCode?: string
+}
+
 // ─── HTTP client ──────────────────────────────────────────────────────────────
 
 async function netcashPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
@@ -119,6 +136,37 @@ export async function getMandateStatus(mandateId: string): Promise<NetcashStatus
     serviceKey: env.NETCASH_SERVICE_KEY,
     mandateId,
   })
+}
+
+// Submit an ad-hoc (once-off) debit against an existing authorized mandate.
+// Used for manual payments — member pays outside the scheduled debit day.
+export async function submitOnceOffDebit(payload: {
+  mandateId: string
+  amount: number
+  reference: string
+  idempotencyKey: string
+}): Promise<NetcashDebitResponse> {
+  return netcashPost<NetcashDebitResponse>('/debit/once-off', {
+    serviceKey: env.NETCASH_SERVICE_KEY,
+    ...payload,
+  })
+}
+
+// Map a raw Netcash transaction status string to our TransactionStatus enum values.
+export function mapNetcashTransactionStatus(
+  raw: string,
+): 'SUCCESS' | 'FAILED' | 'REVERSED' | null {
+  const map: Record<string, 'SUCCESS' | 'FAILED' | 'REVERSED'> = {
+    SUCCESS: 'SUCCESS',
+    PAID: 'SUCCESS',
+    COMPLETED: 'SUCCESS',
+    FAILED: 'FAILED',
+    REJECTED: 'FAILED',
+    BOUNCED: 'FAILED',
+    REVERSED: 'REVERSED',
+    REFUNDED: 'REVERSED',
+  }
+  return map[raw.toUpperCase()] ?? null
 }
 
 // ─── Webhook security ─────────────────────────────────────────────────────────
