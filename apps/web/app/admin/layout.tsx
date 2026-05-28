@@ -35,7 +35,7 @@ async function SignOutForm() {
     <form
       action={async () => {
         'use server'
-        await signOut({ redirectTo: '/auth/login' })
+        await signOut({ redirectTo: '/login' })
       }}
     >
       <button
@@ -50,7 +50,7 @@ async function SignOutForm() {
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
-  if (!session?.user?.id) redirect('/auth/login')
+  if (!session?.user?.id) redirect('/login')
 
   const roles = (session.user.roles as string[] | undefined) ?? []
   if (!roles.includes('ADMIN')) redirect('/dashboard')

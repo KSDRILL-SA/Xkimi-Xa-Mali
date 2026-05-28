@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
@@ -114,7 +115,7 @@ export default async function AdminOverviewPage() {
         ].map(({ href, label, Icon }) => (
           <Link
             key={href}
-            href={href}
+            href={href as Route}
             className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3 hover:border-xxm-green/30 hover:shadow-xxm-sm transition-all group"
           >
             <span className="w-9 h-9 rounded-lg bg-xxm-green-50 flex items-center justify-center shrink-0 group-hover:bg-xxm-green group-hover:text-white transition-colors">

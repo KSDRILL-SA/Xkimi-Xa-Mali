@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -53,8 +54,8 @@ export default async function GoalsPage({
     orderBy: [{ status: 'asc' }, { deadline: 'asc' }],
   })
 
-  const activeCount = (goals as GoalRow[]).filter((g) => g.status === 'ACTIVE').length
-  const achievedCount = (goals as GoalRow[]).filter((g) => g.status === 'ACHIEVED').length
+  const activeCount = (goals as unknown as GoalRow[]).filter((g) => g.status === 'ACTIVE').length
+  const achievedCount = (goals as unknown as GoalRow[]).filter((g) => g.status === 'ACHIEVED').length
 
   return (
     <div className="space-y-6">
@@ -89,7 +90,7 @@ export default async function GoalsPage({
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {(goals as GoalRow[]).map((goal) => {
+          {(goals as unknown as GoalRow[]).map((goal) => {
             const pct = Math.min(
               100,
               Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100),
@@ -159,7 +160,7 @@ function FilterChip({
   active,
 }: {
   label: string
-  href: string
+  href: Route
   active: boolean
 }) {
   return (

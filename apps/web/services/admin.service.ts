@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { db, Prisma } from '@/lib/db'
 import { writeAuditLog } from './audit.service'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import { sendWelcomeEmail } from '@/lib/email'
@@ -278,10 +278,10 @@ export async function listAllContributions(adminRoles: string[], params: ListCon
   const { month, year, status, page = 1, limit = 20 } = params
   const skip = (page - 1) * limit
 
-  const where = {
+  const where: Prisma.ContributionWhereInput = {
     periodMonth: month,
     periodYear: year,
-    ...(status && { status }),
+    ...(status && { status: status as Prisma.EnumContributionStatusFilter }),
   }
 
   const [items, total] = await Promise.all([

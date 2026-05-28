@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { listMembers } from '@/services/admin.service'
@@ -72,7 +73,7 @@ export default async function AdminMembersPage({
           {(['ACTIVE', 'PENDING', 'SUSPENDED'] as UserStatus[]).map((s) => (
             <Link
               key={s}
-              href={buildUrl({ status: status === s ? undefined : s, page: '1' })}
+              href={buildUrl({ status: status === s ? undefined : s, page: '1' }) as Route}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 status === s
                   ? 'bg-xxm-green text-white'
@@ -116,7 +117,7 @@ export default async function AdminMembersPage({
                   </td>
                 </tr>
               ) : (
-                (items as MemberListItem[]).map((m, i) => {
+                (items as unknown as MemberListItem[]).map((m, i) => {
                   const sc = STATUS_CONFIG[m.status as UserStatus]
                   return (
                     <tr key={m.id} className={`border-t border-gray-50 ${i % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
@@ -157,7 +158,7 @@ export default async function AdminMembersPage({
           <div className="flex gap-2">
             {page > 1 && (
               <Link
-                href={buildUrl({ page: String(page - 1) })}
+                href={buildUrl({ page: String(page - 1) }) as Route}
                 className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
               >
                 ← Prev
@@ -165,7 +166,7 @@ export default async function AdminMembersPage({
             )}
             {page < totalPages && (
               <Link
-                href={buildUrl({ page: String(page + 1) })}
+                href={buildUrl({ page: String(page + 1) }) as Route}
                 className="px-3 py-1.5 rounded-xl bg-xxm-green text-white hover:bg-xxm-canopy transition-colors"
               >
                 Next →

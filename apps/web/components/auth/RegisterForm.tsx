@@ -96,7 +96,7 @@ export function RegisterForm() {
       consentToPopia: true,
     }
 
-    const res = await fetch('/api/v1/auth/register', {
+    const res = await fetch('/api/v1/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -127,7 +127,7 @@ export function RegisterForm() {
         <p className="text-gray-600 text-sm">
           We sent a verification link to <strong>{prefilled?.email}</strong>. Click the link to activate your account.
         </p>
-        <Button variant="ghost" size="sm" onClick={() => router.push('/auth/login')}>
+        <Button variant="ghost" size="sm" onClick={() => router.push('/login')}>
           Back to login
         </Button>
       </div>
@@ -162,7 +162,7 @@ export function RegisterForm() {
 
         <p className="text-center text-sm text-gray-600">
           Already have an account?{' '}
-          <Link href="/auth/login" className="font-medium text-xxm-green hover:underline">
+          <Link href="/login" className="font-medium text-xxm-green hover:underline">
             Sign in
           </Link>
         </p>

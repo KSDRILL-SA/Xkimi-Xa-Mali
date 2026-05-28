@@ -39,7 +39,7 @@ export default async function StatementsPage() {
   })
 
   // Group by year
-  const byYear = (contributions as ContribRow[]).reduce<Record<number, ContribRow[]>>((acc, c) => {
+  const byYear = (contributions as unknown as ContribRow[]).reduce<Record<number, ContribRow[]>>((acc, c) => {
     if (!acc[c.periodYear]) acc[c.periodYear] = []
     acc[c.periodYear].push(c)
     return acc

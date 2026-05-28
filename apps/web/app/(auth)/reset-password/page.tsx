@@ -23,7 +23,7 @@ export default async function ResetPasswordPage({ searchParams }: Props) {
     )
   }
 
-  if (!token) redirect('/auth/forgot-password')
+  if (!token) redirect('/forgot-password')
 
   return (
     <>

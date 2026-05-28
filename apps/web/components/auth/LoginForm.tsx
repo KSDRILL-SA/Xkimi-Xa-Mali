@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { Route } from 'next'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { signIn } from 'next-auth/react'
@@ -49,7 +50,7 @@ export function LoginForm() {
       return
     }
 
-    router.push(callbackUrl)
+    router.push(callbackUrl as Route)
     router.refresh()
   }
 
@@ -79,7 +80,7 @@ export function LoginForm() {
       <div>
         <div className="flex items-center justify-between mb-1">
           <Label htmlFor="password" required>Password</Label>
-          <Link href="/auth/forgot-password" className="text-xs text-xxm-green hover:underline">
+          <Link href="/forgot-password" className="text-xs text-xxm-green hover:underline">
             Forgot password?
           </Link>
         </div>
@@ -99,7 +100,7 @@ export function LoginForm() {
 
       <p className="text-center text-sm text-gray-600">
         Don&apos;t have an account?{' '}
-        <Link href="/auth/register" className="font-medium text-xxm-green hover:underline">
+        <Link href="/register" className="font-medium text-xxm-green hover:underline">
           Register
         </Link>
       </p>

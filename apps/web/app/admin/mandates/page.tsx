@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
@@ -75,14 +76,14 @@ export default async function AdminMandatesPage({
 
       {/* Status filter */}
       <div className="flex gap-1.5 flex-wrap">
-        <Link href={buildUrl({ status: undefined, page: '1' })}
+        <Link href={buildUrl({ status: undefined, page: '1' }) as Route}
           className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${!filterStatus ? 'bg-xxm-green text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
           All
         </Link>
         {(['PENDING', 'ACTIVE', 'SUSPENDED', 'CANCELLED'] as const).map((s) => (
           <Link
             key={s}
-            href={buildUrl({ status: filterStatus === s ? undefined : s, page: '1' })}
+            href={buildUrl({ status: filterStatus === s ? undefined : s, page: '1' }) as Route}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               filterStatus === s ? 'bg-xxm-green text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
@@ -162,8 +163,8 @@ export default async function AdminMandatesPage({
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Page {page} of {totalPages}</span>
           <div className="flex gap-2">
-            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">← Prev</Link>}
-            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Next →</Link>}
+            {page > 1 && <Link href={buildUrl({ page: String(page - 1) }) as Route} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">← Prev</Link>}
+            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) }) as Route} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Next →</Link>}
           </div>
         </div>
       )}
