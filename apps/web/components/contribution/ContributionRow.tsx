@@ -5,6 +5,7 @@ import { formatZAR, formatMonth } from '@/lib/formatters'
 import { ContributionStatusBadge } from './StatusBadge'
 import { PaymentModal } from './PaymentModal'
 import { Button } from '@/components/ui/Button'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 
 type Transaction = {
   id: string
@@ -94,7 +95,10 @@ export function ContributionRow({ contribution, mandate }: Props) {
               </Button>
             )}
 
-            <span className="text-gray-300 text-lg">{expanded ? '▲' : '▼'}</span>
+            {expanded
+              ? <ChevronUp size={16} className="text-gray-400" aria-hidden />
+              : <ChevronDown size={16} className="text-gray-400" aria-hidden />
+            }
           </div>
         </div>
 
