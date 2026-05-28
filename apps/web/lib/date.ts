@@ -1,3 +1,8 @@
+export const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
 // Returns today's date as YYYY-MM-DD in SAST (UTC+2).
 // Using Intl formatToParts avoids the toISOString UTC roll-back bug on SAST servers.
 export function todaySAST(): string {
