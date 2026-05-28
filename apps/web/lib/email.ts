@@ -132,6 +132,7 @@ export async function sendInviteEmail(
   to: string,
   firstName: string,
   code: string,
+  registrationUrl: string,
 ) {
   await resend.emails.send({
     from: FROM,
@@ -144,16 +145,16 @@ export async function sendInviteEmail(
         and contribution management platform.
       </p>
       <p style="${BODY_STYLE}">Your one-time invite code is:</p>
-      <div style="background:#F3F4F6;border-radius:8px;padding:16px 24px;margin-bottom:24px;text-align:center;">
-        <span style="font-size:24px;font-weight:700;letter-spacing:4px;color:#1B4332;font-family:monospace;">${code}</span>
+      <div style="background:#F3F4F6;border-radius:8px;padding:16px 24px;margin:0 0 24px;text-align:center;">
+        <span style="font-size:28px;font-weight:700;letter-spacing:6px;color:#1B4332;font-family:monospace;">${code}</span>
       </div>
       <p style="${BODY_STYLE}">
-        Open the <strong>${APP_NAME}</strong> registration page and enter this code to create your account.
-        This code expires in <strong>7 days</strong>.
+        Click the button below to open the registration page — your code will be filled in automatically.
       </p>
+      <a href="${registrationUrl}" style="${BTN_STYLE}">Create My Account</a>
       <p style="${SMALL_STYLE}">
-        If you did not expect this invitation, you can safely ignore this email.
-        The code will expire automatically.
+        Or copy your code and visit <strong>${APP_NAME}</strong> registration manually.<br/>
+        This invitation expires in <strong>7 days</strong>. If you did not expect this, ignore this email.
       </p>
     `),
   })

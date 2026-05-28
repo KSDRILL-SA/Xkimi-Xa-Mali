@@ -52,7 +52,8 @@ export async function POST(req: NextRequest) {
   if (!Number.isFinite(minAmt) || minAmt < 100)
     return apiError('VAL_006', '"minimumAmount" must be at least 100', 400)
 
-  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  const baseUrl = new URL(req.url).origin
+  const ip      = req.headers.get('x-forwarded-for') ?? undefined
 
   try {
     const result = await generateInvite(
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
         phone:         b.phone as string,
         minimumAmount: minAmt,
       },
+      baseUrl,
       ip,
     )
     return apiSuccess(result, 201)

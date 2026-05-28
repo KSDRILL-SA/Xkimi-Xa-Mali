@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -17,13 +17,40 @@ type PrefilledData = {
 }
 
 export function RegisterForm() {
-  const router = useRouter()
-  const [step, setStep] = useState<1 | 2>(1)
+  const router      = useRouter()
+  const searchParams = useSearchParams()
+  const [step, setStep]         = useState<1 | 2>(1)
   const [inviteCode, setInviteCode] = useState('')
-  const [prefilled, setPrefilled] = useState<PrefilledData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
+  const [prefilled, setPrefilled]   = useState<PrefilledData | null>(null)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+  const [success, setSuccess]   = useState(false)
+
+  // Auto-validate when code arrives via email/SMS link (?code=XKM-...)
+  useEffect(() => {
+    const urlCode = searchParams.get('code')
+    if (!urlCode) return
+    const formatted = urlCode.trim().toUpperCase()
+    setInviteCode(formatted)
+    // Auto-submit: validate immediately so the member lands straight on Step 2
+    fetch('/api/v1/auth/invitations/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: formatted }),
+    })
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.data) {
+          setPrefilled(json.data)
+          setStep(2)
+        } else {
+          setError(json.error?.message ?? 'This invite link is invalid or has expired.')
+        }
+      })
+      .catch(() => setError('Could not validate invite code. Please try again.'))
+  // Only run once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ─── Step 1 — validate invite code ─────────────────────────────────────────
 

@@ -101,6 +101,7 @@ export async function generateInvite(
   adminId: string,
   adminRoles: string[],
   params: CreateInviteParams,
+  baseUrl: string,
   ip?: string,
 ) {
   assertAdmin(adminRoles)
@@ -121,10 +122,11 @@ export async function generateInvite(
   ])
   if (existingInvite || existingUser) throw new InviteDuplicateError()
 
-  const code       = generateInviteCode()
-  const codeHash   = hashCode(code)
-  const codePrefix = code.split('-')[1] // 4-char first segment
-  const expiresAt  = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
+  const code            = generateInviteCode()
+  const codeHash        = hashCode(code)
+  const codePrefix      = code.split('-')[1] // 4-char first segment
+  const expiresAt       = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
+  const registrationUrl = `${baseUrl}/auth/register?code=${encodeURIComponent(code)}`
 
   const invite = await db.invitation.create({
     data: {
@@ -134,17 +136,26 @@ export async function generateInvite(
     },
   })
 
-  // Auto-deliver code to invitee's phone via SMS
+  // Auto-deliver code + registration link to invitee's phone via SMS
   sendSMS({
     to: normPhone,
-    body: `Hi ${firstName}, you've been invited to join Xkimm Xa Mali.\n\nYour invite code: ${code}\n\nVisit the app and register using this code. Expires in 7 days.`,
+    body: [
+      `Hi ${firstName}, you have been invited to join Xkimm Xa Mali.`,
+      ``,
+      `Your invite code: ${code}`,
+      ``,
+      `Tap the link below to register — your code will be pre-filled:`,
+      registrationUrl,
+      ``,
+      `Code expires in 7 days. Do not share this code.`,
+    ].join('\n'),
     userSuppliedId: `invite-${invite.id}`,
   }).catch((_err) => {
     // Delivery failure is non-fatal — admin still has the code to share
   })
 
-  // Send email notification with the code
-  sendInviteEmail(email, firstName, code).catch((_err) => {
+  // Send email with code + clickable registration link
+  sendInviteEmail(email, firstName, code, registrationUrl).catch((_err) => {
     // Non-fatal
   })
 

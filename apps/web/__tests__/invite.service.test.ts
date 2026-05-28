@@ -91,20 +91,22 @@ describe('generateInvite', () => {
     email: 'k@x.co.za', phone: '0821234567', minimumAmount: 200,
   }
 
+  const BASE = 'http://localhost:3000'
+
   it('throws InviteForbiddenError for non-admin', async () => {
-    await expect(generateInvite('u1', MEMBER, params)).rejects.toBeInstanceOf(InviteForbiddenError)
+    await expect(generateInvite('u1', MEMBER, params, BASE)).rejects.toBeInstanceOf(InviteForbiddenError)
   })
 
   it('throws InviteDuplicateError when active invite exists', async () => {
     mockDb.invitation.findFirst.mockResolvedValue({ id: 'existing' } as never)
     mockDb.user.findFirst.mockResolvedValue(null as never)
-    await expect(generateInvite('a1', ADMIN, params)).rejects.toBeInstanceOf(InviteDuplicateError)
+    await expect(generateInvite('a1', ADMIN, params, BASE)).rejects.toBeInstanceOf(InviteDuplicateError)
   })
 
   it('throws InviteDuplicateError when user already registered', async () => {
     mockDb.invitation.findFirst.mockResolvedValue(null as never)
     mockDb.user.findFirst.mockResolvedValue({ id: 'u2' } as never)
-    await expect(generateInvite('a1', ADMIN, params)).rejects.toBeInstanceOf(InviteDuplicateError)
+    await expect(generateInvite('a1', ADMIN, params, BASE)).rejects.toBeInstanceOf(InviteDuplicateError)
   })
 
   it('creates invite, sends SMS+email, writes audit log', async () => {
@@ -115,7 +117,7 @@ describe('generateInvite', () => {
     mockSendInviteEmail.mockResolvedValue(undefined as never)
     mockWriteAuditLog.mockResolvedValue(undefined)
 
-    const result = await generateInvite('a1', ADMIN, params)
+    const result = await generateInvite('a1', ADMIN, params, BASE)
 
     expect(mockDb.invitation.create).toHaveBeenCalledWith(
       expect.objectContaining({
