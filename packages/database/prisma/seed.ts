@@ -53,31 +53,45 @@ async function main() {
   console.log('Founder seeded:', founder.email)
 
   // Seed notification templates
+  // Slugs must exactly match what the job functions pass to queueNotification().
   const templates = [
+    // --- SMS templates used by Inngest job functions ---
     {
-      slug: 'morning-warning-sms',
+      slug: 'debit-morning-warning',
       channel: 'SMS' as const,
-      body: 'Xkimm Xa Mali: Tonight at 20:00 we will deduct R{{amount}} for your {{month}} contribution. Reply DELAY to postpone.',
+      body: 'Xkimm Xa Mali: Tonight at 20:00 we will deduct R{{amount}} for your monthly contribution. Reply DELAY to postpone.',
     },
     {
-      slug: 'payment-success-sms',
+      slug: 'debit-tomorrow-warning',
       channel: 'SMS' as const,
-      body: 'Xkimm Xa Mali: R{{amount}} contribution for {{month}} received. Thank you, {{firstName}}!',
+      body: 'Xkimm Xa Mali: Reminder — your delayed debit of R{{amount}} will run tomorrow ({{newDate}}). Ensure funds are available.',
     },
+    {
+      slug: 'debit-success',
+      channel: 'SMS' as const,
+      body: 'Xkimm Xa Mali: R{{amount}} contribution received. Thank you, {{firstName}}!',
+    },
+    {
+      slug: 'debit-pending',
+      channel: 'SMS' as const,
+      body: 'Xkimm Xa Mali: Your debit of R{{amount}} is being processed. We will confirm once settled.',
+    },
+    {
+      slug: 'overdue-reminder',
+      channel: 'SMS' as const,
+      body: 'Xkimm Xa Mali: Your monthly contribution of R{{amount}} is still outstanding. Please pay before month-end to avoid penalties.',
+    },
+    // --- SMS templates for other events ---
     {
       slug: 'payment-failed-sms',
       channel: 'SMS' as const,
-      body: 'Xkimm Xa Mali: Your R{{amount}} debit for {{month}} was declined. Please log in to resolve: {{url}}',
+      body: 'Xkimm Xa Mali: Your R{{amount}} debit was declined. Please log in to resolve: {{url}}',
     },
-    {
-      slug: 'overdue-reminder-sms',
-      channel: 'SMS' as const,
-      body: 'Xkimm Xa Mali: Your {{month}} contribution of R{{amount}} is still outstanding. Please pay before month-end.',
-    },
+    // --- Email templates ---
     {
       slug: 'welcome-email',
       channel: 'EMAIL' as const,
-      body: 'Welcome to Xkimm Xa Mali, {{firstName}}! Your account is ready.',
+      body: 'Welcome to Xkimm Xa Mali, {{firstName}}! Your account is active.',
     },
     {
       slug: 'email-verification',
@@ -92,7 +106,17 @@ async function main() {
     {
       slug: 'payment-success-email',
       channel: 'EMAIL' as const,
-      body: 'Hi {{firstName}}, your R{{amount}} contribution for {{month}} has been processed successfully.',
+      body: 'Hi {{firstName}}, your R{{amount}} contribution for {{period}} has been processed successfully.',
+    },
+    {
+      slug: 'payment-failed-email',
+      channel: 'EMAIL' as const,
+      body: 'Hi {{firstName}}, your R{{amount}} debit for {{period}} was declined. Log in to resolve: {{url}}',
+    },
+    {
+      slug: 'overdue-reminder-email',
+      channel: 'EMAIL' as const,
+      body: 'Hi {{firstName}}, your R{{amount}} contribution for {{period}} is still outstanding. Please pay: {{url}}',
     },
   ]
 

@@ -6,6 +6,7 @@ import {
   debitOverdueReminder,
   contributionMonthRollover,
   mandateDelayHandler,
+  notificationFlush,
 } from '@/inngest'
 
 export const { GET, POST, PUT } = serve({
@@ -16,5 +17,6 @@ export const { GET, POST, PUT } = serve({
     debitOverdueReminder,
     contributionMonthRollover,
     mandateDelayHandler,
+    notificationFlush,
   ],
 })
