@@ -135,6 +135,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
   @@map("accounts")
 }
 
@@ -146,6 +147,7 @@ model Session {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("sessions")
 }
 
@@ -204,6 +206,7 @@ model UserRole {
   role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   @@id([userId, roleId])
+  @@index([roleId])
   @@map("user_roles")
 }
 
@@ -223,6 +226,7 @@ model BankAccount {
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   mandates PaymentMandate[]
 
+  @@index([userId])
   @@map("bank_accounts")
 }
 
@@ -241,6 +245,8 @@ model PaymentMandate {
   bankAccount  BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
   transactions Transaction[]
 
+  @@index([userId])
+  @@index([bankAccountId])
   @@map("payment_mandates")
 }
 
@@ -262,6 +268,7 @@ model Contribution {
   transactions Transaction[]
 
   @@unique([userId, periodMonth, periodYear])
+  @@index([userId])
   @@index([status, dueDate])
   @@map("contributions")
 }
@@ -282,6 +289,8 @@ model Transaction {
   contribution Contribution   @relation(fields: [contributionId], references: [id], onDelete: Restrict)
   mandate      PaymentMandate @relation(fields: [mandateId], references: [id], onDelete: Restrict)
 
+  @@index([contributionId])
+  @@index([mandateId])
   @@index([status, createdAt])
   @@index([gatewayRef])
   @@map("transactions")
@@ -317,6 +326,7 @@ model GoalProgress {
 
   goal Goal @relation(fields: [goalId], references: [id], onDelete: Restrict)
 
+  @@index([goalId])
   @@map("goal_progress")
 }
 
@@ -347,6 +357,7 @@ model Notification {
   template NotificationTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt])
+  @@index([templateId])
   @@index([status])
   @@map("notifications")
 }
@@ -406,8 +417,8 @@ model Invitation {
   acceptedAt    DateTime?
   createdAt     DateTime         @default(now())
 
-  invitedBy  User  @relation("InvitesSent",    fields: [invitedById],  references: [id])
-  acceptedBy User? @relation("InviteAccepted", fields: [acceptedById], references: [id])
+  invitedBy  User  @relation("InvitesSent",    fields: [invitedById],  references: [id], onDelete: Restrict)
+  acceptedBy User? @relation("InviteAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
 
   @@index([invitedById])
   @@index([email])
