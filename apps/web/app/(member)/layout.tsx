@@ -45,6 +45,7 @@ export default async function MemberLayout({ children }: { children: React.React
           <NavLink href="/dashboard/goals">Goals</NavLink>
           <NavLink href="/dashboard/transactions">Transactions</NavLink>
           <NavLink href="/dashboard/statements">Statements</NavLink>
+          <NavLink href="/dashboard/whatsapp">WhatsApp</NavLink>
           <NavLink href="/dashboard/profile">Profile</NavLink>
           {isAdmin && <NavLink href="/admin">Admin</NavLink>}
         </nav>
