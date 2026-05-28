@@ -1,9 +1,35 @@
 import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth'
-import Link from 'next/link'
-import { signOut } from '@/lib/auth'
+import { auth, signOut } from '@/lib/auth'
+import { AppHeader } from '@/components/layout/AppHeader'
+import { ScrollNav, type NavItem } from '@/components/layout/ScrollNav'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { ToastProvider } from '@/components/ui/Toast'
+import {
+  LayoutDashboard,
+  Wallet,
+  CalendarCheck,
+  Target,
+  ArrowLeftRight,
+  FileText,
+  MessageCircle,
+  UserCircle,
+  Bell,
+  ShieldCheck,
+} from 'lucide-react'
 
-async function SignOutButton() {
+const memberNav: NavItem[] = [
+  { href: '/dashboard',              label: 'Dashboard',     icon: LayoutDashboard, exact: true },
+  { href: '/dashboard/contributions',label: 'Contributions', icon: Wallet },
+  { href: '/dashboard/mandates',     label: 'Mandates',      icon: CalendarCheck },
+  { href: '/dashboard/goals',        label: 'Goals',         icon: Target },
+  { href: '/dashboard/transactions', label: 'Transactions',  icon: ArrowLeftRight },
+  { href: '/dashboard/statements',   label: 'Statements',    icon: FileText },
+  { href: '/dashboard/notifications',label: 'Notifications', icon: Bell },
+  { href: '/dashboard/whatsapp',     label: 'WhatsApp',      icon: MessageCircle },
+  { href: '/dashboard/profile',      label: 'Profile',       icon: UserCircle },
+]
+
+async function SignOutForm() {
   return (
     <form
       action={async () => {
@@ -13,7 +39,7 @@ async function SignOutButton() {
     >
       <button
         type="submit"
-        className="text-sm text-white/70 hover:text-white transition-colors"
+        className="text-xs text-white/55 hover:text-white transition-colors outline-none focus-visible:underline"
       >
         Sign out
       </button>
@@ -26,51 +52,35 @@ export default async function MemberLayout({ children }: { children: React.React
   if (!session?.user) redirect('/auth/login')
 
   const isAdmin = session.user.roles?.includes('ADMIN')
+  const name    = session.user.name ?? ''
+  const initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?'
+
+  const nav: NavItem[] = isAdmin
+    ? [...memberNav, { href: '/admin', label: 'Admin', icon: ShieldCheck }]
+    : memberNav
 
   return (
-    <div className="min-h-dvh flex flex-col bg-xxm-green-50">
-      {/* Top nav */}
-      <header className="h-14 bg-xxm-green shadow-sm flex items-center px-4 md:px-6 gap-4">
-        <Link href="/dashboard" className="flex items-center gap-2 mr-auto">
-          <span className="w-7 h-7 rounded-lg bg-xxm-gold/20 border border-xxm-gold/40 flex items-center justify-center">
-            <span className="text-sm font-black text-xxm-gold">X</span>
-          </span>
-          <span className="text-white font-semibold text-sm hidden sm:block">Xkimm Xa Mali</span>
-        </Link>
+    <ToastProvider>
+      <div className="min-h-dvh flex flex-col bg-xxm-champagne">
+        <AppHeader
+          userName={name}
+          userInitials={initials}
+          signOutSlot={<SignOutForm />}
+        />
 
-        <nav className="flex items-center gap-1">
-          <NavLink href="/dashboard">Dashboard</NavLink>
-          <NavLink href="/dashboard/contributions">Contributions</NavLink>
-          <NavLink href="/dashboard/mandates">Mandates</NavLink>
-          <NavLink href="/dashboard/goals">Goals</NavLink>
-          <NavLink href="/dashboard/transactions">Transactions</NavLink>
-          <NavLink href="/dashboard/statements">Statements</NavLink>
-          <NavLink href="/dashboard/whatsapp">WhatsApp</NavLink>
-          <NavLink href="/dashboard/profile">Profile</NavLink>
-          {isAdmin && <NavLink href="/admin">Admin</NavLink>}
-        </nav>
+        <ScrollNav items={nav} variant="member" />
 
-        <div className="flex items-center gap-3 ml-2">
-          <span className="text-white/70 text-sm hidden md:block">
-            {session.user.name}
-          </span>
-          <SignOutButton />
-        </div>
-      </header>
+        <main className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
+          {children}
+        </main>
 
-      {/* Page */}
-      <main className="flex-1 p-4 md:p-6 max-w-6xl w-full mx-auto">{children}</main>
-    </div>
-  )
-}
-
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="px-3 py-1.5 rounded-md text-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-    >
-      {children}
-    </Link>
+        <AppFooter />
+      </div>
+    </ToastProvider>
   )
 }

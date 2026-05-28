@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
+import { TrendingUp, Calendar, CheckCircle2 } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
@@ -41,13 +42,13 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard label="Total contributed" value={formatZAR(totalPaid)} />
-        <StatCard label={`${currentYear} total`} value={formatZAR(yearlyTotal)} />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard icon={TrendingUp} label="Total contributed" value={formatZAR(totalPaid)} />
+        <StatCard icon={Calendar}   label={`${currentYear} total`} value={formatZAR(yearlyTotal)} />
         <StatCard
+          icon={CheckCircle2}
           label="Contributions"
           value={`${contributions.filter((c) => c.status === 'PAID').length} paid`}
-          className="col-span-2 md:col-span-1"
         />
       </div>
 
@@ -116,11 +117,18 @@ export default async function DashboardPage() {
   )
 }
 
-function StatCard({ label, value, className = '' }: { label: string; value: string; className?: string }) {
+import type { LucideIcon } from 'lucide-react'
+
+function StatCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <div className={`xxm-card p-4 ${className}`}>
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</p>
-      <p className="text-xl font-bold text-xxm-green-900 mt-1 amount">{value}</p>
+    <div className="xxm-card p-4 flex items-center gap-4">
+      <div className="w-10 h-10 rounded-xl bg-xxm-champagne-200 flex items-center justify-center shrink-0">
+        <Icon size={18} className="text-xxm-green" aria-hidden />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs text-gray-400 font-medium uppercase tracking-wide truncate">{label}</p>
+        <p className="text-xl font-bold text-xxm-green-900 mt-0.5 amount">{value}</p>
+      </div>
     </div>
   )
 }
