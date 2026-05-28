@@ -14,6 +14,7 @@ type XXMEvents = {
       reason: string | null
     }
   }
+  'xxm/notifications.flush': { data: Record<string, never> }
 }
 
 export const inngest = new Inngest({
@@ -28,4 +29,5 @@ export const InngestEvents = {
   DEBIT_OVERDUE_REMINDER: 'xxm/debit.overdue-reminder',
   CONTRIBUTION_MONTH_ROLLOVER: 'xxm/contribution.month-rollover',
   MANDATE_DELAY_HANDLER: 'xxm/mandate.delay-handler',
+  NOTIFICATIONS_FLUSH: 'xxm/notifications.flush',
 } as const
