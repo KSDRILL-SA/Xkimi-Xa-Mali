@@ -7,6 +7,7 @@ import { getContributionSummary } from '@/services/contribution.service'
 import { ContributionSummaryCards } from '@/components/contribution/SummaryCards'
 import { ContributionRow } from '@/components/contribution/ContributionRow'
 import { Button } from '@/components/ui/Button'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = { title: 'Contributions' }
 
@@ -61,19 +62,17 @@ export default async function ContributionsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-xxm-green-900">Contributions</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Your monthly payment history and ledger.
-          </p>
-        </div>
-        {hasOpen && (
-          <Button asChild>
-            <Link href="/dashboard/contribute">Make a payment</Link>
-          </Button>
-        )}
-      </div>
+      <PageHeader
+        title="Contributions"
+        subtitle="Your monthly payment history and ledger."
+        action={
+          hasOpen ? (
+            <Button asChild>
+              <Link href="/dashboard/contribute">Make a payment</Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
       {/* Summary */}
       <ContributionSummaryCards summary={summary} />

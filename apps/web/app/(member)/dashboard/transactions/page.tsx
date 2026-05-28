@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
+import { CreditCard, FileText } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Transactions' }
 
@@ -151,10 +152,10 @@ export default async function TransactionsPage({
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         {txs.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">
-            <p className="text-4xl mb-3">💳</p>
+          <div className="p-12 text-center text-gray-400 flex flex-col items-center gap-3">
+            <CreditCard size={40} strokeWidth={1.5} className="text-gray-300" aria-hidden />
             <p className="font-medium">No transactions found</p>
-            <p className="text-sm mt-1">Try adjusting your filters</p>
+            <p className="text-sm">Try adjusting your filters</p>
           </div>
         ) : (
           <>
@@ -233,15 +234,16 @@ export default async function TransactionsPage({
       </div>
 
       {/* Statement shortcut */}
-      <div className="bg-xxm-green/5 border border-xxm-green/20 rounded-xl p-4 flex items-center justify-between">
+      <div className="bg-xxm-green/5 border border-xxm-green/20 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <p className="font-medium text-xxm-green text-sm">Need a PDF statement?</p>
           <p className="text-xs text-gray-500 mt-0.5">Download a formatted statement for any month</p>
         </div>
         <Link
           href="/dashboard/statements"
-          className="px-4 py-2 text-sm rounded-lg bg-xxm-green text-white font-medium hover:bg-xxm-green/90 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-xl bg-xxm-green text-white font-medium hover:bg-xxm-canopy transition-colors shrink-0 self-start sm:self-auto"
         >
+          <FileText size={14} aria-hidden />
           Statements
         </Link>
       </div>

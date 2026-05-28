@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
+import { BarChart3, Target, Wallet, FileText } from 'lucide-react'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = { title: 'Admin — Xkimm Xa Mali' }
 
@@ -43,18 +45,19 @@ export default async function AdminOverviewPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-xxm-green">Admin Overview</h1>
-          <p className="text-sm text-gray-500 mt-1">{MONTHS[month - 1]} {year}</p>
-        </div>
-        <Link
-          href="/admin/reports"
-          className="px-4 py-2 rounded-lg bg-xxm-green text-white text-sm font-medium hover:bg-xxm-green/90 transition-colors"
-        >
-          Full Reports
-        </Link>
-      </div>
+      <PageHeader
+        title="Admin Overview"
+        subtitle={`${MONTHS[month - 1]} ${year}`}
+        action={
+          <Link
+            href="/admin/reports"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors"
+          >
+            <FileText size={14} aria-hidden />
+            Full Reports
+          </Link>
+        }
+      />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -70,7 +73,7 @@ export default async function AdminOverviewPage() {
       {/* This month summary */}
       <div className="bg-white rounded-xl border border-gray-100 p-5">
         <h2 className="font-semibold text-xxm-green mb-4">This Month — {MONTHS[month - 1]} {year}</h2>
-        <div className="grid grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
           <div>
             <p className="text-gray-500 text-xs">Total Due</p>
             <p className="font-bold text-gray-900 text-lg mt-0.5">{formatZAR(totalDue)}</p>
@@ -103,19 +106,21 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Quick links */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {[
-          { href: '/admin/reports', label: 'Monthly Reports', icon: '📊' },
-          { href: '/dashboard/goals', label: 'Manage Goals', icon: '🎯' },
-          { href: '/dashboard/contributions', label: 'Contributions', icon: '💳' },
-        ].map(({ href, label, icon }) => (
+          { href: '/admin/reports',          label: 'Monthly Reports', Icon: BarChart3 },
+          { href: '/dashboard/goals',        label: 'Manage Goals',    Icon: Target },
+          { href: '/dashboard/contributions',label: 'Contributions',   Icon: Wallet },
+        ].map(({ href, label, Icon }) => (
           <Link
             key={href}
             href={href}
-            className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3 hover:border-xxm-green/30 hover:shadow-sm transition-all"
+            className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3 hover:border-xxm-green/30 hover:shadow-xxm-sm transition-all group"
           >
-            <span className="text-2xl">{icon}</span>
-            <span className="text-sm font-medium text-gray-700">{label}</span>
+            <span className="w-9 h-9 rounded-lg bg-xxm-green-50 flex items-center justify-center shrink-0 group-hover:bg-xxm-green group-hover:text-white transition-colors">
+              <Icon size={18} className="text-xxm-green group-hover:text-white transition-colors" aria-hidden />
+            </span>
+            <span className="text-sm font-medium text-gray-700 group-hover:text-xxm-green transition-colors">{label}</span>
           </Link>
         ))}
       </div>
