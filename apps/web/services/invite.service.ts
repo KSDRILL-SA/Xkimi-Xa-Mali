@@ -147,7 +147,9 @@ export async function generateInvite(
       `Tap the link below to register — your code will be pre-filled:`,
       registrationUrl,
       ``,
-      `Code expires in 7 days. Do not share this code.`,
+      `IMPORTANT: This code is personal to you. Never share it with`,
+      `anyone — including Xkimm Xa Mali staff or admins. We will`,
+      `NEVER ask you for this code. It expires in 7 days.`,
     ].join('\n'),
     userSuppliedId: `invite-${invite.id}`,
   }).catch((_err) => {

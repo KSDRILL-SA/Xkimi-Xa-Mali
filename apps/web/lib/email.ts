@@ -153,9 +153,23 @@ export async function sendInviteEmail(
       </p>
       <a href="${registrationUrl}" style="${BTN_STYLE}">Create My Account</a>
       <p style="${SMALL_STYLE}">
-        Or copy your code and visit <strong>${APP_NAME}</strong> registration manually.<br/>
-        This invitation expires in <strong>7 days</strong>. If you did not expect this, ignore this email.
+        Or copy your code and visit <strong>${APP_NAME}</strong> registration manually.
+        This invitation expires in <strong>7 days</strong>.
       </p>
+      <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px;margin-top:20px;">
+        <p style="margin:0;color:#991B1B;font-size:13px;font-weight:600;">
+          🔒 Security notice
+        </p>
+        <p style="margin:8px 0 0;color:#7F1D1D;font-size:13px;">
+          This code is personal to you and tied to your email address and phone number.
+          <strong>Never share it with anyone</strong> — including ${APP_NAME} staff, admins, or anyone
+          claiming to help you register. ${APP_NAME} will never ask you for this code.
+        </p>
+        <p style="margin:8px 0 0;color:#7F1D1D;font-size:13px;">
+          If you did not expect this invitation, please ignore this email.
+          The code cannot be used by anyone other than you.
+        </p>
+      </div>
     `),
   })
 }
