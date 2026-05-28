@@ -37,9 +37,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <span className="text-xxm-gold/70 text-xs font-medium hidden sm:block">· Admin</span>
         </Link>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-1 flex-wrap">
           <AdminNavLink href="/admin">Overview</AdminNavLink>
+          <AdminNavLink href="/admin/members">Members</AdminNavLink>
+          <AdminNavLink href="/admin/contributions">Contributions</AdminNavLink>
+          <AdminNavLink href="/admin/mandates">Mandates</AdminNavLink>
+          <AdminNavLink href="/admin/goals">Goals</AdminNavLink>
+          <AdminNavLink href="/admin/notifications">Broadcast</AdminNavLink>
           <AdminNavLink href="/admin/reports">Reports</AdminNavLink>
+          <AdminNavLink href="/admin/audit">Audit</AdminNavLink>
           <AdminNavLink href="/dashboard">Member View</AdminNavLink>
         </nav>
 
