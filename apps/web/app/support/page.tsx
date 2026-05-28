@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { AppFooter } from '@/components/layout/AppFooter'
 import { ArrowLeft, MessageCircle, Mail, HelpCircle, Users, FileText, Shield } from 'lucide-react'
+import { env } from '@/lib/env'
 
 export const metadata: Metadata = {
   title: 'Support — Xkimm Xa Mali',
@@ -74,7 +75,7 @@ export default function SupportPage() {
           {/* Contact cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <a
-              href="https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb?mlu=2&s=sh&p=a"
+              href={env.WHATSAPP_GROUP_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="xxm-card p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"

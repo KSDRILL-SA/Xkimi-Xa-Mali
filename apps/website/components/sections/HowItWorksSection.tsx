@@ -2,6 +2,7 @@
 
 import { CheckCircle2, CreditCard, MailOpen, MessageCircle, UserPlus } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { WA_LINK } from '@/lib/utils'
 
 const steps = [
   {
@@ -125,7 +126,7 @@ export function HowItWorksSection() {
           </div>
 
           <a
-            href="https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb"
+            href={WA_LINK}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-xxm-green text-white font-bold text-sm shadow-xxm whitespace-nowrap shrink-0"

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { AppFooter } from '@/components/layout/AppFooter'
+import { env } from '@/lib/env'
 import {
   TrendingUp,
   Shield,
@@ -422,7 +423,7 @@ export default function AboutPage() {
               <ArrowRight size={15} aria-hidden />
             </Link>
             <a
-              href="https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb?mlu=2&s=sh&p=a"
+              href={env.WHATSAPP_GROUP_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xs text-xxm-green/60 hover:text-xxm-green transition-colors"

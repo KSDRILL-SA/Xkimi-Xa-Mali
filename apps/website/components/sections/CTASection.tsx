@@ -3,7 +3,7 @@
 import { ArrowRight, MessageCircle } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL } from '@/lib/utils'
+import { APP_URL, WA_LINK } from '@/lib/utils'
 
 export function CTASection() {
   const revealRef = useScrollReveal(0.15)
@@ -71,7 +71,7 @@ export function CTASection() {
               </a>
 
               <a
-                href="https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb"
+                href={WA_LINK}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary flex-1 inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-2xl border border-white/20 text-white/80 font-semibold text-base"

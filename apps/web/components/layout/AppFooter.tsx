@@ -1,27 +1,8 @@
 import type { Route } from 'next'
 import Link from 'next/link'
+import { Shield, FileText, HelpCircle, Info, MessageCircle } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import {
-  Facebook,
-  Twitter,
-  Instagram,
-  Linkedin,
-  Youtube,
-  MessageCircle,
-  Shield,
-  FileText,
-  HelpCircle,
-  Info,
-} from 'lucide-react'
-
-const social = [
-  { icon: Facebook,      label: 'Facebook',       href: '#' },
-  { icon: Twitter,       label: 'X / Twitter',    href: '#' },
-  { icon: Instagram,     label: 'Instagram',      href: '#' },
-  { icon: Linkedin,      label: 'LinkedIn',       href: '#' },
-  { icon: Youtube,       label: 'YouTube',        href: '#' },
-  { icon: MessageCircle, label: 'WhatsApp Group', href: 'https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb?mlu=2&s=sh&p=a', external: true },
-]
+import { env } from '@/lib/env'
 
 const legal = [
   { icon: Info,       label: 'About',          href: '/about' },
@@ -37,6 +18,7 @@ export function AppFooter() {
     <footer className="mt-auto border-t border-gray-100 bg-white">
       <div className="max-w-screen-xl mx-auto px-4 md:px-6 py-8">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+
           {/* Brand */}
           <div className="flex flex-col gap-3 max-w-xs">
             <XmmLogo size={38} withText textColor="text-xxm-green" />
@@ -49,25 +31,22 @@ export function AppFooter() {
             </p>
           </div>
 
-          {/* Social icons */}
+          {/* Community */}
           <div className="flex flex-col gap-3">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
-              Connect
+              Community
             </p>
-            <div className="flex items-center gap-2 flex-wrap">
-              {social.map(({ icon: Icon, label, href, external }) => (
-                <a
-                  key={label}
-                  href={href}
-                  aria-label={label}
-                  target={external ? '_blank' : undefined}
-                  rel={external ? 'noopener noreferrer' : undefined}
-                  className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 hover:text-xxm-green hover:border-xxm-green/30 hover:bg-xxm-green-50 transition-all duration-150 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold"
-                >
-                  <Icon size={15} aria-hidden />
-                </a>
-              ))}
-            </div>
+            <a
+              href={env.WHATSAPP_GROUP_LINK}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2.5 text-xs text-gray-500 hover:text-xxm-green transition-colors group"
+            >
+              <span className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-xxm-green group-hover:border-xxm-green/30 group-hover:bg-xxm-green-50 transition-all duration-150">
+                <MessageCircle size={15} aria-hidden />
+              </span>
+              {env.WHATSAPP_GROUP_NAME}
+            </a>
           </div>
 
           {/* Legal links */}
