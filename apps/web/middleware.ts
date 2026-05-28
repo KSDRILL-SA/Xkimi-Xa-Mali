@@ -24,8 +24,17 @@ export default auth((req) => {
   // Public routes — no session required
   const isPublicPage =
     pathname === '/' ||
+    pathname === '/about' ||
+    pathname === '/privacy' ||
+    pathname === '/terms' ||
+    pathname === '/support' ||
     pathname === '/whatsapp' ||
-    pathname.startsWith('/auth/')
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
+    pathname === '/verify-email' ||
+    pathname.startsWith('/invite/')
 
   const isPublicApi =
     pathname === '/api/v1/auth/register' ||
@@ -36,7 +45,7 @@ export default auth((req) => {
 
   if (isPublicPage || isPublicApi) {
     // Redirect already-authed users away from auth pages
-    if (session && pathname.startsWith('/auth/')) {
+    if (session && (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password')) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
     return NextResponse.next()
@@ -50,7 +59,7 @@ export default auth((req) => {
         { status: 401 },
       )
     }
-    const loginUrl = new URL('/auth/login', req.url)
+    const loginUrl = new URL('/login', req.url)
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
   }

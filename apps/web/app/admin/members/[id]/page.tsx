@@ -81,7 +81,7 @@ export default async function AdminMemberDetailPage({
   }
 
   const sc = USER_STATUS_CONFIG[member.status] ?? USER_STATUS_CONFIG.PENDING
-  const isAdmin = member.roles.some((r: { role: string }) => r.role === 'ADMIN')
+  const isAdmin = member.roles.some((r) => r.role.name === 'ADMIN')
   type ContribItem = { id: string; periodMonth: number; periodYear: number; amountDue: unknown; amountPaid: unknown; status: string }
   type MandateItem = { id: string; status: string; amount: unknown; debitDay: number; createdAt: Date }
 

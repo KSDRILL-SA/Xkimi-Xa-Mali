@@ -26,7 +26,7 @@ interface AddressShape {
 
 export default async function ProfilePage() {
   const session = await auth()
-  if (!session?.user?.id) redirect('/auth/login')
+  if (!session?.user?.id) redirect('/login')
 
   const userId = session.user.id
 

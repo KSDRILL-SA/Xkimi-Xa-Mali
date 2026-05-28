@@ -20,7 +20,7 @@ export default function VerifyEmailPage() {
         The link expires in 24 hours.
       </Alert>
       <Button variant="ghost" size="sm" asChild>
-        <Link href="/auth/login">Back to login</Link>
+        <Link href="/login">Back to login</Link>
       </Button>
     </div>
   )

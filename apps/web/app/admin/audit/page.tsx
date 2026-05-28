@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { listAuditLogs } from '@/services/admin.service'
@@ -129,8 +130,8 @@ export default async function AdminAuditPage({
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Page {page} of {totalPages}</span>
           <div className="flex gap-2">
-            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">← Prev</Link>}
-            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Next →</Link>}
+            {page > 1 && <Link href={buildUrl({ page: String(page - 1) }) as Route} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">← Prev</Link>}
+            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) }) as Route} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Next →</Link>}
           </div>
         </div>
       )}

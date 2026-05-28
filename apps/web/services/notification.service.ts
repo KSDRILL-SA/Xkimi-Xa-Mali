@@ -1,5 +1,5 @@
 import { Resend } from 'resend'
-import { db } from '@/lib/db'
+import { db, Prisma } from '@/lib/db'
 import { env } from '@/lib/env'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import {
@@ -156,7 +156,7 @@ export async function queueNotification(params: {
       templateId: template.id,
       channel: params.channel,
       status: 'QUEUED',
-      payload: params.payload as unknown,
+      payload: params.payload as Prisma.InputJsonValue,
     },
   })
 }
@@ -196,7 +196,7 @@ export async function sendNotificationNow(params: {
       templateId: template.id,
       channel: params.channel,
       status: 'QUEUED',
-      payload: params.payload as unknown,
+      payload: params.payload as Prisma.InputJsonValue,
     },
   })
 

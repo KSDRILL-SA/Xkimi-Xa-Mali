@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
-import { TrendingUp, Calendar, CheckCircle2 } from 'lucide-react'
+import { TrendingUp, Calendar, CheckCircle2, type LucideIcon } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
@@ -116,8 +116,6 @@ export default async function DashboardPage() {
     </div>
   )
 }
-
-import type { LucideIcon } from 'lucide-react'
 
 function StatCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (

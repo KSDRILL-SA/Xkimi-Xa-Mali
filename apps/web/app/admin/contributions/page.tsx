@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
@@ -76,7 +77,7 @@ export default async function AdminContributionsPage({
           {MONTHS.map((name, idx) => (
             <Link
               key={name}
-              href={buildUrl({ month: String(idx + 1), page: '1' })}
+              href={buildUrl({ month: String(idx + 1), page: '1' }) as Route}
               className={`px-2 py-1.5 font-medium transition-colors ${
                 month === idx + 1 ? 'bg-xxm-green text-white' : 'text-gray-600 hover:bg-gray-50'
               }`}
@@ -95,7 +96,7 @@ export default async function AdminContributionsPage({
           {(Object.keys(STATUS_CONFIG) as string[]).map((s) => (
             <Link
               key={s}
-              href={buildUrl({ status: status === s ? undefined : s, page: '1' })}
+              href={buildUrl({ status: status === s ? undefined : s, page: '1' }) as Route}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 status === s ? 'bg-xxm-green text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
@@ -104,7 +105,7 @@ export default async function AdminContributionsPage({
             </Link>
           ))}
           {status && (
-            <Link href={buildUrl({ status: undefined, page: '1' })} className="px-3 py-1.5 rounded-full text-xs bg-gray-100 text-gray-500">
+            <Link href={buildUrl({ status: undefined, page: '1' }) as Route} className="px-3 py-1.5 rounded-full text-xs bg-gray-100 text-gray-500">
               Clear
             </Link>
           )}
@@ -145,7 +146,7 @@ export default async function AdminContributionsPage({
                   </td>
                 </tr>
               ) : (
-                (items as Array<{ id: string; amountDue: unknown; amountPaid: unknown; status: string; user: { id: string; firstName: string; lastName: string; email: string } }>).map((row) => {
+                (items as unknown as Array<{ id: string; amountDue: unknown; amountPaid: unknown; status: string; user: { id: string; firstName: string; lastName: string; email: string } }>).map((row) => {
                   const cfg = STATUS_CONFIG[row.status] ?? STATUS_CONFIG.PENDING
                   return (
                     <tr key={row.id} className="border-t border-gray-50">
@@ -171,8 +172,8 @@ export default async function AdminContributionsPage({
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-500">Page {page} of {totalPages}</span>
           <div className="flex gap-2">
-            {page > 1 && <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">← Prev</Link>}
-            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Next →</Link>}
+            {page > 1 && <Link href={buildUrl({ page: String(page - 1) }) as Route} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">← Prev</Link>}
+            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) }) as Route} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Next →</Link>}
           </div>
         </div>
       )}

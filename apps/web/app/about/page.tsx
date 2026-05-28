@@ -12,6 +12,7 @@ import {
   Handshake,
   Lock,
   Zap,
+  MessageCircle,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -129,7 +130,7 @@ export default function AboutPage() {
           </Link>
 
           <Link
-            href="/auth/login"
+            href="/login"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-xxm-gold text-xxm-green-900 text-sm font-bold hover:bg-xxm-gold-dark transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             Sign in
@@ -203,12 +204,11 @@ export default function AboutPage() {
                 always known — that money moves faster and further when it moves together.
               </p>
               <p>
-                Rooted in the South African tradition of the{' '}
-                <em className="font-semibold text-xxm-green">stokvel</em> — the time-honoured
-                practice of communal savings and collective upliftment — Xkimm Xa Mali was
-                conceived as something more: a structured, transparent, technology-powered
-                platform that would take the spirit of the stokvel and give it the discipline of a
-                financial institution.
+                Rooted in the age-old African wisdom that wealth moves faster and further when it
+                moves together, Xkimm Xa Mali was conceived as something more than ordinary group
+                savings: a structured, transparent, technology-powered platform that takes the
+                principle of collective financial discipline and gives it the rigour, accountability,
+                and automation of a proper financial institution.
               </p>
               <p>
                 The name itself is a Tsonga phrase representing the idea of collective financial
@@ -415,14 +415,26 @@ export default function AboutPage() {
               </p>
             </div>
             <Link
-              href="/auth/login"
+              href="/login"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-xxm-green text-white font-bold text-sm hover:bg-xxm-canopy transition-colors shadow-xxm"
             >
               Sign in to your account
               <ArrowRight size={15} aria-hidden />
             </Link>
+            <a
+              href="https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb?mlu=2&s=sh&p=a"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-xs text-xxm-green/60 hover:text-xxm-green transition-colors"
+            >
+              <MessageCircle size={13} aria-hidden />
+              Join our WhatsApp group
+            </a>
             <p className="text-xs text-gray-400 italic">
               &ldquo;Blessed is the hand that giveth.&rdquo; — Acts 20:35
+            </p>
+            <p className="text-[11px] text-gray-300 mt-1">
+              A <span className="font-semibold text-gray-400">KSDRILL-SA</span> platform
             </p>
           </div>
         </section>
