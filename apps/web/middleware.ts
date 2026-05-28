@@ -5,6 +5,14 @@ const WEBHOOK_PREFIX = '/api/v1/webhooks'
 const HEALTH_PATH = '/api/v1/health'
 const AUTH_PREFIX = '/api/auth'
 
+const AUTH_PAGES = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+]
+
 export default auth((req) => {
   const { pathname } = req.nextUrl
 
@@ -21,11 +29,24 @@ export default auth((req) => {
 
   const session = req.auth
 
+  // Legacy /auth/* paths → actual App Router routes
+  if (pathname.startsWith('/auth/')) {
+    const legacy = pathname.replace(/^\/auth/, '') || '/login'
+    const target = new URL(legacy, req.url)
+    target.search = req.nextUrl.search
+    return NextResponse.redirect(target)
+  }
+
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/about', req.url))
+  }
+
   // Public routes — no session required
   const isPublicPage =
-    pathname === '/' ||
+    pathname === '/about' ||
     pathname === '/whatsapp' ||
-    pathname.startsWith('/auth/')
+    pathname.startsWith('/invite/') ||
+    AUTH_PAGES.includes(pathname)
 
   const isPublicApi =
     pathname === '/api/v1/auth/register' ||
@@ -36,7 +57,7 @@ export default auth((req) => {
 
   if (isPublicPage || isPublicApi) {
     // Redirect already-authed users away from auth pages
-    if (session && pathname.startsWith('/auth/')) {
+    if (session && AUTH_PAGES.includes(pathname)) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
     return NextResponse.next()
@@ -50,7 +71,7 @@ export default auth((req) => {
         { status: 401 },
       )
     }
-    const loginUrl = new URL('/auth/login', req.url)
+    const loginUrl = new URL('/login', req.url)
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
   }
