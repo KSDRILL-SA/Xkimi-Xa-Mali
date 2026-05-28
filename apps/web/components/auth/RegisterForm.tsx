@@ -32,7 +32,7 @@ export function RegisterForm() {
     if (!urlCode) return
     const formatted = urlCode.trim().toUpperCase()
     setInviteCode(formatted)
-    // Auto-submit: validate immediately so the member lands straight on Step 2
+    setLoading(true)
     fetch('/api/v1/auth/invitations/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -48,6 +48,7 @@ export function RegisterForm() {
         }
       })
       .catch(() => setError('Could not validate invite code. Please try again.'))
+      .finally(() => setLoading(false))
   // Only run once on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { Check, Copy } from 'lucide-react'
 
 type CreatedInvite = {
   code: string
@@ -103,7 +104,11 @@ export function CreateInviteModal({ onCreated }: { onCreated?: () => void }) {
                     onClick={handleCopy}
                     className="w-full px-4 py-2 rounded-lg bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-green/90 transition-colors"
                   >
-                    {copied ? '✓ Copied!' : 'Copy code'}
+                    {copied ? (
+                      <><Check size={14} aria-hidden /> Copied!</>
+                    ) : (
+                      <><Copy size={14} aria-hidden /> Copy code</>
+                    )}
                   </button>
                 </div>
                 <button
