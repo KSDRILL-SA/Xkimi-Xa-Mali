@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <!-- Maskable icon — safe zone is 80% (inner 154px circle) -->
+  <rect width="192" height="192" fill="#1B4332"/>
+  <text x="96" y="108" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="700" font-size="72" fill="#D4AF37">X</text>
+  <text x="96" y="142" text-anchor="middle" font-family="system-ui, sans-serif" font-weight="600" font-size="20" letter-spacing="4" fill="#ffffff">MALI</text>
+</svg>
