@@ -1,0 +1,88 @@
+'use client'
+
+import { ArrowRight, MessageCircle } from 'lucide-react'
+import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { XmmLogo } from '@/components/ui/XmmLogo'
+import { APP_URL } from '@/lib/utils'
+
+export function CTASection() {
+  const ref = useScrollReveal(0.15) as React.MutableRefObject<HTMLElement>
+
+  return (
+    <section
+      ref={ref as React.RefObject<HTMLDivElement>}
+      id="cta"
+      className="relative py-20 md:py-32 px-4 md:px-8 overflow-hidden bg-xxm-champagne-50"
+      aria-labelledby="cta-heading"
+    >
+      <div className="max-w-screen-lg mx-auto">
+        <div className="reveal relative rounded-3xl bg-xxm-green-950 overflow-hidden">
+
+          {/* animated border glow */}
+          <div
+            className="absolute inset-0 rounded-3xl border-2 border-xxm-gold/20 animate-border-glow pointer-events-none"
+            aria-hidden
+          />
+
+          {/* background orbs inside card */}
+          <div
+            className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full opacity-10 animate-orb-drift-1 pointer-events-none"
+            style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 65%)' }}
+            aria-hidden
+          />
+          <div
+            className="absolute bottom-0 left-0 w-[300px] h-[300px] rounded-full opacity-8 animate-orb-drift-2 pointer-events-none"
+            style={{ background: 'radial-gradient(circle, #2C5F47 0%, transparent 65%)' }}
+            aria-hidden
+          />
+          <div className="noise-overlay rounded-3xl" aria-hidden />
+
+          {/* content */}
+          <div className="relative z-10 flex flex-col items-center text-center px-8 md:px-16 py-16 md:py-20 gap-8">
+            <div className="animate-float">
+              <XmmLogo size={64} />
+            </div>
+
+            <div>
+              <h2
+                id="cta-heading"
+                className="text-4xl md:text-5xl font-black text-white leading-tight"
+              >
+                Ready to build{' '}
+                <span className="text-shimmer">wealth together?</span>
+              </h2>
+              <p className="mt-5 text-white/55 text-base md:text-lg max-w-lg mx-auto leading-relaxed">
+                Xkimm Xa Mali is an invite-only platform. If you&rsquo;re already a member,
+                sign in. If you&rsquo;d like to connect with the brotherhood, reach us on WhatsApp.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 w-full justify-center max-w-md">
+              <a
+                href={`${APP_URL}/login`}
+                className="btn-primary flex-1 inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
+              >
+                Sign In to Your Account
+                <ArrowRight size={16} aria-hidden />
+              </a>
+
+              <a
+                href="https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary flex-1 inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-2xl border border-white/20 text-white/80 font-semibold text-base"
+              >
+                <MessageCircle size={16} aria-hidden />
+                WhatsApp Group
+              </a>
+            </div>
+
+            <p className="text-white/25 text-xs italic">
+              &ldquo;Blessed is the hand that giveth.&rdquo; — Acts 20:35
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
