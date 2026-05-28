@@ -28,7 +28,7 @@ export default async function WhatsAppPage({
   searchParams: Promise<{ updated?: string }>
 }) {
   const session = await auth()
-  if (!session?.user?.id) redirect('/auth/login')
+  if (!session?.user?.id) redirect('/login')
 
   const userId = session.user.id
   const params = await searchParams

@@ -1,21 +1,23 @@
-const CACHE_NAME = 'xxm-v1'
+const CACHE_NAME = 'xxm-v2'
 const OFFLINE_URL = '/offline'
 
 const STATIC_PATTERNS = [
   /^\/_next\/static\//,
   /^\/_next\/image\//,
   /^\/icons\//,
-  /^\/manifest\.json/,
+  /^\/manifest\.webmanifest/,
   /\.(?:woff2?|ttf|otf)$/,
 ]
 
-const NETWORK_ONLY_PATTERNS = [
-  /^\/api\//,
-]
+const NETWORK_ONLY_PATTERNS = [/^\/api\//]
 
 async function cacheOfflinePage() {
   const cache = await caches.open(CACHE_NAME)
-  await cache.add(OFFLINE_URL)
+  try {
+    await cache.add(OFFLINE_URL)
+  } catch {
+    // Non-fatal during install
+  }
 }
 
 self.addEventListener('install', (event) => {
@@ -37,18 +39,15 @@ self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
 
-  // Only handle same-origin GET requests
   if (request.method !== 'GET' || url.origin !== self.location.origin) return
 
   const path = url.pathname
 
-  // Network-only — never cache API calls
   if (NETWORK_ONLY_PATTERNS.some((p) => p.test(path))) {
     event.respondWith(fetch(request))
     return
   }
 
-  // Cache-first — static assets
   if (STATIC_PATTERNS.some((p) => p.test(path))) {
     event.respondWith(
       caches.match(request).then((cached) => {
@@ -65,20 +64,23 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Network-first — pages: try network, fall back to offline page on failure
+  // HTML navigations: network-only — never serve stale/offline for server errors
+  const isDocument = request.mode === 'navigate' || request.destination === 'document'
+
+  if (isDocument) {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        const cached = await caches.match(request)
+        if (cached) return cached
+        const offline = await caches.match(OFFLINE_URL)
+        if (offline) return offline
+        return new Response('Offline', { status: 503, statusText: 'Offline' })
+      }),
+    )
+    return
+  }
+
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((c) => c.put(request, clone))
-        }
-        return response
-      })
-      .catch(() =>
-        caches.match(request).then(
-          (cached) => cached ?? caches.match(OFFLINE_URL),
-        ),
-      ),
+    fetch(request).catch(() => caches.match(request).then((cached) => cached ?? fetch(request))),
   )
 })

@@ -115,7 +115,7 @@ export default function AboutPage() {
           className="h-16 flex items-center justify-between gap-4 px-4 md:px-8 max-w-screen-xl mx-auto"
         >
           <Link
-            href="/"
+            href="/about"
             className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg"
             aria-label="Xkimm Xa Mali home"
           >
@@ -129,7 +129,7 @@ export default function AboutPage() {
           </Link>
 
           <Link
-            href="/auth/login"
+            href="/login"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-xxm-gold text-xxm-green-900 text-sm font-bold hover:bg-xxm-gold-dark transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
             Sign in
@@ -415,7 +415,7 @@ export default function AboutPage() {
               </p>
             </div>
             <Link
-              href="/auth/login"
+              href="/login"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-xxm-green text-white font-bold text-sm hover:bg-xxm-canopy transition-colors shadow-xxm"
             >
               Sign in to your account

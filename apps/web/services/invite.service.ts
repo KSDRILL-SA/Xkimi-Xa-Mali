@@ -126,7 +126,7 @@ export async function generateInvite(
   const codeHash        = hashCode(code)
   const codePrefix      = code.split('-')[1] // 4-char first segment
   const expiresAt       = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
-  const registrationUrl = `${baseUrl}/auth/register?code=${encodeURIComponent(code)}`
+  const registrationUrl = `${baseUrl}/register?code=${encodeURIComponent(code)}`
 
   const invite = await db.invitation.create({
     data: {

@@ -37,12 +37,9 @@ export default auth((req) => {
     return NextResponse.redirect(target)
   }
 
-  if (pathname === '/') {
-    return NextResponse.redirect(new URL('/about', req.url))
-  }
-
   // Public routes — no session required
   const isPublicPage =
+    pathname === '/' ||
     pathname === '/about' ||
     pathname === '/whatsapp' ||
     pathname.startsWith('/invite/') ||

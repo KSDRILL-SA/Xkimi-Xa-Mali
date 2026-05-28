@@ -20,7 +20,7 @@ function layout(content: string): string {
 }
 
 export async function sendVerificationEmail(to: string, firstName: string, token: string, baseUrl: string) {
-  const url = `${baseUrl}/auth/verify-email?token=${token}`
+  const url = `${baseUrl}/verify-email?token=${token}`
   await resend.emails.send({
     from: FROM,
     to,
@@ -35,7 +35,7 @@ export async function sendVerificationEmail(to: string, firstName: string, token
 }
 
 export async function sendPasswordResetEmail(to: string, firstName: string, token: string, baseUrl: string) {
-  const url = `${baseUrl}/auth/reset-password?token=${token}`
+  const url = `${baseUrl}/reset-password?token=${token}`
   await resend.emails.send({
     from: FROM,
     to,

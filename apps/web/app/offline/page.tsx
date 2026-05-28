@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { Button } from '@/components/ui/Button'
@@ -17,12 +19,15 @@ export default function OfflinePage() {
         </p>
       </div>
 
-      <Button variant="primary" asChild>
-        <Link href="/dashboard">
+      <div className="flex flex-col gap-3 w-full max-w-sm">
+        <Button variant="primary" onClick={() => window.location.reload()}>
           <RefreshCw size={15} aria-hidden />
-          Retry
-        </Link>
-      </Button>
+          Try again
+        </Button>
+        <Button variant="secondary" asChild>
+          <Link href="/about">Go to homepage</Link>
+        </Button>
+      </div>
 
       <p className="mt-10 text-xs text-gray-400 italic">
         &ldquo;Blessed is the hand that giveth.&rdquo; — Acts 20:35
