@@ -8,9 +8,11 @@ const AUTH_PREFIX = '/api/auth'
 export default auth((req) => {
   const { pathname } = req.nextUrl
 
-  // Always allow: health, webhooks (self-verifying), NextAuth internals
+  // Always allow: health, webhooks (self-verifying), NextAuth internals, SW + offline
   if (
     pathname === HEALTH_PATH ||
+    pathname === '/offline' ||
+    pathname === '/sw.js' ||
     pathname.startsWith(WEBHOOK_PREFIX) ||
     pathname.startsWith(AUTH_PREFIX)
   ) {
@@ -29,7 +31,8 @@ export default auth((req) => {
     pathname === '/api/v1/auth/register' ||
     pathname === '/api/v1/auth/forgot-password' ||
     pathname === '/api/v1/auth/reset-password' ||
-    pathname === '/api/v1/auth/verify-email'
+    pathname === '/api/v1/auth/verify-email' ||
+    pathname === '/api/v1/auth/invitations/validate'
 
   if (isPublicPage || isPublicApi) {
     // Redirect already-authed users away from auth pages
@@ -73,5 +76,5 @@ export default auth((req) => {
 })
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw\\.js).*)'],
 }
