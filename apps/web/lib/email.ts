@@ -128,6 +128,52 @@ export async function sendPaymentFailedEmail(
   })
 }
 
+export async function sendInviteEmail(
+  to: string,
+  firstName: string,
+  code: string,
+  registrationUrl: string,
+) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `You have been invited to join ${APP_NAME}`,
+    html: layout(`
+      <h1 style="${HEADING_STYLE}">You're Invited, ${firstName}!</h1>
+      <p style="${BODY_STYLE}">
+        You have been invited to join <strong>${APP_NAME}</strong> — a secure group savings
+        and contribution management platform.
+      </p>
+      <p style="${BODY_STYLE}">Your one-time invite code is:</p>
+      <div style="background:#F3F4F6;border-radius:8px;padding:16px 24px;margin:0 0 24px;text-align:center;">
+        <span style="font-size:28px;font-weight:700;letter-spacing:6px;color:#1B4332;font-family:monospace;">${code}</span>
+      </div>
+      <p style="${BODY_STYLE}">
+        Click the button below to open the registration page — your code will be filled in automatically.
+      </p>
+      <a href="${registrationUrl}" style="${BTN_STYLE}">Create My Account</a>
+      <p style="${SMALL_STYLE}">
+        Or copy your code and visit <strong>${APP_NAME}</strong> registration manually.
+        This invitation expires in <strong>7 days</strong>.
+      </p>
+      <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:12px 16px;margin-top:20px;">
+        <p style="margin:0;color:#991B1B;font-size:13px;font-weight:600;">
+          🔒 Security notice
+        </p>
+        <p style="margin:8px 0 0;color:#7F1D1D;font-size:13px;">
+          This code is personal to you and tied to your email address and phone number.
+          <strong>Never share it with anyone</strong> — including ${APP_NAME} staff, admins, or anyone
+          claiming to help you register. ${APP_NAME} will never ask you for this code.
+        </p>
+        <p style="margin:8px 0 0;color:#7F1D1D;font-size:13px;">
+          If you did not expect this invitation, please ignore this email.
+          The code cannot be used by anyone other than you.
+        </p>
+      </div>
+    `),
+  })
+}
+
 export async function sendOverdueReminderEmail(
   to: string,
   firstName: string,
