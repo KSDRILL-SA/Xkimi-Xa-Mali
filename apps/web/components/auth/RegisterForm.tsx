@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
+import { RegisterStep2Schema, type RegisterStep2Input } from '@/lib/validation/auth'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
@@ -26,13 +29,18 @@ export function RegisterForm() {
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState(false)
 
+  const step2Form = useForm<RegisterStep2Input>({
+    resolver: zodResolver(RegisterStep2Schema),
+    defaultValues: { consentToPopia: false },
+  })
+
   // Auto-validate when code arrives via email/SMS link (?code=XKM-...)
   useEffect(() => {
     const urlCode = searchParams.get('code')
     if (!urlCode) return
     const formatted = urlCode.trim().toUpperCase()
     setInviteCode(formatted)
-    // Auto-submit: validate immediately so the member lands straight on Step 2
+    setLoading(true)
     fetch('/api/v1/auth/invitations/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -48,6 +56,7 @@ export function RegisterForm() {
         }
       })
       .catch(() => setError('Could not validate invite code. Please try again.'))
+      .finally(() => setLoading(false))
   // Only run once on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -79,27 +88,23 @@ export function RegisterForm() {
 
   // ─── Step 2 — complete registration ────────────────────────────────────────
 
-  async function handleRegister(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
+  async function handleRegister(data: RegisterStep2Input) {
     setLoading(true)
     setError('')
-
-    const fd = new FormData(e.currentTarget)
-    const payload = {
-      inviteCode:     inviteCode.trim().toUpperCase(),
-      email:          prefilled!.email,
-      phone:          prefilled!.phone,
-      firstName:      (fd.get('firstName') as string).trim(),
-      lastName:       (fd.get('lastName') as string).trim(),
-      idNumber:       (fd.get('idNumber') as string || undefined),
-      password:       fd.get('password') as string,
-      consentToPopia: true,
-    }
 
     const res = await fetch('/api/v1/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        inviteCode:     inviteCode.trim().toUpperCase(),
+        email:          prefilled!.email,
+        phone:          prefilled!.phone,
+        firstName:      data.firstName.trim(),
+        lastName:       data.lastName.trim(),
+        idNumber:       data.idNumber || undefined,
+        password:       data.password,
+        consentToPopia: true,
+      }),
     })
 
     const json = await res.json()
@@ -172,8 +177,10 @@ export function RegisterForm() {
 
   // ─── Step 2 — Complete registration ─────────────────────────────────────────
 
+  const { register: reg2, handleSubmit: submit2, formState: { errors: e2 }, setValue: set2 } = step2Form
+
   return (
-    <form onSubmit={handleRegister} className="space-y-4" noValidate>
+    <form onSubmit={submit2(handleRegister)} className="space-y-4" noValidate>
       {error && <Alert variant="error">{error}</Alert>}
 
       <div className="rounded-lg bg-xxm-green/5 border border-xxm-green/20 px-4 py-3 text-sm text-xxm-green space-y-1">
@@ -184,11 +191,17 @@ export function RegisterForm() {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <Label htmlFor="firstName" required>First name</Label>
-          <Input id="firstName" name="firstName" defaultValue={prefilled?.firstName} placeholder="Kurhula" minLength={2} required />
+          <Input id="firstName" placeholder="Kurhula"
+            defaultValue={prefilled?.firstName}
+            error={e2.firstName?.message}
+            {...reg2('firstName')} />
         </div>
         <div>
           <Label htmlFor="lastName" required>Last name</Label>
-          <Input id="lastName" name="lastName" defaultValue={prefilled?.lastName} placeholder="Maluleke" minLength={2} required />
+          <Input id="lastName" placeholder="Maluleke"
+            defaultValue={prefilled?.lastName}
+            error={e2.lastName?.message}
+            {...reg2('lastName')} />
         </div>
       </div>
 
@@ -208,26 +221,34 @@ export function RegisterForm() {
 
       <div>
         <Label htmlFor="idNumber">SA ID number <span className="text-gray-400 font-normal">(optional)</span></Label>
-        <Input id="idNumber" name="idNumber" placeholder="13-digit ID number" maxLength={13} />
+        <Input id="idNumber" placeholder="13-digit ID number" maxLength={13}
+          error={e2.idNumber?.message}
+          {...reg2('idNumber')} />
       </div>
 
       <div>
         <Label htmlFor="password" required>Password</Label>
-        <Input id="password" name="password" type="password" autoComplete="new-password"
-          placeholder="Min. 8 chars, 1 uppercase, 1 number" required minLength={8} />
+        <Input id="password" type="password" autoComplete="new-password"
+          placeholder="Min. 8 chars, 1 uppercase, 1 number"
+          error={e2.password?.message}
+          {...reg2('password')} />
       </div>
 
       <div className="flex items-start gap-2 pt-1">
         <input
           id="consentToPopia"
-          name="consentToPopia"
           type="checkbox"
-          required
           className="mt-0.5 h-4 w-4 rounded border-gray-300 text-xxm-green accent-xxm-green cursor-pointer"
+          onChange={(e) => set2('consentToPopia', e.target.checked)}
         />
-        <Label htmlFor="consentToPopia" className="mb-0 font-normal text-gray-600 cursor-pointer">
-          I consent to the processing of my personal information in accordance with POPIA.
-        </Label>
+        <div>
+          <Label htmlFor="consentToPopia" className="mb-0 font-normal text-gray-600 cursor-pointer">
+            I consent to the processing of my personal information in accordance with POPIA.
+          </Label>
+          {e2.consentToPopia && (
+            <p className="text-xs text-red-500 mt-0.5">{e2.consentToPopia.message}</p>
+          )}
+        </div>
       </div>
 
       <Button type="submit" className="w-full" size="lg" loading={loading}>

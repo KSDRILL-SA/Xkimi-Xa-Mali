@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { FileText } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
@@ -57,7 +58,7 @@ export default async function StatementsPage() {
 
       {contributions.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400">
-          <p className="text-4xl mb-3">📄</p>
+          <FileText size={40} className="mx-auto mb-3 text-gray-300" aria-hidden />
           <p className="font-medium">No contribution periods yet</p>
           <p className="text-sm mt-1">Statements will appear once contributions are generated for your account</p>
         </div>

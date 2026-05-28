@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
-import { APP_URL } from '@/lib/utils'
+import { APP_URL, WA_LINK } from '@/lib/utils'
 
 export function HeroSection() {
   return (
@@ -19,7 +19,6 @@ export function HeroSection() {
           quality={90}
           className="object-cover object-center"
           sizes="100vw"
-          aria-hidden="true"
         />
 
         {/* layered overlays for depth */}
@@ -120,7 +119,7 @@ export function HeroSection() {
             </a>
 
             <a
-              href="https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb"
+              href={WA_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-secondary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl border border-white/20 text-white/80 font-semibold text-base hover:border-xxm-gold/40"

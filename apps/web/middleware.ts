@@ -28,7 +28,6 @@ export default auth((req) => {
     pathname === '/privacy' ||
     pathname === '/terms' ||
     pathname === '/support' ||
-    pathname === '/whatsapp' ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/forgot-password' ||

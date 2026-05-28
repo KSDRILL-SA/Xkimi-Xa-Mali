@@ -16,6 +16,7 @@ type FormData = z.infer<typeof Schema>
 export function ForgotPasswordForm() {
   const [sent, setSent] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(Schema),
@@ -23,13 +24,19 @@ export function ForgotPasswordForm() {
 
   async function onSubmit(data: FormData) {
     setLoading(true)
-    await fetch('/api/v1/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    setLoading(false)
-    setSent(true)
+    setError('')
+    try {
+      await fetch('/api/v1/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      setSent(true)
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (sent) {
@@ -42,6 +49,7 @@ export function ForgotPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      {error && <Alert variant="error">{error}</Alert>}
       <div>
         <Label htmlFor="email" required>Email address</Label>
         <Input id="email" type="email" placeholder="you@example.com" error={errors.email?.message} {...register('email')} />

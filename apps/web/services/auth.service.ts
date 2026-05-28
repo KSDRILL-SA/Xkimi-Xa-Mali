@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'crypto'
 import { db } from '@/lib/db'
+import { env } from '@/lib/env'
 import { encrypt } from '@/lib/encryption'
 import { sendVerificationEmail, sendPasswordResetEmail } from '@/lib/email'
 import { writeAuditLog } from './audit.service'
@@ -38,7 +39,7 @@ export async function registerUser(
   ])
 
   const adminRole = await db.role.findUnique({ where: { name: 'ADMIN' } })
-  const founderEmail = process.env.FOUNDER_EMAIL
+  const founderEmail = env.FOUNDER_EMAIL
   const isFounder = founderEmail && input.email.toLowerCase() === founderEmail.toLowerCase()
 
   const roleConnections = [{ roleId: memberRole.id }]

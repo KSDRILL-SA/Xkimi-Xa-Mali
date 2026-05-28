@@ -78,5 +78,21 @@ export const ChangePasswordSchema = z
     path: ['confirmPassword'],
   })
 
+export const RegisterStep2Schema = z.object({
+  firstName: z.string().min(2, 'First name must be at least 2 characters').max(50),
+  lastName:  z.string().min(2, 'Last name must be at least 2 characters').max(50),
+  idNumber:  z
+    .string()
+    .optional()
+    .refine((v) => !v || (SA_ID_REGEX.test(v) && validateSAId(v)), 'Please enter a valid SA ID number'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
+    .regex(/[0-9]/, 'Must contain at least one number'),
+  consentToPopia: z.boolean().refine((v) => v, 'You must consent to our privacy policy'),
+})
+
 export type RegisterInput = z.infer<typeof RegisterSchema>
+export type RegisterStep2Input = z.infer<typeof RegisterStep2Schema>
 export type LoginInput = z.infer<typeof LoginSchema>
