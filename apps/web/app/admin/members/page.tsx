@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { listMembers } from '@/services/admin.service'
 import { formatDate } from '@/lib/formatters'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = { title: 'Members — Admin' }
 
@@ -46,30 +47,28 @@ export default async function AdminMembersPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-xxm-green">Members</h1>
-          <p className="text-sm text-gray-500 mt-1">{total} total</p>
-        </div>
-      </div>
+      <PageHeader title="Members" subtitle={`${total} total`} />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <form method="GET" action="/admin/members" className="flex gap-2 flex-1 min-w-0">
+      <div className="flex flex-col gap-3">
+        <form method="GET" action="/admin/members" className="flex gap-2">
           <input
             type="text"
             name="search"
             defaultValue={search}
             placeholder="Search name, email or phone…"
-            className="flex-1 min-w-0 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-xxm-green/30"
+            className="flex-1 min-w-0 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white"
           />
           {status && <input type="hidden" name="status" value={status} />}
-          <button type="submit" className="px-4 py-1.5 rounded-lg bg-xxm-green text-white text-sm font-medium">
+          <button
+            type="submit"
+            className="px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors shrink-0"
+          >
             Search
           </button>
         </form>
 
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {(['ACTIVE', 'PENDING', 'SUSPENDED'] as UserStatus[]).map((s) => (
             <Link
               key={s}
@@ -84,7 +83,10 @@ export default async function AdminMembersPage({
             </Link>
           ))}
           {(search || status) && (
-            <Link href="/admin/members" className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-gray-200">
+            <Link
+              href="/admin/members"
+              className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-gray-200"
+            >
               Clear
             </Link>
           )}
@@ -150,16 +152,22 @@ export default async function AdminMembersPage({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
           <span className="text-gray-500">Page {page} of {totalPages}</span>
           <div className="flex gap-2">
             {page > 1 && (
-              <Link href={buildUrl({ page: String(page - 1) })} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+              <Link
+                href={buildUrl({ page: String(page - 1) })}
+                className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+              >
                 ← Prev
               </Link>
             )}
             {page < totalPages && (
-              <Link href={buildUrl({ page: String(page + 1) })} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
+              <Link
+                href={buildUrl({ page: String(page + 1) })}
+                className="px-3 py-1.5 rounded-xl bg-xxm-green text-white hover:bg-xxm-canopy transition-colors"
+              >
                 Next →
               </Link>
             )}

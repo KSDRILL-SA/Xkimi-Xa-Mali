@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { MessageSquare, Mail, Bell, type LucideIcon } from 'lucide-react'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = { title: 'Notifications' }
 
@@ -25,10 +27,10 @@ const CHANNEL_LABELS: Record<NotifChannel, string> = {
   PUSH: 'Push',
 }
 
-const CHANNEL_ICONS: Record<NotifChannel, string> = {
-  SMS: '💬',
-  EMAIL: '✉️',
-  PUSH: '🔔',
+const CHANNEL_ICONS: Record<NotifChannel, LucideIcon> = {
+  SMS:   MessageSquare,
+  EMAIL: Mail,
+  PUSH:  Bell,
 }
 
 const STATUS_CONFIG: Record<NotifStatus, { label: string; className: string }> = {
@@ -120,25 +122,18 @@ export default async function NotificationsPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-xxm-green-900">Notifications</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {total} notification{total !== 1 ? 's' : ''} total
-            {failedCount > 0 && (
-              <span className="ml-2 text-red-600 font-medium">
-                · {failedCount} failed
-              </span>
-            )}
-          </p>
-        </div>
-        <Link
-          href="/dashboard/profile"
-          className="text-sm text-xxm-green-700 hover:text-xxm-green-900 underline underline-offset-2"
-        >
-          Manage preferences
-        </Link>
-      </div>
+      <PageHeader
+        title="Notifications"
+        subtitle={`${total} notification${total !== 1 ? 's' : ''} total${failedCount > 0 ? ` · ${failedCount} failed` : ''}`}
+        action={
+          <Link
+            href="/dashboard/profile"
+            className="text-sm text-xxm-green-700 hover:text-xxm-green-900 underline underline-offset-2"
+          >
+            Manage preferences
+          </Link>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
@@ -146,7 +141,7 @@ export default async function NotificationsPage({
         {validChannels.map((ch) => (
           <FilterChip
             key={ch}
-            label={`${CHANNEL_ICONS[ch]} ${CHANNEL_LABELS[ch]}`}
+            label={CHANNEL_LABELS[ch]}
             href={buildUrl({ channel: ch, cursor: undefined })}
             active={channelFilter === ch}
           />
@@ -176,10 +171,11 @@ export default async function NotificationsPage({
           {(items as NotificationItem[]).map((n) => {
             const cfg = STATUS_CONFIG[n.status as NotifStatus] ?? STATUS_CONFIG.QUEUED
             const date = n.sentAt ?? n.createdAt
+            const ChannelIcon = CHANNEL_ICONS[n.channel as NotifChannel] ?? Bell
             return (
               <div key={n.id} className="flex items-start gap-4 px-5 py-4">
-                <div className="text-xl mt-0.5" aria-hidden>
-                  {CHANNEL_ICONS[n.channel as NotifChannel] ?? '🔔'}
+                <div className="mt-0.5 w-8 h-8 rounded-full bg-xxm-green-50 flex items-center justify-center shrink-0" aria-hidden>
+                  <ChannelIcon size={15} className="text-xxm-green" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 truncate">

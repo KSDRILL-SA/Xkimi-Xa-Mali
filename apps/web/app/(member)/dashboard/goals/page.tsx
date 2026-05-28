@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
+import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = { title: 'Goals' }
 
@@ -58,14 +59,10 @@ export default async function GoalsPage({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-xxm-green-900">Financial Goals</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {activeCount} active · {achievedCount} achieved
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Financial Goals"
+        subtitle={`${activeCount} active · ${achievedCount} achieved`}
+      />
 
       {/* Filter tabs */}
       <div className="flex flex-wrap gap-2">
