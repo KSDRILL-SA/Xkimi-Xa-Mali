@@ -110,7 +110,8 @@ model User {
   lockedGoals            Goal[]                  @relation("GoalLocker")
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
-  sentInvites            Invite[]                @relation("SentInvites")
+  invitesSent            Invitation[]            @relation("InvitesSent")
+  inviteAccepted         Invitation?             @relation("InviteAccepted")
 
   @@map("users")
 }
@@ -381,20 +382,35 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// ─── Invites ──────────────────────────────────────────────────────────────────
+// ─── Invitations ─────────────────────────────────────────────────────────────
 
-model Invite {
-  id          String    @id @default(cuid())
-  email       String
-  tokenHash   String    @unique
-  invitedById String
-  expiresAt   DateTime
-  acceptedAt  DateTime?
-  createdAt   DateTime  @default(now())
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
 
-  invitedBy User @relation("SentInvites", fields: [invitedById], references: [id], onDelete: Cascade)
+model Invitation {
+  id            String           @id @default(cuid())
+  codeHash      String           @unique
+  codePrefix    String
+  firstName     String
+  lastName      String
+  email         String           @unique
+  phone         String           @unique
+  minimumAmount Decimal          @db.Decimal(10, 2)
+  status        InvitationStatus @default(PENDING)
+  invitedById   String
+  acceptedById  String?          @unique
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  invitedBy  User  @relation("InvitesSent",    fields: [invitedById],  references: [id])
+  acceptedBy User? @relation("InviteAccepted", fields: [acceptedById], references: [id])
 
   @@index([invitedById])
   @@index([email])
-  @@map("invites")
+  @@index([status])
+  @@map("invitations")
 }

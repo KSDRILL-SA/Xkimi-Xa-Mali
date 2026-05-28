@@ -130,24 +130,30 @@ export async function sendPaymentFailedEmail(
 
 export async function sendInviteEmail(
   to: string,
-  inviteUrl: string,
-  expiresHours = 72,
+  firstName: string,
+  code: string,
 ) {
   await resend.emails.send({
     from: FROM,
     to,
     subject: `You have been invited to join ${APP_NAME}`,
     html: layout(`
-      <h1 style="${HEADING_STYLE}">You're Invited</h1>
+      <h1 style="${HEADING_STYLE}">You're Invited, ${firstName}!</h1>
       <p style="${BODY_STYLE}">
         You have been invited to join <strong>${APP_NAME}</strong> — a secure group savings
-        and contribution management platform. Your invitation link is valid for
-        <strong>${expiresHours} hours</strong>.
+        and contribution management platform.
       </p>
-      <a href="${inviteUrl}" style="${BTN_STYLE}">Accept Invitation</a>
+      <p style="${BODY_STYLE}">Your one-time invite code is:</p>
+      <div style="background:#F3F4F6;border-radius:8px;padding:16px 24px;margin-bottom:24px;text-align:center;">
+        <span style="font-size:24px;font-weight:700;letter-spacing:4px;color:#1B4332;font-family:monospace;">${code}</span>
+      </div>
+      <p style="${BODY_STYLE}">
+        Open the <strong>${APP_NAME}</strong> registration page and enter this code to create your account.
+        This code expires in <strong>7 days</strong>.
+      </p>
       <p style="${SMALL_STYLE}">
         If you did not expect this invitation, you can safely ignore this email.
-        The link will expire automatically.
+        The code will expire automatically.
       </p>
     `),
   })
