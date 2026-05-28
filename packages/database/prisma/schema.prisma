@@ -110,6 +110,7 @@ model User {
   lockedGoals            Goal[]                  @relation("GoalLocker")
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
+  sentInvites            Invite[]                @relation("SentInvites")
 
   @@map("users")
 }
@@ -378,4 +379,22 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([userId, createdAt])
   @@map("audit_logs")
+}
+
+// ─── Invites ──────────────────────────────────────────────────────────────────
+
+model Invite {
+  id          String    @id @default(cuid())
+  email       String
+  tokenHash   String    @unique
+  invitedById String
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  invitedBy User @relation("SentInvites", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([invitedById])
+  @@index([email])
+  @@map("invites")
 }

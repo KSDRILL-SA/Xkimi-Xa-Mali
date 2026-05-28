@@ -128,6 +128,31 @@ export async function sendPaymentFailedEmail(
   })
 }
 
+export async function sendInviteEmail(
+  to: string,
+  inviteUrl: string,
+  expiresHours = 72,
+) {
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `You have been invited to join ${APP_NAME}`,
+    html: layout(`
+      <h1 style="${HEADING_STYLE}">You're Invited</h1>
+      <p style="${BODY_STYLE}">
+        You have been invited to join <strong>${APP_NAME}</strong> — a secure group savings
+        and contribution management platform. Your invitation link is valid for
+        <strong>${expiresHours} hours</strong>.
+      </p>
+      <a href="${inviteUrl}" style="${BTN_STYLE}">Accept Invitation</a>
+      <p style="${SMALL_STYLE}">
+        If you did not expect this invitation, you can safely ignore this email.
+        The link will expire automatically.
+      </p>
+    `),
+  })
+}
+
 export async function sendOverdueReminderEmail(
   to: string,
   firstName: string,
