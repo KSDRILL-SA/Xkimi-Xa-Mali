@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getMemberDetail, setMemberStatus, AdminNotFoundError } from '@/services/admin.service'
+import { setMemberRole } from '@/services/invite.service'
 import { formatDate, formatZAR } from '@/lib/formatters'
 
 export const metadata: Metadata = { title: 'Member Detail — Admin' }
@@ -64,8 +65,23 @@ export default async function AdminMemberDetailPage({
     await setMemberStatus(s!.user.id, r, id, 'SUSPENDED')
     redirect(`/admin/members/${id}?updated=1`)
   }
+  async function promoteAdmin() {
+    'use server'
+    const s = await auth()
+    const r = (s!.user.roles as string[] | undefined) ?? []
+    await setMemberRole(s!.user.id, r, id, 'ADMIN', true)
+    redirect(`/admin/members/${id}?updated=1`)
+  }
+  async function revokeAdmin() {
+    'use server'
+    const s = await auth()
+    const r = (s!.user.roles as string[] | undefined) ?? []
+    await setMemberRole(s!.user.id, r, id, 'ADMIN', false)
+    redirect(`/admin/members/${id}?updated=1`)
+  }
 
   const sc = USER_STATUS_CONFIG[member.status] ?? USER_STATUS_CONFIG.PENDING
+  const isAdmin = member.roles.some((r: { role: string }) => r.role === 'ADMIN')
   type ContribItem = { id: string; periodMonth: number; periodYear: number; amountDue: unknown; amountPaid: unknown; status: string }
   type MandateItem = { id: string; status: string; amount: unknown; debitDay: number; createdAt: Date }
 
@@ -105,6 +121,19 @@ export default async function AdminMemberDetailPage({
               <form action={suspend}>
                 <button type="submit" className="px-3 py-1.5 text-xs rounded-lg bg-red-100 text-red-700 font-medium hover:bg-red-200">
                   Suspend
+                </button>
+              </form>
+            )}
+            {isAdmin ? (
+              <form action={revokeAdmin}>
+                <button type="submit" className="px-3 py-1.5 text-xs rounded-lg bg-orange-100 text-orange-700 font-medium hover:bg-orange-200">
+                  Revoke Admin
+                </button>
+              </form>
+            ) : (
+              <form action={promoteAdmin}>
+                <button type="submit" className="px-3 py-1.5 text-xs rounded-lg bg-xxm-gold/20 text-xxm-gold font-medium hover:bg-xxm-gold/30 border border-xxm-gold/30">
+                  Make Admin
                 </button>
               </form>
             )}
