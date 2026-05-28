@@ -22,16 +22,16 @@ const pillars = [
 ]
 
 export function MissionSection() {
-  const ref = useScrollReveal(0.08) as React.MutableRefObject<HTMLElement>
+  const revealRef = useScrollReveal(0.08)
 
   return (
     <section
-      ref={ref as React.RefObject<HTMLDivElement>}
+      ref={revealRef}
       id="mission"
       className="relative py-20 md:py-32 overflow-hidden bg-xxm-green"
       aria-labelledby="mission-heading"
     >
-      {/* background orb */}
+      {/* background orbs */}
       <div
         className="absolute top-0 right-0 w-[700px] h-[700px] rounded-full opacity-8 pointer-events-none"
         style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 65%)' }}
@@ -48,12 +48,13 @@ export function MissionSection() {
 
           {/* left — story */}
           <div className="reveal-left">
-            <span className="text-xxm-gold text-xs font-bold tracking-widest uppercase">
+            <span className="inline-flex items-center gap-2 bg-xxm-gold/15 border border-xxm-gold/20 rounded-full px-4 py-1.5 text-xxm-gold text-xs font-bold tracking-widest uppercase mb-6">
+              <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold" aria-hidden />
               Our Mission
             </span>
             <h2
               id="mission-heading"
-              className="mt-4 text-4xl md:text-5xl font-black text-white leading-tight"
+              className="text-4xl md:text-5xl font-black text-white leading-tight"
             >
               Wealth moves faster when it{' '}
               <span className="text-shimmer">moves together.</span>
@@ -75,7 +76,7 @@ export function MissionSection() {
               </p>
             </div>
 
-            {/* pull quote */}
+            {/* pull quote card */}
             <div className="mt-10 glass-gold rounded-2xl p-6 relative overflow-hidden">
               <Quote size={20} className="text-xxm-gold/40 mb-3" aria-hidden />
               <p className="text-white text-base italic leading-relaxed font-medium">
@@ -89,7 +90,8 @@ export function MissionSection() {
 
           {/* right — pillars */}
           <div className="flex flex-col gap-5 reveal-right delay-200">
-            <span className="text-xxm-gold text-xs font-bold tracking-widest uppercase mb-2">
+            <span className="inline-flex items-center gap-2 bg-xxm-gold/15 border border-xxm-gold/20 rounded-full px-4 py-1.5 text-xxm-gold text-xs font-bold tracking-widest uppercase w-fit mb-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold" aria-hidden />
               Three pillars, one purpose
             </span>
 

@@ -1,55 +1,39 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 
+/* Returns a callback ref — assign directly to the section's ref prop.
+   React calls the callback with the element once mounted and null on unmount,
+   so we never need to cast and the typing is clean. */
 export function useScrollReveal(threshold = 0.12) {
-  const ref = useRef<HTMLElement | null>(null)
+  const cleanup = useRef<(() => void) | null>(null)
 
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
+  return useCallback(
+    (el: HTMLElement | null) => {
+      cleanup.current?.()
+      cleanup.current = null
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('revealed')
-            observer.unobserve(entry.target)
-          }
-        })
-      },
-      { threshold, rootMargin: '0px 0px -60px 0px' }
-    )
+      if (!el) return
 
-    const targets = el.querySelectorAll<HTMLElement>(
-      '.reveal, .reveal-left, .reveal-right, .reveal-scale, .step-line'
-    )
-    targets.forEach((t) => observer.observe(t))
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('revealed')
+              observer.unobserve(entry.target)
+            }
+          })
+        },
+        { threshold, rootMargin: '0px 0px -60px 0px' }
+      )
 
-    return () => observer.disconnect()
-  }, [threshold])
+      const targets = el.querySelectorAll<HTMLElement>(
+        '.reveal, .reveal-left, .reveal-right, .reveal-scale, .step-line'
+      )
+      targets.forEach((t) => observer.observe(t))
 
-  return ref
-}
-
-export function useInView(threshold = 0.1) {
-  const ref = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.classList.add('revealed')
-          observer.disconnect()
-        }
-      },
-      { threshold }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [threshold])
-
-  return ref
+      cleanup.current = () => observer.disconnect()
+    },
+    [threshold]
+  )
 }

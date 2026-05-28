@@ -6,11 +6,11 @@ import { XmmLogo } from '@/components/ui/XmmLogo'
 import { APP_URL } from '@/lib/utils'
 
 export function CTASection() {
-  const ref = useScrollReveal(0.15) as React.MutableRefObject<HTMLElement>
+  const revealRef = useScrollReveal(0.15)
 
   return (
     <section
-      ref={ref as React.RefObject<HTMLDivElement>}
+      ref={revealRef}
       id="cta"
       className="relative py-20 md:py-32 px-4 md:px-8 overflow-hidden bg-xxm-champagne-50"
       aria-labelledby="cta-heading"
@@ -24,7 +24,7 @@ export function CTASection() {
             aria-hidden
           />
 
-          {/* background orbs inside card */}
+          {/* background orbs */}
           <div
             className="absolute top-0 right-0 w-[500px] h-[500px] rounded-full opacity-10 animate-orb-drift-1 pointer-events-none"
             style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 65%)' }}
@@ -39,6 +39,8 @@ export function CTASection() {
 
           {/* content */}
           <div className="relative z-10 flex flex-col items-center text-center px-8 md:px-16 py-16 md:py-20 gap-8">
+
+            {/* floating logo */}
             <div className="animate-float">
               <XmmLogo size={64} />
             </div>
@@ -53,10 +55,12 @@ export function CTASection() {
               </h2>
               <p className="mt-5 text-white/55 text-base md:text-lg max-w-lg mx-auto leading-relaxed">
                 Xkimm Xa Mali is an invite-only platform. If you&rsquo;re already a member,
-                sign in. If you&rsquo;d like to connect with the brotherhood, reach us on WhatsApp.
+                sign in to your account. If you&rsquo;d like to connect with the brotherhood,
+                reach us on WhatsApp.
               </p>
             </div>
 
+            {/* action buttons */}
             <div className="flex flex-col sm:flex-row gap-4 w-full justify-center max-w-md">
               <a
                 href={`${APP_URL}/login`}
@@ -77,7 +81,35 @@ export function CTASection() {
               </a>
             </div>
 
-            <p className="text-white/25 text-xs italic">
+            {/* divider */}
+            <div className="w-full max-w-xs h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+            {/* secondary actions row */}
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              <a
+                href={`${APP_URL}/dashboard`}
+                className="text-white/35 hover:text-white/70 text-sm font-medium transition-colors flex items-center gap-1.5"
+              >
+                Member portal
+                <ArrowRight size={12} aria-hidden />
+              </a>
+              <a
+                href={`${APP_URL}/admin`}
+                className="text-white/35 hover:text-white/70 text-sm font-medium transition-colors flex items-center gap-1.5"
+              >
+                Admin panel
+                <ArrowRight size={12} aria-hidden />
+              </a>
+              <a
+                href={`${APP_URL}/support`}
+                className="text-white/35 hover:text-white/70 text-sm font-medium transition-colors flex items-center gap-1.5"
+              >
+                Support
+                <ArrowRight size={12} aria-hidden />
+              </a>
+            </div>
+
+            <p className="text-white/20 text-xs italic">
               &ldquo;Blessed is the hand that giveth.&rdquo; — Acts 20:35
             </p>
           </div>
