@@ -10,20 +10,22 @@ import {
   Shield,
   FileText,
   HelpCircle,
+  Info,
 } from 'lucide-react'
 
 const social = [
-  { icon: Facebook,      label: 'Facebook',  href: '#' },
+  { icon: Facebook,      label: 'Facebook',    href: '#' },
   { icon: Twitter,       label: 'X / Twitter', href: '#' },
-  { icon: Instagram,     label: 'Instagram', href: '#' },
-  { icon: Linkedin,      label: 'LinkedIn',  href: '#' },
-  { icon: Youtube,       label: 'YouTube',   href: '#' },
-  { icon: MessageCircle, label: 'WhatsApp',  href: '#' },
+  { icon: Instagram,     label: 'Instagram',   href: '#' },
+  { icon: Linkedin,      label: 'LinkedIn',    href: '#' },
+  { icon: Youtube,       label: 'YouTube',     href: '#' },
+  { icon: MessageCircle, label: 'WhatsApp',    href: '#' },
 ]
 
 const legal = [
-  { icon: Shield,    label: 'Privacy Policy', href: '#' },
-  { icon: FileText,  label: 'Terms of Use',   href: '#' },
+  { icon: Info,       label: 'About',          href: '/about' },
+  { icon: Shield,     label: 'Privacy Policy', href: '#' },
+  { icon: FileText,   label: 'Terms of Use',   href: '#' },
   { icon: HelpCircle, label: 'Support',        href: '#' },
 ]
 
