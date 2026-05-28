@@ -16,6 +16,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMAIL_NOT_VERIFIED: 'Please verify your email before logging in.',
   ACCOUNT_SUSPENDED: 'Your account has been suspended. Contact the admin.',
   CredentialsSignin: 'Incorrect email or password.',
+  Configuration: 'Login is not configured correctly. Contact support or check server setup.',
+  AccessDenied: 'Access denied. You may not have permission to sign in.',
+  CallbackRouteError: 'Sign-in failed. Please try again.',
 }
 
 export function LoginForm() {
