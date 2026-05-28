@@ -1,9 +1,36 @@
 import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth'
-import Link from 'next/link'
-import { signOut } from '@/lib/auth'
+import { auth, signOut } from '@/lib/auth'
+import { AppHeader } from '@/components/layout/AppHeader'
+import { ScrollNav, type NavItem } from '@/components/layout/ScrollNav'
+import { AppFooter } from '@/components/layout/AppFooter'
+import { ToastProvider } from '@/components/ui/Toast'
+import {
+  LayoutDashboard,
+  Users,
+  Wallet,
+  CalendarCheck,
+  Target,
+  Megaphone,
+  UserPlus,
+  BarChart3,
+  ShieldCheck,
+  ArrowLeft,
+} from 'lucide-react'
 
-async function AdminSignOutButton() {
+const adminNav: NavItem[] = [
+  { href: '/admin',                  label: 'Overview',     icon: LayoutDashboard, exact: true },
+  { href: '/admin/members',          label: 'Members',      icon: Users },
+  { href: '/admin/contributions',    label: 'Contributions',icon: Wallet },
+  { href: '/admin/mandates',         label: 'Mandates',     icon: CalendarCheck },
+  { href: '/admin/goals',            label: 'Goals',        icon: Target },
+  { href: '/admin/notifications',    label: 'Broadcast',    icon: Megaphone },
+  { href: '/admin/invitations',      label: 'Invitations',  icon: UserPlus },
+  { href: '/admin/reports',          label: 'Reports',      icon: BarChart3 },
+  { href: '/admin/audit',            label: 'Audit',        icon: ShieldCheck },
+  { href: '/dashboard',             label: 'Member View',  icon: ArrowLeft },
+]
+
+async function SignOutForm() {
   return (
     <form
       action={async () => {
@@ -11,7 +38,10 @@ async function AdminSignOutButton() {
         await signOut({ redirectTo: '/auth/login' })
       }}
     >
-      <button type="submit" className="text-sm text-white/70 hover:text-white transition-colors">
+      <button
+        type="submit"
+        className="text-xs text-white/55 hover:text-white transition-colors outline-none focus-visible:underline"
+      >
         Sign out
       </button>
     </form>
@@ -25,49 +55,32 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const roles = (session.user.roles as string[] | undefined) ?? []
   if (!roles.includes('ADMIN')) redirect('/dashboard')
 
+  const name = session.user.name ?? ''
+  const initials = name
+    .split(' ')
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || '?'
+
   return (
-    <div className="min-h-dvh flex flex-col bg-gray-50">
-      {/* Top nav */}
-      <header className="h-14 bg-xxm-green shadow-sm flex items-center px-4 md:px-6 gap-4">
-        <Link href="/admin" className="flex items-center gap-2 mr-auto">
-          <span className="w-7 h-7 rounded-lg bg-xxm-gold/20 border border-xxm-gold/40 flex items-center justify-center">
-            <span className="text-sm font-black text-xxm-gold">X</span>
-          </span>
-          <span className="text-white font-semibold text-sm hidden sm:block">Xkimm Xa Mali</span>
-          <span className="text-xxm-gold/70 text-xs font-medium hidden sm:block">· Admin</span>
-        </Link>
+    <ToastProvider>
+      <div className="min-h-dvh flex flex-col bg-xxm-champagne">
+        <AppHeader
+          userName={name}
+          userInitials={initials}
+          isAdmin
+          signOutSlot={<SignOutForm />}
+        />
 
-        <nav className="flex items-center gap-1 flex-wrap">
-          <AdminNavLink href="/admin">Overview</AdminNavLink>
-          <AdminNavLink href="/admin/members">Members</AdminNavLink>
-          <AdminNavLink href="/admin/contributions">Contributions</AdminNavLink>
-          <AdminNavLink href="/admin/mandates">Mandates</AdminNavLink>
-          <AdminNavLink href="/admin/goals">Goals</AdminNavLink>
-          <AdminNavLink href="/admin/notifications">Broadcast</AdminNavLink>
-          <AdminNavLink href="/admin/invitations">Invitations</AdminNavLink>
-          <AdminNavLink href="/admin/reports">Reports</AdminNavLink>
-          <AdminNavLink href="/admin/audit">Audit</AdminNavLink>
-          <AdminNavLink href="/dashboard">Member View</AdminNavLink>
-        </nav>
+        <ScrollNav items={adminNav} variant="admin" />
 
-        <div className="flex items-center gap-3 ml-2">
-          <span className="text-white/70 text-sm hidden md:block">{session.user.name}</span>
-          <AdminSignOutButton />
-        </div>
-      </header>
+        <main className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
+          {children}
+        </main>
 
-      <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">{children}</main>
-    </div>
-  )
-}
-
-function AdminNavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="px-3 py-1.5 rounded-md text-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors"
-    >
-      {children}
-    </Link>
+        <AppFooter />
+      </div>
+    </ToastProvider>
   )
 }
