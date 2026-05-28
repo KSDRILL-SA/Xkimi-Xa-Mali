@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -137,22 +138,22 @@ export default async function NotificationsPage({
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2">
-        <FilterChip label="All" href={buildUrl({ channel: undefined, cursor: undefined })} active={!channelFilter} />
+        <FilterChip label="All" href={buildUrl({ channel: undefined, cursor: undefined }) as Route} active={!channelFilter} />
         {validChannels.map((ch) => (
           <FilterChip
             key={ch}
             label={CHANNEL_LABELS[ch]}
-            href={buildUrl({ channel: ch, cursor: undefined })}
+            href={buildUrl({ channel: ch, cursor: undefined }) as Route}
             active={channelFilter === ch}
           />
         ))}
         <div className="w-px bg-gray-200 mx-1" />
-        <FilterChip label="All status" href={buildUrl({ status: undefined, cursor: undefined })} active={!statusFilter} />
+        <FilterChip label="All status" href={buildUrl({ status: undefined, cursor: undefined }) as Route} active={!statusFilter} />
         {validStatuses.map((s) => (
           <FilterChip
             key={s}
             label={STATUS_CONFIG[s].label}
-            href={buildUrl({ status: s, cursor: undefined })}
+            href={buildUrl({ status: s, cursor: undefined }) as Route}
             active={statusFilter === s}
           />
         ))}
@@ -201,7 +202,7 @@ export default async function NotificationsPage({
         <div className="flex justify-between">
           {cursor ? (
             <Link
-              href={buildUrl({ cursor: undefined })}
+              href={buildUrl({ cursor: undefined }) as Route}
               className="text-sm text-xxm-green-700 hover:text-xxm-green-900 underline"
             >
               ← Back to latest
@@ -211,7 +212,7 @@ export default async function NotificationsPage({
           )}
           {nextCursor && (
             <Link
-              href={buildUrl({ cursor: nextCursor })}
+              href={buildUrl({ cursor: nextCursor }) as Route}
               className="text-sm text-xxm-green-700 hover:text-xxm-green-900 underline"
             >
               Load older →
@@ -229,7 +230,7 @@ function FilterChip({
   active,
 }: {
   label: string
-  href: string
+  href: Route
   active: boolean
 }) {
   return (

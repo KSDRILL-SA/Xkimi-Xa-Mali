@@ -23,7 +23,7 @@ export function ForgotPasswordForm() {
 
   async function onSubmit(data: FormData) {
     setLoading(true)
-    await fetch('/api/v1/auth/forgot-password', {
+    await fetch('/api/v1/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -50,7 +50,7 @@ export function ForgotPasswordForm() {
         Send reset link
       </Button>
       <p className="text-center text-sm">
-        <Link href="/auth/login" className="text-xxm-green font-medium hover:underline">
+        <Link href="/login" className="text-xxm-green font-medium hover:underline">
           Back to login
         </Link>
       </p>

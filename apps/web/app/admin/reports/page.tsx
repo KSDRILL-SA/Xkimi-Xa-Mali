@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
@@ -70,7 +71,7 @@ export default async function AdminReportsPage({
   ])
 
   type ContribSummary = { amountDue: unknown; amountPaid: unknown; status: string }
-  const contribs = allContribs as ContribSummary[]
+  const contribs = allContribs as unknown as ContribSummary[]
   const totalDue     = contribs.reduce((s, c) => s + Number(c.amountDue), 0)
   const totalPaid    = contribs.reduce((s, c) => s + Number(c.amountPaid), 0)
   const paidCount    = contribs.filter((c) => c.status === 'PAID').length
@@ -101,7 +102,7 @@ export default async function AdminReportsPage({
             {MONTHS.map((name, idx) => (
               <Link
                 key={name}
-                href={buildUrl(idx + 1, year)}
+                href={buildUrl(idx + 1, year) as Route}
                 className={`px-2 py-1.5 text-xs font-medium transition-colors ${
                   month === idx + 1
                     ? 'bg-xxm-green text-white'
@@ -184,7 +185,7 @@ export default async function AdminReportsPage({
               </tr>
             </thead>
             <tbody>
-              {(members as MemberRow[]).map((m, i) => {
+              {(members as unknown as MemberRow[]).map((m, i) => {
                 const contrib = m.contributions[0]
                 const amountDue  = contrib ? Number(contrib.amountDue) : 0
                 const amountPaid = contrib ? Number(contrib.amountPaid) : 0

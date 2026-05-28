@@ -49,7 +49,9 @@ export async function PATCH(req: NextRequest) {
     data: {
       userId: session.user.id,
       action: 'WHATSAPP_PREFERENCE_UPDATED',
-      metadata: { enabled },
+      entity: 'NotificationPreference',
+      entityId: session.user.id,
+      payload: { enabled },
     },
   })
 
