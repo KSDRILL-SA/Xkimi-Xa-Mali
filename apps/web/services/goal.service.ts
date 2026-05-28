@@ -1,4 +1,4 @@
-import { db } from '@/lib/db'
+import { db, Prisma } from '@/lib/db'
 import { env } from '@/lib/env'
 import { writeAuditLog } from './audit.service'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
@@ -183,7 +183,7 @@ export async function updateGoal(
     action: 'GOAL_UPDATED',
     entity: 'Goal',
     entityId: id,
-    payload: input as Record<string, unknown>,
+    payload: input as unknown as Prisma.InputJsonValue,
     ipAddress: ip,
   })
 

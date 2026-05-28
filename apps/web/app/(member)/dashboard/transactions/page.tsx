@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import type { Route } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -114,7 +115,7 @@ export default async function TransactionsPage({
         <div className="flex flex-wrap gap-2">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider self-center mr-1">Status</span>
           <Link
-            href={buildUrl({ status: undefined, page: '1' })}
+            href={buildUrl({ status: undefined, page: '1' }) as Route}
             className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${!statusFilter ? 'bg-xxm-green text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             All
@@ -122,7 +123,7 @@ export default async function TransactionsPage({
           {validStatuses.map((s) => (
             <Link
               key={s}
-              href={buildUrl({ status: s, page: '1' })}
+              href={buildUrl({ status: s, page: '1' }) as Route}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${statusFilter === s ? 'bg-xxm-green text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
               {STATUS_CONFIG[s].label}
@@ -132,7 +133,7 @@ export default async function TransactionsPage({
         <div className="flex flex-wrap gap-2">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider self-center mr-1">Type</span>
           <Link
-            href={buildUrl({ type: undefined, page: '1' })}
+            href={buildUrl({ type: undefined, page: '1' }) as Route}
             className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${!typeFilter ? 'bg-xxm-green text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
           >
             All
@@ -140,7 +141,7 @@ export default async function TransactionsPage({
           {validTypes.map((t) => (
             <Link
               key={t}
-              href={buildUrl({ type: t, page: '1' })}
+              href={buildUrl({ type: t, page: '1' }) as Route}
               className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${typeFilter === t ? 'bg-xxm-green text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
             >
               {TYPE_LABELS[t]}
@@ -172,7 +173,7 @@ export default async function TransactionsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {(txs as TxRow[]).map((tx, i) => {
+                  {(txs as unknown as TxRow[]).map((tx, i) => {
                     const sc = STATUS_CONFIG[tx.status as TxStatus] ?? { label: tx.status, className: 'bg-gray-100 text-gray-600' }
                     return (
                       <tr key={tx.id} className={`border-b border-gray-50 ${i % 2 === 1 ? 'bg-gray-50/50' : ''}`}>
@@ -212,7 +213,7 @@ export default async function TransactionsPage({
                 <div className="flex gap-2">
                   {page > 1 && (
                     <Link
-                      href={buildUrl({ page: String(page - 1) })}
+                      href={buildUrl({ page: String(page - 1) }) as Route}
                       className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 hover:bg-gray-50"
                     >
                       Previous
@@ -220,7 +221,7 @@ export default async function TransactionsPage({
                   )}
                   {page < totalPages && (
                     <Link
-                      href={buildUrl({ page: String(page + 1) })}
+                      href={buildUrl({ page: String(page + 1) }) as Route}
                       className="px-3 py-1.5 text-xs rounded-lg bg-xxm-green text-white hover:bg-xxm-green/90"
                     >
                       Next

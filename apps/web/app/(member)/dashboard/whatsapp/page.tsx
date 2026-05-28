@@ -16,7 +16,9 @@ async function setWhatsAppPreference(enabled: boolean, userId: string) {
     data: {
       userId,
       action: 'WHATSAPP_PREFERENCE_UPDATED',
-      metadata: { enabled },
+      entity: 'NotificationPreference',
+      entityId: userId,
+      payload: { enabled },
     },
   })
   redirect(`/dashboard/whatsapp?updated=1`)
@@ -28,7 +30,7 @@ export default async function WhatsAppPage({
   searchParams: Promise<{ updated?: string }>
 }) {
   const session = await auth()
-  if (!session?.user?.id) redirect('/auth/login')
+  if (!session?.user?.id) redirect('/login')
 
   const userId = session.user.id
   const params = await searchParams

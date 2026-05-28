@@ -1,5 +1,6 @@
 'use client'
 
+import type { Route } from 'next'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useRef, useEffect, useState, useCallback } from 'react'
@@ -34,11 +35,13 @@ export function ScrollNav({ items, variant = 'member' }: ScrollNavProps) {
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    updateFades()
+    // Defer to next frame so the browser has finished layout before measuring
+    const raf = requestAnimationFrame(updateFades)
     el.addEventListener('scroll', updateFades, { passive: true })
     const ro = new ResizeObserver(updateFades)
     ro.observe(el)
     return () => {
+      cancelAnimationFrame(raf)
       el.removeEventListener('scroll', updateFades)
       ro.disconnect()
     }
@@ -102,7 +105,7 @@ export function ScrollNav({ items, variant = 'member' }: ScrollNavProps) {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={item.href as Route}
               data-active={active}
               aria-current={active ? 'page' : undefined}
               className={cn(

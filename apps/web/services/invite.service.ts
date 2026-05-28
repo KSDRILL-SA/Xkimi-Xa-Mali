@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'crypto'
-import { db } from '@/lib/db'
+import { db, Prisma } from '@/lib/db'
 import { sendInviteEmail, sendVerificationEmail } from '@/lib/email'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import { writeAuditLog } from './audit.service'
@@ -321,7 +321,7 @@ export async function acceptInviteRegistration(
   const rawToken    = generateToken()
   const tokenHash   = hashToken(rawToken)
 
-  const user = await db.$transaction(async (tx: typeof db) => {
+  const user = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const created = await tx.user.create({
       data: {
         email:         invite.email,
