@@ -67,7 +67,7 @@ async function dispatchEmail(
   const firstName = String(payload.firstName ?? '')
   const amount = String(payload.amount ?? '0')
   const period = String(payload.period ?? payload.month ?? '')
-  const dashboardUrl = String(payload.url ?? process.env.NEXTAUTH_URL ?? '')
+  const dashboardUrl = String(payload.url ?? env.NEXTAUTH_URL ?? '')
 
   switch (slug) {
     case 'welcome-email':

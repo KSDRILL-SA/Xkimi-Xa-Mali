@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
+import { env } from '@/lib/env'
 import { PWARegister } from '@/components/PWARegister'
 import './globals.css'
 
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title:       { default: 'Xkimm Xa Mali', template: '%s | Xkimm Xa Mali' },
   description: 'A collective financial platform built on trust, brotherhood, and shared wealth.',
-  metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL(env.NEXTAUTH_URL ?? 'http://localhost:3000'),
   manifest:    '/manifest.webmanifest',
   appleWebApp: {
     capable: true,

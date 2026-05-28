@@ -19,10 +19,21 @@ const ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: 'Incorrect email or password.',
 }
 
+function safeCallbackUrl(raw: string | null): string {
+  if (!raw) return '/dashboard'
+  try {
+    const url = new URL(raw, window.location.origin)
+    if (url.origin !== window.location.origin) return '/dashboard'
+    return url.pathname + url.search + url.hash
+  } catch {
+    return '/dashboard'
+  }
+}
+
 export function LoginForm() {
   const router = useRouter()
   const params = useSearchParams()
-  const callbackUrl = params.get('callbackUrl') ?? '/dashboard'
+  const callbackUrl = safeCallbackUrl(params.get('callbackUrl'))
   const verified = params.get('verified')
   const errorParam = params.get('error')
 
@@ -50,7 +61,7 @@ export function LoginForm() {
       return
     }
 
-    router.push(callbackUrl as Route)
+    router.push(callbackUrl as Route<string>)
     router.refresh()
   }
 

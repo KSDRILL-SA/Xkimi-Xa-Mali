@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { MessageCircle } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL } from '@/lib/utils'
+import { APP_URL, WA_LINK } from '@/lib/utils'
 
 const year = new Date().getFullYear()
 
@@ -45,7 +45,7 @@ export function Footer() {
             </p>
 
             <a
-              href="https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb"
+              href={WA_LINK}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xxm-gold/70 hover:text-xxm-gold text-sm font-medium transition-colors w-fit"
