@@ -110,6 +110,8 @@ model User {
   lockedGoals            Goal[]                  @relation("GoalLocker")
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
+  invitesSent            Invitation[]            @relation("InvitesSent")
+  inviteAccepted         Invitation?             @relation("InviteAccepted")
 
   @@map("users")
 }
@@ -378,4 +380,37 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([userId, createdAt])
   @@map("audit_logs")
+}
+
+// ─── Invitations ─────────────────────────────────────────────────────────────
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+model Invitation {
+  id            String           @id @default(cuid())
+  codeHash      String           @unique
+  codePrefix    String
+  firstName     String
+  lastName      String
+  email         String           @unique
+  phone         String           @unique
+  minimumAmount Decimal          @db.Decimal(10, 2)
+  status        InvitationStatus @default(PENDING)
+  invitedById   String
+  acceptedById  String?          @unique
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  createdAt     DateTime         @default(now())
+
+  invitedBy  User  @relation("InvitesSent",    fields: [invitedById],  references: [id])
+  acceptedBy User? @relation("InviteAccepted", fields: [acceptedById], references: [id])
+
+  @@index([invitedById])
+  @@index([email])
+  @@index([status])
+  @@map("invitations")
 }
