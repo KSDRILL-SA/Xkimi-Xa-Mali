@@ -15,10 +15,10 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: { default: 'Xkimm Xa Mali', template: '%s | Xkimm Xa Mali' },
-  description: 'Group savings and contribution management platform.',
+  title:       { default: 'Xkimm Xa Mali', template: '%s | Xkimm Xa Mali' },
+  description: 'A collective financial platform built on trust, brotherhood, and shared wealth.',
   metadataBase: new URL(process.env.NEXTAUTH_URL ?? 'http://localhost:3000'),
-  manifest: '/manifest.webmanifest',
+  manifest:    '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -26,17 +26,17 @@ export const metadata: Metadata = {
   },
   formatDetection: { telephone: false },
   openGraph: {
-    type: 'website',
-    siteName: 'Xkimm Xa Mali',
-    title: 'Xkimm Xa Mali',
-    description: 'Group savings and contribution management platform.',
+    type:        'website',
+    siteName:    'Xkimm Xa Mali',
+    title:       'Xkimm Xa Mali',
+    description: 'A collective financial platform built on trust, brotherhood, and shared wealth.',
   },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="min-h-dvh bg-xxm-green-50 antialiased">
+      <body className="min-h-dvh bg-xxm-champagne antialiased">
         {children}
         <PWARegister />
       </body>
