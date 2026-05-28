@@ -10,12 +10,12 @@ export async function GET(req: NextRequest) {
 
   try {
     await verifyEmail(token, ip)
-    return NextResponse.redirect(new URL('/auth/login?verified=1', req.url))
+    return NextResponse.redirect(new URL('/login?verified=1', req.url))
   } catch (err) {
     const e = err as { code?: string }
     if (e.code === 'AUTH_004') {
-      return NextResponse.redirect(new URL('/auth/login?error=invalid_token', req.url))
+      return NextResponse.redirect(new URL('/login?error=invalid_token', req.url))
     }
-    return NextResponse.redirect(new URL('/auth/login?error=server', req.url))
+    return NextResponse.redirect(new URL('/login?error=server', req.url))
   }
 }

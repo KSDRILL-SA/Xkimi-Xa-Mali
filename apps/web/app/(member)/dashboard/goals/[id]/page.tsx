@@ -51,6 +51,12 @@ export default async function GoalDetailPage({
 
   if (!goal) notFound()
 
+  const progressEntries: ProgressEntry[] = goal.progress.map((p) => ({
+    id: p.id,
+    amount: p.amount.toString(),
+    recordedAt: p.recordedAt,
+  }))
+
   const status = goal.status as GoalStatus
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT
   const pct = Math.min(
@@ -145,8 +151,8 @@ export default async function GoalDetailPage({
           </div>
         ) : (
           <div className="xxm-card divide-y divide-gray-100">
-            {(goal.progress as ProgressEntry[]).map((entry, idx) => {
-              const runningTotal = (goal.progress as ProgressEntry[])
+            {progressEntries.map((entry, idx) => {
+              const runningTotal = progressEntries
                 .slice(idx)
                 .reduce((sum: number, p: ProgressEntry) => sum + Number(p.amount), 0)
 

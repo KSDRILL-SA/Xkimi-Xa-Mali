@@ -40,7 +40,7 @@ export function ResetPasswordForm({ token }: Props) {
     setLoading(true)
     setServerError('')
 
-    const res = await fetch('/api/v1/auth/reset-password', {
+    const res = await fetch('/api/v1/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data, token }),
@@ -54,7 +54,7 @@ export function ResetPasswordForm({ token }: Props) {
       return
     }
 
-    router.push('/auth/login?reset=1')
+    router.push('/login?reset=1')
   }
 
   return (

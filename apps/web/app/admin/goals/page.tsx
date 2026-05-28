@@ -57,7 +57,7 @@ export default async function AdminGoalsPage({
                   <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">No goals yet.</td>
                 </tr>
               ) : (
-                (items as GoalRow[]).map((g, i) => {
+                (items as unknown as GoalRow[]).map((g, i) => {
                   const cfg  = STATUS_CONFIG[g.status] ?? STATUS_CONFIG.DRAFT
                   const pct  = Math.min(100, Math.round((Number(g.currentAmount) / Number(g.targetAmount)) * 100))
                   return (
