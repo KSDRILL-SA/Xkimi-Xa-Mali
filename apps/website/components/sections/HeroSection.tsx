@@ -19,7 +19,6 @@ export function HeroSection() {
           quality={90}
           className="object-cover object-center"
           sizes="100vw"
-          aria-hidden="true"
         />
 
         {/* layered overlays for depth */}

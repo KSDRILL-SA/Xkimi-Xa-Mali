@@ -88,21 +88,21 @@ export function CTASection() {
             <div className="flex flex-wrap items-center justify-center gap-6">
               <a
                 href={`${APP_URL}/dashboard`}
-                className="text-white/35 hover:text-white/70 text-sm font-medium transition-colors flex items-center gap-1.5"
+                className="text-white/55 hover:text-white/80 text-sm font-medium transition-colors flex items-center gap-1.5"
               >
                 Member portal
                 <ArrowRight size={12} aria-hidden />
               </a>
               <a
                 href={`${APP_URL}/admin`}
-                className="text-white/35 hover:text-white/70 text-sm font-medium transition-colors flex items-center gap-1.5"
+                className="text-white/55 hover:text-white/80 text-sm font-medium transition-colors flex items-center gap-1.5"
               >
                 Admin panel
                 <ArrowRight size={12} aria-hidden />
               </a>
               <a
                 href={`${APP_URL}/support`}
-                className="text-white/35 hover:text-white/70 text-sm font-medium transition-colors flex items-center gap-1.5"
+                className="text-white/55 hover:text-white/80 text-sm font-medium transition-colors flex items-center gap-1.5"
               >
                 Support
                 <ArrowRight size={12} aria-hidden />
