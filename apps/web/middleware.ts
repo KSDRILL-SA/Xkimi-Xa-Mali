@@ -1,5 +1,8 @@
-import { auth } from '@/lib/auth'
+import NextAuth from 'next-auth'
 import { NextResponse } from 'next/server'
+import { authConfig } from '@/lib/auth.config'
+
+const { auth } = NextAuth(authConfig)
 
 const WEBHOOK_PREFIX = '/api/v1/webhooks'
 const HEALTH_PATH = '/api/v1/health'

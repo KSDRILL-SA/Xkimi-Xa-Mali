@@ -1,27 +1,14 @@
 import NextAuth from 'next-auth'
 import { PrismaAdapter } from '@auth/prisma-adapter'
-import Credentials, { CredentialsSignin } from 'next-auth/providers/credentials'
+import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { db } from './db'
 import { LoginSchema } from './validation/auth'
-
-class EmailNotVerified extends CredentialsSignin {
-  code = 'EMAIL_NOT_VERIFIED'
-}
-
-class AccountSuspended extends CredentialsSignin {
-  code = 'ACCOUNT_SUSPENDED'
-}
+import { authConfig } from './auth.config'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(db),
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
-  trustHost: true,
-  session: { strategy: 'jwt' },
-  pages: {
-    signIn: '/login',
-    error: '/login',
-  },
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -36,11 +23,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user?.password) return null
 
         if (user.status === 'PENDING') {
-          throw new EmailNotVerified()
+          throw new Error('EMAIL_NOT_VERIFIED')
         }
 
         if (user.status === 'SUSPENDED') {
-          throw new AccountSuspended()
+          throw new Error('ACCOUNT_SUSPENDED')
         }
 
         const valid = await bcrypt.compare(parsed.data.password, user.password)
@@ -55,18 +42,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.roles = (user as { roles?: string[] }).roles ?? []
-      }
-      return token
-    },
-    session({ session, token }) {
-      session.user.id = token.id as string
-      session.user.roles = token.roles as string[]
-      return session
-    },
-  },
 })
