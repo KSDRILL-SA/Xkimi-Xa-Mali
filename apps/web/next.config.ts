@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next'
+import { withSentryConfig } from '@sentry/nextjs'
 
 const nextConfig: NextConfig = {
   experimental: {
@@ -9,6 +10,14 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      {
+        // Service worker must be served from root scope
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
       {
         source: '/(.*)',
         headers: [
@@ -27,11 +36,12 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://browser.sentry-cdn.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self'",
-              "connect-src 'self' https://*.vercel.app https://*.upstash.io",
+              "connect-src 'self' https://*.vercel.app https://*.upstash.io https://o*.ingest.sentry.io",
+              "worker-src 'self'",
               "frame-ancestors 'none'",
             ].join('; '),
           },
@@ -41,4 +51,27 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+const sentryOptions = {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: true,
+  widenClientFileUpload: true,
+  hideSourceMaps: true,
+  disableLogger: true,
+  automaticVercelMonitors: true,
+}
+
+let config: NextConfig = nextConfig
+
+// Only wrap with Sentry when DSN is configured
+if (process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN) {
+  config = withSentryConfig(nextConfig, sentryOptions)
+}
+
+// Bundle analyser — run with ANALYZE=true next build
+if (process.env.ANALYZE === 'true') {
+  const withBundleAnalyzer = require('@next/bundle-analyzer')({ enabled: true })
+  config = withBundleAnalyzer(config)
+}
+
+export default config
