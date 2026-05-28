@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { CheckCircle2 } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 
@@ -163,7 +164,7 @@ export default async function WhatsAppPage({
             'Goal milestone alerts',
           ].map((item) => (
             <li key={item} className="flex items-start gap-2">
-              <span className="mt-0.5 text-xxm-green-600">✓</span>
+              <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-xxm-green-600" aria-hidden />
               {item}
             </li>
           ))}
