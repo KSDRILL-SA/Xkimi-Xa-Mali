@@ -8,8 +8,9 @@ import Link from 'next/link'
 import { RegisterStep2Schema, type RegisterStep2Input } from '@/lib/validation/auth'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
+import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
+import { Stepper } from '@/components/ui/Stepper'
 
 type PrefilledData = {
   firstName: string
@@ -139,39 +140,48 @@ export function RegisterForm() {
     )
   }
 
+  const STEPS = [
+    { label: 'Invite code',  description: 'Validate your invite' },
+    { label: 'Your details', description: 'Complete your profile' },
+  ]
+
   // ─── Step 1 — Enter invite code ─────────────────────────────────────────────
 
   if (step === 1) {
     return (
-      <form onSubmit={handleValidateCode} className="space-y-4" noValidate>
-        {error && <Alert variant="error">{error}</Alert>}
+      <div className="space-y-6">
+        <Stepper steps={STEPS} currentStep={0} />
+        <form onSubmit={handleValidateCode} className="space-y-4" noValidate>
+          {error && <Alert variant="error">{error}</Alert>}
 
-        <div>
-          <Label htmlFor="inviteCode" required>Invite code</Label>
-          <Input
-            id="inviteCode"
-            placeholder="XKM-XXXX-XXXX"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-            maxLength={12}
-            className="font-mono tracking-widest text-center"
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            Enter the invite code you received via SMS or email.
+          <FormGroup
+            label="Invite code"
+            htmlFor="inviteCode"
+            required
+            hint="Enter the code you received via SMS or email."
+          >
+            <Input
+              id="inviteCode"
+              placeholder="XKM-XXXX-XXXX"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              maxLength={12}
+              className="font-mono tracking-widest text-center"
+            />
+          </FormGroup>
+
+          <Button type="submit" className="w-full" size="lg" loading={loading}>
+            Validate code
+          </Button>
+
+          <p className="text-center text-sm text-xxm-gray-600">
+            Already have an account?{' '}
+            <Link href="/login" className="font-medium text-xxm-green hover:underline">
+              Sign in
+            </Link>
           </p>
-        </div>
-
-        <Button type="submit" className="w-full" size="lg" loading={loading}>
-          Validate code
-        </Button>
-
-        <p className="text-center text-sm text-gray-600">
-          Already have an account?{' '}
-          <Link href="/login" className="font-medium text-xxm-green hover:underline">
-            Sign in
-          </Link>
-        </p>
-      </form>
+        </form>
+      </div>
     )
   }
 
@@ -180,88 +190,71 @@ export function RegisterForm() {
   const { register: reg2, handleSubmit: submit2, formState: { errors: e2 }, setValue: set2 } = step2Form
 
   return (
-    <form onSubmit={submit2(handleRegister)} className="space-y-4" noValidate>
-      {error && <Alert variant="error">{error}</Alert>}
+    <div className="space-y-6">
+      <Stepper steps={STEPS} currentStep={1} />
 
-      <div className="rounded-lg bg-xxm-green/5 border border-xxm-green/20 px-4 py-3 text-sm text-xxm-green space-y-1">
-        <p className="font-semibold">Invite verified</p>
-        <p>Code: <span className="font-mono">{inviteCode}</span></p>
-      </div>
+      <form onSubmit={submit2(handleRegister)} className="space-y-4" noValidate>
+        {error && <Alert variant="error">{error}</Alert>}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor="firstName" required>First name</Label>
-          <Input id="firstName" placeholder="Kurhula"
-            defaultValue={prefilled?.firstName}
-            error={e2.firstName?.message}
-            {...reg2('firstName')} />
+        <div className="rounded-xl bg-xxm-green/5 border border-xxm-green/20 px-4 py-3 text-sm text-xxm-green space-y-1">
+          <p className="font-semibold">Invite verified</p>
+          <p>Code: <span className="font-mono">{inviteCode}</span></p>
         </div>
-        <div>
-          <Label htmlFor="lastName" required>Last name</Label>
-          <Input id="lastName" placeholder="Maluleke"
-            defaultValue={prefilled?.lastName}
-            error={e2.lastName?.message}
-            {...reg2('lastName')} />
+
+        <div className="grid grid-cols-2 gap-3">
+          <FormGroup label="First name" htmlFor="firstName" required error={e2.firstName?.message}>
+            <Input id="firstName" placeholder="Kurhula" defaultValue={prefilled?.firstName} {...reg2('firstName')} />
+          </FormGroup>
+          <FormGroup label="Last name" htmlFor="lastName" required error={e2.lastName?.message}>
+            <Input id="lastName" placeholder="Maluleke" defaultValue={prefilled?.lastName} {...reg2('lastName')} />
+          </FormGroup>
         </div>
-      </div>
 
-      <div>
-        <Label htmlFor="emailDisplay">Email address</Label>
-        <Input id="emailDisplay" value={prefilled?.email ?? ''} readOnly disabled
-          className="bg-gray-50 text-gray-500 cursor-not-allowed" />
-        <p className="text-xs text-gray-400 mt-1">Locked to your invite. Cannot be changed.</p>
-      </div>
+        <FormGroup label="Email address" htmlFor="emailDisplay" hint="Locked to your invite — cannot be changed.">
+          <Input id="emailDisplay" value={prefilled?.email ?? ''} readOnly disabled />
+        </FormGroup>
 
-      <div>
-        <Label htmlFor="phoneDisplay">SA mobile number</Label>
-        <Input id="phoneDisplay" value={prefilled?.phone ?? ''} readOnly disabled
-          className="bg-gray-50 text-gray-500 cursor-not-allowed" />
-        <p className="text-xs text-gray-400 mt-1">Locked to your invite. Cannot be changed.</p>
-      </div>
+        <FormGroup label="SA mobile number" htmlFor="phoneDisplay" hint="Locked to your invite — cannot be changed.">
+          <Input id="phoneDisplay" value={prefilled?.phone ?? ''} readOnly disabled />
+        </FormGroup>
 
-      <div>
-        <Label htmlFor="idNumber">SA ID number <span className="text-gray-400 font-normal">(optional)</span></Label>
-        <Input id="idNumber" placeholder="13-digit ID number" maxLength={13}
-          error={e2.idNumber?.message}
-          {...reg2('idNumber')} />
-      </div>
+        <FormGroup label="SA ID number" htmlFor="idNumber" hint="Optional" error={e2.idNumber?.message}>
+          <Input id="idNumber" placeholder="13-digit ID number" maxLength={13} {...reg2('idNumber')} />
+        </FormGroup>
 
-      <div>
-        <Label htmlFor="password" required>Password</Label>
-        <Input id="password" type="password" autoComplete="new-password"
-          placeholder="Min. 8 chars, 1 uppercase, 1 number"
-          error={e2.password?.message}
-          {...reg2('password')} />
-      </div>
+        <FormGroup label="Password" htmlFor="password" required error={e2.password?.message} hint="Min. 8 characters, 1 uppercase, 1 number">
+          <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" {...reg2('password')} />
+        </FormGroup>
 
-      <div className="flex items-start gap-2 pt-1">
-        <input
-          id="consentToPopia"
-          type="checkbox"
-          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-xxm-green accent-xxm-green cursor-pointer"
-          onChange={(e) => set2('consentToPopia', e.target.checked)}
-        />
-        <div>
-          <Label htmlFor="consentToPopia" className="mb-0 font-normal text-gray-600 cursor-pointer">
-            I consent to the processing of my personal information in accordance with POPIA.
-          </Label>
-          {e2.consentToPopia && (
-            <p className="text-xs text-red-500 mt-0.5">{e2.consentToPopia.message}</p>
-          )}
+        <div className="flex items-start gap-2 pt-1">
+          <input
+            id="consentToPopia"
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 rounded border-xxm-gray-300 text-xxm-green accent-xxm-green cursor-pointer"
+            onChange={(e) => set2('consentToPopia', e.target.checked)}
+          />
+          <div>
+            <label htmlFor="consentToPopia" className="text-sm font-normal text-xxm-gray-600 cursor-pointer">
+              I consent to the processing of my personal information in accordance with POPIA.
+            </label>
+            {e2.consentToPopia && (
+              <p className="text-xs text-red-500 mt-0.5">{e2.consentToPopia.message}</p>
+            )}
+          </div>
         </div>
-      </div>
 
-      <Button type="submit" className="w-full" size="lg" loading={loading}>
-        Create account
-      </Button>
+        <Button type="submit" className="w-full" size="lg" loading={loading}>
+          Create account
+        </Button>
 
-      <button
-        type="button"
-        onClick={() => { setStep(1); setError(''); setPrefilled(null) }}
-        className="w-full text-sm text-gray-500 hover:text-gray-700 text-center"
-      >
-        ← Use a different code
-      </button>
-    </form>
+        <button
+          type="button"
+          onClick={() => { setStep(1); setError(''); setPrefilled(null) }}
+          className="w-full text-sm text-xxm-gray-500 hover:text-xxm-gray-700 text-center"
+        >
+          ← Use a different code
+        </button>
+      </form>
+    </div>
   )
 }
