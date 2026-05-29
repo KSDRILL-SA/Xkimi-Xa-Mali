@@ -1,0 +1,13 @@
+{
+  "name": "@xxm/config",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared configuration — tsconfig, tailwind, eslint",
+  "exports": {
+    "./tsconfig/base":   "./tsconfig/base.json",
+    "./tsconfig/nextjs": "./tsconfig/nextjs.json",
+    "./tailwind":        "./tailwind/base.ts",
+    "./eslint":          "./eslint/index.mjs"
+  },
+  "files": ["tsconfig", "tailwind", "eslint"]
+}

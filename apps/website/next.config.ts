@@ -1,6 +1,7 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/config'],
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [

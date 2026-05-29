@@ -12,6 +12,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@xxm/config":   "*",
+    "@xxm/database": "*",
+    "@xxm/types":    "*",
+    "@xxm/ui":       "*",
+    "@xxm/utils":    "*",
     "@auth/prisma-adapter": "^2.7.4",
     "@hookform/resolvers": "^3.9.1",
     "@prisma/client": "^6.1.0",
