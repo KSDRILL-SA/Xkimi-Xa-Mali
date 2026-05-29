@@ -4,14 +4,12 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ChangePasswordSchema } from '@/lib/validation/auth'
-import { z } from 'zod'
+import type { ChangePasswordInput as FormData } from '@/lib/validation/auth'
 import { api, ApiClientError } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Alert } from '@/components/ui/Alert'
-
-type FormData = z.infer<typeof ChangePasswordSchema>
 
 export function ChangePasswordForm() {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)

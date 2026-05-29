@@ -79,9 +79,9 @@ export default async function ContributionsPage() {
 
       {/* No active mandate warning */}
       {!mandateInfo && (
-        <div className="xxm-card p-4 border-l-4 border-amber-400 bg-amber-50">
-          <p className="text-sm text-amber-800 font-medium">No active mandate</p>
-          <p className="text-xs text-amber-700 mt-1">
+        <div className="xxm-card p-4 xxm-banner-warning">
+          <p className="text-sm font-medium">No active mandate</p>
+          <p className="text-xs mt-1">
             Set up a payment mandate to enable monthly debits and manual payments.{' '}
             <Link href="/dashboard/mandates" className="underline font-semibold">
               Go to Mandates

@@ -1,13 +1,13 @@
 import { NextRequest } from 'next/server'
-import { z } from 'zod'
+import { PasswordResetRequestSchema as Schema } from '@/lib/validation/auth'
 import { authRatelimit } from '@/lib/redis'
+import { getClientIP } from '@/lib/request'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { requestPasswordReset } from '@/services/auth.service'
 
-const Schema = z.object({ email: z.string().email() })
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  const ip = getClientIP(req) ?? 'unknown'
 
   const { success } = await authRatelimit.limit(`reset:${ip}`)
   if (!success) return apiError('SYS_005', 'Too many requests. Please try again later.', 429)

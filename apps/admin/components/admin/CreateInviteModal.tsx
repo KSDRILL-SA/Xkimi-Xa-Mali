@@ -3,6 +3,8 @@
 import { useState, useRef } from 'react'
 import { Button, Input, Label, Alert } from '@xxm/ui'
 import { Check, Copy, X, UserPlus } from 'lucide-react'
+import { api, ApiClientError } from '@/lib/api'
+import { MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR, DEFAULT_INVITE_AMOUNT } from '@xxm/utils'
 
 type CreatedInvite = {
   code: string; firstName: string; lastName: string; email: string
@@ -21,30 +23,23 @@ export function CreateInviteModal({ onCreated }: { onCreated?: () => void }) {
     setLoading(true)
     setError('')
 
-    const fd  = new FormData(e.currentTarget)
-    const res = await fetch(`${process.env['NEXT_PUBLIC_WEB_URL'] ?? ''}/api/v1/admin/invitations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    const fd = new FormData(e.currentTarget)
+    try {
+      const data = await api.post<CreatedInvite>('/api/v1/admin/invitations', {
         firstName:     fd.get('firstName'),
         lastName:      fd.get('lastName'),
         email:         fd.get('email'),
         phone:         fd.get('phone'),
         minimumAmount: Number(fd.get('minimumAmount')),
-      }),
-    })
-
-    const json = await res.json()
-    setLoading(false)
-
-    if (!res.ok) {
-      setError(json.error?.message ?? 'Failed to create invitation.')
-      return
+      })
+      setCreated(data)
+      formRef.current?.reset()
+      onCreated?.()
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Failed to create invitation.')
+    } finally {
+      setLoading(false)
     }
-
-    setCreated(json.data)
-    formRef.current?.reset()
-    onCreated?.()
   }
 
   function handleCopy() {
@@ -120,7 +115,7 @@ export function CreateInviteModal({ onCreated }: { onCreated?: () => void }) {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="invite-amount">Minimum monthly amount (R) *</Label>
-                  <Input id="invite-amount" name="minimumAmount" type="number" min={100} step={50} defaultValue="200" required />
+                  <Input id="invite-amount" name="minimumAmount" type="number" min={MIN_CONTRIBUTION_ZAR} step={CONTRIBUTION_STEP_ZAR} defaultValue={String(DEFAULT_INVITE_AMOUNT)} required />
                 </div>
 
                 <div className="flex gap-3 pt-1">

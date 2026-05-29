@@ -66,7 +66,7 @@ export default function SupportPage() {
             <h1 className="text-3xl sm:text-4xl font-black text-xxm-green-900 leading-tight">
               Support
             </h1>
-            <p className="text-gray-600 text-[15px] leading-relaxed mt-3">
+            <p className="text-xxm-gray-600 text-[15px] leading-relaxed mt-3">
               Need help? Start with the FAQs below. For anything else, reach out to the
               platform administrators directly via WhatsApp.
             </p>
@@ -84,14 +84,14 @@ export default function SupportPage() {
               rel="noopener noreferrer"
               className="xxm-card p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
             >
-              <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-                <MessageCircle size={18} className="text-green-600" aria-hidden />
+              <div className="w-10 h-10 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
+                <MessageCircle size={18} className="text-xxm-green" aria-hidden />
               </div>
               <div>
                 <p className="font-bold text-xxm-green-900 group-hover:text-xxm-green transition-colors">
                   Message Admin on WhatsApp
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                <p className="text-xs text-xxm-gray-500 mt-0.5 leading-relaxed">
                   Chat directly with an administrator on WhatsApp for immediate assistance.
                 </p>
               </div>
@@ -101,14 +101,14 @@ export default function SupportPage() {
               href="mailto:support@xkimmxamali.co.za"
               className="xxm-card p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
             >
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                <Mail size={18} className="text-blue-500" aria-hidden />
+              <div className="w-10 h-10 rounded-xl bg-xxm-champagne-200 flex items-center justify-center shrink-0">
+                <Mail size={18} className="text-xxm-green-700" aria-hidden />
               </div>
               <div>
                 <p className="font-bold text-xxm-green-900 group-hover:text-xxm-green transition-colors">
                   Email Support
                 </p>
-                <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                <p className="text-xs text-xxm-gray-500 mt-0.5 leading-relaxed">
                   For non-urgent queries, email us. We respond within 1–2 business days.
                 </p>
               </div>
@@ -125,7 +125,7 @@ export default function SupportPage() {
               {faqs.map(({ q, a }) => (
                 <div key={q} className="xxm-card p-5">
                   <p className="font-bold text-xxm-green-900 mb-2 text-sm">{q}</p>
-                  <p className="text-sm text-gray-500 leading-relaxed">{a}</p>
+                  <p className="text-sm text-xxm-gray-500 leading-relaxed">{a}</p>
                 </div>
               ))}
             </div>
@@ -135,15 +135,15 @@ export default function SupportPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Link href="/about" className="xxm-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
               <Users size={16} className="text-xxm-gold shrink-0" aria-hidden />
-              <span className="text-sm font-medium text-gray-700 group-hover:text-xxm-green">About the platform</span>
+              <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">About the platform</span>
             </Link>
             <Link href="/privacy" className="xxm-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
               <Shield size={16} className="text-xxm-gold shrink-0" aria-hidden />
-              <span className="text-sm font-medium text-gray-700 group-hover:text-xxm-green">Privacy Policy</span>
+              <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">Privacy Policy</span>
             </Link>
             <Link href="/terms" className="xxm-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
               <FileText size={16} className="text-xxm-gold shrink-0" aria-hidden />
-              <span className="text-sm font-medium text-gray-700 group-hover:text-xxm-green">Terms of Use</span>
+              <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">Terms of Use</span>
             </Link>
           </div>
         </div>

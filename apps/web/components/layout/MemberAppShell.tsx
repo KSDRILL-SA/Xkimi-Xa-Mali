@@ -4,6 +4,7 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { ScrollNav, type NavItem } from '@/components/layout/ScrollNav'
 import { AppFooter } from '@/components/layout/AppFooter'
 import { ToastProvider } from '@/components/ui'
+import { env } from '@/lib/env'
 import {
   LayoutDashboard,
   Wallet,
@@ -45,13 +46,19 @@ export function MemberAppShell({
   signOutSlot,
 }: MemberAppShellProps) {
   const nav: NavItem[] = isAdmin
-    ? [...memberNav, { href: '/admin', label: 'Admin', icon: ShieldCheck }]
+    ? [...memberNav, { href: env.NEXT_PUBLIC_ADMIN_URL as string, label: 'Admin', icon: ShieldCheck }]
     : memberNav
 
   return (
     <ToastProvider>
       <div className="min-h-dvh flex flex-col bg-xxm-champagne">
-        <AppHeader userName={userName} userInitials={userInitials} signOutSlot={signOutSlot} />
+        <AppHeader
+          userName={userName}
+          userInitials={userInitials}
+          signOutSlot={signOutSlot}
+          showBell
+          showSkipLink
+        />
         <ScrollNav items={nav} variant="member" />
         <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
           {children}

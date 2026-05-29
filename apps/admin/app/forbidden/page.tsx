@@ -8,8 +8,8 @@ export default function ForbiddenPage() {
   return (
     <div className="min-h-dvh flex items-center justify-center bg-xxm-champagne p-4">
       <div className="text-center space-y-4 max-w-sm">
-        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mx-auto">
-          <ShieldOff size={28} className="text-red-600" />
+        <div className="w-16 h-16 mx-auto xxm-icon-bg-danger">
+          <ShieldOff size={28} />
         </div>
         <h1 className="text-2xl font-bold text-xxm-green-900">Access Denied</h1>
         <p className="text-sm text-xxm-gray-500">
