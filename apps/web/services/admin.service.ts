@@ -409,6 +409,109 @@ export async function listAuditLogs(adminRoles: string[], params: ListAuditParam
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+// ─── Dashboard stats ──────────────────────────────────────────────────────────
+
+export async function getDashboardStats(adminRoles: string[]) {
+  assertAdmin(adminRoles)
+
+  const now = new Date()
+  const thisMonth = now.getMonth() + 1
+  const thisYear = now.getFullYear()
+  const monthStart = new Date(thisYear, thisMonth - 1, 1)
+
+  const [
+    memberCounts,
+    mandateCounts,
+    contributionSummary,
+    recentAuditLogs,
+    poolTotal,
+    pendingInvites,
+  ] = await Promise.all([
+    // Member counts by status
+    db.user.groupBy({ by: ['status'], _count: { status: true } }),
+
+    // Mandate counts by status
+    db.paymentMandate.groupBy({ by: ['status'], _count: { status: true } }),
+
+    // This month's contribution stats
+    db.contribution.aggregate({
+      where: { periodMonth: thisMonth, periodYear: thisYear },
+      _count: { id: true },
+      _sum: { amountDue: true, amountPaid: true },
+    }),
+
+    // Last 10 audit events for the activity feed
+    db.auditLog.findMany({
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        action: true,
+        entity: true,
+        entityId: true,
+        createdAt: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    }),
+
+    // All-time pool total (sum of all paid contributions)
+    db.contribution.aggregate({
+      where: { status: 'PAID' },
+      _sum: { amountPaid: true },
+    }),
+
+    // Open invitation count
+    db.invitation.count({ where: { status: 'PENDING', expiresAt: { gt: now } } }),
+  ])
+
+  // Contributions received this calendar month
+  const newContributionsThisMonth = await db.contribution.count({
+    where: { createdAt: { gte: monthStart } },
+  })
+
+  const memberMap = Object.fromEntries(
+    memberCounts.map((r) => [r.status, r._count.status]),
+  )
+  const mandateMap = Object.fromEntries(
+    mandateCounts.map((r) => [r.status, r._count.status]),
+  )
+
+  const thisMonthDue = Number(contributionSummary._sum.amountDue ?? 0)
+  const thisMonthPaid = Number(contributionSummary._sum.amountPaid ?? 0)
+
+  return {
+    members: {
+      total: Object.values(memberMap).reduce((a, b) => a + b, 0),
+      active: memberMap['ACTIVE'] ?? 0,
+      pending: memberMap['PENDING'] ?? 0,
+      suspended: memberMap['SUSPENDED'] ?? 0,
+    },
+    mandates: {
+      active: mandateMap['ACTIVE'] ?? 0,
+      pending: mandateMap['PENDING'] ?? 0,
+      suspended: mandateMap['SUSPENDED'] ?? 0,
+      cancelled: mandateMap['CANCELLED'] ?? 0,
+    },
+    contributions: {
+      thisMonthTotal: contributionSummary._count.id,
+      thisMonthDue,
+      thisMonthPaid,
+      thisMonthOutstanding: thisMonthDue - thisMonthPaid,
+      collectionRate:
+        thisMonthDue > 0 ? Math.round((thisMonthPaid / thisMonthDue) * 100) : 0,
+      newThisMonth: newContributionsThisMonth,
+    },
+    pool: {
+      total: Number(poolTotal._sum.amountPaid ?? 0),
+    },
+    invitations: {
+      pending: pendingInvites,
+    },
+    recentActivity: recentAuditLogs,
+    generatedAt: now.toISOString(),
+  }
+}
+
 // ─── Goals (admin read + force-expire) ───────────────────────────────────────
 
 export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
