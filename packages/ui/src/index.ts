@@ -1,3 +1,7 @@
+export { AppHeader } from './components/AppHeader'
+export type { AppHeaderProps } from './components/AppHeader'
+export { ScrollNav } from './components/ScrollNav'
+export type { NavItem } from './components/ScrollNav'
 export { Alert } from './components/Alert'
 export { Breadcrumb } from './components/Breadcrumb'
 export { Button } from './components/Button'

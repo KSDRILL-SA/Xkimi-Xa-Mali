@@ -44,8 +44,8 @@ export const STATUS_STYLES = {
   },
   contribution: {
     PAID:    { label: 'Paid',    className: 'xxm-status-success' },
-    PARTIAL: { label: 'Partial', className: 'xxm-status-warning' },
-    PENDING: { label: 'Pending', className: 'xxm-status-pending' },
+    PARTIAL: { label: 'Partial', className: 'xxm-status-pending' },
+    PENDING: { label: 'Pending', className: 'xxm-status-warning' },
     OVERDUE: { label: 'Overdue', className: 'xxm-status-danger'  },
     WAIVED:  { label: 'Waived',  className: 'xxm-status-info'    },
   },

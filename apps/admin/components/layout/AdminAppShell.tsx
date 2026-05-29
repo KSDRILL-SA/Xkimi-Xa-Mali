@@ -39,8 +39,16 @@ export function AdminAppShell({ children, userName, userInitials, signOutSlot }:
   return (
     <ToastProvider>
       <div className="min-h-dvh flex flex-col bg-xxm-champagne">
-        <AppHeader userName={userName} userInitials={userInitials} signOutSlot={signOutSlot} />
-        <ScrollNav items={adminNav} />
+        <AppHeader
+          userName={userName}
+          userInitials={userInitials}
+          signOutSlot={signOutSlot}
+          homeHref="/"
+          subtitle="Admin Portal"
+          showAdminBadge
+          fixedHeight={false}
+        />
+        <ScrollNav items={adminNav} variant="admin" />
         <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
           {children}
         </main>
