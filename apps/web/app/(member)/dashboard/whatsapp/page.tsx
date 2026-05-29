@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, ExternalLink, MessageCircle } from 'lucide-react'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { env } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'WhatsApp Notifications' }
 
@@ -148,6 +149,44 @@ export default async function WhatsAppPage({
           >
             Add phone number on profile →
           </a>
+        )}
+      </div>
+
+      {/* Group link */}
+      <div className="xxm-card p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+            <MessageCircle size={18} className="text-green-600" aria-hidden />
+          </div>
+          <div>
+            <p className="font-bold text-xxm-green-900">Join the WhatsApp Group</p>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Stay connected with the community — announcements, goal updates, and group discussions.
+            </p>
+          </div>
+        </div>
+        <a
+          href={env.WHATSAPP_GROUP_LINK}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-green-700 transition-colors"
+        >
+          Open WhatsApp Group
+          <ExternalLink size={13} aria-hidden />
+        </a>
+        {env.ADMIN_WHATSAPP_NUMBER && (
+          <div className="pt-1 border-t border-gray-100">
+            <p className="text-xs text-gray-400 mb-2">Want to join? Message the admin directly:</p>
+            <a
+              href={`https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I would like to join the Xkimm Xa Mali WhatsApp group. Please add me.')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 text-sm text-xxm-green-700 hover:text-xxm-green font-medium transition-colors"
+            >
+              <MessageCircle size={14} aria-hidden />
+              Message Admin to Join
+            </a>
+          </div>
         )}
       </div>
 
