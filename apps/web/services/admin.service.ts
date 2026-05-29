@@ -104,6 +104,8 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
       email: true,
       phone: true,
       status: true,
+      loginAttempts: true,
+      lockedUntil: true,
       createdAt: true,
       updatedAt: true,
       popiaConsentAt: true,
@@ -431,6 +433,65 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
       },
     }),
     db.goal.count(),
+  ])
+
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+}
+
+// ─── Security ─────────────────────────────────────────────────────────────────
+
+export async function unlockMember(
+  adminId: string,
+  adminRoles: string[],
+  memberId: string,
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const member = await db.user.findUnique({
+    where: { id: memberId },
+    select: { id: true, loginAttempts: true, lockedUntil: true },
+  })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  await db.user.update({
+    where: { id: memberId },
+    data: { loginAttempts: 0, lockedUntil: null },
+  })
+
+  await writeAuditLog({
+    userId: adminId,
+    action: 'ADMIN_MEMBER_UNLOCKED',
+    entity: 'User',
+    entityId: memberId,
+    payload: { previousAttempts: member.loginAttempts, wasLockedUntil: member.lockedUntil },
+    ipAddress: ip,
+  })
+
+  return { memberId, unlocked: true }
+}
+
+export async function getMemberLoginHistory(
+  adminRoles: string[],
+  memberId: string,
+  page = 1,
+  limit = 20,
+) {
+  assertAdmin(adminRoles)
+
+  const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true } })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  const skip = (page - 1) * limit
+  const [items, total] = await Promise.all([
+    db.loginHistory.findMany({
+      where: { userId: memberId },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+      select: { id: true, success: true, ipAddress: true, userAgent: true, createdAt: true },
+    }),
+    db.loginHistory.count({ where: { userId: memberId } }),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
