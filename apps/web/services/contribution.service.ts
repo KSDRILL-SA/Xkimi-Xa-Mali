@@ -3,26 +3,16 @@ import { Prisma } from '@prisma/client'
 import type { ContributionStatus, TransactionStatus } from '@prisma/client'
 import { db } from '@/lib/db'
 import { writeAuditLog } from './audit.service'
+import { logger } from '@/lib/logger'
+import {
+  ForbiddenError,
+  ContributionNotFoundError,
+  ContributionConflictError,
+  MandateConflictError,
+} from '@/lib/errors'
 import { submitOnceOffDebit, mapNetcashTransactionStatus } from '@/lib/netcash'
 import type { ManualContributionInput, GenerateContributionsInput } from '@/lib/validation/contribution'
 import type { NetcashTransactionEvent } from '@/lib/netcash'
-
-// ─── Domain errors ─────────────────────────────────────────────────────────
-
-class NotFoundError extends Error {
-  code = 'CTR_001'
-  status = 404
-}
-class ForbiddenError extends Error {
-  code = 'SYS_003'
-  status = 403
-}
-class ConflictError extends Error {
-  status = 409
-  constructor(message: string, public code: string) {
-    super(message)
-  }
-}
 
 // ─── Access control ────────────────────────────────────────────────────────
 
@@ -67,11 +57,12 @@ export async function getContribution(id: string, requesterId: string, roles: st
     where: { id },
     include: { transactions: { orderBy: { createdAt: 'desc' } } },
   })
-  if (!contribution) throw new NotFoundError('Contribution not found')
+  if (!contribution) throw new ContributionNotFoundError()
   assertCanAccess(contribution.userId, requesterId, roles)
   return contribution
 }
 
+// DB-aggregated summary — does NOT load all contributions into memory.
 export async function getContributionSummary(
   userId: string,
   requesterId: string,
@@ -79,22 +70,37 @@ export async function getContributionSummary(
 ) {
   assertCanAccess(userId, requesterId, roles)
 
-  const contributions = await db.contribution.findMany({ where: { userId } })
   const currentYear = new Date().getFullYear()
 
-  const totalPaid = contributions.reduce((sum, c) => sum + Number(c.amountPaid), 0)
-  const yearlyPaid = contributions
-    .filter((c) => c.periodYear === currentYear)
-    .reduce((sum, c) => sum + Number(c.amountPaid), 0)
+  const [byStatus, totals, yearTotals] = await Promise.all([
+    db.contribution.groupBy({
+      by: ['status'],
+      where: { userId },
+      _count: { status: true },
+    }),
+    db.contribution.aggregate({
+      where: { userId },
+      _sum: { amountPaid: true },
+      _count: { id: true },
+    }),
+    db.contribution.aggregate({
+      where: { userId, periodYear: currentYear },
+      _sum: { amountPaid: true },
+    }),
+  ])
+
+  const statusCounts = Object.fromEntries(
+    byStatus.map((r) => [r.status, r._count.status]),
+  )
 
   return {
-    totalPaid,
-    yearlyPaid,
-    totalContributions: contributions.length,
-    paid: contributions.filter((c) => c.status === 'PAID').length,
-    partial: contributions.filter((c) => c.status === 'PARTIAL').length,
-    pending: contributions.filter((c) => c.status === 'PENDING').length,
-    overdue: contributions.filter((c) => c.status === 'OVERDUE').length,
+    totalPaid: Number(totals._sum.amountPaid ?? 0),
+    yearlyPaid: Number(yearTotals._sum.amountPaid ?? 0),
+    totalContributions: totals._count.id,
+    paid:    statusCounts['PAID']    ?? 0,
+    partial: statusCounts['PARTIAL'] ?? 0,
+    pending: statusCounts['PENDING'] ?? 0,
+    overdue: statusCounts['OVERDUE'] ?? 0,
   }
 }
 
@@ -109,18 +115,16 @@ export async function submitManualPayment(
 ) {
   assertCanAccess(userId, requesterId, roles)
 
-  // Manual payments are debited via the member's active mandate authorization
   const mandate = await db.paymentMandate.findFirst({
     where: { userId, status: 'ACTIVE' },
   })
   if (!mandate?.netcashMandateId) {
-    throw new ConflictError(
+    throw new MandateConflictError(
       'An active payment mandate is required to make a manual payment',
       'CTR_002',
     )
   }
 
-  // Find or create the contribution record for this period
   const dueDate = new Date(data.periodYear, data.periodMonth - 1, mandate.debitDay)
   let contribution = await db.contribution.findUnique({
     where: {
@@ -147,18 +151,17 @@ export async function submitManualPayment(
   }
 
   if (contribution.status === 'PAID') {
-    throw new ConflictError('This period is already fully paid', 'CTR_003')
+    throw new ContributionConflictError('This period is already fully paid', 'CTR_003')
   }
 
   const remaining = Number(contribution.amountDue) - Number(contribution.amountPaid)
   if (data.amount > remaining + 0.01) {
-    throw new ConflictError(
+    throw new ContributionConflictError(
       `Amount exceeds remaining balance of R${remaining.toFixed(2)}`,
       'CTR_004',
     )
   }
 
-  // Idempotency key per payment attempt — prevents duplicate Netcash charges on retry
   const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${randomUUID()}`
 
   const gatewayRes = await submitOnceOffDebit({
@@ -185,8 +188,6 @@ export async function submitManualPayment(
     },
   })
 
-  // If Netcash confirms immediately, update the ledger now.
-  // Otherwise the transaction webhook (M06) will settle it later.
   if (txStatus === 'SUCCESS') {
     await recalculateContributionStatus(contribution.id)
   }
@@ -206,6 +207,13 @@ export async function submitManualPayment(
     ipAddress: ip,
   })
 
+  logger.info('Manual payment submitted', {
+    userId,
+    contributionId: contribution.id,
+    amount: data.amount,
+    gatewayStatus: gatewayRes.status,
+  })
+
   return { contribution, transaction }
 }
 
@@ -214,16 +222,17 @@ export async function submitManualPayment(
 // Derives contribution status from the sum of all SUCCESS transactions.
 // Always called after a transaction status change so the ledger stays consistent.
 export async function recalculateContributionStatus(contributionId: string) {
-  const [contribution, successTxs] = await Promise.all([
+  const [contribution, aggr] = await Promise.all([
     db.contribution.findUnique({ where: { id: contributionId } }),
-    db.transaction.findMany({
+    db.transaction.aggregate({
       where: { contributionId, status: 'SUCCESS' },
+      _sum: { amount: true },
     }),
   ])
 
   if (!contribution) return
 
-  const newAmountPaid = successTxs.reduce((sum, t) => sum + Number(t.amount), 0)
+  const newAmountPaid = Number(aggr._sum.amount ?? 0)
   const amountDue = Number(contribution.amountDue)
   const now = new Date()
 
@@ -251,12 +260,11 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
     where: { gatewayRef: event.transactionRef },
   })
 
-  if (!transaction) return // unknown ref — no-op
+  if (!transaction) return
 
   const newStatus = mapNetcashTransactionStatus(event.status)
-  if (!newStatus) return // unrecognised status — ignore
+  if (!newStatus) return
 
-  // Terminal states are never overwritten; identical status is a no-op
   const terminal: TransactionStatus[] = ['SUCCESS', 'REVERSED']
   if (terminal.includes(transaction.status as TransactionStatus)) return
   if (transaction.status === newStatus) return
@@ -270,8 +278,14 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
     },
   })
 
-  // Re-derive the contribution ledger from the updated transaction set
   await recalculateContributionStatus(transaction.contributionId)
+
+  logger.info('Transaction webhook processed', {
+    transactionId: transaction.id,
+    transactionRef: event.transactionRef,
+    previousStatus: transaction.status,
+    newStatus,
+  })
 
   await writeAuditLog({
     action: 'TRANSACTION_WEBHOOK_RECEIVED',
@@ -316,10 +330,7 @@ export async function generateMonthlyContributions(
       },
     })
 
-    if (existing) {
-      skipped++
-      continue
-    }
+    if (existing) { skipped++; continue }
 
     const dueDate = new Date(data.year, data.month - 1, mandate.debitDay)
     await db.contribution.create({
@@ -335,6 +346,8 @@ export async function generateMonthlyContributions(
     })
     created++
   }
+
+  logger.info('Monthly contributions generated', { month: data.month, year: data.year, created, skipped })
 
   await writeAuditLog({
     userId: adminId,

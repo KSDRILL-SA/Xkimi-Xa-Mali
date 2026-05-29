@@ -4,20 +4,9 @@ import { renderStatementPDF } from '@/lib/pdf/statement'
 import type { StatementData } from '@/lib/pdf/statement'
 import type { TransactionFilter } from '@/lib/validation/report'
 import { MONTHS } from '@/lib/date'
+import { ForbiddenError, ReportNotFoundError } from '@/lib/errors'
 
-// ─── Domain errors ────────────────────────────────────────────────────────────
-
-export class ReportNotFoundError extends Error {
-  code = 'RPT_001'
-  status = 404
-  constructor(msg = 'No data found for the requested period') { super(msg) }
-}
-
-export class ReportForbiddenError extends Error {
-  code = 'RPT_002'
-  status = 403
-  constructor() { super('Access denied') }
-}
+export { ReportNotFoundError }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -28,7 +17,7 @@ function periodLabel(month: number, year: number): string {
 
 function assertCanAccess(targetUserId: string, requesterId: string, roles: string[]) {
   if (targetUserId !== requesterId && !roles.includes('ADMIN')) {
-    throw new ReportForbiddenError()
+    throw new ForbiddenError('Access denied')
   }
 }
 

@@ -1,26 +1,9 @@
 import { db, Prisma } from '@/lib/db'
 import { env } from '@/lib/env'
 import { writeAuditLog } from './audit.service'
+import { logger } from '@/lib/logger'
+import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/errors'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
-
-// ─── Domain errors ──────────────────────────────────────────────────────────
-
-export class GoalNotFoundError extends Error {
-  code = 'GOL_001'
-  status = 404
-  constructor() { super('Goal not found') }
-}
-
-export class GoalConflictError extends Error {
-  status = 409
-  constructor(message: string, public code: string) { super(message) }
-}
-
-export class GoalForbiddenError extends Error {
-  code = 'GOL_003'
-  status = 403
-  constructor(message: string) { super(message) }
-}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -164,7 +147,7 @@ export async function updateGoal(
     )
   }
   if (g.lockedAt) {
-    throw new GoalForbiddenError('Goal is locked and cannot be modified')
+    throw new ForbiddenError('Goal is locked and cannot be modified')
   }
 
   const updated = await db.goal.update({
@@ -199,7 +182,7 @@ export async function deleteGoal(id: string, adminUserId: string, ip: string) {
     throw new GoalConflictError('Only DRAFT goals can be deleted', 'GOL_005')
   }
   if (g.lockedAt) {
-    throw new GoalForbiddenError('Goal is locked and cannot be deleted')
+    throw new ForbiddenError('Goal is locked and cannot be deleted')
   }
 
   await db.goal.delete({ where: { id } })
@@ -245,7 +228,7 @@ export async function activateGoal(id: string, adminUserId: string, ip: string) 
 
 export async function lockGoal(id: string, adminUserId: string, ip: string) {
   if (!env.ENABLE_GOAL_LOCKING) {
-    throw new GoalForbiddenError('Goal locking is disabled in this environment')
+    throw new ForbiddenError('Goal locking is disabled in this environment')
   }
 
   const existing = await db.goal.findUnique({ where: { id } })
