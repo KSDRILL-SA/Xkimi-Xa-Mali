@@ -69,10 +69,10 @@ export default function PrivacyPage() {
             <h1 className="text-3xl sm:text-4xl font-black text-xxm-green-900 leading-tight">
               Privacy Policy
             </h1>
-            <p className="text-gray-500 text-sm mt-3">
+            <p className="text-xxm-gray-500 text-sm mt-3">
               Effective date: 1 January 2025 &nbsp;·&nbsp; Last updated: {new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long' })}
             </p>
-            <p className="text-gray-600 text-[15px] leading-relaxed mt-4">
+            <p className="text-xxm-gray-600 text-[15px] leading-relaxed mt-4">
               Xkimm Xa Mali is a private, invite-only collective savings platform operated by KSDRILL-SA.
               This policy explains how we handle your personal information in accordance with the
               Protection of Personal Information Act (POPIA) and other applicable South African law.
@@ -89,7 +89,7 @@ export default function PrivacyPage() {
                   </span>
                   {title}
                 </h2>
-                <p className="text-sm text-gray-600 leading-relaxed">{body}</p>
+                <p className="text-sm text-xxm-gray-600 leading-relaxed">{body}</p>
               </section>
             ))}
           </div>

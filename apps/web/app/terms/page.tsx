@@ -73,10 +73,10 @@ export default function TermsPage() {
             <h1 className="text-3xl sm:text-4xl font-black text-xxm-green-900 leading-tight">
               Terms of Use
             </h1>
-            <p className="text-gray-500 text-sm mt-3">
+            <p className="text-xxm-gray-500 text-sm mt-3">
               Effective date: 1 January 2025 &nbsp;·&nbsp; Last updated: {new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long' })}
             </p>
-            <p className="text-gray-600 text-[15px] leading-relaxed mt-4">
+            <p className="text-xxm-gray-600 text-[15px] leading-relaxed mt-4">
               By accessing or using the Xkimm Xa Mali platform operated by KSDRILL-SA, you agree to
               be bound by these Terms of Use. Please read them carefully before proceeding.
             </p>
@@ -92,7 +92,7 @@ export default function TermsPage() {
                   </span>
                   {title}
                 </h2>
-                <p className="text-sm text-gray-600 leading-relaxed">{body}</p>
+                <p className="text-sm text-xxm-gray-600 leading-relaxed">{body}</p>
               </section>
             ))}
           </div>

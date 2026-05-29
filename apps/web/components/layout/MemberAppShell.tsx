@@ -4,6 +4,7 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { ScrollNav, type NavItem } from '@/components/layout/ScrollNav'
 import { AppFooter } from '@/components/layout/AppFooter'
 import { ToastProvider } from '@/components/ui'
+import { env } from '@/lib/env'
 import {
   LayoutDashboard,
   Wallet,
@@ -45,7 +46,7 @@ export function MemberAppShell({
   signOutSlot,
 }: MemberAppShellProps) {
   const nav: NavItem[] = isAdmin
-    ? [...memberNav, { href: '/admin', label: 'Admin', icon: ShieldCheck }]
+    ? [...memberNav, { href: env.NEXT_PUBLIC_ADMIN_URL as string, label: 'Admin', icon: ShieldCheck }]
     : memberNav
 
   return (

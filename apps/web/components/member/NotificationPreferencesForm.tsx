@@ -40,7 +40,7 @@ export function NotificationPreferencesForm({ initial }: { initial: Prefs }) {
         <div key={channel.key} className="flex items-center justify-between gap-4 py-2">
           <div>
             <p className="text-sm font-medium text-xxm-green-900">{channel.label}</p>
-            <p className="text-xs text-gray-400">{channel.description}</p>
+            <p className="text-xs text-xxm-gray-400">{channel.description}</p>
           </div>
           <Switch
             checked={prefs[channel.key]}
@@ -49,7 +49,7 @@ export function NotificationPreferencesForm({ initial }: { initial: Prefs }) {
           />
         </div>
       ))}
-      <p className="text-xs text-gray-400 pt-2 border-t border-gray-100">
+      <p className="text-xs text-xxm-gray-400 pt-2 border-t border-xxm-gray-100">
         Critical payment notifications may still be sent regardless of these settings.
       </p>
     </div>
