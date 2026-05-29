@@ -47,11 +47,53 @@ vi.mock('@/services/audit.service', () => ({
   writeAuditLog: vi.fn(),
 }))
 
+vi.mock('@/lib/env', () => ({
+  env: {
+    DATABASE_URL: 'postgresql://x:x@localhost/x',
+    NEXTAUTH_SECRET: 'test-secret-minimum-32-characters-xx',
+    ENCRYPTION_KEY: 'a'.repeat(64),
+    NETCASH_SERVICE_KEY: 'test',
+    NETCASH_WEBHOOK_SECRET: 'test',
+    NETCASH_API_URL: 'https://test.example.com',
+    BULKSMS_USERNAME: 'test',
+    BULKSMS_PASSWORD: 'test',
+    RESEND_API_KEY: 'test',
+    RESEND_FROM_EMAIL: 'test@example.com',
+    INNGEST_EVENT_KEY: 'test',
+    INNGEST_SIGNING_KEY: 'test',
+    UPSTASH_REDIS_REST_URL: 'https://test.upstash.io',
+    UPSTASH_REDIS_REST_TOKEN: 'test',
+    BLOB_READ_WRITE_TOKEN: 'test',
+    MAX_LOGIN_ATTEMPTS: 5,
+    LOCKOUT_DURATION_MINUTES: 15,
+    ENABLE_GOAL_LOCKING: true,
+    ENABLE_MANUAL_PAYMENTS: true,
+    WHATSAPP_GROUP_LINK: 'https://chat.whatsapp.com/test',
+    WHATSAPP_GROUP_NAME: 'Test',
+    ADMIN_WHATSAPP_NUMBER: '27810780859',
+  },
+}))
+
+vi.mock('@/lib/cache', () => ({
+  cache: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    del: vi.fn().mockResolvedValue(undefined),
+  },
+  CACHE_KEYS: {
+    DASHBOARD_STATS: 'xxm:cache:stats',
+    DASHBOARD_STATS_TTL: 300,
+    goalsPage: (s: string, p: number, l: number) => `xxm:cache:goals:${s}:${p}:${l}`,
+    GOALS_TTL: 120,
+  },
+}))
+
 import { db } from '@/lib/db'
 import { writeAuditLog } from '@/services/audit.service'
 import { generateMonthlyContributions } from '@/services/contribution.service'
 import { sendSMS } from '@/lib/bulksms'
 import { sendWelcomeEmail } from '@/lib/email'
+import { ForbiddenError, AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import {
   listMembers,
   getMemberDetail,
@@ -64,10 +106,10 @@ import {
   broadcastNotification,
   listAuditLogs,
   listAllGoals,
-  AdminForbiddenError,
-  AdminNotFoundError,
-  AdminConflictError,
 } from '@/services/admin.service'
+
+// Alias to preserve test body readability
+const AdminForbiddenError = ForbiddenError
 
 const mockDb = db as {
   user: {

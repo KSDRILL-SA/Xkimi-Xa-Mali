@@ -16,6 +16,7 @@ vi.mock('@/lib/db', () => ({
     },
     notificationPreference: { findUnique: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn() },
+    $queryRaw: vi.fn(),
   },
 }))
 
@@ -176,13 +177,12 @@ describe('flushQueuedNotifications', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns zero counts when queue is empty', async () => {
-    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
-      .mockResolvedValue([])
-    ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
-      .mockResolvedValue([])
+    // $queryRaw claims the batch atomically; empty array means nothing to process.
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([])
 
     const result = await flushQueuedNotifications()
     expect(result).toEqual({ processed: 0, sent: 0, failed: 0 })
+    expect(db.notification.findMany).not.toHaveBeenCalled()
   })
 
   it('sends SMS notifications and marks them SENT', async () => {
@@ -199,6 +199,7 @@ describe('flushQueuedNotifications', () => {
       },
     ]
 
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-1' }])
     ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
@@ -236,6 +237,7 @@ describe('flushQueuedNotifications', () => {
     ]
     const prefsNoSMS = { userId: 'user-2', sms: false, email: true, push: true }
 
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-2' }])
     ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
@@ -267,6 +269,7 @@ describe('flushQueuedNotifications', () => {
     ]
     const prefsNoSMS = { userId: 'user-3', sms: false, email: true, push: true }
 
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-3' }])
     ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
@@ -297,6 +300,7 @@ describe('flushQueuedNotifications', () => {
       },
     ]
 
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-4' }])
     ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
@@ -344,6 +348,7 @@ describe('template interpolation', () => {
       },
     ]
 
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-5' }])
     ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
@@ -379,6 +384,7 @@ describe('template interpolation', () => {
       },
     ]
 
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-6' }])
     ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
