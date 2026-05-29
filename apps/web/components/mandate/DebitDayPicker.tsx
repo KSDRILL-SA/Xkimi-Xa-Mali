@@ -13,7 +13,7 @@ const DAYS = Array.from({ length: 28 }, (_, i) => i + 1)
 export function DebitDayPicker({ value, onChange, error }: Props) {
   return (
     <div>
-      <div className="grid grid-cols-7 gap-1.5">
+      <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
         {DAYS.map((day) => (
           <button
             key={day}

@@ -145,7 +145,7 @@ export default async function AdminMandatesPage({
                           {m.status === 'PENDING' && (
                             <form action={approve}>
                               <input type="hidden" name="mandateId" value={m.id} />
-                              <button type="submit" className="px-2 py-1 text-xs rounded-lg bg-green-50 text-green-700 hover:bg-green-100 font-semibold border border-green-200 transition-colors">
+                              <button type="submit" className="px-3 py-1.5 text-xs rounded-lg bg-green-50 text-green-700 hover:bg-green-100 font-semibold border border-green-200 transition-colors min-h-[32px]">
                                 Approve
                               </button>
                             </form>
@@ -153,7 +153,7 @@ export default async function AdminMandatesPage({
                           {m.status !== 'CANCELLED' && (
                             <form action={reject}>
                               <input type="hidden" name="mandateId" value={m.id} />
-                              <button type="submit" className="px-2 py-1 text-xs rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-semibold border border-red-200 transition-colors">
+                              <button type="submit" className="px-3 py-1.5 text-xs rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-semibold border border-red-200 transition-colors min-h-[32px]">
                                 Reject
                               </button>
                             </form>
