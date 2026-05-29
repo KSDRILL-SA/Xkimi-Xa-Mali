@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 
 export const metadata: Metadata = { title: 'Goals' }
 
@@ -22,11 +23,11 @@ type GoalRow = {
   lockedAt: Date | null
 }
 
-const STATUS_CONFIG: Record<GoalStatus, { label: string; className: string }> = {
-  DRAFT:    { label: 'Draft',    className: 'bg-gray-100 text-gray-600' },
-  ACTIVE:   { label: 'Active',   className: 'bg-blue-100 text-blue-700' },
-  ACHIEVED: { label: 'Achieved', className: 'bg-green-100 text-green-700' },
-  FAILED:   { label: 'Failed',   className: 'bg-red-100 text-red-700' },
+const STATUS_CONFIG: Record<GoalStatus, { label: string; className: string; barVariant: 'default' | 'gold' | 'success' | 'danger' }> = {
+  DRAFT:    { label: 'Draft',    className: 'xxm-status-info',    barVariant: 'default' },
+  ACTIVE:   { label: 'Active',   className: 'xxm-status-pending', barVariant: 'gold'    },
+  ACHIEVED: { label: 'Achieved', className: 'xxm-status-success', barVariant: 'success' },
+  FAILED:   { label: 'Failed',   className: 'xxm-status-danger',  barVariant: 'danger'  },
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -118,27 +119,19 @@ export default async function GoalsPage({
                     {goal.lockedAt && (
                       <span className="text-xs text-amber-600 font-medium">Locked</span>
                     )}
-                    <span className={`status-pill ${cfg.className}`}>{cfg.label}</span>
+                    <span className={cfg.className} role="status">{cfg.label}</span>
                   </div>
                 </div>
 
                 {/* Progress bar */}
-                <div className="space-y-1.5">
-                  <div className="h-2.5 rounded-full bg-xxm-green-100 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${
-                        status === 'ACHIEVED' ? 'bg-green-500' :
-                        status === 'FAILED'   ? 'bg-red-400'   :
-                        'bg-xxm-green'
-                      }`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{formatZAR(goal.currentAmount)} raised</span>
-                    <span>{pct}% of {formatZAR(goal.targetAmount)}</span>
-                  </div>
-                </div>
+                <ProgressBar
+                  value={pct}
+                  size="md"
+                  variant={cfg.barVariant}
+                  animated={status === 'ACTIVE' && pct < 100}
+                  label={`${formatZAR(goal.currentAmount)} raised`}
+                  showValue
+                />
 
                 {/* Deadline */}
                 <p className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
