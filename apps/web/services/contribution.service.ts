@@ -316,36 +316,36 @@ export async function generateMonthlyContributions(
 
   const eligible = mandates.filter((m) => m.user.status === 'ACTIVE')
 
-  let created = 0
-  let skipped = 0
+  // Bulk-check for existing records in one query instead of N per-mandate lookups.
+  const existing = await db.contribution.findMany({
+    where: {
+      userId: { in: eligible.map((m) => m.userId) },
+      periodMonth: data.month,
+      periodYear: data.year,
+    },
+    select: { userId: true },
+  })
+  const alreadyHas = new Set(existing.map((c) => c.userId))
 
-  for (const mandate of eligible) {
-    const existing = await db.contribution.findUnique({
-      where: {
-        userId_periodMonth_periodYear: {
-          userId: mandate.userId,
-          periodMonth: data.month,
-          periodYear: data.year,
-        },
-      },
-    })
+  const toCreate = eligible.filter((m) => !alreadyHas.has(m.userId))
 
-    if (existing) { skipped++; continue }
-
-    const dueDate = new Date(data.year, data.month - 1, mandate.debitDay)
-    await db.contribution.create({
-      data: {
-        userId: mandate.userId,
+  if (toCreate.length > 0) {
+    await db.contribution.createMany({
+      data: toCreate.map((m) => ({
+        userId: m.userId,
         periodMonth: data.month,
         periodYear: data.year,
-        amountDue: mandate.amount,
+        amountDue: m.amount,
         amountPaid: 0,
-        dueDate,
-        status: 'PENDING',
-      },
+        dueDate: new Date(data.year, data.month - 1, m.debitDay),
+        status: 'PENDING' as const,
+      })),
+      skipDuplicates: true,
     })
-    created++
   }
+
+  const created = toCreate.length
+  const skipped = eligible.length - toCreate.length
 
   logger.info('Monthly contributions generated', { month: data.month, year: data.year, created, skipped })
 

@@ -116,10 +116,20 @@ export async function getMemberSummary(
 
   const currentYear = new Date().getFullYear()
 
-  const [contributions, activeMandate] = await Promise.all([
-    db.contribution.findMany({
+  // All aggregation pushed to DB — avoids loading the full contributions table into memory.
+  const [allTimeTotals, yearlyTotals, statusCounts, activeMandate] = await Promise.all([
+    db.contribution.aggregate({
       where: { userId: targetUserId },
-      select: { amountPaid: true, status: true, periodYear: true },
+      _sum: { amountPaid: true },
+    }),
+    db.contribution.aggregate({
+      where: { userId: targetUserId, periodYear: currentYear },
+      _sum: { amountPaid: true },
+    }),
+    db.contribution.groupBy({
+      by: ['status'],
+      where: { userId: targetUserId },
+      _count: { status: true },
     }),
     db.paymentMandate.findFirst({
       where: { userId: targetUserId, status: 'ACTIVE' },
@@ -127,16 +137,13 @@ export async function getMemberSummary(
     }),
   ])
 
-  const totalContributed = contributions.reduce((sum, c) => sum + Number(c.amountPaid), 0)
-  const yearlyContributed = contributions
-    .filter((c) => c.periodYear === currentYear)
-    .reduce((sum, c) => sum + Number(c.amountPaid), 0)
+  const statusMap = Object.fromEntries(statusCounts.map((r) => [r.status, r._count.status]))
 
   return {
-    totalContributed,
-    yearlyContributed,
-    paidCount: contributions.filter((c) => c.status === 'PAID').length,
-    overdueCount: contributions.filter((c) => c.status === 'OVERDUE').length,
+    totalContributed: Number(allTimeTotals._sum.amountPaid ?? 0),
+    yearlyContributed: Number(yearlyTotals._sum.amountPaid ?? 0),
+    paidCount: statusMap['PAID'] ?? 0,
+    overdueCount: statusMap['OVERDUE'] ?? 0,
     activeMandate: activeMandate
       ? { id: activeMandate.id, amount: Number(activeMandate.amount), debitDay: activeMandate.debitDay }
       : null,

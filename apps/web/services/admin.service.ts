@@ -5,6 +5,7 @@ import { ForbiddenError, AdminNotFoundError, AdminConflictError } from '@/lib/er
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import { sendWelcomeEmail } from '@/lib/email'
 import { generateMonthlyContributions } from './contribution.service'
+import { cache, CACHE_KEYS } from '@/lib/cache'
 
 function assertAdmin(roles: string[]) {
   if (!roles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
@@ -46,6 +47,19 @@ export type ListAuditParams = {
 
 export type BroadcastChannel = 'SMS' | 'EMAIL' | 'BOTH'
 export type BroadcastFilter = 'ALL' | 'ACTIVE' | 'PENDING' | 'SUSPENDED'
+
+type DashboardStats = {
+  members: { total: number; active: number; pending: number; suspended: number }
+  mandates: { active: number; pending: number; suspended: number; cancelled: number }
+  contributions: {
+    thisMonthTotal: number; thisMonthDue: number; thisMonthPaid: number
+    thisMonthOutstanding: number; collectionRate: number; newThisMonth: number
+  }
+  pool: { total: number }
+  invitations: { pending: number }
+  recentActivity: unknown[]
+  generatedAt: string
+}
 
 // ─── Members ─────────────────────────────────────────────────────────────────
 
@@ -153,14 +167,17 @@ export async function setMemberStatus(
     select: { id: true, status: true, firstName: true, lastName: true },
   })
 
-  await writeAuditLog({
-    userId: adminId,
-    action: 'ADMIN_MEMBER_STATUS_CHANGED',
-    entity: 'User',
-    entityId: memberId,
-    payload: { from: member.status, to: newStatus },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminId,
+      action: 'ADMIN_MEMBER_STATUS_CHANGED',
+      entity: 'User',
+      entityId: memberId,
+      payload: { from: member.status, to: newStatus },
+      ipAddress: ip,
+    }),
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+  ])
 
   return updated
 }
@@ -215,14 +232,17 @@ export async function approveMandate(
     select: { id: true, status: true },
   })
 
-  await writeAuditLog({
-    userId: adminId,
-    action: 'ADMIN_MANDATE_APPROVED',
-    entity: 'PaymentMandate',
-    entityId: mandateId,
-    payload: { memberId: mandate.userId },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminId,
+      action: 'ADMIN_MANDATE_APPROVED',
+      entity: 'PaymentMandate',
+      entityId: mandateId,
+      payload: { memberId: mandate.userId },
+      ipAddress: ip,
+    }),
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+  ])
 
   return updated
 }
@@ -245,14 +265,17 @@ export async function rejectMandate(
     select: { id: true, status: true },
   })
 
-  await writeAuditLog({
-    userId: adminId,
-    action: 'ADMIN_MANDATE_REJECTED',
-    entity: 'PaymentMandate',
-    entityId: mandateId,
-    payload: { memberId: mandate.userId },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminId,
+      action: 'ADMIN_MANDATE_REJECTED',
+      entity: 'PaymentMandate',
+      entityId: mandateId,
+      payload: { memberId: mandate.userId },
+      ipAddress: ip,
+    }),
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+  ])
 
   return updated
 }
@@ -414,6 +437,9 @@ export async function listAuditLogs(adminRoles: string[], params: ListAuditParam
 export async function getDashboardStats(adminRoles: string[]) {
   assertAdmin(adminRoles)
 
+  const cached = await cache.get<DashboardStats>(CACHE_KEYS.DASHBOARD_STATS)
+  if (cached) return cached
+
   const now = new Date()
   const thisMonth = now.getMonth() + 1
   const thisYear = now.getFullYear()
@@ -479,7 +505,7 @@ export async function getDashboardStats(adminRoles: string[]) {
   const thisMonthDue = Number(contributionSummary._sum.amountDue ?? 0)
   const thisMonthPaid = Number(contributionSummary._sum.amountPaid ?? 0)
 
-  return {
+  const stats: DashboardStats = {
     members: {
       total: Object.values(memberMap).reduce((a, b) => a + b, 0),
       active: memberMap['ACTIVE'] ?? 0,
@@ -510,6 +536,9 @@ export async function getDashboardStats(adminRoles: string[]) {
     recentActivity: recentAuditLogs,
     generatedAt: now.toISOString(),
   }
+
+  await cache.set(CACHE_KEYS.DASHBOARD_STATS, stats, CACHE_KEYS.DASHBOARD_STATS_TTL)
+  return stats
 }
 
 // ─── Goals (admin read + force-expire) ───────────────────────────────────────

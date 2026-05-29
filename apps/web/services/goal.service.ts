@@ -4,6 +4,7 @@ import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/errors'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
+import { cache, CACHE_KEYS } from '@/lib/cache'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,17 @@ function serializeGoal(goal: GoalRow) {
   }
 }
 
+// Evicts the first few pages across all status filters. Goals are a small
+// dataset (admin-only writes, infrequent mutations) so clearing common pages is
+// sufficient — the TTL handles any long-tail cache entries.
+async function evictGoalsCache(): Promise<void> {
+  const statuses = ['all', 'DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED']
+  const pages = [1, 2, 3]
+  const limits = [20, 50]
+  const keys = statuses.flatMap((s) => pages.flatMap((p) => limits.map((l) => CACHE_KEYS.goalsPage(s, p, l))))
+  await cache.del(...keys)
+}
+
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
 export async function getGoals(
@@ -54,6 +66,16 @@ export async function getGoals(
   page = 1,
   limit = 20,
 ) {
+  const cacheKey = CACHE_KEYS.goalsPage(status ?? 'all', page, limit)
+  const cached = await cache.get<{
+    items: ReturnType<typeof serializeGoal>[]
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }>(cacheKey)
+  if (cached) return cached
+
   const where = status ? { status } : {}
   const [items, total] = await Promise.all([
     db.goal.findMany({
@@ -65,13 +87,16 @@ export async function getGoals(
     db.goal.count({ where }),
   ])
 
-  return {
+  const result = {
     items: (items as GoalRow[]).map(serializeGoal),
     total,
     page,
     limit,
     totalPages: Math.ceil(total / limit),
   }
+
+  await cache.set(cacheKey, result, CACHE_KEYS.GOALS_TTL)
+  return result
 }
 
 export async function getGoal(id: string) {
@@ -118,14 +143,17 @@ export async function createGoal(
     },
   })
 
-  await writeAuditLog({
-    userId: adminUserId,
-    action: 'GOAL_CREATED',
-    entity: 'Goal',
-    entityId: goal.id,
-    payload: { title: input.title, targetAmount: input.targetAmount, type: input.type },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminUserId,
+      action: 'GOAL_CREATED',
+      entity: 'Goal',
+      entityId: goal.id,
+      payload: { title: input.title, targetAmount: input.targetAmount, type: input.type },
+      ipAddress: ip,
+    }),
+    evictGoalsCache(),
+  ])
 
   return serializeGoal(goal as GoalRow)
 }
@@ -161,14 +189,17 @@ export async function updateGoal(
     },
   })
 
-  await writeAuditLog({
-    userId: adminUserId,
-    action: 'GOAL_UPDATED',
-    entity: 'Goal',
-    entityId: id,
-    payload: input as unknown as Prisma.InputJsonValue,
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminUserId,
+      action: 'GOAL_UPDATED',
+      entity: 'Goal',
+      entityId: id,
+      payload: input as unknown as Prisma.InputJsonValue,
+      ipAddress: ip,
+    }),
+    evictGoalsCache(),
+  ])
 
   return serializeGoal(updated as GoalRow)
 }
@@ -187,14 +218,17 @@ export async function deleteGoal(id: string, adminUserId: string, ip: string) {
 
   await db.goal.delete({ where: { id } })
 
-  await writeAuditLog({
-    userId: adminUserId,
-    action: 'GOAL_DELETED',
-    entity: 'Goal',
-    entityId: id,
-    payload: { title: g.title },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminUserId,
+      action: 'GOAL_DELETED',
+      entity: 'Goal',
+      entityId: id,
+      payload: { title: g.title },
+      ipAddress: ip,
+    }),
+    evictGoalsCache(),
+  ])
 }
 
 export async function activateGoal(id: string, adminUserId: string, ip: string) {
@@ -214,14 +248,17 @@ export async function activateGoal(id: string, adminUserId: string, ip: string) 
     data: { status: 'ACTIVE' },
   })
 
-  await writeAuditLog({
-    userId: adminUserId,
-    action: 'GOAL_ACTIVATED',
-    entity: 'Goal',
-    entityId: id,
-    payload: { title: g.title },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminUserId,
+      action: 'GOAL_ACTIVATED',
+      entity: 'Goal',
+      entityId: id,
+      payload: { title: g.title },
+      ipAddress: ip,
+    }),
+    evictGoalsCache(),
+  ])
 
   return serializeGoal(updated as GoalRow)
 }
@@ -247,14 +284,17 @@ export async function lockGoal(id: string, adminUserId: string, ip: string) {
     data: { lockedAt: new Date(), lockedById: adminUserId },
   })
 
-  await writeAuditLog({
-    userId: adminUserId,
-    action: 'GOAL_LOCKED',
-    entity: 'Goal',
-    entityId: id,
-    payload: { title: g.title, lockedById: adminUserId },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminUserId,
+      action: 'GOAL_LOCKED',
+      entity: 'Goal',
+      entityId: id,
+      payload: { title: g.title, lockedById: adminUserId },
+      ipAddress: ip,
+    }),
+    evictGoalsCache(),
+  ])
 
   return serializeGoal(updated as GoalRow)
 }
@@ -298,14 +338,17 @@ export async function recordProgress(
     }),
   ])
 
-  await writeAuditLog({
-    userId: adminUserId,
-    action: 'GOAL_PROGRESS_RECORDED',
-    entity: 'Goal',
-    entityId: goalId,
-    payload: { amount: input.amount, newTotal, note: input.note },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminUserId,
+      action: 'GOAL_PROGRESS_RECORDED',
+      entity: 'Goal',
+      entityId: goalId,
+      payload: { amount: input.amount, newTotal, note: input.note },
+      ipAddress: ip,
+    }),
+    evictGoalsCache(),
+  ])
 
   return {
     id: progress.id,
