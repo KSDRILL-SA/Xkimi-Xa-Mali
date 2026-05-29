@@ -7,8 +7,8 @@ import { UpdateProfileSchema, type UpdateProfileInput, type AddressInput, SA_PRO
 import { api, ApiClientError } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
 import { Select } from '@/components/ui/Select'
+import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
 
 interface Address {
@@ -39,14 +39,14 @@ export function ProfileForm({ userId, initial }: Props) {
     resolver: zodResolver(UpdateProfileSchema),
     defaultValues: {
       firstName: initial.firstName,
-      lastName: initial.lastName,
-      phone: initial.phone,
+      lastName:  initial.lastName,
+      phone:     initial.phone,
       address: initial.address
         ? {
-            line1: initial.address.line1 ?? '',
-            line2: initial.address.line2 ?? '',
-            city: initial.address.city ?? '',
-            province: initial.address.province as AddressInput['province'],
+            line1:      initial.address.line1      ?? '',
+            line2:      initial.address.line2      ?? '',
+            city:       initial.address.city       ?? '',
+            province:   initial.address.province   as AddressInput['province'],
             postalCode: initial.address.postalCode ?? '',
           }
         : undefined,
@@ -72,61 +72,53 @@ export function ProfileForm({ userId, initial }: Props) {
       {status && <Alert variant={status.type}>{status.msg}</Alert>}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="firstName" required>First name</Label>
-          <Input id="firstName" error={errors.firstName?.message} {...register('firstName')} />
-        </div>
-        <div>
-          <Label htmlFor="lastName" required>Last name</Label>
-          <Input id="lastName" error={errors.lastName?.message} {...register('lastName')} />
-        </div>
+        <FormGroup label="First name" htmlFor="firstName" required error={errors.firstName?.message}>
+          <Input id="firstName" {...register('firstName')} />
+        </FormGroup>
+        <FormGroup label="Last name" htmlFor="lastName" required error={errors.lastName?.message}>
+          <Input id="lastName" {...register('lastName')} />
+        </FormGroup>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="email">Email (read-only)</Label>
-          <Input id="email" value={initial.email} disabled className="bg-gray-50" />
-        </div>
-        <div>
-          <Label htmlFor="phone" required>Mobile number</Label>
-          <Input id="phone" type="tel" error={errors.phone?.message} {...register('phone')} />
-        </div>
+        <FormGroup label="Email" htmlFor="email" hint="Read-only — contact admin to change">
+          <Input id="email" value={initial.email} disabled />
+        </FormGroup>
+        <FormGroup label="Mobile number" htmlFor="phone" required error={errors.phone?.message}>
+          <Input id="phone" type="tel" {...register('phone')} />
+        </FormGroup>
       </div>
 
-      <div>
-        <Label htmlFor="idNumber">SA ID number (read-only)</Label>
-        <Input id="idNumber" value={initial.idNumberMasked ?? 'Not provided'} disabled className="bg-gray-50" />
-      </div>
+      <FormGroup label="SA ID number" htmlFor="idNumber" hint="Read-only — contact admin to update">
+        <Input id="idNumber" value={initial.idNumberMasked ?? 'Not provided'} disabled />
+      </FormGroup>
 
-      <div className="pt-2 border-t border-gray-100">
-        <h4 className="text-sm font-semibold text-xxm-green-900 mb-3 mt-3">Address</h4>
+      <div className="pt-2 border-t border-xxm-gray-100">
+        <h4 className="text-sm font-semibold text-xxm-green-900 mb-4 mt-3">Address</h4>
         <div className="space-y-4">
-          <div>
-            <Label htmlFor="line1">Street address</Label>
-            <Input id="line1" placeholder="123 Main Street" error={errors.address?.line1?.message} {...register('address.line1')} />
-          </div>
-          <div>
-            <Label htmlFor="line2">Apartment, suite, etc. (optional)</Label>
+          <FormGroup label="Street address" htmlFor="line1" error={errors.address?.line1?.message}>
+            <Input id="line1" placeholder="123 Main Street" {...register('address.line1')} />
+          </FormGroup>
+
+          <FormGroup label="Apartment, suite, etc." htmlFor="line2" hint="Optional">
             <Input id="line2" {...register('address.line2')} />
-          </div>
+          </FormGroup>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="city">City</Label>
-              <Input id="city" error={errors.address?.city?.message} {...register('address.city')} />
-            </div>
-            <div>
-              <Label htmlFor="province">Province</Label>
-              <Select id="province" error={errors.address?.province?.message} {...register('address.province')}>
+            <FormGroup label="City" htmlFor="city" error={errors.address?.city?.message}>
+              <Input id="city" {...register('address.city')} />
+            </FormGroup>
+            <FormGroup label="Province" htmlFor="province" error={errors.address?.province?.message}>
+              <Select id="province" {...register('address.province')}>
                 <option value="">Select…</option>
                 {SA_PROVINCES.map((p) => (
                   <option key={p} value={p}>{p}</option>
                 ))}
               </Select>
-            </div>
-            <div>
-              <Label htmlFor="postalCode">Postal code</Label>
-              <Input id="postalCode" maxLength={4} error={errors.address?.postalCode?.message} {...register('address.postalCode')} />
-            </div>
+            </FormGroup>
+            <FormGroup label="Postal code" htmlFor="postalCode" error={errors.address?.postalCode?.message}>
+              <Input id="postalCode" maxLength={4} {...register('address.postalCode')} />
+            </FormGroup>
           </div>
         </div>
       </div>
