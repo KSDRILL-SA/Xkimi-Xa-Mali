@@ -1,5 +1,5 @@
 import { inngest } from '@/lib/inngest'
-import { flushQueuedNotifications } from '@/services/notification.service'
+import { flushQueuedNotifications, requeueFailedNotifications } from '@/services/notification.service'
 
 export const notificationFlush = inngest.createFunction(
   {
@@ -14,6 +14,9 @@ export const notificationFlush = inngest.createFunction(
     { cron: '*/5 * * * *' }, // also poll every 5 minutes as a safety net
   ],
   async ({ step }) => {
+    // Promote eligible FAILED notifications back to QUEUED before flushing
+    await step.run('requeue-failed', () => requeueFailedNotifications())
+
     const result = await step.run('flush-queued', () =>
       flushQueuedNotifications(100),
     )

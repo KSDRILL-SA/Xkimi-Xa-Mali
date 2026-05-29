@@ -227,52 +227,61 @@ export type FlushResult = {
   failed: number
 }
 
+const MAX_RETRIES = 3
+
 export async function flushQueuedNotifications(batchSize = 100): Promise<FlushResult> {
-  const queued = await db.notification.findMany({
-    where: { status: 'QUEUED' },
-    take: batchSize,
-    orderBy: { createdAt: 'asc' },
+  // Atomically claim a batch by setting status to FAILED temporarily — prevents
+  // duplicate dispatch when multiple Inngest replays run in parallel. Use a
+  // transaction to find-and-mark in one round-trip.
+  const now = new Date()
+  const ids: string[] = await db.$queryRaw`
+    UPDATE "notifications"
+    SET "status" = 'FAILED', "errorMessage" = 'in-flight'
+    WHERE "id" IN (
+      SELECT "id" FROM "notifications"
+      WHERE "status" = 'QUEUED' AND "retryCount" < ${MAX_RETRIES}
+      ORDER BY "createdAt" ASC
+      LIMIT ${batchSize}
+      FOR UPDATE SKIP LOCKED
+    )
+    RETURNING "id"
+  `.then((rows: Array<{ id: string }>) => rows.map((r) => r.id))
+
+  if (ids.length === 0) return { processed: 0, sent: 0, failed: 0 }
+
+  const claimed = await db.notification.findMany({
+    where: { id: { in: ids } },
     include: {
       template: true,
-      user: {
-        select: { email: true, phone: true },
-      },
+      user: { select: { email: true, phone: true } },
     },
   })
 
-  if (queued.length === 0) return { processed: 0, sent: 0, failed: 0 }
-
   const allPrefs = await db.notificationPreference.findMany({
-    where: { userId: { in: [...new Set((queued as QueuedNotification[]).map((n) => n.userId))] } },
+    where: { userId: { in: [...new Set((claimed as QueuedNotification[]).map((n) => n.userId))] } },
   })
-
-  const prefsMap = new Map(
-    (allPrefs as NotifPrefs[]).map((p) => [p.userId, p]),
-  )
+  const prefsMap = new Map((allPrefs as NotifPrefs[]).map((p) => [p.userId, p]))
 
   let sent = 0
   let failed = 0
 
   await Promise.all(
-    (queued as QueuedNotification[]).map(async (notification) => {
+    (claimed as QueuedNotification[]).map(async (notification) => {
       const prefs = prefsMap.get(notification.userId)
       const payload = notification.payload as Record<string, unknown>
       const slug = notification.template.slug
 
-      // Check preference unless mandatory
+      // User opted out — mark silently sent (preference respected, not a failure)
       if (!MANDATORY_SLUGS.has(slug) && prefs) {
-        if (notification.channel === 'SMS' && !prefs.sms) {
-          await db.notification.update({ where: { id: notification.id }, data: { status: 'SENT', sentAt: new Date() } })
-          sent++
-          return
-        }
-        if (notification.channel === 'EMAIL' && !prefs.email) {
-          await db.notification.update({ where: { id: notification.id }, data: { status: 'SENT', sentAt: new Date() } })
-          sent++
-          return
-        }
-        if (notification.channel === 'PUSH' && !prefs.push) {
-          await db.notification.update({ where: { id: notification.id }, data: { status: 'SENT', sentAt: new Date() } })
+        if (
+          (notification.channel === 'SMS' && !prefs.sms) ||
+          (notification.channel === 'EMAIL' && !prefs.email) ||
+          (notification.channel === 'PUSH' && !prefs.push)
+        ) {
+          await db.notification.update({
+            where: { id: notification.id },
+            data: { status: 'SENT', sentAt: now, errorMessage: null },
+          })
           sent++
           return
         }
@@ -280,42 +289,52 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
 
       try {
         if (notification.channel === 'EMAIL' && notification.user.email) {
-          await dispatchEmail(
-            notification.id,
-            notification.user.email,
-            slug,
-            notification.template.body,
-            payload,
-          )
+          await dispatchEmail(notification.id, notification.user.email, slug, notification.template.body, payload)
           sent++
         } else if (notification.channel === 'SMS' && notification.user.phone) {
-          await dispatchSMS(
-            notification.id,
-            notification.user.phone,
-            slug,
-            notification.template.body,
-            payload,
-          )
+          await dispatchSMS(notification.id, notification.user.phone, slug, notification.template.body, payload)
           sent++
         } else {
-          // No contact info — mark sent to avoid infinite retry
+          // No contact details — mark sent to drain the queue
           await db.notification.update({
             where: { id: notification.id },
-            data: { status: 'SENT', sentAt: new Date() },
+            data: { status: 'SENT', sentAt: now, errorMessage: null },
           })
           sent++
         }
-      } catch {
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
         await db.notification.update({
           where: { id: notification.id },
-          data: { status: 'FAILED' },
+          data: {
+            status: 'FAILED',
+            errorMessage: msg,
+            retryCount: { increment: 1 },
+          },
         })
         failed++
       }
     }),
   )
 
-  return { processed: queued.length, sent, failed }
+  return { processed: claimed.length, sent, failed }
+}
+
+// ---------------------------------------------------------------------------
+// Public: requeue FAILED notifications that haven't exhausted their retries
+// Called by notification-flush before each batch to promote eligible records
+// ---------------------------------------------------------------------------
+
+export async function requeueFailedNotifications(): Promise<number> {
+  const result = await db.notification.updateMany({
+    where: {
+      status: 'FAILED',
+      retryCount: { lt: MAX_RETRIES },
+      errorMessage: { not: 'in-flight' }, // skip records currently being processed
+    },
+    data: { status: 'QUEUED' },
+  })
+  return result.count
 }
 
 // ---------------------------------------------------------------------------
