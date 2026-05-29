@@ -22,7 +22,7 @@ export const env = createEnv({
     BLOB_READ_WRITE_TOKEN: z.string().min(1),
     WHATSAPP_GROUP_LINK: z.string().url().default('https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb'),
     WHATSAPP_GROUP_NAME: z.string().default('Xkimm Xa Mali'),
-    ADMIN_WHATSAPP_NUMBER: z.string().min(1).optional(),
+    ADMIN_WHATSAPP_NUMBER: z.string().min(1).default('27810780859'),
     ENABLE_MANUAL_PAYMENTS: z.coerce.boolean().default(true),
     ENABLE_GOAL_LOCKING: z.coerce.boolean().default(true),
   },
