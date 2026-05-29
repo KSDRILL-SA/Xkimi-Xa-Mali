@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { z } from 'zod'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
+import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
 
 const Schema = z
@@ -60,14 +60,12 @@ export function ResetPasswordForm({ token }: Props) {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       {serverError && <Alert variant="error">{serverError}</Alert>}
-      <div>
-        <Label htmlFor="password" required>New password</Label>
-        <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" error={errors.password?.message} {...register('password')} />
-      </div>
-      <div>
-        <Label htmlFor="confirmPassword" required>Confirm password</Label>
-        <Input id="confirmPassword" type="password" autoComplete="new-password" placeholder="Repeat your password" error={errors.confirmPassword?.message} {...register('confirmPassword')} />
-      </div>
+      <FormGroup label="New password" htmlFor="password" required error={errors.password?.message} hint="Min. 8 characters, 1 uppercase, 1 number">
+        <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" {...register('password')} />
+      </FormGroup>
+      <FormGroup label="Confirm password" htmlFor="confirmPassword" required error={errors.confirmPassword?.message}>
+        <Input id="confirmPassword" type="password" autoComplete="new-password" placeholder="Repeat your password" {...register('confirmPassword')} />
+      </FormGroup>
       <Button type="submit" className="w-full" size="lg" loading={loading}>
         Set new password
       </Button>
