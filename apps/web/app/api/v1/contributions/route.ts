@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { getContributions } from '@/services/contribution.service'
 
 export async function GET(req: NextRequest) {
@@ -21,7 +21,6 @@ export async function GET(req: NextRequest) {
       totalPages: result.totalPages,
     })
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }

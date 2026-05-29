@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { apiRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { getMandate, updateMandate, cancelMandate } from '@/services/mandate.service'
 import { UpdateMandateSchema } from '@/lib/validation/mandate'
 
@@ -17,8 +17,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const mandate = await getMandate(id, session.user.id, session.user.roles ?? [])
     return apiSuccess(mandate)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }
 
@@ -45,8 +44,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const mandate = await updateMandate(id, parsed.data, session.user.id, session.user.roles ?? [], ip)
     return apiSuccess(mandate)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }
 
@@ -64,7 +62,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     await cancelMandate(id, session.user.id, session.user.roles ?? [], ip)
     return apiSuccess({ cancelled: true })
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }
