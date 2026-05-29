@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { ChangePasswordSchema } from '@/lib/validation/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { changePassword } from '@/services/auth.service'
 
 export async function PATCH(req: NextRequest) {
@@ -24,8 +24,6 @@ export async function PATCH(req: NextRequest) {
     await changePassword(session.user.id, parsed.data.currentPassword, parsed.data.newPassword, ip)
     return apiSuccess({ message: 'Password changed successfully.' })
   } catch (err) {
-    const e = err as { code?: string }
-    if (e.code === 'AUTH_001') return apiError('AUTH_001', 'Current password is incorrect.', 400)
-    return apiError('SYS_004', 'Failed to change password. Please try again.', 500)
+    return handleServiceError(err)
   }
 }
