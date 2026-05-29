@@ -84,16 +84,7 @@ export default async function WhatsAppPage({
               )}
             </p>
           </div>
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
-              phone
-                ? 'bg-green-100 text-green-700'
-                : 'bg-amber-100 text-amber-700'
-            }`}
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${phone ? 'bg-green-500' : 'bg-amber-500'}`}
-            />
+          <span className={phone ? 'xxm-status-success' : 'xxm-status-warning'}>
             {phone ? 'Verified' : 'Missing'}
           </span>
         </div>
@@ -110,13 +101,7 @@ export default async function WhatsAppPage({
                 : 'You have opted out. No WhatsApp messages will be sent to your number.'}
             </p>
           </div>
-          <span
-            className={`shrink-0 mt-0.5 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-              isEnabled
-                ? 'bg-xxm-green-100 text-xxm-green-800'
-                : 'bg-gray-100 text-gray-500'
-            }`}
-          >
+          <span className={`shrink-0 mt-0.5 ${isEnabled ? 'xxm-status-success' : 'xxm-status-pending'}`}>
             {isEnabled ? 'On' : 'Off'}
           </span>
         </div>

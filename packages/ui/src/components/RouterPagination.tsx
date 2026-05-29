@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Pagination } from '@/components/ui/Pagination'
+import { Pagination } from './Pagination'
 
 interface RouterPaginationProps {
   totalItems: number
