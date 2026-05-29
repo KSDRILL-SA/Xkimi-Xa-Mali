@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { MessageCircle } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, WA_LINK } from '@/lib/utils'
+import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 
 const year = new Date().getFullYear()
 
@@ -45,7 +45,7 @@ export function Footer() {
             </p>
 
             <a
-              href={WA_LINK}
+              href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xxm-gold/70 hover:text-xxm-gold text-sm font-medium transition-colors w-fit"

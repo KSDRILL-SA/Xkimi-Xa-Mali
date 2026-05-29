@@ -78,7 +78,7 @@ export function AppFooter() {
             </p>
             <span className="hidden sm:inline text-gray-300 mx-1.5">·</span>
             <p className="text-xs text-gray-400">
-              A <span className="font-semibold text-xxm-green/60">KSDRILL-SA</span> product.
+              By <span className="font-semibold text-xxm-green/60">KSDRILL-SA</span> product.
             </p>
           </div>
           <div className="flex items-center gap-1 flex-wrap justify-center">

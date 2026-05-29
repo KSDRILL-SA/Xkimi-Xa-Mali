@@ -3,7 +3,7 @@
 import { ArrowRight, MessageCircle } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, WA_LINK } from '@/lib/utils'
+import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 
 export function CTASection() {
   const revealRef = useScrollReveal(0.15)
@@ -71,13 +71,13 @@ export function CTASection() {
               </a>
 
               <a
-                href={WA_LINK}
+                href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary flex-1 inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-2xl border border-white/20 text-white/80 font-semibold text-base"
               >
                 <MessageCircle size={16} aria-hidden />
-                WhatsApp Group
+                Join WhatsApp
               </a>
             </div>
 
