@@ -75,7 +75,11 @@ export default function SupportPage() {
           {/* Contact cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <a
-              href={env.WHATSAPP_GROUP_LINK}
+              href={
+                env.ADMIN_WHATSAPP_NUMBER
+                  ? `https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I need support with my Xkimm Xa Mali account. Please assist me.')}`
+                  : env.WHATSAPP_GROUP_LINK
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="xxm-card p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
@@ -85,10 +89,10 @@ export default function SupportPage() {
               </div>
               <div>
                 <p className="font-bold text-xxm-green-900 group-hover:text-xxm-green transition-colors">
-                  WhatsApp Group
+                  Message Admin on WhatsApp
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
-                  Join the members&rsquo; WhatsApp group for direct admin contact and announcements.
+                  Chat directly with an administrator on WhatsApp for immediate assistance.
                 </p>
               </div>
             </a>

@@ -7,16 +7,16 @@ import { XmmLogo } from '@/components/ui/XmmLogo'
 import { APP_URL, NAV_LINKS } from '@/lib/utils'
 
 export function Navbar() {
-  const [scrolled, setScrolled]       = useState(false)
+  const [atTop, setAtTop]             = useState(true)
   const [menuOpen, setMenuOpen]       = useState(false)
   const [activeSection, setActive]    = useState<string>('hero')
   const [showLeftFade, setLeftFade]   = useState(false)
   const [showRightFade, setRightFade] = useState(true)
   const navScrollRef                  = useRef<HTMLDivElement>(null)
 
-  /* ── Scroll state ───────────────────────────────────────────────── */
+  /* ── Scroll state — visible only when exactly at the top ────────── */
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40)
+    const onScroll = () => setAtTop(window.scrollY === 0)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
@@ -54,8 +54,8 @@ export function Navbar() {
   return (
     <>
       <header
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${
-          scrolled ? 'nav-scrolled' : 'bg-transparent'
+        className={`fixed top-0 inset-x-0 z-50 bg-transparent transition-opacity duration-500 ${
+          atTop ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         style={{ height: 'var(--nav-height)' }}
       >

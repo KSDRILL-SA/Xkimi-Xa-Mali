@@ -2,7 +2,7 @@
 
 import { CheckCircle2, CreditCard, MailOpen, MessageCircle, UserPlus } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
-import { WA_LINK } from '@/lib/utils'
+import { adminWhatsAppUrl } from '@/lib/utils'
 
 const steps = [
   {
@@ -126,7 +126,7 @@ export function HowItWorksSection() {
           </div>
 
           <a
-            href={WA_LINK}
+            href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-xxm-green text-white font-bold text-sm shadow-xxm whitespace-nowrap shrink-0"

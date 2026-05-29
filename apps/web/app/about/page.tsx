@@ -423,7 +423,11 @@ export default function AboutPage() {
               <ArrowRight size={15} aria-hidden />
             </Link>
             <a
-              href={env.WHATSAPP_GROUP_LINK}
+              href={
+                env.ADMIN_WHATSAPP_NUMBER
+                  ? `https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}`
+                  : env.WHATSAPP_GROUP_LINK
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xs text-xxm-green/60 hover:text-xxm-green transition-colors"
@@ -435,7 +439,7 @@ export default function AboutPage() {
               &ldquo;Blessed is the hand that giveth.&rdquo; — Acts 20:35
             </p>
             <p className="text-[11px] text-gray-300 mt-1">
-              A <span className="font-semibold text-gray-400">KSDRILL-SA</span> platform
+              By <span className="font-semibold text-gray-400">KSDRILL-SA</span> platform
             </p>
           </div>
         </section>
