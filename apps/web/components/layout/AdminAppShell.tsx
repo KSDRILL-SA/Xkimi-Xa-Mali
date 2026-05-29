@@ -3,7 +3,7 @@
 import { AppHeader } from '@/components/layout/AppHeader'
 import { ScrollNav, type NavItem } from '@/components/layout/ScrollNav'
 import { AppFooter } from '@/components/layout/AppFooter'
-import { ToastProvider } from '@/components/ui/Toast'
+import { ToastProvider } from '@/components/ui'
 import {
   LayoutDashboard,
   Users,

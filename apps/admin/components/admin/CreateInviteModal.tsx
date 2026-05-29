@@ -97,7 +97,7 @@ export function CreateInviteModal({ onCreated }: { onCreated?: () => void }) {
               <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
                 {error && <Alert variant="error">{error}</Alert>}
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="invite-fn">First name *</Label>
                     <Input id="invite-fn" name="firstName" required minLength={2} />

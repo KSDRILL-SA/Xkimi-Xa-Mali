@@ -10,7 +10,7 @@ export default function NotFound() {
       <XmmLogo size={56} />
       <div>
         <p className="text-xxm-gold text-xs font-bold tracking-widest uppercase mb-3">404</p>
-        <h1 className="text-4xl font-black text-white mb-3">Page not found</h1>
+        <h1 className="text-3xl sm:text-4xl font-black text-white mb-3">Page not found</h1>
         <p className="text-white/50 text-base max-w-xs mx-auto">
           This page doesn&rsquo;t exist. Perhaps you were looking for the member portal.
         </p>

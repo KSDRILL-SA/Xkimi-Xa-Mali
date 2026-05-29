@@ -10,10 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@xxm/config":   "*",
     "@xxm/database": "*",
+    "@xxm/types":    "*",
     "@xxm/ui":       "*",
     "@xxm/utils":    "*",
-    "@xxm/types":    "*",
     "@auth/prisma-adapter": "^2.7.4",
     "bcryptjs":             "^2.4.3",
     "next":                 "15.1.3",

@@ -86,7 +86,7 @@ export default async function AdminOverviewPage() {
       </div>
 
       {/* Quick nav */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
         {quickLinks.map(({ href, icon: Icon, label }) => (
           <Link
             key={href}

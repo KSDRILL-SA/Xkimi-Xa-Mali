@@ -111,7 +111,7 @@ export default async function AdminContributionsPage({
 
       {/* Period + filters */}
       <div className="flex flex-wrap gap-2 items-center">
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+        <div className="flex rounded-lg border border-gray-200 overflow-x-auto scrollbar-none text-xs flex-nowrap">
           {MONTHS.map((name, idx) => (
             <Link
               key={name}
@@ -151,7 +151,7 @@ export default async function AdminContributionsPage({
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Total Due',    value: formatZAR(totalDue),    cls: 'text-gray-900' },
           { label: 'Total Paid',   value: formatZAR(totalPaid),   cls: 'text-green-600' },
