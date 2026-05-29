@@ -82,9 +82,9 @@ export default async function GoalsPage({
       {/* Goals grid */}
       {goals.length === 0 ? (
         <div className="xxm-card p-10 text-center">
-          <p className="text-gray-400 text-sm">No goals found.</p>
+          <p className="text-xxm-gray-400 text-sm">No goals found.</p>
           {isAdmin && (
-            <p className="text-gray-400 text-xs mt-1">
+            <p className="text-xxm-gray-400 text-xs mt-1">
               Create the first goal via the admin API to start tracking progress.
             </p>
           )}
@@ -111,7 +111,7 @@ export default async function GoalsPage({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-xxm-green-900 truncate">{goal.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-xxm-gray-400 mt-0.5">
                       {TYPE_LABELS[goal.type] ?? goal.type}
                     </p>
                   </div>
@@ -134,7 +134,7 @@ export default async function GoalsPage({
                 />
 
                 {/* Deadline */}
-                <p className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
+                <p className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-xxm-gray-400'}`}>
                   {isOverdue ? 'Overdue · ' : 'Deadline · '}
                   {formatDate(goal.deadline)}
                 </p>
@@ -162,7 +162,7 @@ function FilterChip({
       className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
         active
           ? 'bg-xxm-green-900 text-white'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-gray-200'
       }`}
     >
       {label}

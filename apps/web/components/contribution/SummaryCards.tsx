@@ -45,9 +45,9 @@ function StatCard({
 }) {
   return (
     <div className="xxm-card p-4 space-y-1">
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-xxm-gray-400 font-medium uppercase tracking-wide">{label}</p>
       <p className={`text-xl font-bold amount ${valueClass}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400">{sub}</p>}
+      {sub && <p className="text-xs text-xxm-gray-400">{sub}</p>}
     </div>
   )
 }

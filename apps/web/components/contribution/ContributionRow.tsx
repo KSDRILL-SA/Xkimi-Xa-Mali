@@ -39,11 +39,11 @@ interface Props {
 const PAYABLE = new Set(['PENDING', 'PARTIAL', 'OVERDUE'])
 
 const TX_STATUS_CLASSES: Record<string, string> = {
-  SUCCESS:    'text-green-600',
+  SUCCESS:    'text-xxm-green',
   PENDING:    'text-amber-600',
   PROCESSING: 'text-blue-600',
   FAILED:     'text-red-600',
-  REVERSED:   'text-gray-400 line-through',
+  REVERSED:   'text-xxm-gray-400 line-through',
 }
 
 export function ContributionRow({ contribution, mandate }: Props) {
@@ -61,7 +61,7 @@ export function ContributionRow({ contribution, mandate }: Props) {
       <div className="xxm-card overflow-hidden">
         {/* Main row */}
         <div
-          className="flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors"
+          className="flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-xxm-gray-50 transition-colors"
           onClick={() => setExpanded((v) => !v)}
           role="button"
           tabIndex={0}
@@ -71,7 +71,7 @@ export function ContributionRow({ contribution, mandate }: Props) {
             <p className="text-sm font-semibold text-xxm-green-900">
               {formatMonth(contribution.periodMonth, contribution.periodYear)}
             </p>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-xxm-gray-400 mt-0.5">
               Due {new Date(contribution.dueDate).toLocaleDateString('en-ZA')}
             </p>
           </div>
@@ -81,7 +81,7 @@ export function ContributionRow({ contribution, mandate }: Props) {
               <p className="text-sm font-semibold amount text-xxm-green-900">
                 {formatZAR(contribution.amountPaid)}
               </p>
-              <p className="text-xs text-gray-400">of {formatZAR(contribution.amountDue)}</p>
+              <p className="text-xs text-xxm-gray-400">of {formatZAR(contribution.amountDue)}</p>
             </div>
 
             <ContributionStatusBadge status={contribution.status} />
@@ -96,15 +96,15 @@ export function ContributionRow({ contribution, mandate }: Props) {
             )}
 
             {expanded
-              ? <ChevronUp size={16} className="text-gray-400" aria-hidden />
-              : <ChevronDown size={16} className="text-gray-400" aria-hidden />
+              ? <ChevronUp size={16} className="text-xxm-gray-400" aria-hidden />
+              : <ChevronDown size={16} className="text-xxm-gray-400" aria-hidden />
             }
           </div>
         </div>
 
         {/* Progress bar */}
         {contribution.status !== 'PAID' && contribution.status !== 'WAIVED' && (
-          <div className="h-1 bg-gray-100">
+          <div className="h-1 bg-xxm-gray-100">
             <div
               className="h-full bg-xxm-green transition-all duration-500"
               style={{ width: `${progress}%` }}
@@ -114,14 +114,14 @@ export function ContributionRow({ contribution, mandate }: Props) {
 
         {/* Expanded: transaction history */}
         {expanded && contribution.transactions.length > 0 && (
-          <div className="border-t border-gray-100 divide-y divide-gray-50">
+          <div className="border-t border-xxm-gray-100 divide-y divide-gray-50">
             {contribution.transactions.map((tx) => (
-              <div key={tx.id} className="flex items-center justify-between px-4 py-2.5 bg-gray-50">
+              <div key={tx.id} className="flex items-center justify-between px-4 py-2.5 bg-xxm-gray-50">
                 <div>
-                  <p className="text-xs font-medium text-gray-600 capitalize">
+                  <p className="text-xs font-medium text-xxm-gray-600 capitalize">
                     {tx.type.toLowerCase().replace('_', ' ')}
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-xxm-gray-400">
                     {new Date(tx.createdAt).toLocaleDateString('en-ZA')}
                   </p>
                 </div>
@@ -129,7 +129,7 @@ export function ContributionRow({ contribution, mandate }: Props) {
                   <p className="text-sm font-semibold amount text-xxm-green-900">
                     {formatZAR(tx.amount)}
                   </p>
-                  <p className={`text-xs font-medium ${TX_STATUS_CLASSES[tx.status] ?? 'text-gray-400'}`}>
+                  <p className={`text-xs font-medium ${TX_STATUS_CLASSES[tx.status] ?? 'text-xxm-gray-400'}`}>
                     {tx.status}
                   </p>
                 </div>
@@ -139,8 +139,8 @@ export function ContributionRow({ contribution, mandate }: Props) {
         )}
 
         {expanded && contribution.transactions.length === 0 && (
-          <div className="border-t border-gray-100 px-4 py-3 bg-gray-50">
-            <p className="text-xs text-gray-400">No transactions recorded yet.</p>
+          <div className="border-t border-xxm-gray-100 px-4 py-3 bg-xxm-gray-50">
+            <p className="text-xs text-xxm-gray-400">No transactions recorded yet.</p>
           </div>
         )}
       </div>

@@ -16,10 +16,10 @@ type ProgressEntry = {
 }
 
 const STATUS_CONFIG: Record<GoalStatus, { label: string; barClass: string; badgeClass: string }> = {
-  DRAFT:    { label: 'Draft',    barClass: 'bg-gray-400',   badgeClass: 'bg-gray-100 text-gray-600' },
-  ACTIVE:   { label: 'Active',   barClass: 'bg-xxm-green',  badgeClass: 'bg-blue-100 text-blue-700' },
-  ACHIEVED: { label: 'Achieved', barClass: 'bg-green-500',  badgeClass: 'bg-green-100 text-green-700' },
-  FAILED:   { label: 'Failed',   barClass: 'bg-red-400',    badgeClass: 'bg-red-100 text-red-700' },
+  DRAFT:    { label: 'Draft',    barClass: 'bg-xxm-gray-300',  badgeClass: 'xxm-status-info'    },
+  ACTIVE:   { label: 'Active',   barClass: 'bg-xxm-gold',      badgeClass: 'xxm-status-pending' },
+  ACHIEVED: { label: 'Achieved', barClass: 'bg-xxm-green',     badgeClass: 'xxm-status-success' },
+  FAILED:   { label: 'Failed',   barClass: 'bg-red-400',       badgeClass: 'xxm-status-danger'  },
 }
 
 function formatRelative(date: Date): string {
@@ -85,7 +85,7 @@ export default async function GoalDetailPage({
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-xxm-green-900">{goal.title}</h1>
             {goal.description && (
-              <p className="text-sm text-gray-500 mt-1">{goal.description}</p>
+              <p className="text-sm text-xxm-gray-500 mt-1">{goal.description}</p>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -118,7 +118,7 @@ export default async function GoalDetailPage({
               style={{ width: `${pct}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center justify-between text-xs text-xxm-gray-500">
             <span>{pct}% complete</span>
             <span>Deadline: {formatDate(goal.deadline)}</span>
           </div>
@@ -126,14 +126,14 @@ export default async function GoalDetailPage({
 
         {/* Achieved banner */}
         {status === 'ACHIEVED' && (
-          <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800 font-medium">
+          <div className="rounded-lg bg-xxm-green-50 border border-xxm-green/20 px-4 py-3 text-sm text-xxm-green font-medium">
             This goal has been achieved.
           </div>
         )}
 
         {/* Failed banner */}
         {status === 'FAILED' && (
-          <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800 font-medium">
+          <div className="rounded-lg bg-xxm-champagne-200 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
             This goal was not achieved by the deadline.
           </div>
         )}
@@ -141,13 +141,13 @@ export default async function GoalDetailPage({
 
       {/* Progress history */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
+        <h2 className="text-sm font-semibold text-xxm-gray-500 uppercase tracking-wide">
           Progress history ({goal.progress.length})
         </h2>
 
         {goal.progress.length === 0 ? (
           <div className="xxm-card p-8 text-center">
-            <p className="text-gray-400 text-sm">No progress recorded yet.</p>
+            <p className="text-xxm-gray-400 text-sm">No progress recorded yet.</p>
           </div>
         ) : (
           <div className="xxm-card divide-y divide-gray-100">
@@ -162,12 +162,12 @@ export default async function GoalDetailPage({
                     <p className="text-sm font-medium text-xxm-green-900">
                       {formatZAR(entry.amount)}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-xxm-gray-400 mt-0.5">
                       {formatRelative(entry.recordedAt)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-gray-400">Cumulative</p>
+                    <p className="text-xs text-xxm-gray-400">Cumulative</p>
                     <p className="text-sm font-semibold text-xxm-green-700">
                       {formatZAR(runningTotal)}
                     </p>
@@ -193,7 +193,7 @@ function Stat({
 }) {
   return (
     <div className="xxm-card p-3">
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-xs text-xxm-gray-400 font-medium uppercase tracking-wide">{label}</p>
       <p className={`text-lg font-bold mt-0.5 ${highlight ? 'text-red-600' : 'text-xxm-green-900'}`}>
         {value}
       </p>
