@@ -16,7 +16,7 @@ import {
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, WA_LINK } from '@/lib/utils'
+import { appHref, WA_LINK } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: 'About',
@@ -341,7 +341,7 @@ export default function AboutPage() {
               <p className="text-gray-500 text-sm mt-2">This is a private platform. Access is by invitation only.</p>
             </div>
             <a
-              href={`${APP_URL}/login`}
+              href={appHref('/login')}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-xxm-green text-white font-bold text-sm hover:bg-xxm-canopy transition-colors shadow-xxm"
             >
               Sign in to your account

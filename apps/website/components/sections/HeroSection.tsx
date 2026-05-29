@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
-import { APP_URL, WA_LINK } from '@/lib/utils'
+import { appHref, WA_LINK } from '@/lib/utils'
 
 export function HeroSection() {
   return (
@@ -111,7 +111,7 @@ export function HeroSection() {
             style={{ animationDelay: '0.8s' }}
           >
             <a
-              href={`${APP_URL}/login`}
+              href={appHref('/login')}
               className="btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
             >
               Sign In

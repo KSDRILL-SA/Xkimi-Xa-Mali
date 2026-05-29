@@ -1,6 +1,13 @@
 import type { NextConfig } from 'next'
+import { buildAppRewrites } from './lib/app-proxy'
+
+const appDevOrigin = process.env.APP_DEV_ORIGIN
 
 const nextConfig: NextConfig = {
+  async rewrites() {
+    if (!appDevOrigin) return []
+    return buildAppRewrites(appDevOrigin)
+  },
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [

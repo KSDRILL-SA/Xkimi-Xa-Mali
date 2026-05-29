@@ -3,7 +3,7 @@
 import { ArrowRight, MessageCircle } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, WA_LINK } from '@/lib/utils'
+import { appHref, WA_LINK } from '@/lib/utils'
 
 export function CTASection() {
   const revealRef = useScrollReveal(0.15)
@@ -63,7 +63,7 @@ export function CTASection() {
             {/* action buttons */}
             <div className="flex flex-col sm:flex-row gap-4 w-full justify-center max-w-md">
               <a
-                href={`${APP_URL}/login`}
+                href={appHref('/login')}
                 className="btn-primary flex-1 inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
               >
                 Sign In to Your Account
@@ -87,21 +87,21 @@ export function CTASection() {
             {/* secondary actions row */}
             <div className="flex flex-wrap items-center justify-center gap-6">
               <a
-                href={`${APP_URL}/dashboard`}
+                href={appHref('/dashboard')}
                 className="text-white/55 hover:text-white/80 text-sm font-medium transition-colors flex items-center gap-1.5"
               >
                 Member portal
                 <ArrowRight size={12} aria-hidden />
               </a>
               <a
-                href={`${APP_URL}/admin`}
+                href={appHref('/admin')}
                 className="text-white/55 hover:text-white/80 text-sm font-medium transition-colors flex items-center gap-1.5"
               >
                 Admin panel
                 <ArrowRight size={12} aria-hidden />
               </a>
               <a
-                href={`${APP_URL}/support`}
+                href={appHref('/support')}
                 className="text-white/55 hover:text-white/80 text-sm font-medium transition-colors flex items-center gap-1.5"
               >
                 Support

@@ -1,7 +1,11 @@
 import type { NextConfig } from 'next'
 import { withSentryConfig } from '@sentry/nextjs'
 
+const webDevAssetOrigin = process.env.WEB_DEV_ASSET_ORIGIN
+
 const nextConfig: NextConfig = {
+  // Unified local dev: marketing site on :3000 proxies here; assets load from :3001
+  ...(webDevAssetOrigin ? { assetPrefix: webDevAssetOrigin } : {}),
   experimental: {
     typedRoutes: true,
   },

@@ -6,7 +6,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "npm run dev:unified",
+    "dev:unified": "concurrently -k -n web,www -c green,cyan \"npm run dev -w @xxm/web\" \"npm run dev -w @xxm/website\"",
+    "dev:turbo": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
@@ -18,9 +20,10 @@
     "db:studio": "cd packages/database && npx prisma studio"
   },
   "devDependencies": {
-    "turbo": "^2.3.3",
+    "@types/node": "^22.0.0",
+    "concurrently": "^9.2.1",
     "prettier": "^3.4.2",
-    "@types/node": "^22.0.0"
+    "turbo": "^2.3.3"
   },
   "engines": {
     "node": ">=20.0.0",

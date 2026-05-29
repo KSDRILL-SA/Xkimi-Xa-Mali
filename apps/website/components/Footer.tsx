@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { MessageCircle } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, WA_LINK } from '@/lib/utils'
+import { appHref, WA_LINK } from '@/lib/utils'
 
 const year = new Date().getFullYear()
 
@@ -13,15 +13,15 @@ const links = {
     { label: 'Brotherhood',   href: '/#founders' },
   ],
   Account: [
-    { label: 'Sign In',       href: `${APP_URL}/login` },
-    { label: 'Member Portal', href: `${APP_URL}/dashboard` },
-    { label: 'Admin Panel',   href: `${APP_URL}/admin` },
+    { label: 'Sign In',       href: appHref('/login') },
+    { label: 'Member Portal', href: appHref('/dashboard') },
+    { label: 'Admin Panel',   href: appHref('/admin') },
   ],
   Legal: [
     { label: 'About',         href: '/about' },
-    { label: 'Privacy Policy', href: `${APP_URL}/privacy` },
-    { label: 'Terms of Service', href: `${APP_URL}/terms` },
-    { label: 'Support',       href: `${APP_URL}/support` },
+    { label: 'Privacy Policy', href: appHref('/privacy') },
+    { label: 'Terms of Service', href: appHref('/terms') },
+    { label: 'Support',       href: appHref('/support') },
   ],
 }
 
@@ -70,7 +70,7 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {items.map(({ label, href }) => (
                   <li key={label}>
-                    {href.startsWith('http') || href.startsWith(APP_URL) ? (
+                    {href.startsWith('http') ? (
                       <a
                         href={href}
                         className="text-white/55 hover:text-white text-sm transition-colors duration-200"

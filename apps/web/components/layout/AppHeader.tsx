@@ -1,6 +1,7 @@
+import type { Route } from 'next'
 import Link from 'next/link'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { Bell, ChevronRight } from 'lucide-react'
+import { Bell, ChevronRight, Home } from 'lucide-react'
 
 interface AppHeaderProps {
   userName?: string | null
@@ -43,6 +44,14 @@ export function AppHeader({ userName, userInitials = '?', isAdmin, signOutSlot }
 
         {/* Right cluster */}
         <div className="flex items-center gap-2">
+          <Link
+            href={'/' as Route}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold"
+          >
+            <Home size={14} aria-hidden />
+            Home
+          </Link>
+
           {/* Notification bell */}
           <Link
             href="/dashboard/notifications"

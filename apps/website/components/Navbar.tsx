@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Menu, X } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, NAV_LINKS } from '@/lib/utils'
+import { appHref, NAV_LINKS } from '@/lib/utils'
 
 export function Navbar() {
   const [scrolled, setScrolled]       = useState(false)
@@ -102,7 +102,7 @@ export function Navbar() {
 
           {/* ── Desktop CTA ─────────────────────────────────────────── */}
           <a
-            href={`${APP_URL}/login`}
+            href={appHref('/login')}
             className="hidden lg:inline-flex btn-primary items-center gap-2 px-5 py-2.5 rounded-xl bg-xxm-gold text-xxm-green-950 text-sm font-bold shadow-gold-sm hover:shadow-gold shrink-0"
           >
             Sign In
@@ -148,7 +148,7 @@ export function Navbar() {
 
               {/* Sign In pill at end of scroll */}
               <a
-                href={`${APP_URL}/login`}
+                href={appHref('/login')}
                 className="whitespace-nowrap shrink-0 ml-2 px-4 py-1.5 rounded-full text-xs font-bold bg-xxm-gold/20 text-xxm-gold border border-xxm-gold/30 hover:bg-xxm-gold hover:text-xxm-green-950 transition-all duration-200"
               >
                 Sign In →
@@ -192,7 +192,7 @@ export function Navbar() {
 
           <div className="mt-auto pt-8 border-t border-white/10 flex flex-col gap-3">
             <a
-              href={`${APP_URL}/login`}
+              href={appHref('/login')}
               className="btn-primary flex items-center justify-center gap-2 py-4 rounded-2xl bg-xxm-gold text-xxm-green-950 text-base font-bold shadow-gold"
               onClick={() => setMenuOpen(false)}
             >

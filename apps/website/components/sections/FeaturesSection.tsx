@@ -12,7 +12,7 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
-import { APP_URL } from '@/lib/utils'
+import { appHref } from '@/lib/utils'
 
 const features = [
   {
@@ -121,7 +121,7 @@ export function FeaturesSection() {
 
           {/* inline CTA */}
           <a
-            href={`${APP_URL}/login`}
+            href={appHref('/login')}
             className="inline-flex items-center gap-1.5 mt-6 text-xxm-green font-semibold text-sm hover:text-xxm-canopy transition-colors group"
           >
             See it in your dashboard

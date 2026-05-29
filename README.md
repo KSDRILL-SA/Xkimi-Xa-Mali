@@ -107,11 +107,12 @@ npm run db:migrate
 npm run db:seed   # requires FOUNDER_EMAIL/PHONE/PASSWORD in .env.local
 ```
 
-### 5. Start development server
+### 5. Start development servers (unified URL)
 
 ```bash
 npm run dev
-# App: http://localhost:3000
+# Marketing site + member portal: http://localhost:3000
+# (Member app runs on :3001 behind the scenes; you only need :3000 in the browser.)
 # Prisma Studio: npm run db:studio
 ```
 
