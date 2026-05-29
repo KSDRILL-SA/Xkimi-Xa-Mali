@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { formatZAR } from '@/lib/formatters'
 import { ProgressBar } from '@/components/ui/ProgressBar'
-import { TrendingUp, Calendar, CheckCircle2, type LucideIcon } from 'lucide-react'
+import { AnimatedStatCard } from '@/components/dashboard/AnimatedStatCard'
+import { formatZAR } from '@/lib/formatters'
+import { TrendingUp, Calendar, CheckCircle2 } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Dashboard' }
 
@@ -23,12 +24,13 @@ export default async function DashboardPage() {
     }),
   ])
 
-  const totalPaid = contributions
+  const paidCount  = contributions.filter((c) => c.status === 'PAID').length
+  const totalPaid  = contributions
     .filter((c) => c.status === 'PAID')
     .reduce((sum, c) => sum + Number(c.amountPaid), 0)
 
-  const currentYear = new Date().getFullYear()
-  const yearlyTotal = contributions
+  const currentYear  = new Date().getFullYear()
+  const yearlyTotal  = contributions
     .filter((c) => c.periodYear === currentYear)
     .reduce((sum, c) => sum + Number(c.amountPaid), 0)
 
@@ -42,15 +44,11 @@ export default async function DashboardPage() {
         <p className="text-xxm-gray-500 text-sm mt-1">Here&apos;s your contribution overview.</p>
       </div>
 
-      {/* Stats */}
+      {/* Animated stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard icon={TrendingUp} label="Total contributed" value={formatZAR(totalPaid)} />
-        <StatCard icon={Calendar}   label={`${currentYear} total`} value={formatZAR(yearlyTotal)} />
-        <StatCard
-          icon={CheckCircle2}
-          label="Contributions"
-          value={`${contributions.filter((c) => c.status === 'PAID').length} paid`}
-        />
+        <AnimatedStatCard icon={TrendingUp} label="Total contributed"   value={totalPaid}   prefix="R " decimals={2} />
+        <AnimatedStatCard icon={Calendar}   label={`${currentYear} total`} value={yearlyTotal} prefix="R " decimals={2} />
+        <AnimatedStatCard icon={CheckCircle2} label="Paid contributions" value={paidCount} suffix=" paid" />
       </div>
 
       {/* Recent contributions */}
@@ -73,7 +71,7 @@ export default async function DashboardPage() {
                   <p className="text-xs text-xxm-gray-400">Due {new Date(c.dueDate).toLocaleDateString('en-ZA')}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="amount text-sm font-semibold text-xxm-green-900 tabular-nums">
+                  <span className="text-sm font-semibold text-xxm-green-900 tabular-nums">
                     {formatZAR(c.amountPaid)}
                   </span>
                   <StatusBadge status={c.status} />
@@ -109,20 +107,6 @@ export default async function DashboardPage() {
           </div>
         </section>
       )}
-    </div>
-  )
-}
-
-function StatCard({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-  return (
-    <div className="xxm-card card-hover p-4 flex items-center gap-4">
-      <div className="w-10 h-10 rounded-xl bg-xxm-champagne-200 flex items-center justify-center shrink-0">
-        <Icon size={18} className="text-xxm-green" aria-hidden />
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs text-xxm-gray-400 font-medium uppercase tracking-wide truncate">{label}</p>
-        <p className="text-xl font-bold text-xxm-green-900 mt-0.5 tabular-nums">{value}</p>
-      </div>
     </div>
   )
 }

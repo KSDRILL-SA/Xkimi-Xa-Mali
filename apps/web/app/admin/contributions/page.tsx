@@ -6,6 +6,8 @@ import { auth } from '@/lib/auth'
 import { listAllContributions, bulkGenerateContributions } from '@/services/admin.service'
 import { formatZAR } from '@/lib/formatters'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { DataTable, type Column } from '@/components/ui/DataTable'
+import { RouterPagination } from '@/components/ui/RouterPagination'
 
 export const metadata: Metadata = { title: 'Contributions — Admin' }
 
@@ -53,9 +55,43 @@ export default async function AdminContributionsPage({
     return `/admin/contributions?${p.toString()}`
   }
 
-  type ContribSummary = { amountDue: unknown; amountPaid: unknown }
-  const totalDue  = (items as ContribSummary[]).reduce((s, c) => s + Number(c.amountDue), 0)
-  const totalPaid = (items as ContribSummary[]).reduce((s, c) => s + Number(c.amountPaid), 0)
+  type RawContrib = { id: string; amountDue: unknown; amountPaid: unknown; status: string; user: { id: string; firstName: string; lastName: string; email: string } }
+  const rawItems = items as unknown as RawContrib[]
+
+  const totalDue  = rawItems.reduce((s, c) => s + Number(c.amountDue), 0)
+  const totalPaid = rawItems.reduce((s, c) => s + Number(c.amountPaid), 0)
+
+  type ContribRow = { id: string; member: string; email: string; due: string; paid: string; status: string; statusClass: string }
+
+  const contribColumns: Column<ContribRow>[] = [
+    {
+      key: 'member',
+      header: 'Member',
+      sortable: true,
+      render: (r) => (
+        <div>
+          <p className="font-medium text-xxm-green-900">{r.member}</p>
+          <p className="text-xs text-xxm-gray-400">{r.email}</p>
+        </div>
+      ),
+    },
+    { key: 'due',    header: 'Due',    align: 'right', render: (r) => <span className="tabular-nums">{r.due}</span> },
+    { key: 'paid',   header: 'Paid',   align: 'right', render: (r) => <span className="tabular-nums text-xxm-green-600 font-medium">{r.paid}</span> },
+    { key: 'status', header: 'Status', align: 'center', render: (r) => <span className={r.statusClass} role="status">{r.status}</span> },
+  ]
+
+  const contribRows: ContribRow[] = rawItems.map((row) => {
+    const cfg = STATUS_CONFIG[row.status] ?? STATUS_CONFIG.PENDING
+    return {
+      id:          row.id,
+      member:      `${row.user.firstName} ${row.user.lastName}`,
+      email:       row.user.email,
+      due:         formatZAR(Number(row.amountDue)),
+      paid:        formatZAR(Number(row.amountPaid)),
+      status:      cfg.label,
+      statusClass: cfg.className,
+    }
+  })
 
   return (
     <div className="space-y-6">
@@ -128,57 +164,16 @@ export default async function AdminContributionsPage({
         ))}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-                <th className="px-4 py-3 text-left font-semibold">Member</th>
-                <th className="px-4 py-3 text-right font-semibold">Due</th>
-                <th className="px-4 py-3 text-right font-semibold">Paid</th>
-                <th className="px-4 py-3 text-center font-semibold">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-gray-400">
-                    No contributions for this period.
-                  </td>
-                </tr>
-              ) : (
-                (items as unknown as Array<{ id: string; amountDue: unknown; amountPaid: unknown; status: string; user: { id: string; firstName: string; lastName: string; email: string } }>).map((row) => {
-                  const cfg = STATUS_CONFIG[row.status] ?? STATUS_CONFIG.PENDING
-                  return (
-                    <tr key={row.id} className="border-t border-gray-50">
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{row.user.firstName} {row.user.lastName}</p>
-                        <p className="text-xs text-gray-400">{row.user.email}</p>
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-700">{formatZAR(Number(row.amountDue))}</td>
-                      <td className="px-4 py-3 text-right text-green-600">{formatZAR(Number(row.amountPaid))}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={cfg.className} role="status">{cfg.label}</span>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        columns={contribColumns}
+        data={contribRows}
+        keyExtractor={(r) => r.id}
+        striped
+        caption={`Contributions for ${MONTHS[month - 1]} ${year}`}
+        emptyState={<div className="py-12 text-center text-xxm-gray-400 text-sm">No contributions for this period.</div>}
+      />
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Page {page} of {totalPages}</span>
-          <div className="flex gap-2">
-            {page > 1 && <Link href={buildUrl({ page: String(page - 1) }) as Route} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">← Prev</Link>}
-            {page < totalPages && <Link href={buildUrl({ page: String(page + 1) }) as Route} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">Next →</Link>}
-          </div>
-        </div>
-      )}
+      <RouterPagination totalItems={total} itemsPerPage={25} currentPage={page} baseUrl="/admin/contributions" className="justify-center" />
 
       {/* Bulk generate */}
       <div className="bg-white rounded-xl border border-gray-100 p-5">
