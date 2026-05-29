@@ -1,17 +1,11 @@
-type ContributionStatus = 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'WAIVED'
+import { STATUS_STYLES } from '@xxm/utils'
 
-const CONFIG: Record<ContributionStatus, { label: string; classes: string }> = {
-  PENDING: { label: 'Pending', classes: 'xxm-status-warning' },
-  PARTIAL: { label: 'Partial', classes: 'xxm-status-pending' },
-  PAID:    { label: 'Paid',    classes: 'xxm-status-success' },
-  OVERDUE: { label: 'Overdue', classes: 'xxm-status-danger'  },
-  WAIVED:  { label: 'Waived',  classes: 'xxm-status-info'    },
-}
+type ContributionStatus = keyof typeof STATUS_STYLES.contribution
 
 export function ContributionStatusBadge({ status }: { status: string }) {
-  const cfg = CONFIG[status as ContributionStatus] ?? CONFIG.PENDING
+  const cfg = STATUS_STYLES.contribution[status as ContributionStatus] ?? STATUS_STYLES.contribution.PENDING
   return (
-    <span className={cfg.classes} role="status">
+    <span className={cfg.className} role="status">
       {cfg.label}
     </span>
   )
