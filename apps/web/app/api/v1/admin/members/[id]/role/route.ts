@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import { setMemberRole, RoleForbiddenError } from '@/services/invite.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { setMemberRole } from '@/services/invite.service'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -25,9 +25,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const result = await setMemberRole(session.user.id, roles, id, b.role, b.assign, ip)
     return apiSuccess(result)
   } catch (e) {
-    if (e instanceof RoleForbiddenError) return apiError(e.code, e.message, 403)
-    const ce = e as { code?: string; status?: number; message: string }
-    if (ce.status === 404) return apiError(ce.code ?? 'ADM_001', ce.message, 404)
-    throw e
+    return handleServiceError(e)
   }
 }

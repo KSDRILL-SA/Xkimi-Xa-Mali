@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { TransactionFilterSchema } from '@/lib/validation/report'
-import { getTransactionHistory, ReportForbiddenError } from '@/services/report.service'
+import { getTransactionHistory } from '@/services/report.service'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -36,8 +36,6 @@ export async function GET(req: NextRequest) {
       totalPages: result.totalPages,
     })
   } catch (err: unknown) {
-    if (err instanceof ReportForbiddenError) return apiError(err.code, err.message, err.status)
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }
