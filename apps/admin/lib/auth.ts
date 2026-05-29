@@ -3,12 +3,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { db } from './db'
-import { z } from 'zod'
-
-const LoginSchema = z.object({
-  email:    z.string().email(),
-  password: z.string().min(1),
-})
+import { LoginSchema } from '@xxm/utils/schemas'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),

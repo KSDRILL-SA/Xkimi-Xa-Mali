@@ -81,7 +81,7 @@ export function BankAccountForm({ onCancel, onSuccess }: Props) {
 
       <div className="flex items-center gap-2">
         <input id="isPrimary" type="checkbox" className="h-4 w-4 rounded border-gray-300 accent-xxm-green cursor-pointer" {...register('isPrimary')} />
-        <Label htmlFor="isPrimary" className="mb-0 font-normal text-gray-600 cursor-pointer">
+        <Label htmlFor="isPrimary" className="mb-0 font-normal text-xxm-gray-600 cursor-pointer">
           Set as primary account
         </Label>
       </div>

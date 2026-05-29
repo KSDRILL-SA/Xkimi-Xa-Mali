@@ -60,7 +60,8 @@ export function Dropdown({ children, className }: DropdownProps) {
 export function DropdownTrigger({ children, className }: { children: React.ReactNode; className?: string }) {
   const { toggle, open, triggerId, menuId } = useDropdown()
   return (
-    <div
+    <button
+      type="button"
       id={triggerId}
       aria-haspopup="menu"
       aria-expanded={open}
@@ -69,7 +70,7 @@ export function DropdownTrigger({ children, className }: { children: React.React
       className={cn('cursor-pointer', className)}
     >
       {children}
-    </div>
+    </button>
   )
 }
 

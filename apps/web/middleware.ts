@@ -63,20 +63,14 @@ export default auth((req) => {
     return NextResponse.redirect(loginUrl)
   }
 
-  // Admin routes require ADMIN role
-  const isAdminRoute =
-    pathname.startsWith('/admin') || pathname.startsWith('/api/v1/admin')
-
-  if (isAdminRoute) {
-    const roles = session.user?.roles as string[] | undefined
-    if (!roles?.includes('ADMIN')) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json(
-          { error: { code: 'SYS_003', message: 'Forbidden', traceId: '' } },
-          { status: 403 },
-        )
-      }
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+  // Admin API routes require ADMIN role
+  if (pathname.startsWith('/api/v1/admin')) {
+    const roles = Array.isArray(session.user?.roles) ? (session.user.roles as string[]) : []
+    if (!roles.includes('ADMIN')) {
+      return NextResponse.json(
+        { error: { code: 'SYS_003', message: 'Forbidden', traceId: '' } },
+        { status: 403 },
+      )
     }
   }
 

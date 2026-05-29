@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
+
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
@@ -10,8 +10,9 @@ import { Input } from '@/components/ui/Input'
 import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
 
-const Schema = z.object({ email: z.string().email('Please enter a valid email address') })
-type FormData = z.infer<typeof Schema>
+import { PasswordResetRequestSchema as Schema } from '@/lib/validation/auth'
+import type { PasswordResetRequestInput as FormData } from '@/lib/validation/auth'
+import { api, ApiClientError } from '@/lib/api'
 
 export function ForgotPasswordForm() {
   const [sent, setSent] = useState(false)
@@ -26,14 +27,10 @@ export function ForgotPasswordForm() {
     setLoading(true)
     setError('')
     try {
-      await fetch('/api/v1/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+      await api.post('/api/v1/forgot-password', data)
       setSent(true)
-    } catch {
-      setError('Something went wrong. Please try again.')
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }

@@ -28,6 +28,7 @@ export const env = createEnv({
   },
   client: {
     NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
+    NEXT_PUBLIC_ADMIN_URL: z.string().url().default('http://localhost:3002'),
   },
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
@@ -53,5 +54,6 @@ export const env = createEnv({
     ENABLE_MANUAL_PAYMENTS: process.env.ENABLE_MANUAL_PAYMENTS,
     ENABLE_GOAL_LOCKING: process.env.ENABLE_GOAL_LOCKING,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    NEXT_PUBLIC_ADMIN_URL: process.env.NEXT_PUBLIC_ADMIN_URL,
   },
 })

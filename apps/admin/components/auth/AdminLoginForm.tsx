@@ -49,7 +49,7 @@ export function AdminLoginForm() {
       <div className="space-y-1.5">
         <Label htmlFor="email">Email address</Label>
         <Input id="email" name="email" type="email" autoComplete="email" required
-          icon={<Mail size={15} />} placeholder="admin@example.com" />
+          icon={Mail} placeholder="admin@example.com" />
       </div>
 
       <div className="space-y-1.5">
@@ -57,7 +57,7 @@ export function AdminLoginForm() {
         <Input
           id="password" name="password" type={showPw ? 'text' : 'password'}
           autoComplete="current-password" required
-          icon={<Lock size={15} />}
+          icon={Lock}
           suffix={
             <button type="button" onClick={() => setShowPw((v) => !v)} className="text-xxm-gray-400 hover:text-xxm-green transition-colors" aria-label={showPw ? 'Hide password' : 'Show password'}>
               {showPw ? <EyeOff size={15} /> : <Eye size={15} />}

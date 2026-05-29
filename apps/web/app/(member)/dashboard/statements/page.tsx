@@ -87,7 +87,7 @@ export default async function StatementsPage() {
                           {outstanding > 0 && (
                             <>
                               <span className="text-xs text-xxm-gray-400">·</span>
-                              <span className="text-xs text-red-600 font-medium tabular-nums">Outstanding {formatZAR(outstanding)}</span>
+                              <span className="text-xs xxm-text-danger font-medium tabular-nums">Outstanding {formatZAR(outstanding)}</span>
                             </>
                           )}
                         </div>

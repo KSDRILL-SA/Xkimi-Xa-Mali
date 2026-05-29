@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/Label'
 import { Select } from '@/components/ui/Select'
 import { Alert } from '@/components/ui/Alert'
 import { api } from '@/lib/api'
-import { formatZAR, formatMonth } from '@/lib/formatters'
+import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
 
 type OpenPeriod = {
   id?: string
@@ -45,7 +45,7 @@ export default function ContributePage() {
     formState: { errors, isSubmitting },
   } = useForm<ManualContributionInput>({
     resolver: zodResolver(ManualContributionSchema),
-    defaultValues: { amount: 100 },
+    defaultValues: { amount: MIN_CONTRIBUTION_ZAR },
   })
 
   const selectedMonth = watch('periodMonth')
@@ -153,9 +153,9 @@ export default function ContributePage() {
       </div>
 
       {!mandate && (
-        <div className="xxm-card p-5 border-l-4 border-red-400 bg-red-50">
-          <p className="text-sm font-semibold text-red-800">No active mandate</p>
-          <p className="text-xs text-red-700 mt-1">
+        <div className="xxm-card p-5 xxm-banner-error">
+          <p className="text-sm font-semibold">No active mandate</p>
+          <p className="text-xs mt-1">
             You need an active payment mandate before making a payment.
             <a href="/dashboard/mandates" className="ml-1 underline font-semibold">Set up mandate</a>
           </p>
@@ -179,7 +179,7 @@ export default function ContributePage() {
 
           {success ? (
             <div className="xxm-card p-6 text-center space-y-2">
-              <p className="text-lg font-bold text-green-700">Payment submitted</p>
+              <p className="text-lg font-bold xxm-text-success">Payment submitted</p>
               <p className="text-sm text-gray-500">Redirecting to your contributions...</p>
             </div>
           ) : (
@@ -207,7 +207,7 @@ export default function ContributePage() {
                 {selectedPeriod && selectedPeriod.amountPaid > 0 && (
                   <div className="text-sm flex justify-between text-gray-500">
                     <span>Already paid</span>
-                    <span className="text-green-600 font-medium">
+                    <span className="xxm-text-success font-medium">
                       {formatZAR(selectedPeriod.amountPaid)}
                     </span>
                   </div>
@@ -218,8 +218,8 @@ export default function ContributePage() {
                   <Input
                     id="amount"
                     type="number"
-                    min={100}
-                    step={50}
+                    min={MIN_CONTRIBUTION_ZAR}
+                    step={CONTRIBUTION_STEP_ZAR}
                     error={errors.amount?.message}
                     {...register('amount', { valueAsNumber: true })}
                   />

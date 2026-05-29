@@ -1,18 +1,18 @@
-import { forwardRef } from 'react'
+import React, { forwardRef } from 'react'
 import { cn } from '@xxm/utils'
 import { CheckCircle2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 type InputSize = 'sm' | 'md' | 'lg'
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'prefix'> {
   error?: string
   hint?: string
   icon?: LucideIcon
   size?: InputSize
   success?: boolean
   prefix?: string
-  suffix?: string | LucideIcon
+  suffix?: string | LucideIcon | React.ReactNode
 }
 
 const sizeClasses: Record<InputSize, string> = {
@@ -23,8 +23,10 @@ const sizeClasses: Record<InputSize, string> = {
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ className, error, hint, icon: Icon, size = 'md', success, prefix, suffix: Suffix, disabled, ...props }, ref) => {
-    const hasSuffixIcon = Suffix && typeof Suffix !== 'string'
-    const SuffixIcon = hasSuffixIcon ? (Suffix as LucideIcon) : null
+    const isSuffixIcon  = Suffix && typeof Suffix === 'function'
+    const isSuffixStr   = Suffix && typeof Suffix === 'string'
+    const isSuffixNode  = Suffix && !isSuffixIcon && !isSuffixStr
+    const SuffixIcon    = isSuffixIcon ? (Suffix as LucideIcon) : null
 
     return (
       <div className="w-full">
@@ -66,14 +68,19 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               <CheckCircle2 size={15} aria-hidden />
             </span>
           )}
-          {Suffix && !success && typeof Suffix === 'string' && (
+          {isSuffixStr && !success && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xxm-gray-500 text-sm pointer-events-none select-none">
-              {Suffix}
+              {Suffix as string}
             </span>
           )}
           {SuffixIcon && !success && (
             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xxm-gray-400 pointer-events-none">
               <SuffixIcon size={15} aria-hidden />
+            </span>
+          )}
+          {isSuffixNode && !success && (
+            <span className="absolute right-2 top-1/2 -translate-y-1/2">
+              {Suffix as React.ReactNode}
             </span>
           )}
         </div>

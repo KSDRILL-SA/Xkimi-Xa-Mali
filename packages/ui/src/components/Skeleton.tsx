@@ -59,14 +59,14 @@ export function SkeletonDashboard() {
   )
 }
 
-export function SkeletonTable({ rows = 5 }: { rows?: number }) {
+export function SkeletonTable({ rows = 5, cols }: { rows?: number; cols?: number }) {
   return (
     <div className="space-y-4 animate-fade-in" aria-label="Loading" aria-busy="true">
       <div className="flex items-center justify-between">
         <Skeleton className="h-7 w-40" />
         <Skeleton className="h-9 w-28" rounded="lg" />
       </div>
-      <SkeletonRow cols={rows} />
+      <SkeletonRow cols={cols ?? rows} />
     </div>
   )
 }

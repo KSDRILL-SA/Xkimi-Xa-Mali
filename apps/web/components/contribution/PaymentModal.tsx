@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Alert } from '@/components/ui/Alert'
-import { formatZAR, formatMonth } from '@/lib/formatters'
+import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
 import { api } from '@/lib/api'
 
 type OpenContribution = {
@@ -103,7 +103,7 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
           {contribution.amountPaid > 0 && (
             <div className="flex justify-between text-sm -mt-3">
               <span className="text-gray-400">Already paid</span>
-              <span className="text-green-600">{formatZAR(contribution.amountPaid)}</span>
+              <span className="xxm-text-success">{formatZAR(contribution.amountPaid)}</span>
             </div>
           )}
 
@@ -117,9 +117,9 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
               <Input
                 id="amount"
                 type="number"
-                min={100}
+                min={MIN_CONTRIBUTION_ZAR}
                 max={remaining}
-                step={50}
+                step={CONTRIBUTION_STEP_ZAR}
                 error={errors.amount?.message}
                 {...register('amount', { valueAsNumber: true })}
               />

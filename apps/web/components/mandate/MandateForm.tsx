@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/Select'
 import { Alert } from '@/components/ui/Alert'
 import { DebitDayPicker } from './DebitDayPicker'
 import { api } from '@/lib/api'
+import { MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR, DEFAULT_DEBIT_DAY } from '@/lib/formatters'
 
 type BankAccountOption = {
   id: string
@@ -35,7 +36,7 @@ export function MandateForm({ bankAccounts }: Props) {
     formState: { errors, isSubmitting },
   } = useForm<CreateMandateInput>({
     resolver: zodResolver(CreateMandateSchema),
-    defaultValues: { debitDay: 1, amount: 100 },
+    defaultValues: { debitDay: DEFAULT_DEBIT_DAY, amount: MIN_CONTRIBUTION_ZAR },
   })
 
   async function onSubmit(data: CreateMandateInput) {
@@ -86,9 +87,9 @@ export function MandateForm({ bankAccounts }: Props) {
         <Input
           id="amount"
           type="number"
-          min={100}
-          step={50}
-          placeholder="e.g. 100"
+          min={MIN_CONTRIBUTION_ZAR}
+          step={CONTRIBUTION_STEP_ZAR}
+          placeholder={`e.g. ${MIN_CONTRIBUTION_ZAR}`}
           error={errors.amount?.message}
           {...register('amount', { valueAsNumber: true })}
         />
