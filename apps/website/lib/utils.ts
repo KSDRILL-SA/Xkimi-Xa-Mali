@@ -6,8 +6,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const APP_URL = siteEnv.APP_URL
-export const WA_LINK = siteEnv.WA_LINK
+export const APP_URL         = siteEnv.APP_URL
+export const WA_LINK         = siteEnv.WA_LINK
+export const ADMIN_WA_NUMBER = siteEnv.ADMIN_WA_NUMBER
+
+export function adminWhatsAppUrl(message: string): string {
+  if (ADMIN_WA_NUMBER) {
+    return `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(message)}`
+  }
+  return WA_LINK
+}
 
 export const NAV_LINKS = [
   { label: 'Home',         href: '/',              sectionId: 'hero' },

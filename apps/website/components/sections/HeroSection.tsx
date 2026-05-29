@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
-import { APP_URL, WA_LINK } from '@/lib/utils'
+import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 
 export function HeroSection() {
   return (
@@ -119,7 +119,7 @@ export function HeroSection() {
             </a>
 
             <a
-              href={WA_LINK}
+              href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-secondary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl border border-white/20 text-white/80 font-semibold text-base hover:border-xxm-gold/40"

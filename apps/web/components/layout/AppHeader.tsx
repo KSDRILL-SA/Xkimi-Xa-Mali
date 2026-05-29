@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { Bell, ChevronRight } from 'lucide-react'
 
@@ -10,9 +13,19 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ userName, userInitials = '?', isAdmin, signOutSlot }: AppHeaderProps) {
+  const [atTop, setAtTop] = useState(true)
+
+  useEffect(() => {
+    const onScroll = () => setAtTop(window.scrollY === 0)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
     <header
-      className="sticky top-0 z-40 bg-xxm-green border-b border-white/10 shadow-xxm"
+      className={`sticky top-0 z-40 bg-xxm-green border-b border-white/10 shadow-xxm transition-opacity duration-500 ${
+        atTop ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
       style={{ height: 'var(--header-h)' }}
     >
       <div className="h-full flex items-center gap-3 px-4 md:px-6 max-w-screen-2xl mx-auto">
