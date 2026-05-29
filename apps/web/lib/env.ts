@@ -25,6 +25,13 @@ export const env = createEnv({
     ADMIN_WHATSAPP_NUMBER: z.string().min(1).default('27810780859'),
     ENABLE_MANUAL_PAYMENTS: z.coerce.boolean().default(true),
     ENABLE_GOAL_LOCKING: z.coerce.boolean().default(true),
+    // Sentry (build-time source-map upload; optional in dev)
+    SENTRY_ORG: z.string().optional(),
+    SENTRY_PROJECT: z.string().optional(),
+    SENTRY_DSN: z.string().url().optional(),
+    // Security tunables — allows per-environment adjustment without code changes
+    MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
+    LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
   },
   client: {
     NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
@@ -52,6 +59,11 @@ export const env = createEnv({
     ADMIN_WHATSAPP_NUMBER: process.env.ADMIN_WHATSAPP_NUMBER,
     ENABLE_MANUAL_PAYMENTS: process.env.ENABLE_MANUAL_PAYMENTS,
     ENABLE_GOAL_LOCKING: process.env.ENABLE_GOAL_LOCKING,
+    SENTRY_ORG: process.env.SENTRY_ORG,
+    SENTRY_PROJECT: process.env.SENTRY_PROJECT,
+    SENTRY_DSN: process.env.SENTRY_DSN,
+    MAX_LOGIN_ATTEMPTS: process.env.MAX_LOGIN_ATTEMPTS,
+    LOCKOUT_DURATION_MINUTES: process.env.LOCKOUT_DURATION_MINUTES,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
   },
 })
