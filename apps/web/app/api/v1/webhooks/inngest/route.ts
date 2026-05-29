@@ -8,6 +8,8 @@ import {
   mandateDelayHandler,
   notificationFlush,
   goalDeadlineChecker,
+  mandateStatusSync,
+  inviteExpiry,
 } from '@/inngest'
 
 export const { GET, POST, PUT } = serve({
@@ -20,5 +22,7 @@ export const { GET, POST, PUT } = serve({
     mandateDelayHandler,
     notificationFlush,
     goalDeadlineChecker,
+    mandateStatusSync,
+    inviteExpiry,
   ],
 })
