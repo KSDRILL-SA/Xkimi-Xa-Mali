@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { UpdateProfileSchema } from '@/lib/validation/profile'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { getMemberProfile, updateMemberProfile } from '@/services/member.service'
 
 type Params = { params: Promise<{ id: string }> }
@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const profile = await getMemberProfile(id, session.user.id, session.user.roles)
     return apiSuccess(profile)
   } catch (err) {
-    return handleError(err)
+    return handleServiceError(err)
   }
 }
 
@@ -42,15 +42,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const updated = await updateMemberProfile(id, session.user.id, session.user.roles, parsed.data, ip)
     return apiSuccess(updated)
   } catch (err) {
-    return handleError(err)
+    return handleServiceError(err)
   }
-}
-
-function handleError(err: unknown) {
-  const e = err as { code?: string; message: string }
-  if (e.code === 'SYS_003') return apiError('SYS_003', e.message, 403)
-  if (e.code === 'MBR_001') return apiError('MBR_001', e.message, 404)
-  if (e.code === 'MBR_002') return apiError('MBR_002', e.message, 409)
-  console.error('[members]', e)
-  return apiError('SYS_004', 'Something went wrong', 500)
 }

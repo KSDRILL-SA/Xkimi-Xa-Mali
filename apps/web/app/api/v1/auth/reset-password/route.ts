@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { PasswordResetSchema } from '@/lib/validation/auth'
 import { authRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { resetPassword } from '@/services/auth.service'
 
 export async function POST(req: NextRequest) {
@@ -24,8 +24,6 @@ export async function POST(req: NextRequest) {
     await resetPassword(parsed.data.token, parsed.data.password, ip)
     return apiSuccess({ message: 'Password reset successful. You can now log in.' })
   } catch (err) {
-    const e = err as { code?: string }
-    if (e.code === 'AUTH_004') return apiError('AUTH_004', 'This reset link is invalid or has expired.', 400)
-    return apiError('SYS_004', 'Password reset failed. Please try again.', 500)
+    return handleServiceError(err)
   }
 }
