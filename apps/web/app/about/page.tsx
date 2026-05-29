@@ -194,7 +194,7 @@ export default function AboutPage() {
               <span className="text-xs font-bold text-xxm-gold tracking-widest uppercase">
                 Our story
               </span>
-              <h2 className="text-3xl font-black text-xxm-green-900">How it all began</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900">How it all began</h2>
             </div>
 
             <div className="space-y-5 text-gray-600 text-[15px] leading-relaxed max-w-prose mx-auto">
@@ -254,7 +254,7 @@ export default function AboutPage() {
               <span className="text-xs font-bold text-xxm-gold tracking-widest uppercase">
                 What we stand for
               </span>
-              <h2 className="text-3xl font-black text-xxm-green-900">Three pillars, one purpose</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900">Three pillars, one purpose</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -283,7 +283,7 @@ export default function AboutPage() {
               <span className="text-xs font-bold text-xxm-gold tracking-widest uppercase">
                 The brotherhood
               </span>
-              <h2 className="text-3xl font-black text-xxm-green-900">Meet the founders</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900">Meet the founders</h2>
               <p className="text-gray-500 text-sm max-w-md leading-relaxed mt-1">
                 Four men. One pact. A platform built from scratch with nothing but discipline,
                 vision, and each other&rsquo;s word.
@@ -325,7 +325,7 @@ export default function AboutPage() {
               <span className="text-xs font-bold text-xxm-gold tracking-widest uppercase">
                 Core values
               </span>
-              <h2 className="text-3xl font-black text-white">
+              <h2 className="text-2xl sm:text-3xl font-black text-white">
                 The principles we build on
               </h2>
             </div>
@@ -355,7 +355,7 @@ export default function AboutPage() {
             <span className="text-xs font-bold text-xxm-gold tracking-widest uppercase">
               The platform
             </span>
-            <h2 className="text-3xl font-black text-xxm-green-900 mt-2 mb-6">
+            <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900 mt-2 mb-6">
               Built for serious savers
             </h2>
 
