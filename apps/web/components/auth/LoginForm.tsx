@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { LoginSchema, type LoginInput } from '@/lib/validation/auth'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
+import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -76,21 +76,21 @@ export function LoginForm() {
         </Alert>
       )}
 
-      <div>
-        <Label htmlFor="email" required>Email address</Label>
+      <FormGroup label="Email address" htmlFor="email" required error={errors.email?.message}>
         <Input
           id="email"
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
-          error={errors.email?.message}
           {...register('email')}
         />
-      </div>
+      </FormGroup>
 
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <Label htmlFor="password" required>Password</Label>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <label htmlFor="password" className="text-sm font-medium text-xxm-green-900">
+            Password <span className="text-red-500 text-xs" aria-hidden>*</span>
+          </label>
           <Link href="/forgot-password" className="text-xs text-xxm-green hover:underline">
             Forgot password?
           </Link>

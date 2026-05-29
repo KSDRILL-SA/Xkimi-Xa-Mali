@@ -3,14 +3,16 @@
 import { forwardRef, cloneElement, isValidElement } from 'react'
 import { cn } from '@/lib/utils'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'gold'
-type Size    = 'sm' | 'md' | 'lg'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline' | 'gold' | 'tertiary'
+type Size    = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant
   size?: Size
   loading?: boolean
   asChild?: boolean
+  iconOnly?: boolean
+  fullWidth?: boolean
 }
 
 const base =
@@ -30,18 +32,29 @@ const variants: Record<Variant, string> = {
   danger:
     'bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] shadow-sm',
   outline:
-    'border border-gray-200 bg-white text-gray-700 hover:bg-xxm-green-50 hover:border-xxm-green/20 hover:text-xxm-green active:scale-[0.97]',
+    'border border-xxm-gray-200 bg-white text-xxm-gray-700 hover:bg-xxm-green-50 hover:border-xxm-green/20 hover:text-xxm-green active:scale-[0.97]',
+  tertiary:
+    'border border-xxm-gray-200 text-xxm-gray-700 hover:bg-xxm-gray-50 active:scale-[0.97]',
 }
 
 const sizes: Record<Size, string> = {
+  xs: 'h-6  px-2   text-xs  gap-1',
   sm: 'h-8  px-3   text-xs  gap-1.5',
   md: 'h-10 px-4   text-sm  gap-2',
   lg: 'h-12 px-5   text-sm  gap-2',
+  xl: 'h-14 px-8   text-base gap-2.5',
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', loading, asChild, children, disabled, ...props }, ref) => {
-    const classes = cn(base, variants[variant], sizes[size], className)
+  ({ className, variant = 'primary', size = 'md', loading, asChild, iconOnly, fullWidth, children, disabled, ...props }, ref) => {
+    const classes = cn(
+      base,
+      variants[variant],
+      sizes[size],
+      iconOnly && 'px-0 aspect-square',
+      fullWidth && 'w-full',
+      className,
+    )
 
     if (asChild && isValidElement(children)) {
       const child = children as React.ReactElement<{ className?: string }>
