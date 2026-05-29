@@ -2,113 +2,132 @@ import { cn } from '@/lib/utils'
 
 interface XmmLogoProps {
   size?: number
-  className?: string
-  variant?: 'default' | 'mono' | 'light'
   showWordmark?: boolean
+  variant?: 'default' | 'light' | 'mono'
+  className?: string
 }
 
 export function XmmLogo({
   size = 40,
-  className,
-  variant = 'default',
   showWordmark = false,
+  variant = 'default',
+  className,
 }: XmmLogoProps) {
-  const ring1 = variant === 'light' ? 'rgba(255,255,255,0.12)' : 'rgba(212,175,55,0.15)'
-  const ring2 = variant === 'light' ? 'rgba(255,255,255,0.06)' : 'rgba(212,175,55,0.07)'
-  const greenFill = variant === 'mono' ? '#333' : '#1B4332'
-  const goldFill = variant === 'mono' ? '#888' : '#D4AF37'
-  const goldLight = variant === 'mono' ? '#aaa' : '#F0D060'
-  const goldDark = variant === 'mono' ? '#666' : '#A88828'
+  const gold      = variant === 'mono' ? '#999' : '#D4AF37'
+  const goldLight = variant === 'mono' ? '#ccc' : '#F5D76E'
+  const goldDark  = variant === 'mono' ? '#666' : '#8B6914'
+  const goldMid   = variant === 'mono' ? '#aaa' : '#BF9B30'
+  const green     = variant === 'mono' ? '#333' : '#1B4332'
+  const canopy    = variant === 'mono' ? '#555' : '#2C5F47'
+
+  const uid = `xmm-ws-${size}`
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
-      {/* ── Emblem ── */}
-      <div className="relative shrink-0" style={{ width: size, height: size }}>
-        {/* outer orbit ring */}
-        <svg
-          viewBox="0 0 100 100"
-          width={size}
-          height={size}
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-          className="absolute inset-0"
-        >
-          {/* orbit rings */}
-          <circle cx="50" cy="50" r="47" stroke={ring1} strokeWidth="1" />
-          <circle cx="50" cy="50" r="41" stroke={ring2} strokeWidth="0.5" />
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 100 100"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-label="Xkimm Xa Mali logo"
+        role="img"
+      >
+        <defs>
+          <linearGradient id={`${uid}-ring`} x1="25%" y1="0%" x2="75%" y2="100%">
+            <stop offset="0%"   stopColor={goldLight} />
+            <stop offset="40%"  stopColor={gold} />
+            <stop offset="100%" stopColor={goldDark} />
+          </linearGradient>
+          <radialGradient id={`${uid}-disc`} cx="38%" cy="32%" r="68%">
+            <stop offset="0%"   stopColor={canopy} stopOpacity="0.9" />
+            <stop offset="100%" stopColor={green}  stopOpacity="1" />
+          </radialGradient>
+          <radialGradient id={`${uid}-sheen`} cx="30%" cy="28%" r="55%">
+            <stop offset="0%"   stopColor="rgba(255,255,255,0.14)" />
+            <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+          </radialGradient>
+          <linearGradient id={`${uid}-arrow-gold`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stopColor={goldLight} />
+            <stop offset="55%"  stopColor={gold} />
+            <stop offset="100%" stopColor={goldMid} />
+          </linearGradient>
+          <linearGradient id={`${uid}-center-ring`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stopColor={goldLight} />
+            <stop offset="100%" stopColor={goldMid} />
+          </linearGradient>
+          <linearGradient id={`${uid}-bar`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%"   stopColor={goldLight} />
+            <stop offset="100%" stopColor={gold} />
+          </linearGradient>
+        </defs>
 
-          {/* main coin body — deep green */}
-          <circle cx="50" cy="50" r="38" fill={greenFill} />
+        {/* Outer gold ring */}
+        <circle cx="50" cy="50" r="49" fill={`url(#${uid}-ring)`} />
+        <circle cx="50" cy="50" r="45" fill="none" stroke={goldDark} strokeWidth="0.6" opacity="0.5" />
 
-          {/* inner sheen ring */}
-          <circle cx="50" cy="50" r="35" fill="none" stroke={goldFill} strokeWidth="1.2" opacity="0.4" />
+        {/* Green disc */}
+        <circle cx="50" cy="50" r="43" fill={`url(#${uid}-disc)`} />
 
-          {/* top gradient highlight */}
-          <defs>
-            <radialGradient id="logoGrad" cx="35%" cy="30%" r="65%" fx="35%" fy="30%">
-              <stop offset="0%" stopColor="rgba(255,255,255,0.18)" />
-              <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-            </radialGradient>
-            <linearGradient id="xGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor={goldLight} />
-              <stop offset="50%" stopColor={goldFill} />
-              <stop offset="100%" stopColor={goldDark} />
-            </linearGradient>
-            <linearGradient id="mGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor={goldLight} />
-              <stop offset="100%" stopColor={goldFill} />
-            </linearGradient>
-          </defs>
-
-          <circle cx="50" cy="50" r="38" fill="url(#logoGrad)" />
-
-          {/* "X" letter — bold, centered, offset up */}
-          <text
-            x="50"
-            y="46"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="url(#xGrad)"
-            fontSize="26"
-            fontWeight="900"
-            fontFamily="system-ui, -apple-system, sans-serif"
-            letterSpacing="-1"
-          >
-            X
-          </text>
-
-          {/* "M" monogram — smaller, below X */}
-          <text
-            x="50"
-            y="66"
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fill="url(#mGrad)"
-            fontSize="11"
-            fontWeight="700"
-            fontFamily="system-ui, -apple-system, sans-serif"
-            letterSpacing="3"
+        {/* Green arrow — behind */}
+        <g transform="translate(50,50) rotate(45)">
+          <polygon
+            points="-30,0 -20,-8.5 -20,-3.5 20,-3.5 20,-8.5 30,0 20,8.5 20,3.5 -20,3.5 -20,8.5"
+            fill={canopy}
             opacity="0.85"
-          >
-            XXM
-          </text>
-
-          {/* bottom gold accent line */}
-          <line
-            x1="34" y1="72" x2="66" y2="72"
-            stroke={goldFill}
-            strokeWidth="1"
-            opacity="0.5"
           />
+        </g>
 
-          {/* top sparkle dot */}
-          <circle cx="50" cy="17" r="2.5" fill={goldFill} opacity="0.6" />
-          <circle cx="50" cy="17" r="1.2" fill={goldLight} />
-        </svg>
-      </div>
+        {/* Gold arrow — front */}
+        <g transform="translate(50,50) rotate(-45)">
+          <polygon
+            points="-30,0 -20,-8.5 -20,-3.5 20,-3.5 20,-8.5 30,0 20,8.5 20,3.5 -20,3.5 -20,8.5"
+            fill={`url(#${uid}-arrow-gold)`}
+          />
+          <polygon
+            points="-30,0 -20,-8.5 -20,-6 20,-6 20,-8.5 30,0"
+            fill={goldLight}
+            opacity="0.22"
+          />
+        </g>
 
-      {/* ── Wordmark ── */}
+        {/* Bar chart */}
+        <rect x="36.5" y="19"   width="4.2" height="8.5"  rx="1.2" fill={`url(#${uid}-bar)`} opacity="0.60" />
+        <rect x="42.5" y="16"   width="4.2" height="11.5" rx="1.2" fill={`url(#${uid}-bar)`} opacity="0.75" />
+        <rect x="48.5" y="12.5" width="4.2" height="15"   rx="1.2" fill={`url(#${uid}-bar)`} />
+        <rect x="54.5" y="16.5" width="4.2" height="11"   rx="1.2" fill={`url(#${uid}-bar)`} opacity="0.70" />
+
+        {/* Center medallion */}
+        <circle cx="50" cy="50" r="14"   fill={green} />
+        <circle cx="50" cy="50" r="13"   fill="none" stroke={`url(#${uid}-center-ring)`} strokeWidth="1.8" />
+        <circle cx="50" cy="50" r="11.5" fill="none" stroke={goldLight} strokeWidth="0.4" opacity="0.3" />
+
+        {/* R symbol */}
+        <text
+          x="50" y="55.5"
+          textAnchor="middle"
+          fill={gold}
+          fontFamily="Georgia, 'Times New Roman', serif"
+          fontSize="15"
+          fontWeight="bold"
+        >
+          R
+        </text>
+
+        {/* Handshake arc */}
+        <path
+          d="M45.5 60 Q50 63.5 54.5 60"
+          stroke={gold}
+          strokeWidth="1.4"
+          fill="none"
+          strokeLinecap="round"
+          opacity="0.6"
+        />
+
+        {/* Top sheen */}
+        <circle cx="50" cy="50" r="43" fill={`url(#${uid}-sheen)`} />
+      </svg>
+
       {showWordmark && (
         <div className="flex flex-col leading-none select-none">
           <span
