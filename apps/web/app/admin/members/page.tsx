@@ -1,28 +1,63 @@
 import type { Metadata } from 'next'
-import type { Route } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { listMembers } from '@/services/admin.service'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { DataTable, type Column } from '@/components/ui/DataTable'
+import { RouterPagination } from '@/components/ui/RouterPagination'
 
 export const metadata: Metadata = { title: 'Members — Admin' }
 
 type UserStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED'
 
-type MemberListItem = {
-  id: string; firstName: string; lastName: string; email: string;
-  phone: string; status: string; createdAt: Date;
-  roles: { role: string }[];
-  _count: { contributions: number; mandates: number };
-}
-
 const STATUS_CONFIG: Record<UserStatus, { label: string; className: string }> = {
   ACTIVE:    { label: 'Active',    className: 'xxm-status-success' },
   PENDING:   { label: 'Pending',   className: 'xxm-status-warning' },
-  SUSPENDED: { label: 'Suspended', className: 'xxm-status-danger' },
+  SUSPENDED: { label: 'Suspended', className: 'xxm-status-danger'  },
 }
+
+type MemberRow = {
+  id: string
+  name: string
+  email: string
+  phone: string
+  status: string
+  statusClass: string
+  contribs: number
+  mandates: number
+  joined: string
+}
+
+const columns: Column<MemberRow>[] = [
+  {
+    key: 'name',
+    header: 'Member',
+    sortable: true,
+    render: (r) => (
+      <div>
+        <p className="font-medium text-xxm-green-900">{r.name}</p>
+        <p className="text-xs text-xxm-gray-400">{r.email}</p>
+      </div>
+    ),
+  },
+  { key: 'phone',    header: 'Phone',    render: (r) => <span className="font-mono text-xs">{r.phone}</span> },
+  { key: 'status',   header: 'Status',   align: 'center', render: (r) => <span className={r.statusClass} role="status">{r.status}</span> },
+  { key: 'contribs', header: 'Contribs', align: 'center', sortable: true },
+  { key: 'mandates', header: 'Mandates', align: 'center' },
+  { key: 'joined',   header: 'Joined',   sortable: true },
+  {
+    key: 'id',
+    header: 'Actions',
+    align: 'center',
+    render: (r) => (
+      <Link href={`/admin/members/${r.id}`} className="text-xs text-xxm-green hover:underline font-medium">
+        View
+      </Link>
+    ),
+  },
+]
 
 export default async function AdminMembersPage({
   searchParams,
@@ -30,21 +65,41 @@ export default async function AdminMembersPage({
   searchParams: Promise<{ search?: string; status?: string; page?: string }>
 }) {
   const session = await auth()
-  const roles = (session!.user.roles as string[] | undefined) ?? []
-  const params = await searchParams
+  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const params  = await searchParams
 
   const search = params.search ?? undefined
   const status = params.status as UserStatus | undefined
   const page   = Math.max(1, parseInt(params.page ?? '1', 10))
 
-  const { items, total, totalPages } = await listMembers(roles, { search, status, page, limit: 25 })
+  const { items, total } = await listMembers(roles, { search, status, page, limit: 25 })
 
-  const buildUrl = (overrides: Record<string, string | undefined>) => {
+  type RawMember = {
+    id: string; firstName: string; lastName: string; email: string;
+    phone: string; status: string; createdAt: Date;
+    _count: { contributions: number; mandates: number };
+  }
+
+  const rows: MemberRow[] = (items as unknown as RawMember[]).map((m) => {
+    const sc = STATUS_CONFIG[m.status as UserStatus] ?? { label: m.status, className: 'xxm-status-info' }
+    return {
+      id:          m.id,
+      name:        `${m.firstName} ${m.lastName}`,
+      email:       m.email,
+      phone:       m.phone,
+      status:      sc.label,
+      statusClass: sc.className,
+      contribs:    m._count.contributions,
+      mandates:    m._count.mandates,
+      joined:      formatDate(m.createdAt),
+    }
+  })
+
+  const buildFilterUrl = (s: string | undefined, q: string | undefined) => {
     const p = new URLSearchParams()
-    const merged = { search, status, page: String(page), ...overrides }
-    Object.entries(merged).forEach(([k, v]) => { if (v) p.set(k, v) })
-    const qs = p.toString()
-    return `/admin/members${qs ? `?${qs}` : ''}`
+    if (q) p.set('search', q)
+    if (s) p.set('status', s)
+    return `/admin/members${p.toString() ? `?${p.toString()}` : ''}`
   }
 
   return (
@@ -52,7 +107,7 @@ export default async function AdminMembersPage({
       <Breadcrumb items={[{ label: 'Admin', href: '/admin' }, { label: 'Members' }]} />
       <PageHeader title="Members" subtitle={`${total} total`} />
 
-      {/* Filters */}
+      {/* Search + filters */}
       <div className="flex flex-col gap-3">
         <form method="GET" action="/admin/members" className="flex gap-2">
           <input
@@ -60,13 +115,10 @@ export default async function AdminMembersPage({
             name="search"
             defaultValue={search}
             placeholder="Search name, email or phone…"
-            className="flex-1 min-w-0 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white"
+            className="flex-1 min-w-0 rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm text-xxm-green-900 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white"
           />
           {status && <input type="hidden" name="status" value={status} />}
-          <button
-            type="submit"
-            className="px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors shrink-0"
-          >
+          <button type="submit" className="px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors shrink-0">
             Search
           </button>
         </form>
@@ -75,106 +127,25 @@ export default async function AdminMembersPage({
           {(['ACTIVE', 'PENDING', 'SUSPENDED'] as UserStatus[]).map((s) => (
             <Link
               key={s}
-              href={buildUrl({ status: status === s ? undefined : s, page: '1' }) as Route}
+              href={buildFilterUrl(status === s ? undefined : s, search)}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                status === s
-                  ? 'bg-xxm-green text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                status === s ? 'bg-xxm-green text-white' : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gray-200'
               }`}
             >
               {STATUS_CONFIG[s].label}
             </Link>
           ))}
           {(search || status) && (
-            <Link
-              href="/admin/members"
-              className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 hover:bg-gray-200"
-            >
+            <Link href="/admin/members" className="px-3 py-1.5 rounded-full text-xs font-medium bg-xxm-gray-100 text-xxm-gray-500 hover:bg-xxm-gray-200">
               Clear
             </Link>
           )}
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
-                <th className="px-4 py-3 text-left font-semibold">Member</th>
-                <th className="px-4 py-3 text-left font-semibold">Phone</th>
-                <th className="px-4 py-3 text-center font-semibold">Status</th>
-                <th className="px-4 py-3 text-center font-semibold">Contribs</th>
-                <th className="px-4 py-3 text-center font-semibold">Mandates</th>
-                <th className="px-4 py-3 text-left font-semibold hidden md:table-cell">Joined</th>
-                <th className="px-4 py-3 text-center font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-400">
-                    No members found.
-                  </td>
-                </tr>
-              ) : (
-                (items as unknown as MemberListItem[]).map((m, i) => {
-                  const sc = STATUS_CONFIG[m.status as UserStatus]
-                  return (
-                    <tr key={m.id} className={`border-t border-gray-50 ${i % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{m.firstName} {m.lastName}</p>
-                        <p className="text-xs text-gray-400">{m.email}</p>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 text-xs font-mono">{m.phone}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={sc.className} role="status">{sc.label}</span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-gray-600">{(m._count as { contributions: number }).contributions}</td>
-                      <td className="px-4 py-3 text-center text-gray-600">{(m._count as { mandates: number }).mandates}</td>
-                      <td className="px-4 py-3 text-xs text-gray-400 hidden md:table-cell">{formatDate(m.createdAt)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <Link
-                          href={`/admin/members/${m.id}`}
-                          className="text-xs text-xxm-green hover:underline font-medium"
-                        >
-                          View
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable columns={columns} data={rows} keyExtractor={(r) => r.id} stickyHeader striped caption="Member list" />
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm">
-          <span className="text-gray-500">Page {page} of {totalPages}</span>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <Link
-                href={buildUrl({ page: String(page - 1) }) as Route}
-                className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                ← Prev
-              </Link>
-            )}
-            {page < totalPages && (
-              <Link
-                href={buildUrl({ page: String(page + 1) }) as Route}
-                className="px-3 py-1.5 rounded-xl bg-xxm-green text-white hover:bg-xxm-canopy transition-colors"
-              >
-                Next →
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
+      <RouterPagination totalItems={total} itemsPerPage={25} currentPage={page} baseUrl="/admin/members" className="justify-center" />
     </div>
   )
 }
