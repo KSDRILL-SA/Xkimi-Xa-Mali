@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
+import { getMemberSummary } from '@/services/member.service'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { AnimatedStatCard } from '@/components/dashboard/AnimatedStatCard'
 import { ContributionStatusBadge } from '@/components/contribution/StatusBadge'
@@ -11,10 +12,18 @@ export const metadata: Metadata = { title: 'Dashboard' }
 
 export default async function DashboardPage() {
   const session = await auth()
+  const userId  = session!.user.id
+  const roles   = session!.user.roles ?? []
 
-  const [contributions, goals] = await Promise.all([
+  const currentYear = new Date().getFullYear()
+
+  type RecentContrib = Awaited<ReturnType<typeof db.contribution.findMany>>[number]
+  type ActiveGoal    = Awaited<ReturnType<typeof db.goal.findMany>>[number]
+
+  const [summary, recentContributions, goals] = await Promise.all([
+    getMemberSummary(userId, userId, roles),
     db.contribution.findMany({
-      where: { userId: session!.user.id },
+      where: { userId },
       orderBy: { createdAt: 'desc' },
       take: 5,
     }),
@@ -24,16 +33,6 @@ export default async function DashboardPage() {
       take: 3,
     }),
   ])
-
-  const paidCount  = contributions.filter((c) => c.status === 'PAID').length
-  const totalPaid  = contributions
-    .filter((c) => c.status === 'PAID')
-    .reduce((sum, c) => sum + Number(c.amountPaid), 0)
-
-  const currentYear  = new Date().getFullYear()
-  const yearlyTotal  = contributions
-    .filter((c) => c.periodYear === currentYear)
-    .reduce((sum, c) => sum + Number(c.amountPaid), 0)
 
   return (
     <div className="space-y-6">
@@ -45,11 +44,11 @@ export default async function DashboardPage() {
         <p className="text-xxm-gray-500 text-sm mt-1">Here&apos;s your contribution overview.</p>
       </div>
 
-      {/* Animated stat cards */}
+      {/* Animated stat cards — DB-aggregated totals, not sampled from the 5-row preview */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <AnimatedStatCard icon={TrendingUp} label="Total contributed"   value={totalPaid}   prefix="R " decimals={2} />
-        <AnimatedStatCard icon={Calendar}   label={`${currentYear} total`} value={yearlyTotal} prefix="R " decimals={2} />
-        <AnimatedStatCard icon={CheckCircle2} label="Paid contributions" value={paidCount} suffix=" paid" />
+        <AnimatedStatCard icon={TrendingUp}   label="Total contributed"      value={summary.totalContributed}  prefix="R " decimals={2} />
+        <AnimatedStatCard icon={Calendar}     label={`${currentYear} total`} value={summary.yearlyContributed} prefix="R " decimals={2} />
+        <AnimatedStatCard icon={CheckCircle2} label="Paid contributions"     value={summary.paidCount}         suffix=" paid" />
       </div>
 
       {/* Recent contributions */}
@@ -57,13 +56,13 @@ export default async function DashboardPage() {
         <h2 className="text-sm font-semibold text-xxm-gray-500 uppercase tracking-wide mb-3">
           Recent contributions
         </h2>
-        {contributions.length === 0 ? (
+        {recentContributions.length === 0 ? (
           <div className="xxm-card p-8 text-center text-xxm-gray-400 text-sm">
             No contributions yet. Set up your payment mandate to get started.
           </div>
         ) : (
           <div className="xxm-card divide-y divide-xxm-gray-100">
-            {contributions.map((c) => (
+            {recentContributions.map((c: RecentContrib) => (
               <div key={c.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-medium text-xxm-green-900">
@@ -90,7 +89,7 @@ export default async function DashboardPage() {
             Active goals
           </h2>
           <div className="grid gap-3">
-            {goals.map((g) => {
+            {goals.map((g: ActiveGoal) => {
               const pct = Math.min(100, Math.round((Number(g.currentAmount) / Number(g.targetAmount)) * 100))
               return (
                 <div key={g.id} className="xxm-card p-4 space-y-2">
