@@ -5,7 +5,6 @@ import { listAllContributions } from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
 import { Breadcrumb, DataTable, type Column, RouterPagination, Alert } from '@xxm/ui'
 import { db } from '@/lib/db'
-import { writeFile } from 'fs/promises'
 
 export const metadata: Metadata = { title: 'Contributions' }
 
