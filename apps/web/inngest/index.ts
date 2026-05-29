@@ -5,3 +5,5 @@ export { contributionMonthRollover } from './functions/contribution-month-rollov
 export { mandateDelayHandler } from './functions/mandate-delay-handler'
 export { notificationFlush } from './functions/notification-flush'
 export { goalDeadlineChecker } from './functions/goal-deadline-checker'
+export { mandateStatusSync } from './functions/mandate-status-sync'
+export { inviteExpiry } from './functions/invite-expiry'
