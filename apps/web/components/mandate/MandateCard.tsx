@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Alert } from '@/components/ui/Alert'
 import { ConfirmModal } from '@/components/ui/ConfirmModal'
+import { STATUS_STYLES } from '@xxm/utils'
 import { DelayForm } from './DelayForm'
 import { EditMandateForm } from './EditMandateForm'
 
@@ -26,13 +27,6 @@ type MandateData = {
   }
 }
 
-const STATUS_CONFIG: Record<MandateStatus, { label: string; classes: string }> = {
-  PENDING:   { label: 'Pending',   classes: 'bg-amber-100 text-amber-700' },
-  ACTIVE:    { label: 'Active',    classes: 'bg-green-100 text-green-700' },
-  SUSPENDED: { label: 'Suspended', classes: 'bg-red-100 text-red-700' },
-  CANCELLED: { label: 'Cancelled', classes: 'bg-gray-100 text-gray-500' },
-}
-
 interface Props {
   mandate: MandateData
 }
@@ -45,7 +39,7 @@ export function MandateCard({ mandate }: Props) {
   const [cancelling, setCancelling] = useState(false)
   const [cancelError, setCancelError] = useState('')
 
-  const status = STATUS_CONFIG[mandate.status] ?? STATUS_CONFIG.SUSPENDED
+  const status = STATUS_STYLES.mandate[mandate.status] ?? STATUS_STYLES.mandate.SUSPENDED
   const canManage = mandate.status === 'ACTIVE' || mandate.status === 'PENDING'
   const canDelay = mandate.status === 'ACTIVE'
 
@@ -73,9 +67,7 @@ export function MandateCard({ mandate }: Props) {
           <div className="flex items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <span
-                  className={`status-pill text-xs font-semibold ${status.classes}`}
-                >
+                <span className={status.className} role="status">
                   {status.label}
                 </span>
               </div>

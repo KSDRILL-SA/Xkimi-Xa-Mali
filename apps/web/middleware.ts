@@ -65,8 +65,8 @@ export default auth((req) => {
 
   // Admin API routes require ADMIN role
   if (pathname.startsWith('/api/v1/admin')) {
-    const roles = session.user?.roles as string[] | undefined
-    if (!roles?.includes('ADMIN')) {
+    const roles = Array.isArray(session.user?.roles) ? (session.user.roles as string[]) : []
+    if (!roles.includes('ADMIN')) {
       return NextResponse.json(
         { error: { code: 'SYS_003', message: 'Forbidden', traceId: '' } },
         { status: 403 },
