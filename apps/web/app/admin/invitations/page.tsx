@@ -144,7 +144,7 @@ export default async function AdminInvitationsPage({
                           <input type="hidden" name="inviteId" value={inv.id} />
                           <button
                             type="submit"
-                            className="px-2 py-1 text-xs rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-semibold border border-red-200 transition-colors"
+                            className="px-3 py-1.5 text-xs rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-semibold border border-red-200 transition-colors min-h-[32px]"
                           >
                             Revoke
                           </button>

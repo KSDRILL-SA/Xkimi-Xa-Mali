@@ -66,7 +66,7 @@ export default async function NotificationsPage({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-xxm-gray-700">Channel</label>
                 <select name="channel" defaultValue="SMS"
