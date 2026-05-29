@@ -9,7 +9,7 @@ export default function AdminLoginPage() {
     <div className="min-h-dvh flex items-center justify-center bg-xxm-green p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <XmmLogo variant="light" size="md" className="mx-auto mb-4" />
+          <XmmLogo variant="light" size={44} className="mx-auto mb-4" />
           <h1 className="text-xl font-bold text-white">Admin Portal</h1>
           <p className="text-sm text-white/60 mt-1">Restricted to authorised administrators only.</p>
         </div>

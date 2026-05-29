@@ -8,7 +8,7 @@
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
-  "dependencies": {
-    "@xxm/database": "*"
+  "peerDependencies": {
+    "@prisma/client": ">=6.0.0"
   }
 }
