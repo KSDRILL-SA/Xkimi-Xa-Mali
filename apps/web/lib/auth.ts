@@ -3,11 +3,12 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { db } from './db'
+import { env } from './env'
 import { LoginSchema } from './validation/auth'
 import { logger } from './logger'
 
-const MAX_LOGIN_ATTEMPTS = 5
-const LOCKOUT_DURATION_MS = 15 * 60 * 1000
+const MAX_LOGIN_ATTEMPTS = env.MAX_LOGIN_ATTEMPTS
+const LOCKOUT_DURATION_MS = env.LOCKOUT_DURATION_MINUTES * 60 * 1000
 
 async function recordLoginHistory(userId: string, success: boolean) {
   await db.loginHistory
