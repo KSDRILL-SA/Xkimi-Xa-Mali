@@ -28,6 +28,7 @@ export function AppHeader({ userName, userInitials = '?', isAdmin, signOutSlot }
       }`}
       style={{ height: 'var(--header-h)' }}
     >
+      <a href="#main-content" className="skip-to-main">Skip to main content</a>
       <div className="h-full flex items-center gap-3 px-4 md:px-6 max-w-screen-2xl mx-auto">
         {/* Brand */}
         <Link

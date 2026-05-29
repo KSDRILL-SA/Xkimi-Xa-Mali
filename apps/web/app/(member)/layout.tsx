@@ -75,7 +75,7 @@ export default async function MemberLayout({ children }: { children: React.React
 
         <ScrollNav items={nav} variant="member" />
 
-        <main className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
+        <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
           {children}
         </main>
 

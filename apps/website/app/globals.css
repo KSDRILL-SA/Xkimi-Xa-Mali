@@ -257,35 +257,42 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* ─── Button transitions ────────────────────────────────────────────── */
+/* ─── Button system ─────────────────────────────────────────────────── */
 .btn-primary {
+  background-color: #D4AF37;
+  color: #052E16;
+  font-weight: 700;
+  transition: background-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
   position: relative;
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-
-.btn-primary::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.1);
-  opacity: 0;
-  transition: opacity 0.2s ease;
+.btn-primary:hover {
+  background-color: #A88828;
+  box-shadow: 0 8px 24px rgba(212,175,55,0.4);
 }
-
-.btn-primary:hover::after { opacity: 1; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(212,175,55,0.4); }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:focus-visible {
+  outline: 2px solid #D4AF37;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(212,175,55,0.2);
+}
+.btn-primary:active { transform: scale(0.97); }
 
 .btn-secondary {
-  transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.8);
+  background: transparent;
+  transition: border-color 200ms ease, color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
 }
-
 .btn-secondary:hover {
-  transform: translateY(-2px);
-  border-color: rgba(212, 175, 55, 0.6);
-  color: #D4AF37;
+  border-color: rgba(212,175,55,0.4);
+  color: #ffffff;
 }
+.btn-secondary:focus-visible {
+  outline: 2px solid rgba(255,255,255,0.4);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(255,255,255,0.1);
+}
+.btn-secondary:active { transform: scale(0.97); }
 
 /* ─── Section divider ───────────────────────────────────────────────── */
 .section-divider {
@@ -308,9 +315,31 @@ body {
     transform: none;
     transition: none;
   }
-  * {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
+
+/* ─── Button system ─────────────────────────────────────────────────── */
+.btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border-radius: 0.75rem;
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+  cursor: pointer;
+  outline: none;
+  text-decoration: none;
+  padding: 0.625rem 1.5rem;
+  font-size: 0.9375rem;
+  line-height: 1;
+}
+.btn-base:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 2px #D4AF37, 0 0 0 4px rgba(212,175,55,0.2);
+}
+.btn-base:active { transform: scale(0.97); }
