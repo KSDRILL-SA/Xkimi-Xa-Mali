@@ -1,29 +1,13 @@
 import { db, Prisma } from '@/lib/db'
 import { writeAuditLog } from './audit.service'
+import { logger } from '@/lib/logger'
+import { ForbiddenError, AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import { sendWelcomeEmail } from '@/lib/email'
 import { generateMonthlyContributions } from './contribution.service'
 
-// ─── Domain errors ────────────────────────────────────────────────────────────
-
-export class AdminForbiddenError extends Error {
-  code = 'SYS_003'
-  status = 403
-  constructor() { super('Admin access required') }
-}
-export class AdminNotFoundError extends Error {
-  code = 'ADM_001'
-  status = 404
-  constructor(msg = 'Resource not found') { super(msg) }
-}
-export class AdminConflictError extends Error {
-  code = 'ADM_002'
-  status = 409
-  constructor(msg: string) { super(msg) }
-}
-
 function assertAdmin(roles: string[]) {
-  if (!roles.includes('ADMIN')) throw new AdminForbiddenError()
+  if (!roles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

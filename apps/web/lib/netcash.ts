@@ -1,5 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto'
 import { env } from './env'
+import { withRetry } from './retry'
+import { ExternalServiceError } from './errors'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +23,7 @@ export type NetcashCreateMandatePayload = {
   idNumber?: string
   amount: number
   debitDay: number
-  startDate: string // YYYY-MM-DD
+  startDate: string
   referenceNumber: string
 }
 
@@ -48,7 +50,6 @@ export type NetcashWebhookEvent = {
   processedAt?: string
 }
 
-// Sent by Netcash when a once-off or scheduled debit settles or fails.
 export type NetcashTransactionEvent = {
   transactionRef: string
   status: 'SUCCESS' | 'FAILED' | 'REVERSED' | 'PENDING'
@@ -67,6 +68,13 @@ export type NetcashDebitResponse = {
 
 // ─── HTTP client ──────────────────────────────────────────────────────────────
 
+class NetcashError extends Error {
+  constructor(public readonly statusCode: number, message: string, public readonly errorCode?: string) {
+    super(message)
+    this.name = 'NetcashError'
+  }
+}
+
 async function netcashPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(`${env.NETCASH_API_URL}${path}`, {
     method: 'POST',
@@ -80,10 +88,34 @@ async function netcashPost<T>(path: string, body: Record<string, unknown>): Prom
   const json = (await res.json()) as T & { errorCode?: string; message?: string }
 
   if (!res.ok || json.errorCode) {
-    throw new Error(json.message ?? `Netcash error ${res.status}`)
+    throw new NetcashError(
+      res.status,
+      json.message ?? `Netcash HTTP ${res.status}`,
+      json.errorCode,
+    )
   }
 
   return json
+}
+
+// Retry wrapper: retries on network errors and 5xx, not on 4xx (bad request).
+function netcashCall<T>(path: string, body: Record<string, unknown>, label: string): Promise<T> {
+  return withRetry(
+    () => netcashPost<T>(path, body),
+    {
+      maxAttempts: 3,
+      baseDelayMs: 1_000,
+      maxDelayMs: 10_000,
+      label: `Netcash.${label}`,
+      retryIf: (err) => {
+        if (err instanceof NetcashError && err.statusCode >= 400 && err.statusCode < 500) return false
+        return true
+      },
+    },
+  ).catch((err) => {
+    const detail = err instanceof NetcashError ? err.message : undefined
+    throw new ExternalServiceError('Netcash', detail)
+  })
 }
 
 // ─── Mandate operations ───────────────────────────────────────────────────────
@@ -91,110 +123,86 @@ async function netcashPost<T>(path: string, body: Record<string, unknown>): Prom
 export async function createDebiCheckMandate(
   payload: NetcashCreateMandatePayload,
 ): Promise<NetcashMandateResponse> {
-  return netcashPost<NetcashMandateResponse>('/mandate/create', {
-    serviceKey: env.NETCASH_SERVICE_KEY,
-    ...payload,
-  })
+  return netcashCall('/mandate/create', { serviceKey: env.NETCASH_SERVICE_KEY, ...payload }, 'createMandate')
 }
 
 export async function cancelDebiCheckMandate(mandateId: string): Promise<NetcashMandateResponse> {
-  return netcashPost<NetcashMandateResponse>('/mandate/cancel', {
-    serviceKey: env.NETCASH_SERVICE_KEY,
-    mandateId,
-  })
+  return netcashCall('/mandate/cancel', { serviceKey: env.NETCASH_SERVICE_KEY, mandateId }, 'cancelMandate')
 }
 
-// Amend an existing DebiCheck mandate. Both the collection amount and the
-// debit day can change; either takes effect from the supplied effectiveDate.
 export async function updateDebiCheckMandate(
   mandateId: string,
   changes: { amount?: number; debitDay?: number },
   effectiveDate: string,
 ): Promise<NetcashMandateResponse> {
-  return netcashPost<NetcashMandateResponse>('/mandate/update', {
-    serviceKey: env.NETCASH_SERVICE_KEY,
-    mandateId,
-    ...(changes.amount !== undefined && { amount: changes.amount }),
-    ...(changes.debitDay !== undefined && { debitDay: changes.debitDay }),
-    effectiveDate,
-  })
+  return netcashCall(
+    '/mandate/update',
+    {
+      serviceKey: env.NETCASH_SERVICE_KEY,
+      mandateId,
+      ...(changes.amount !== undefined && { amount: changes.amount }),
+      ...(changes.debitDay !== undefined && { debitDay: changes.debitDay }),
+      effectiveDate,
+    },
+    'updateMandate',
+  )
 }
 
-export async function delayMandate(
-  mandateId: string,
-  newDate: string,
-): Promise<NetcashMandateResponse> {
-  return netcashPost<NetcashMandateResponse>('/mandate/delay', {
-    serviceKey: env.NETCASH_SERVICE_KEY,
-    mandateId,
-    newDate,
-  })
+export async function delayMandate(mandateId: string, newDate: string): Promise<NetcashMandateResponse> {
+  return netcashCall('/mandate/delay', { serviceKey: env.NETCASH_SERVICE_KEY, mandateId, newDate }, 'delayMandate')
 }
 
 export async function getMandateStatus(mandateId: string): Promise<NetcashStatusResponse> {
-  return netcashPost<NetcashStatusResponse>('/mandate/status', {
-    serviceKey: env.NETCASH_SERVICE_KEY,
-    mandateId,
-  })
+  return netcashCall('/mandate/status', { serviceKey: env.NETCASH_SERVICE_KEY, mandateId }, 'getMandateStatus')
 }
 
-// Submit an ad-hoc (once-off) debit against an existing authorized mandate.
-// Used for manual payments — member pays outside the scheduled debit day.
 export async function submitOnceOffDebit(payload: {
   mandateId: string
   amount: number
   reference: string
   idempotencyKey: string
 }): Promise<NetcashDebitResponse> {
-  return netcashPost<NetcashDebitResponse>('/debit/once-off', {
-    serviceKey: env.NETCASH_SERVICE_KEY,
-    ...payload,
-  })
+  return netcashCall('/debit/once-off', { serviceKey: env.NETCASH_SERVICE_KEY, ...payload }, 'submitOnceOffDebit')
 }
 
-// Submit a scheduled (monthly debit order) debit against an existing authorized mandate.
-// Used by the nightly debit-run job for regular monthly collections.
 export async function submitScheduledDebit(payload: {
   mandateId: string
   amount: number
   reference: string
   idempotencyKey: string
 }): Promise<NetcashDebitResponse> {
-  return netcashPost<NetcashDebitResponse>('/debit/scheduled', {
-    serviceKey: env.NETCASH_SERVICE_KEY,
-    ...payload,
-  })
+  return netcashCall('/debit/scheduled', { serviceKey: env.NETCASH_SERVICE_KEY, ...payload }, 'submitScheduledDebit')
 }
 
-// Map a raw Netcash transaction status string to our TransactionStatus enum values.
-export function mapNetcashTransactionStatus(
-  raw: string,
-): 'SUCCESS' | 'FAILED' | 'REVERSED' | null {
+// ─── Status mapping ───────────────────────────────────────────────────────────
+
+export function mapNetcashTransactionStatus(raw: string): 'SUCCESS' | 'FAILED' | 'REVERSED' | null {
   const map: Record<string, 'SUCCESS' | 'FAILED' | 'REVERSED'> = {
-    SUCCESS: 'SUCCESS',
-    PAID: 'SUCCESS',
-    COMPLETED: 'SUCCESS',
-    FAILED: 'FAILED',
-    REJECTED: 'FAILED',
-    BOUNCED: 'FAILED',
-    REVERSED: 'REVERSED',
-    REFUNDED: 'REVERSED',
+    SUCCESS: 'SUCCESS', PAID: 'SUCCESS', COMPLETED: 'SUCCESS',
+    FAILED: 'FAILED', REJECTED: 'FAILED', BOUNCED: 'FAILED',
+    REVERSED: 'REVERSED', REFUNDED: 'REVERSED',
   }
   return map[raw.toUpperCase()] ?? null
 }
 
+export function mapNetcashStatus(raw: string): 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED' {
+  const map: Record<string, 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED'> = {
+    PENDING: 'PENDING', AUTHORIZED: 'ACTIVE', ACTIVE: 'ACTIVE',
+    SUSPENDED: 'SUSPENDED', REJECTED: 'SUSPENDED', CANCELLED: 'CANCELLED',
+  }
+  return map[raw.toUpperCase()] ?? 'SUSPENDED'
+}
+
 // ─── Webhook security ─────────────────────────────────────────────────────────
 
-// Netcash signs the raw request body with HMAC-SHA256 using the webhook secret.
-// Compared in constant time to avoid leaking the digest via a timing side-channel.
+// Netcash signs the raw request body with HMAC-SHA256.
+// Compared in constant time to prevent timing side-channel attacks.
 export function verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean {
-  const expected = createHmac('sha256', env.NETCASH_WEBHOOK_SECRET)
-    .update(rawBody)
-    .digest('hex')
-  const expectedBuf = Buffer.from(expected, 'utf8')
-  const providedBuf = Buffer.from(signatureHeader, 'utf8')
-  if (expectedBuf.length !== providedBuf.length) return false
-  return timingSafeEqual(expectedBuf, providedBuf)
+  const expected = createHmac('sha256', env.NETCASH_WEBHOOK_SECRET).update(rawBody).digest('hex')
+  const expBuf = Buffer.from(expected, 'utf8')
+  const gotBuf = Buffer.from(signatureHeader, 'utf8')
+  if (expBuf.length !== gotBuf.length) return false
+  return timingSafeEqual(expBuf, gotBuf)
 }
 
 // Documented Netcash outbound IP addresses. Reject webhook calls from outside this set.
@@ -209,37 +217,18 @@ export function isAllowedNetcashIp(ip: string): boolean {
   return NETCASH_WEBHOOK_IPS.has(ip)
 }
 
-// ─── Status mapping ───────────────────────────────────────────────────────────
-
-export function mapNetcashStatus(
-  raw: string,
-): 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED' {
-  const map: Record<string, 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED'> = {
-    PENDING: 'PENDING',
-    AUTHORIZED: 'ACTIVE',
-    ACTIVE: 'ACTIVE',
-    SUSPENDED: 'SUSPENDED',
-    REJECTED: 'SUSPENDED',
-    CANCELLED: 'CANCELLED',
-  }
-  return map[raw.toUpperCase()] ?? 'SUSPENDED'
-}
+// ─── Date helpers ─────────────────────────────────────────────────────────────
 
 // Returns the next calendar occurrence of debitDay as YYYY-MM-DD.
-// Built from local calendar components (not toISOString) so the date is correct
-// regardless of server timezone — SAST is UTC+2, where toISOString would roll
-// a local-midnight date back to the previous day.
+// Uses local calendar components — NOT toISOString — so the date is correct
+// regardless of server TZ (SAST = UTC+2, where toISOString rolls midnight back).
 export function getNextDebitDate(debitDay: number): string {
   const now = new Date()
   let year = now.getFullYear()
-  let month = now.getMonth() // 0-indexed
-  // If today is the debit day or later, the next debit is next month
+  let month = now.getMonth()
   if (now.getDate() >= debitDay) {
     month += 1
-    if (month > 11) {
-      month = 0
-      year += 1
-    }
+    if (month > 11) { month = 0; year += 1 }
   }
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(debitDay).padStart(2, '0')}`
 }
