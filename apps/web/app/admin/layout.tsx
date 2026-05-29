@@ -75,7 +75,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
         <ScrollNav items={adminNav} variant="admin" />
 
-        <main className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
+        <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
           {children}
         </main>
 

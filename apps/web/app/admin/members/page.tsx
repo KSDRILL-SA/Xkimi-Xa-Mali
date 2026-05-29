@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { listMembers } from '@/services/admin.service'
 import { formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 
 export const metadata: Metadata = { title: 'Members — Admin' }
 
@@ -18,9 +19,9 @@ type MemberListItem = {
 }
 
 const STATUS_CONFIG: Record<UserStatus, { label: string; className: string }> = {
-  ACTIVE:    { label: 'Active',    className: 'bg-green-100 text-green-700' },
-  PENDING:   { label: 'Pending',   className: 'bg-yellow-100 text-yellow-700' },
-  SUSPENDED: { label: 'Suspended', className: 'bg-red-100 text-red-700' },
+  ACTIVE:    { label: 'Active',    className: 'xxm-status-success' },
+  PENDING:   { label: 'Pending',   className: 'xxm-status-warning' },
+  SUSPENDED: { label: 'Suspended', className: 'xxm-status-danger' },
 }
 
 export default async function AdminMembersPage({
@@ -48,6 +49,7 @@ export default async function AdminMembersPage({
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: 'Admin', href: '/admin' }, { label: 'Members' }]} />
       <PageHeader title="Members" subtitle={`${total} total`} />
 
       {/* Filters */}
@@ -127,9 +129,7 @@ export default async function AdminMembersPage({
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-xs font-mono">{m.phone}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${sc.className}`}>
-                          {sc.label}
-                        </span>
+                        <span className={sc.className} role="status">{sc.label}</span>
                       </td>
                       <td className="px-4 py-3 text-center text-gray-600">{(m._count as { contributions: number }).contributions}</td>
                       <td className="px-4 py-3 text-center text-gray-600">{(m._count as { mandates: number }).mandates}</td>
