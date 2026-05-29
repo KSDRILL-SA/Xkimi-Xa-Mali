@@ -4,7 +4,28 @@ import { db, Prisma } from '@/lib/db'
 import { sendInviteEmail, sendVerificationEmail } from '@/lib/email'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import { writeAuditLog } from './audit.service'
+import { logger } from '@/lib/logger'
 import { encrypt } from '@/lib/encryption'
+import {
+  ForbiddenError,
+  AdminNotFoundError,
+  InviteNotFoundError,
+  InviteUsedError,
+  InviteRevokedError,
+  InviteExpiredError,
+  InviteBindingError,
+  InviteDuplicateError,
+} from '@/lib/errors'
+
+// Re-export domain errors for callers that import them from this module
+export {
+  InviteNotFoundError,
+  InviteUsedError,
+  InviteRevokedError,
+  InviteExpiredError,
+  InviteBindingError,
+  InviteDuplicateError,
+}
 
 const INVITE_TTL_DAYS = 7
 const BCRYPT_ROUNDS   = 12
@@ -31,7 +52,7 @@ function crockfordEncode(buf: Buffer): string {
 }
 
 function generateInviteCode(): string {
-  const buf = randomBytes(5) // 40 bits → 8 Crockford chars
+  const buf = randomBytes(5)
   const enc = crockfordEncode(buf)
   return `XKM-${enc.slice(0, 4)}-${enc.slice(4, 8)}`
 }
@@ -49,42 +70,7 @@ function hashToken(token: string): string {
 }
 
 function assertAdmin(roles: string[]) {
-  if (!roles.includes('ADMIN')) throw new InviteForbiddenError()
-}
-
-// ─── Domain errors ────────────────────────────────────────────────────────────
-
-export class InviteForbiddenError extends Error {
-  code = 'SYS_003'; status = 403
-  constructor() { super('Admin access required') }
-}
-export class InviteNotFoundError extends Error {
-  code = 'INV_001'; status = 400
-  constructor() { super('Invalid invite code') }
-}
-export class InviteUsedError extends Error {
-  code = 'INV_002'; status = 400
-  constructor() { super('This invite code has already been used') }
-}
-export class InviteRevokedError extends Error {
-  code = 'INV_003'; status = 400
-  constructor() { super('This invite code has been revoked') }
-}
-export class InviteExpiredError extends Error {
-  code = 'INV_004'; status = 400
-  constructor() { super('This invite code has expired') }
-}
-export class InviteBindingError extends Error {
-  code = 'INV_005'; status = 403
-  constructor() { super('Email or phone does not match the invite') }
-}
-export class InviteDuplicateError extends Error {
-  code = 'INV_006'; status = 409
-  constructor() { super('An active invite or account already exists for this email or phone') }
-}
-export class RoleForbiddenError extends Error {
-  code = 'SYS_003'; status = 403
-  constructor() { super('Admin access required') }
+  if (!roles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
 }
 
 // ─── Create invite ────────────────────────────────────────────────────────────
@@ -109,7 +95,6 @@ export async function generateInvite(
   const { firstName, lastName, email, phone, minimumAmount } = params
   const normPhone = normalisePhone(phone)
 
-  // Guard: no active invite or existing account for this email/phone
   const [existingInvite, existingUser] = await Promise.all([
     db.invitation.findFirst({
       where: { OR: [{ email }, { phone: normPhone }], status: 'PENDING' },
@@ -124,7 +109,7 @@ export async function generateInvite(
 
   const code            = generateInviteCode()
   const codeHash        = hashCode(code)
-  const codePrefix      = code.split('-')[1] // 4-char first segment
+  const codePrefix      = code.split('-')[1]
   const expiresAt       = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
   const registrationUrl = `${baseUrl}/auth/register?code=${encodeURIComponent(code)}`
 
@@ -136,30 +121,19 @@ export async function generateInvite(
     },
   })
 
-  // Auto-deliver code + registration link to invitee's phone via SMS
   sendSMS({
     to: normPhone,
     body: [
       `Hi ${firstName}, you have been invited to join Xkimm Xa Mali.`,
-      ``,
       `Your invite code: ${code}`,
-      ``,
-      `Tap the link below to register — your code will be pre-filled:`,
-      registrationUrl,
-      ``,
-      `IMPORTANT: This code is personal to you. Never share it with`,
-      `anyone — including Xkimm Xa Mali staff or admins. We will`,
-      `NEVER ask you for this code. It expires in 7 days.`,
+      `Tap to register: ${registrationUrl}`,
+      `IMPORTANT: Never share this code with anyone. It expires in 7 days.`,
     ].join('\n'),
     userSuppliedId: `invite-${invite.id}`,
-  }).catch((_err) => {
-    // Delivery failure is non-fatal — admin still has the code to share
-  })
+  }).catch((err) => logger.warn('Invite SMS delivery failed', { err, inviteId: invite.id }))
 
-  // Send email with code + clickable registration link
-  sendInviteEmail(email, firstName, code, registrationUrl).catch((_err) => {
-    // Non-fatal
-  })
+  sendInviteEmail(email, firstName, code, registrationUrl)
+    .catch((err) => logger.warn('Invite email delivery failed', { err, inviteId: invite.id }))
 
   await writeAuditLog({
     userId: adminId,
@@ -169,6 +143,8 @@ export async function generateInvite(
     payload: { email, phone: normPhone, expiresAt },
     ipAddress: ip,
   })
+
+  logger.info('Invite created', { inviteId: invite.id, email, adminId })
 
   return { id: invite.id, code, codePrefix, email, phone: normPhone, firstName, lastName, expiresAt }
 }
@@ -181,21 +157,12 @@ export async function listInvitations(adminRoles: string[], page = 1, limit = 20
 
   const [items, total] = await Promise.all([
     db.invitation.findMany({
-      skip,
-      take: limit,
+      skip, take: limit,
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true,
-        codePrefix: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        minimumAmount: true,
-        status: true,
-        expiresAt: true,
-        acceptedAt: true,
-        createdAt: true,
+        id: true, codePrefix: true, firstName: true, lastName: true,
+        email: true, phone: true, minimumAmount: true,
+        status: true, expiresAt: true, acceptedAt: true, createdAt: true,
         invitedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     }),
@@ -223,10 +190,7 @@ export async function revokeInvitation(
   if (invite.status === 'ACCEPTED') throw new InviteUsedError()
   if (invite.status === 'REVOKED') throw new InviteRevokedError()
 
-  await db.invitation.update({
-    where: { id: inviteId },
-    data: { status: 'REVOKED' },
-  })
+  await db.invitation.update({ where: { id: inviteId }, data: { status: 'REVOKED' } })
 
   await writeAuditLog({
     userId: adminId,
@@ -245,14 +209,8 @@ export async function validateInviteCode(code: string) {
   const invite = await db.invitation.findUnique({
     where: { codeHash },
     select: {
-      id: true,
-      status: true,
-      expiresAt: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      phone: true,
-      minimumAmount: true,
+      id: true, status: true, expiresAt: true,
+      firstName: true, lastName: true, email: true, phone: true, minimumAmount: true,
     },
   })
 
@@ -291,14 +249,7 @@ export async function acceptInviteRegistration(
   const codeHash = hashCode(input.inviteCode)
   const invite = await db.invitation.findUnique({
     where: { codeHash },
-    select: {
-      id: true,
-      status: true,
-      expiresAt: true,
-      email: true,
-      phone: true,
-      invitedById: true,
-    },
+    select: { id: true, status: true, expiresAt: true, email: true, phone: true, invitedById: true },
   })
 
   if (!invite) throw new InviteNotFoundError()
@@ -306,7 +257,6 @@ export async function acceptInviteRegistration(
   if (invite.status === 'REVOKED') throw new InviteRevokedError()
   if (invite.expiresAt < new Date()) throw new InviteExpiredError()
 
-  // Binding enforcement — submitted email+phone must match the invite exactly
   if (input.email.toLowerCase().trim() !== invite.email.toLowerCase())
     throw new InviteBindingError()
   if (normalisePhone(input.phone) !== invite.phone)
@@ -324,13 +274,13 @@ export async function acceptInviteRegistration(
   const user = await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const created = await tx.user.create({
       data: {
-        email:         invite.email,
-        phone:         invite.phone,
-        firstName:     input.firstName.trim(),
-        lastName:      input.lastName.trim(),
-        password:      passwordHash,
-        idNumber:      encryptedId,
-        status:        'PENDING',
+        email:          invite.email,
+        phone:          invite.phone,
+        firstName:      input.firstName.trim(),
+        lastName:       input.lastName.trim(),
+        password:       passwordHash,
+        idNumber:       encryptedId,
+        status:         'PENDING',
         popiaConsentAt: new Date(),
       },
     })
@@ -338,11 +288,7 @@ export async function acceptInviteRegistration(
     await tx.userRole.create({ data: { userId: created.id, roleId: memberRole.id } })
     await tx.notificationPreference.create({ data: { userId: created.id } })
     await tx.emailVerificationToken.create({
-      data: {
-        userId:    created.id,
-        tokenHash,
-        expiresAt: new Date(Date.now() + VERIF_TTL_MS),
-      },
+      data: { userId: created.id, tokenHash, expiresAt: new Date(Date.now() + VERIF_TTL_MS) },
     })
     await tx.invitation.update({
       where: { id: invite.id },
@@ -363,6 +309,8 @@ export async function acceptInviteRegistration(
     ipAddress: ip,
   })
 
+  logger.info('Registration via invite completed', { userId: user.id, inviteId: invite.id })
+
   return { userId: user.id, email: user.email }
 }
 
@@ -376,18 +324,14 @@ export async function setMemberRole(
   assign: boolean,
   ip?: string,
 ) {
-  if (!adminRoles.includes('ADMIN')) throw new RoleForbiddenError()
+  assertAdmin(adminRoles)
 
   const [member, role] = await Promise.all([
     db.user.findUnique({ where: { id: memberId }, select: { id: true, email: true } }),
     db.role.findUniqueOrThrow({ where: { name: roleName } }),
   ])
 
-  if (!member) {
-    const e = new Error('Member not found') as Error & { code: string; status: number }
-    e.code = 'ADM_001'; e.status = 404
-    throw e
-  }
+  if (!member) throw new AdminNotFoundError('Member not found')
 
   if (assign) {
     await db.userRole.upsert({

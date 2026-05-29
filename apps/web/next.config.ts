@@ -40,10 +40,12 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://browser.sentry-cdn.com",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              // Vercel Blob CDN uses the project's public blob store subdomain
+              "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
               "font-src 'self'",
-              "connect-src 'self' https://*.vercel.app https://*.upstash.io https://o*.ingest.sentry.io",
-              "worker-src 'self'",
+              // blob store, Inngest Cloud API, Upstash Redis, Sentry ingestion
+              "connect-src 'self' https://*.vercel.app https://*.upstash.io https://o*.ingest.sentry.io https://*.public.blob.vercel-storage.com https://api.inngest.com",
+              "worker-src 'self' blob:",
               "frame-ancestors 'none'",
             ].join('; '),
           },

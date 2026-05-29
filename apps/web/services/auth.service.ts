@@ -5,11 +5,17 @@ import { env } from '@/lib/env'
 import { encrypt } from '@/lib/encryption'
 import { sendVerificationEmail, sendPasswordResetEmail } from '@/lib/email'
 import { writeAuditLog } from './audit.service'
+import { logger } from '@/lib/logger'
+import {
+  UserAlreadyExistsError,
+  InvalidTokenError,
+  InvalidCredentialsError,
+} from '@/lib/errors'
 import type { RegisterInput } from '@/lib/validation/auth'
 
 const BCRYPT_ROUNDS = 12
-const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000 // 24h
-const RESET_TTL_MS = 60 * 60 * 1000             // 1h
+const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
+const RESET_TTL_MS = 60 * 60 * 1000
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -30,7 +36,7 @@ export async function registerUser(
 
   if (existing) {
     const field = existing.email === input.email ? 'email' : 'phone'
-    throw Object.assign(new Error('User already exists'), { code: 'MBR_002', field })
+    throw new UserAlreadyExistsError(field as 'email' | 'phone')
   }
 
   const [passwordHash, memberRole] = await Promise.all([
@@ -90,9 +96,8 @@ export async function verifyEmail(rawToken: string, ipAddress?: string) {
 
   const record = await db.emailVerificationToken.findUnique({ where: { tokenHash } })
 
-  if (!record) throw Object.assign(new Error('Invalid token'), { code: 'AUTH_004' })
-  if (record.usedAt) throw Object.assign(new Error('Token already used'), { code: 'AUTH_004' })
-  if (record.expiresAt < new Date()) throw Object.assign(new Error('Token expired'), { code: 'AUTH_004' })
+  if (!record || record.expiresAt < new Date()) throw new InvalidTokenError('Invalid or expired verification link')
+  if (record.usedAt) throw new InvalidTokenError('This verification link has already been used')
 
   await db.$transaction([
     db.emailVerificationToken.update({
@@ -152,9 +157,8 @@ export async function resetPassword(rawToken: string, newPassword: string, ipAdd
 
   const record = await db.passwordResetToken.findUnique({ where: { tokenHash } })
 
-  if (!record) throw Object.assign(new Error('Invalid token'), { code: 'AUTH_004' })
-  if (record.usedAt) throw Object.assign(new Error('Token already used'), { code: 'AUTH_004' })
-  if (record.expiresAt < new Date()) throw Object.assign(new Error('Token expired'), { code: 'AUTH_004' })
+  if (!record || record.expiresAt < new Date()) throw new InvalidTokenError('Invalid or expired reset link')
+  if (record.usedAt) throw new InvalidTokenError('This reset link has already been used')
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
@@ -186,10 +190,13 @@ export async function changePassword(
 ) {
   const user = await db.user.findUniqueOrThrow({ where: { id: userId } })
 
-  if (!user.password) throw Object.assign(new Error('No password set'), { code: 'AUTH_001' })
+  if (!user.password) throw new InvalidCredentialsError('No password set on this account')
 
   const valid = await bcrypt.compare(currentPassword, user.password)
-  if (!valid) throw Object.assign(new Error('Current password incorrect'), { code: 'AUTH_001' })
+  if (!valid) {
+    logger.warn('Failed password change attempt', { userId })
+    throw new InvalidCredentialsError('Current password is incorrect')
+  }
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
