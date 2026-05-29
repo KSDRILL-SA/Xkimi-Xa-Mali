@@ -4,25 +4,25 @@ import { auth } from '@/lib/auth'
 import { listInvitations, revokeInvitation, InviteUsedError, InviteRevokedError } from '@/services/invite.service'
 import { formatDate } from '@/lib/formatters'
 import { CreateInviteModal } from '@/components/admin/CreateInviteModal'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { RouterPagination } from '@/components/ui/RouterPagination'
 
 export const metadata: Metadata = { title: 'Invitations — Admin' }
 
 type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'REVOKED'
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  PENDING:  { label: 'Pending',  className: 'bg-yellow-100 text-yellow-700' },
-  ACCEPTED: { label: 'Accepted', className: 'bg-green-100  text-green-700'  },
-  REVOKED:  { label: 'Revoked',  className: 'bg-red-100    text-red-700'    },
-  EXPIRED:  { label: 'Expired',  className: 'bg-gray-100   text-gray-500'   },
+  PENDING:  { label: 'Pending',  className: 'xxm-status-warning' },
+  ACCEPTED: { label: 'Accepted', className: 'xxm-status-success' },
+  REVOKED:  { label: 'Revoked',  className: 'xxm-status-danger'  },
+  EXPIRED:  { label: 'Expired',  className: 'xxm-status-info'    },
 }
 
 function InviteStatusBadge({ status, expiresAt }: { status: InvitationStatus; expiresAt: Date }) {
   const resolved = status === 'PENDING' && expiresAt < new Date() ? 'EXPIRED' : status
   const cfg = STATUS_CONFIG[resolved] ?? STATUS_CONFIG.PENDING
   return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${cfg.className}`}>
-      {cfg.label}
-    </span>
+    <span className={cfg.className} role="status">{cfg.label}</span>
   )
 }
 
@@ -70,30 +70,32 @@ export default async function AdminInvitationsPage({
 
   return (
     <div className="space-y-6 max-w-5xl">
+      <Breadcrumb items={[{ label: 'Admin', href: '/admin' }, { label: 'Invitations' }]} />
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-xxm-green">Invitations</h1>
-          <p className="text-sm text-gray-500 mt-1">{total} total</p>
+          <p className="text-sm text-xxm-gray-500 mt-1">{total} total</p>
         </div>
         <CreateInviteModal />
       </div>
 
       {sp.error === 'accepted' && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
           This invitation has already been accepted.
         </div>
       )}
       {sp.error === 'revoked' && (
-        <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
           This invitation is already revoked.
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-xl border border-xxm-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
+              <tr className="bg-xxm-gray-50 text-xs uppercase tracking-wider text-xxm-gray-500">
                 <th className="px-4 py-3 text-left font-semibold">Name / Email</th>
                 <th className="px-4 py-3 text-left font-semibold hidden lg:table-cell">Phone</th>
                 <th className="px-4 py-3 text-left font-semibold hidden md:table-cell">Code prefix</th>
@@ -104,33 +106,33 @@ export default async function AdminInvitationsPage({
                 <th className="px-4 py-3 text-center font-semibold">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-xxm-gray-50">
               {items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-xxm-gray-400">
                     No invitations yet. Create the first one above.
                   </td>
                 </tr>
               ) : (
                 (items as InviteRow[]).map((inv, i) => (
-                  <tr key={inv.id} className={`border-t border-gray-50 ${i % 2 === 1 ? 'bg-gray-50/30' : ''}`}>
+                  <tr key={inv.id} className={`hover:bg-xxm-green-50/30 transition-colors ${i % 2 === 1 ? 'bg-xxm-gray-50/30' : ''}`}>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{inv.firstName} {inv.lastName}</p>
-                      <p className="text-xs text-gray-500">{inv.email}</p>
+                      <p className="font-medium text-xxm-gray-900">{inv.firstName} {inv.lastName}</p>
+                      <p className="text-xs text-xxm-gray-500">{inv.email}</p>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600 hidden lg:table-cell">{inv.phone}</td>
+                    <td className="px-4 py-3 text-xs text-xxm-gray-600 hidden lg:table-cell">{inv.phone}</td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      <span className="font-mono text-xs text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                      <span className="font-mono text-xs text-xxm-gray-700 bg-xxm-gray-100 px-2 py-0.5 rounded">
                         XKM-{inv.codePrefix}…
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right text-xs text-gray-600 hidden md:table-cell">
+                    <td className="px-4 py-3 text-right text-xs text-xxm-gray-600 hidden md:table-cell tabular-nums">
                       R{Number(inv.minimumAmount).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 hidden lg:table-cell">
+                    <td className="px-4 py-3 text-xs text-xxm-gray-500 hidden lg:table-cell">
                       {inv.invitedBy.firstName} {inv.invitedBy.lastName}
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-500 hidden md:table-cell">
+                    <td className="px-4 py-3 text-xs text-xxm-gray-500 hidden md:table-cell">
                       {formatDate(inv.expiresAt)}
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -142,7 +144,7 @@ export default async function AdminInvitationsPage({
                           <input type="hidden" name="inviteId" value={inv.id} />
                           <button
                             type="submit"
-                            className="px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200 font-medium"
+                            className="px-2 py-1 text-xs rounded-lg bg-red-50 text-red-700 hover:bg-red-100 font-semibold border border-red-200 transition-colors"
                           >
                             Revoke
                           </button>
@@ -157,23 +159,7 @@ export default async function AdminInvitationsPage({
         </div>
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Page {page} of {totalPages}</span>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <a href={`/admin/invitations?page=${page - 1}`} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
-                ← Prev
-              </a>
-            )}
-            {page < totalPages && (
-              <a href={`/admin/invitations?page=${page + 1}`} className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
-                Next →
-              </a>
-            )}
-          </div>
-        </div>
-      )}
+      <RouterPagination totalItems={total} itemsPerPage={25} currentPage={page} baseUrl="/admin/invitations" className="justify-center" />
     </div>
   )
 }
