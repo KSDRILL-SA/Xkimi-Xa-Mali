@@ -19,7 +19,7 @@ const STATUS_CONFIG: Record<GoalStatus, { label: string; barClass: string; badge
   DRAFT:    { label: 'Draft',    barClass: 'bg-xxm-gray-300',  badgeClass: 'xxm-status-info'    },
   ACTIVE:   { label: 'Active',   barClass: 'bg-xxm-gold',      badgeClass: 'xxm-status-pending' },
   ACHIEVED: { label: 'Achieved', barClass: 'bg-xxm-green',     badgeClass: 'xxm-status-success' },
-  FAILED:   { label: 'Failed',   barClass: 'bg-red-400',       badgeClass: 'xxm-status-danger'  },
+  FAILED:   { label: 'Failed',   barClass: 'bg-red-500',       badgeClass: 'xxm-status-danger'  },
 }
 
 function formatRelative(date: Date): string {
@@ -133,7 +133,7 @@ export default async function GoalDetailPage({
 
         {/* Failed banner */}
         {status === 'FAILED' && (
-          <div className="rounded-lg bg-xxm-champagne-200 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
+          <div className="rounded-lg bg-xxm-champagne-200 border border-xxm-champagne-400 px-4 py-3 text-sm text-xxm-gray-700 font-medium">
             This goal was not achieved by the deadline.
           </div>
         )}

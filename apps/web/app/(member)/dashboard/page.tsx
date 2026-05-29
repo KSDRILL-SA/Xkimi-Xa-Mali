@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { AnimatedStatCard } from '@/components/dashboard/AnimatedStatCard'
+import { ContributionStatusBadge } from '@/components/contribution/StatusBadge'
 import { formatZAR } from '@/lib/formatters'
 import { TrendingUp, Calendar, CheckCircle2 } from 'lucide-react'
 
@@ -74,7 +75,7 @@ export default async function DashboardPage() {
                   <span className="text-sm font-semibold text-xxm-green-900 tabular-nums">
                     {formatZAR(c.amountPaid)}
                   </span>
-                  <StatusBadge status={c.status} />
+                  <ContributionStatusBadge status={c.status} />
                 </div>
               </div>
             ))}
@@ -111,18 +112,3 @@ export default async function DashboardPage() {
   )
 }
 
-const STATUS_CLASS: Record<string, string> = {
-  PAID:    'xxm-status-success',
-  PENDING: 'xxm-status-warning',
-  PARTIAL: 'xxm-status-pending',
-  OVERDUE: 'xxm-status-danger',
-  WAIVED:  'xxm-status-info',
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span className={STATUS_CLASS[status] ?? 'xxm-status-info'} role="status">
-      {status}
-    </span>
-  )
-}
