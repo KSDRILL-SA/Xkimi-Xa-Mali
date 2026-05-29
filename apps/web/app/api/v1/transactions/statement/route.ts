@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiError } from '@/lib/api-response'
+import { apiError, handleServiceError } from '@/lib/api-response'
 import { StatementRequestSchema } from '@/lib/validation/report'
-import { generateMemberStatement, ReportNotFoundError, ReportForbiddenError } from '@/services/report.service'
+import { generateMemberStatement } from '@/services/report.service'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -32,9 +32,6 @@ export async function GET(req: NextRequest) {
     )
     return NextResponse.redirect(signedUrl, { status: 302 })
   } catch (err: unknown) {
-    if (err instanceof ReportNotFoundError) return apiError(err.code, err.message, err.status)
-    if (err instanceof ReportForbiddenError) return apiError(err.code, err.message, err.status)
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }
