@@ -1,6 +1,9 @@
 export const APP_NAME     = 'Xkimm Xa Mali'
 export const APP_ABBR    = 'XXM'
-export const MIN_CONTRIBUTION_ZAR = 100
+export const MIN_CONTRIBUTION_ZAR  = 100
+export const CONTRIBUTION_STEP_ZAR = 50
+export const DEFAULT_DEBIT_DAY     = 1
+export const DEFAULT_INVITE_AMOUNT = 200
 
 export const USER_STATUS = {
   PENDING:   'PENDING',

@@ -12,6 +12,7 @@ import { Alert } from '@/components/ui/Alert'
 
 import { PasswordResetRequestSchema as Schema } from '@/lib/validation/auth'
 import type { PasswordResetRequestInput as FormData } from '@/lib/validation/auth'
+import { api, ApiClientError } from '@/lib/api'
 
 export function ForgotPasswordForm() {
   const [sent, setSent] = useState(false)
@@ -26,14 +27,10 @@ export function ForgotPasswordForm() {
     setLoading(true)
     setError('')
     try {
-      await fetch('/api/v1/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
+      await api.post('/api/v1/forgot-password', data)
       setSent(true)
-    } catch {
-      setError('Something went wrong. Please try again.')
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.')
     } finally {
       setLoading(false)
     }

@@ -37,7 +37,7 @@ export default async function AdminOverviewPage() {
     { icon: Users,    label: 'Active Members',    value: memberCount,           color: 'bg-xxm-green-50 text-xxm-green' },
     { icon: Wallet,   label: 'Pool Total (All)',   value: formatZAR(poolTotal),  color: 'bg-xxm-gold-50 text-xxm-gold-dark' },
     { icon: BarChart3,label: 'This Month Due',     value: formatZAR(totalDue),   color: 'bg-blue-50 text-blue-600' },
-    { icon: Target,   label: 'Pending Mandates',   value: pendingMandates,       color: 'bg-amber-50 text-amber-600' },
+    { icon: Target,   label: 'Pending Mandates',   value: pendingMandates,       color: 'xxm-icon-bg-warning' },
   ]
 
   const quickLinks = [

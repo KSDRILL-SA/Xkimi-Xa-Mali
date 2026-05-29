@@ -65,7 +65,7 @@ export default async function WhatsAppPage({
       </div>
 
       {showBanner && (
-        <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
+        <div className="xxm-banner-success">
           Preference saved successfully.
         </div>
       )}
@@ -80,7 +80,7 @@ export default async function WhatsAppPage({
               {phone ? (
                 <span className="font-mono text-gray-800">{phone}</span>
               ) : (
-                <span className="text-amber-600">No phone number on your profile</span>
+                <span className="xxm-text-warning">No phone number on your profile</span>
               )}
             </p>
           </div>
@@ -112,7 +112,7 @@ export default async function WhatsAppPage({
             <form action={disableAction}>
               <button
                 type="submit"
-                className="w-full rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-medium text-red-700 hover:bg-red-100 transition-colors"
+                className="xxm-btn-danger"
               >
                 Opt out of WhatsApp notifications
               </button>
@@ -140,8 +140,8 @@ export default async function WhatsAppPage({
       {/* Group link */}
       <div className="xxm-card p-6 space-y-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-            <MessageCircle size={18} className="text-green-600" aria-hidden />
+          <div className="w-10 h-10 shrink-0 xxm-icon-bg-success">
+            <MessageCircle size={18} aria-hidden />
           </div>
           <div>
             <p className="font-bold text-xxm-green-900">Join the WhatsApp Group</p>

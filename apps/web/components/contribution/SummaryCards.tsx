@@ -25,7 +25,7 @@ export function ContributionSummaryCards({ summary }: { summary: Summary }) {
       <StatCard
         label="Overdue"
         value={`${summary.overdue}`}
-        valueClass={summary.overdue > 0 ? 'text-red-600' : 'text-xxm-green-900'}
+        valueClass={summary.overdue > 0 ? 'xxm-text-danger' : 'text-xxm-green-900'}
         sub={summary.overdue > 0 ? 'Action required' : 'All clear'}
       />
     </div>

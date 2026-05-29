@@ -10,6 +10,7 @@ import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
 import { PasswordResetSchema as Schema } from '@/lib/validation/auth'
 import type { PasswordResetInput } from '@/lib/validation/auth'
+import { api, ApiClientError } from '@/lib/api'
 
 type FormData = Omit<PasswordResetInput, 'token'>
 
@@ -27,22 +28,14 @@ export function ResetPasswordForm({ token }: Props) {
   async function onSubmit(data: FormData) {
     setLoading(true)
     setServerError('')
-
-    const res = await fetch('/api/v1/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data, token }),
-    })
-
-    const json = await res.json()
-    setLoading(false)
-
-    if (!res.ok) {
-      setServerError(json.error?.message ?? 'Reset failed. Please try again.')
-      return
+    try {
+      await api.post('/api/v1/reset-password', { ...data, token })
+      router.push('/login?reset=1')
+    } catch (err) {
+      setServerError(err instanceof ApiClientError ? err.message : 'Reset failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
-
-    router.push('/login?reset=1')
   }
 
   return (

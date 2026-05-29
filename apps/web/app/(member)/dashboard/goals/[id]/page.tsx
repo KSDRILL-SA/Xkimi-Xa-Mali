@@ -194,7 +194,7 @@ function Stat({
   return (
     <div className="xxm-card p-3">
       <p className="text-xs text-xxm-gray-400 font-medium uppercase tracking-wide">{label}</p>
-      <p className={`text-lg font-bold mt-0.5 ${highlight ? 'text-red-600' : 'text-xxm-green-900'}`}>
+      <p className={`text-lg font-bold mt-0.5 ${highlight ? 'xxm-text-danger' : 'text-xxm-green-900'}`}>
         {value}
       </p>
     </div>

@@ -117,7 +117,7 @@ export function MandateCard({ mandate }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                className="text-red-600 border-red-200 hover:bg-red-50 ml-auto"
+                className="xxm-text-danger border-red-200 hover:bg-red-50 ml-auto"
                 onClick={() => setShowCancel(true)}
               >
                 Cancel mandate

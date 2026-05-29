@@ -117,7 +117,7 @@ export default async function GoalsPage({
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {goal.lockedAt && (
-                      <span className="text-xs text-amber-600 font-medium">Locked</span>
+                      <span className="text-xs xxm-text-warning font-medium">Locked</span>
                     )}
                     <span className={cfg.className} role="status">{cfg.label}</span>
                   </div>
@@ -134,7 +134,7 @@ export default async function GoalsPage({
                 />
 
                 {/* Deadline */}
-                <p className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-xxm-gray-400'}`}>
+                <p className={`text-xs ${isOverdue ? 'xxm-text-danger font-medium' : 'text-xxm-gray-400'}`}>
                   {isOverdue ? 'Overdue · ' : 'Deadline · '}
                   {formatDate(goal.deadline)}
                 </p>
