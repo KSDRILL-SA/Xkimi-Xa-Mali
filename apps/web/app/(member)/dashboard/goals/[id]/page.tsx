@@ -90,7 +90,7 @@ export default async function GoalDetailPage({
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {goal.lockedAt && (
-              <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+              <span className="xxm-status-warning">
                 Locked
               </span>
             )}

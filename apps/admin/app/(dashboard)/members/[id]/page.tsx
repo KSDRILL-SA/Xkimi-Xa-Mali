@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getMemberDetail, setMemberStatus } from '@/lib/services'
-import { formatDate, formatZAR, formatMonth } from '@xxm/utils'
+import { formatDate, formatZAR, formatMonth, STATUS_STYLES } from '@xxm/utils'
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader } from '@xxm/ui'
 import { revalidatePath } from 'next/cache'
 
@@ -106,11 +106,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                     <span className="text-xxm-gray-600">{formatMonth(c.periodMonth, c.periodYear)}</span>
                     <div className="flex items-center gap-3">
                       <span className="text-xxm-gray-500">{formatZAR(c.amountPaid)} / {formatZAR(c.amountDue)}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        c.status === 'PAID' ? 'bg-xxm-green-100 text-xxm-green-800' :
-                        c.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                        'bg-amber-100 text-amber-700'
-                      }`}>{c.status}</span>
+                      <span className={(STATUS_STYLES.contribution[c.status as keyof typeof STATUS_STYLES.contribution] ?? STATUS_STYLES.contribution.PENDING).className}>{c.status}</span>
                     </div>
                   </li>
                 ))}
@@ -133,11 +129,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                       <span className="font-medium text-xxm-green-900">{formatZAR(m.amount)}</span>
                       <span className="text-xxm-gray-400 text-xs ml-2">Day {m.debitDay}</span>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      m.status === 'ACTIVE' ? 'bg-xxm-green-100 text-xxm-green-800' :
-                      m.status === 'CANCELLED' ? 'bg-red-100 text-red-700' :
-                      'bg-amber-100 text-amber-700'
-                    }`}>{m.status}</span>
+                    <span className={(STATUS_STYLES.mandate[m.status as keyof typeof STATUS_STYLES.mandate] ?? STATUS_STYLES.mandate.PENDING).className}>{m.status}</span>
                   </li>
                 ))}
               </ul>

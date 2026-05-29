@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { cn } from '@xxm/utils'
 
 type BarSize    = 'sm' | 'md' | 'lg'
-type BarVariant = 'default' | 'gold' | 'success' | 'danger'
+type BarVariant = 'default' | 'gold' | 'success' | 'warning' | 'danger'
 
 interface ProgressBarProps {
   value: number
@@ -27,6 +27,7 @@ const variantClasses: Record<BarVariant, string> = {
   default: 'bg-xxm-green',
   gold:    'bg-xxm-gold',
   success: 'bg-xxm-green-500',
+  warning: 'bg-amber-400',
   danger:  'bg-red-500',
 }
 
@@ -34,6 +35,7 @@ const trackClasses: Record<BarVariant, string> = {
   default: 'bg-xxm-green-100',
   gold:    'bg-xxm-gold/20',
   success: 'bg-xxm-green-100',
+  warning: 'bg-amber-100',
   danger:  'bg-red-100',
 }
 
