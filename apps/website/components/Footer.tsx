@@ -55,9 +55,8 @@ export function Footer() {
             </a>
 
             <p className="text-white/20 text-xs">
-              A{' '}
+              By{' '}
               <span className="font-bold text-white/35">KSDRILL-SA</span>
-              {' '}platform
             </p>
           </div>
 
