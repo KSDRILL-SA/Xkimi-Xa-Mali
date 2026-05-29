@@ -1,10 +1,7 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import { cn } from '@xxm/utils'
 import { siteEnv } from '@/lib/env'
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
+export { cn }
 
 export const APP_URL         = siteEnv.APP_URL
 export const WA_LINK         = siteEnv.WA_LINK

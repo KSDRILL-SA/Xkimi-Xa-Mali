@@ -2,18 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    color-scheme: light;
-  }
+@import '../../../packages/ui/src/globals.css';
 
-  *, *::before, *::after {
-    box-sizing: border-box;
-  }
+@layer base {
+  :root { color-scheme: light; }
 
   html {
     -webkit-text-size-adjust: 100%;
-    scroll-behavior: smooth;
     font-feature-settings: 'cv02','cv03','cv04','cv11';
   }
 
@@ -22,50 +17,7 @@
     font-family: var(--font-geist-sans, system-ui, sans-serif);
   }
 
-  ::selection {
-    @apply bg-xxm-green text-white;
-  }
+  ::selection { @apply bg-xxm-green text-white; }
 
-  :focus-visible {
-    @apply outline-none ring-2 ring-xxm-gold ring-offset-2;
-  }
-}
-
-@layer components {
-  .xxm-status-success {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-xxm-green-100 text-xxm-green-800;
-  }
-  .xxm-status-warning {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800;
-  }
-  .xxm-status-danger {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800;
-  }
-  .xxm-status-info {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800;
-  }
-  .xxm-status-pending {
-    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-xxm-gray-100 text-xxm-gray-600;
-  }
-
-  .skeleton {
-    @apply bg-xxm-gray-100 animate-shimmer bg-gradient-to-r from-xxm-gray-100 via-xxm-gray-200 to-xxm-gray-100 bg-[length:400%_100%];
-  }
-
-  .scrollbar-none {
-    scrollbar-width: none;
-    &::-webkit-scrollbar { display: none; }
-  }
-
-  .nav-fade-left {
-    @apply pointer-events-none absolute left-0 top-0 bottom-0 w-8 z-10;
-    background: linear-gradient(to right, white, transparent);
-  }
-  .nav-fade-right {
-    @apply pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-10;
-    background: linear-gradient(to left, white, transparent);
-  }
-  .card-hover {
-    @apply transition-all duration-150 hover:shadow-xxm hover:-translate-y-0.5;
-  }
+  :focus-visible { @apply outline-none ring-2 ring-xxm-gold ring-offset-2; }
 }
