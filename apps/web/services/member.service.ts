@@ -1,24 +1,19 @@
 import { db } from '@/lib/db'
 import { encrypt, decrypt, maskAccountNumber } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
+import { logger } from '@/lib/logger'
+import {
+  ForbiddenError,
+  MemberNotFoundError,
+  BankAccountNotFoundError,
+  BankAccountConflictError,
+} from '@/lib/errors'
 import type {
   UpdateProfileInput,
   CreateBankAccountInput,
   UpdateBankAccountInput,
   NotificationPreferencesInput,
 } from '@/lib/validation/profile'
-
-class ForbiddenError extends Error {
-  code = 'SYS_003'
-}
-class NotFoundError extends Error {
-  code = 'MBR_001'
-}
-class ConflictError extends Error {
-  constructor(message: string, public code: string) {
-    super(message)
-  }
-}
 
 // Members may only access their own resources; admins may access anyone's. [SEC-L4]
 function assertCanAccess(targetUserId: string, requesterId: string, requesterRoles: string[]) {
@@ -33,9 +28,13 @@ function maskIdNumber(encrypted: string | null): string | null {
   return plain.slice(-4).padStart(plain.length, '*')
 }
 
-// ─── Profile ────────────────────────────────────────────────────────────────
+// ─── Profile ──────────────────────────────────────────────────────────────────
 
-export async function getMemberProfile(targetUserId: string, requesterId: string, requesterRoles: string[]) {
+export async function getMemberProfile(
+  targetUserId: string,
+  requesterId: string,
+  requesterRoles: string[],
+) {
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
   const user = await db.user.findUnique({
@@ -56,12 +55,12 @@ export async function getMemberProfile(targetUserId: string, requesterId: string
     },
   })
 
-  if (!user) throw new NotFoundError('Member not found')
+  if (!user) throw new MemberNotFoundError()
 
   return {
     ...user,
     idNumberMasked: maskIdNumber(user.idNumber),
-    idNumber: undefined, // never expose the encrypted value
+    idNumber: undefined,
     roles: user.roles.map((r) => r.role.name),
   }
 }
@@ -75,12 +74,11 @@ export async function updateMemberProfile(
 ) {
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
-  // Phone uniqueness check when changing phone
   if (input.phone) {
     const clash = await db.user.findFirst({
       where: { phone: input.phone, id: { not: targetUserId } },
     })
-    if (clash) throw new ConflictError('That phone number is already in use', 'MBR_002')
+    if (clash) throw new BankAccountConflictError('That phone number is already in use', 'MBR_003')
   }
 
   const updated = await db.user.update({
@@ -103,20 +101,35 @@ export async function updateMemberProfile(
     ipAddress,
   })
 
+  logger.info('Profile updated', { targetUserId, requesterId, fields: Object.keys(input) })
   return updated
 }
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
 
-export async function getMemberSummary(targetUserId: string, requesterId: string, requesterRoles: string[]) {
+export async function getMemberSummary(
+  targetUserId: string,
+  requesterId: string,
+  requesterRoles: string[],
+) {
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
   const currentYear = new Date().getFullYear()
 
-  const [contributions, activeMandate] = await Promise.all([
-    db.contribution.findMany({
+  // All aggregation pushed to DB — avoids loading the full contributions table into memory.
+  const [allTimeTotals, yearlyTotals, statusCounts, activeMandate] = await Promise.all([
+    db.contribution.aggregate({
       where: { userId: targetUserId },
-      select: { amountPaid: true, status: true, periodYear: true },
+      _sum: { amountPaid: true },
+    }),
+    db.contribution.aggregate({
+      where: { userId: targetUserId, periodYear: currentYear },
+      _sum: { amountPaid: true },
+    }),
+    db.contribution.groupBy({
+      by: ['status'],
+      where: { userId: targetUserId },
+      _count: { status: true },
     }),
     db.paymentMandate.findFirst({
       where: { userId: targetUserId, status: 'ACTIVE' },
@@ -124,25 +137,26 @@ export async function getMemberSummary(targetUserId: string, requesterId: string
     }),
   ])
 
-  const totalContributed = contributions.reduce((sum, c) => sum + Number(c.amountPaid), 0)
-  const yearlyContributed = contributions
-    .filter((c) => c.periodYear === currentYear)
-    .reduce((sum, c) => sum + Number(c.amountPaid), 0)
+  const statusMap = Object.fromEntries(statusCounts.map((r) => [r.status, r._count.status]))
 
   return {
-    totalContributed,
-    yearlyContributed,
-    paidCount: contributions.filter((c) => c.status === 'PAID').length,
-    overdueCount: contributions.filter((c) => c.status === 'OVERDUE').length,
+    totalContributed: Number(allTimeTotals._sum.amountPaid ?? 0),
+    yearlyContributed: Number(yearlyTotals._sum.amountPaid ?? 0),
+    paidCount: statusMap['PAID'] ?? 0,
+    overdueCount: statusMap['OVERDUE'] ?? 0,
     activeMandate: activeMandate
       ? { id: activeMandate.id, amount: Number(activeMandate.amount), debitDay: activeMandate.debitDay }
       : null,
   }
 }
 
-// ─── POPIA data export ──────────────────────────────────────────────────────
+// ─── POPIA data export ────────────────────────────────────────────────────────
 
-export async function exportMemberData(targetUserId: string, requesterId: string, requesterRoles: string[]) {
+export async function exportMemberData(
+  targetUserId: string,
+  requesterId: string,
+  requesterRoles: string[],
+) {
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
   const user = await db.user.findUnique({
@@ -157,7 +171,7 @@ export async function exportMemberData(targetUserId: string, requesterId: string
     },
   })
 
-  if (!user) throw new NotFoundError('Member not found')
+  if (!user) throw new MemberNotFoundError()
 
   await writeAuditLog({
     userId: requesterId,
@@ -166,7 +180,8 @@ export async function exportMemberData(targetUserId: string, requesterId: string
     entityId: targetUserId,
   })
 
-  // Decrypt sensitive fields for the data subject's own export
+  logger.info('POPIA data export requested', { targetUserId, requesterId })
+
   return {
     exportedAt: new Date().toISOString(),
     profile: {
@@ -217,7 +232,7 @@ export async function exportMemberData(targetUserId: string, requesterId: string
   }
 }
 
-// ─── Bank accounts ──────────────────────────────────────────────────────────
+// ─── Bank accounts ────────────────────────────────────────────────────────────
 
 export async function listBankAccounts(userId: string) {
   const accounts = await db.bankAccount.findMany({
@@ -237,7 +252,11 @@ export async function listBankAccounts(userId: string) {
   }))
 }
 
-export async function addBankAccount(userId: string, input: CreateBankAccountInput, ipAddress?: string) {
+export async function addBankAccount(
+  userId: string,
+  input: CreateBankAccountInput,
+  ipAddress?: string,
+) {
   const existingCount = await db.bankAccount.count({ where: { userId } })
   const makePrimary = input.isPrimary || existingCount === 0
 
@@ -283,11 +302,10 @@ export async function updateBankAccount(
   ipAddress?: string,
 ) {
   const account = await db.bankAccount.findFirst({ where: { id: accountId, userId } })
-  if (!account) throw new NotFoundError('Bank account not found')
+  if (!account) throw new BankAccountNotFoundError()
 
-  // Verified accounts are locked to changes (mandate may depend on them)
   if (account.verifiedAt && (input.bankName || input.branchCode || input.accountType)) {
-    throw new ConflictError('Verified accounts cannot be edited', 'BANK_002')
+    throw new BankAccountConflictError('Verified accounts cannot be edited', 'BNK_003')
   }
 
   await db.$transaction(async (tx) => {
@@ -320,15 +338,14 @@ export async function removeBankAccount(accountId: string, userId: string, ipAdd
     where: { id: accountId, userId },
     include: { mandates: { where: { status: { in: ['PENDING', 'ACTIVE'] } } } },
   })
-  if (!account) throw new NotFoundError('Bank account not found')
+  if (!account) throw new BankAccountNotFoundError()
 
   if (account.mandates.length > 0) {
-    throw new ConflictError('Cannot remove an account with an active mandate', 'BANK_002')
+    throw new BankAccountConflictError('Cannot remove an account with an active mandate', 'BNK_004')
   }
 
   await db.bankAccount.delete({ where: { id: accountId } })
 
-  // If we removed the primary, promote the oldest remaining account
   if (account.isPrimary) {
     const next = await db.bankAccount.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } })
     if (next) await db.bankAccount.update({ where: { id: next.id }, data: { isPrimary: true } })
@@ -346,13 +363,12 @@ export async function removeBankAccount(accountId: string, userId: string, ipAdd
 // ─── Notification preferences ─────────────────────────────────────────────────
 
 export async function getNotificationPreferences(userId: string) {
-  const prefs = await db.notificationPreference.upsert({
+  return db.notificationPreference.upsert({
     where: { userId },
     update: {},
     create: { userId },
     select: { sms: true, email: true, push: true },
   })
-  return prefs
 }
 
 export async function updateNotificationPreferences(

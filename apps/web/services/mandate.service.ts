@@ -1,6 +1,13 @@
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
+import { logger } from '@/lib/logger'
+import {
+  ForbiddenError,
+  MandateNotFoundError,
+  MandateConflictError,
+  BankAccountNotFoundError,
+} from '@/lib/errors'
 import {
   createDebiCheckMandate,
   cancelDebiCheckMandate,
@@ -16,23 +23,6 @@ import { Prisma } from '@prisma/client'
 import type { MandateStatus, AccountType } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { redis } from '@/lib/redis'
-
-// ─── Domain errors ─────────────────────────────────────────────────────────
-
-class NotFoundError extends Error {
-  code = 'MND_001'
-  status = 404
-}
-class ForbiddenError extends Error {
-  code = 'SYS_003'
-  status = 403
-}
-class ConflictError extends Error {
-  status = 409
-  constructor(message: string, public code: string) {
-    super(message)
-  }
-}
 
 // ─── Access control ────────────────────────────────────────────────────────
 
@@ -78,7 +68,7 @@ export async function getMandate(mandateId: string, requesterId: string, request
     },
   })
 
-  if (!mandate) throw new NotFoundError('Mandate not found')
+  if (!mandate) throw new MandateNotFoundError()
   assertCanAccess(mandate.userId, requesterId, requesterRoles)
 
   return {
@@ -106,7 +96,7 @@ export async function createMandate(
     where: { userId, status: { in: ['PENDING', 'ACTIVE'] } },
   })
   if (existingActive) {
-    throw new ConflictError('An active or pending mandate already exists', 'MND_002')
+    throw new MandateConflictError('An active or pending mandate already exists', 'MND_002')
   }
 
   const bankAccount = await db.bankAccount.findUnique({
@@ -114,7 +104,7 @@ export async function createMandate(
     include: { user: { select: { firstName: true, lastName: true, idNumber: true } } },
   })
   if (!bankAccount || bankAccount.userId !== userId) {
-    throw new NotFoundError('Bank account not found')
+    throw new BankAccountNotFoundError()
   }
 
   const decryptedAccountNumber = decrypt(bankAccount.accountNumber)
@@ -178,11 +168,11 @@ export async function updateMandate(
   ipAddress?: string,
 ) {
   const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
-  if (!mandate) throw new NotFoundError('Mandate not found')
+  if (!mandate) throw new MandateNotFoundError()
   assertCanAccess(mandate.userId, requesterId, requesterRoles)
 
   if (mandate.status !== 'ACTIVE' && mandate.status !== 'PENDING') {
-    throw new ConflictError('Only active or pending mandates can be updated', 'MND_003')
+    throw new MandateConflictError('Only active or pending mandates can be updated', 'MND_003')
   }
 
   // Push amount and/or debit-day changes to Netcash, effective next debit cycle.
@@ -225,11 +215,11 @@ export async function cancelMandate(
   ipAddress?: string,
 ) {
   const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
-  if (!mandate) throw new NotFoundError('Mandate not found')
+  if (!mandate) throw new MandateNotFoundError()
   assertCanAccess(mandate.userId, requesterId, requesterRoles)
 
   if (mandate.status === 'CANCELLED') {
-    throw new ConflictError('Mandate is already cancelled', 'MND_004')
+    throw new MandateConflictError('Mandate is already cancelled', 'MND_004')
   }
 
   if (mandate.netcashMandateId) {
@@ -261,17 +251,16 @@ export async function requestDelay(
   ipAddress?: string,
 ) {
   const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
-  if (!mandate) throw new NotFoundError('Mandate not found')
+  if (!mandate) throw new MandateNotFoundError()
   assertCanAccess(mandate.userId, requesterId, requesterRoles)
 
   if (mandate.status !== 'ACTIVE') {
-    throw new ConflictError('Only active mandates can be delayed', 'MND_005')
+    throw new MandateConflictError('Only active mandates can be delayed', 'MND_005')
   }
 
-  // Delay date must be in the future
   const newDate = new Date(data.newDate)
   if (newDate <= new Date()) {
-    throw new ConflictError('Delay date must be in the future', 'MND_006')
+    throw new MandateConflictError('Delay date must be in the future', 'MND_006')
   }
 
   if (mandate.netcashMandateId) {

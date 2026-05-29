@@ -15,6 +15,8 @@ type XXMEvents = {
     }
   }
   'xxm/notifications.flush': { data: Record<string, never> }
+  'xxm/mandate.status-sync': { data: Record<string, never> }
+  'xxm/invite.expiry': { data: Record<string, never> }
 }
 
 export const inngest = new Inngest({
@@ -30,4 +32,6 @@ export const InngestEvents = {
   CONTRIBUTION_MONTH_ROLLOVER: 'xxm/contribution.month-rollover',
   MANDATE_DELAY_HANDLER: 'xxm/mandate.delay-handler',
   NOTIFICATIONS_FLUSH: 'xxm/notifications.flush',
+  MANDATE_STATUS_SYNC: 'xxm/mandate.status-sync',
+  INVITE_EXPIRY: 'xxm/invite.expiry',
 } as const

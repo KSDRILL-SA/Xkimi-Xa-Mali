@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiError } from '@/lib/api-response'
+import { apiError, handleServiceError } from '@/lib/api-response'
 import { AdminReportRequestSchema } from '@/lib/validation/report'
 import { exportAdminReportCSV } from '@/services/report.service'
 
@@ -33,7 +33,6 @@ export async function GET(req: NextRequest) {
       },
     })
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }
