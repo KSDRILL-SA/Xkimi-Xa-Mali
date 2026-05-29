@@ -201,7 +201,7 @@ export function RegisterForm() {
           <p>Code: <span className="font-mono">{inviteCode}</span></p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormGroup label="First name" htmlFor="firstName" required error={e2.firstName?.message}>
             <Input id="firstName" placeholder="Kurhula" defaultValue={prefilled?.firstName} {...reg2('firstName')} />
           </FormGroup>

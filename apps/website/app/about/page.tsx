@@ -180,7 +180,7 @@ export default function AboutPage() {
           <div className="max-w-screen-md mx-auto">
             <div className="flex flex-col items-center text-center mb-10 gap-2">
               <span className="text-xs font-bold text-xxm-gold-dark tracking-widest uppercase">Our story</span>
-              <h2 className="text-3xl font-black text-xxm-green-900">How it all began</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900">How it all began</h2>
             </div>
 
             <div className="space-y-5 text-gray-600 text-[15px] leading-relaxed max-w-prose mx-auto">
@@ -234,7 +234,7 @@ export default function AboutPage() {
           <div className="max-w-screen-lg mx-auto">
             <div className="flex flex-col items-center text-center mb-12 gap-2">
               <span className="text-xs font-bold text-xxm-gold-dark tracking-widest uppercase">What we stand for</span>
-              <h2 className="text-3xl font-black text-xxm-green-900">Three pillars, one purpose</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900">Three pillars, one purpose</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {pillars.map(({ icon: Icon, title, description, accent, iconBg }) => (
@@ -257,7 +257,7 @@ export default function AboutPage() {
           <div className="max-w-screen-lg mx-auto">
             <div className="flex flex-col items-center text-center mb-12 gap-2">
               <span className="text-xs font-bold text-xxm-gold-dark tracking-widest uppercase">The brotherhood</span>
-              <h2 className="text-3xl font-black text-xxm-green-900">Meet the founders</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900">Meet the founders</h2>
               <p className="text-gray-500 text-sm max-w-md leading-relaxed mt-1">
                 Four men. One pact. A platform built from scratch with nothing but discipline,
                 vision, and each other&rsquo;s word.
@@ -290,7 +290,7 @@ export default function AboutPage() {
           <div className="max-w-screen-lg mx-auto">
             <div className="flex flex-col items-center text-center mb-12 gap-2">
               <span className="text-xs font-bold text-xxm-gold tracking-widest uppercase">Core values</span>
-              <h2 className="text-3xl font-black text-white">The principles we build on</h2>
+              <h2 className="text-2xl sm:text-3xl font-black text-white">The principles we build on</h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               {values.map(({ icon: Icon, title, body }) => (
@@ -315,7 +315,7 @@ export default function AboutPage() {
         <section className="py-16 md:py-24 px-4 bg-white">
           <div className="max-w-screen-md mx-auto text-center">
             <span className="text-xs font-bold text-xxm-gold-dark tracking-widest uppercase">The platform</span>
-            <h2 className="text-3xl font-black text-xxm-green-900 mt-2 mb-6">Built for serious savers</h2>
+            <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900 mt-2 mb-6">Built for serious savers</h2>
             <p className="text-gray-500 text-[15px] leading-relaxed mb-10 max-w-prose mx-auto">
               Xkimm Xa Mali is purpose-built software that automates every aspect of running a
               financial collective — from invite-gated onboarding to bank-verified debit mandates,
