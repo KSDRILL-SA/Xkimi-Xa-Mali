@@ -3,6 +3,8 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 
 export const metadata: Metadata = { title: 'Reports — Admin' }
 
@@ -27,10 +29,10 @@ type MemberRow = {
 type ContribStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'WAIVED'
 
 const STATUS_CONFIG: Record<ContribStatus, { label: string; className: string }> = {
-  PENDING: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700' },
-  PAID:    { label: 'Paid',    className: 'bg-green-100 text-green-700' },
-  OVERDUE: { label: 'Overdue', className: 'bg-red-100 text-red-700' },
-  WAIVED:  { label: 'Waived',  className: 'bg-gray-100 text-gray-500' },
+  PENDING: { label: 'Pending', className: 'xxm-status-warning' },
+  PAID:    { label: 'Paid',    className: 'xxm-status-success' },
+  OVERDUE: { label: 'Overdue', className: 'xxm-status-danger'  },
+  WAIVED:  { label: 'Waived',  className: 'xxm-status-info'    },
 }
 
 export default async function AdminReportsPage({
@@ -81,24 +83,23 @@ export default async function AdminReportsPage({
   const poolTotal = Number(poolResult._sum?.amountPaid ?? 0)
 
   const periodLabel = `${MONTHS[month - 1]} ${year}`
-
-  // Build month/year selectors
   const yearOptions = Array.from({ length: now.getFullYear() - 2023 }, (_, i) => 2024 + i)
-
   const buildUrl = (m: number, y: number) => `/admin/reports?month=${m}&year=${y}`
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: 'Admin', href: '/admin' }, { label: 'Reports' }]} />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
         <div>
           <h1 className="text-2xl font-bold text-xxm-green">Reports</h1>
-          <p className="text-sm text-gray-500 mt-1">{periodLabel}</p>
+          <p className="text-sm text-xxm-gray-500 mt-1">{periodLabel}</p>
         </div>
 
         {/* Period selector */}
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex rounded-lg border border-xxm-gray-200 overflow-hidden text-sm">
             {MONTHS.map((name, idx) => (
               <Link
                 key={name}
@@ -106,7 +107,7 @@ export default async function AdminReportsPage({
                 className={`px-2 py-1.5 text-xs font-medium transition-colors ${
                   month === idx + 1
                     ? 'bg-xxm-green text-white'
-                    : 'text-gray-600 hover:bg-gray-50'
+                    : 'text-xxm-gray-600 hover:bg-xxm-gray-50'
                 }`}
               >
                 {name.slice(0, 3)}
@@ -114,9 +115,8 @@ export default async function AdminReportsPage({
             ))}
           </div>
           <select
-            className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 text-gray-700 bg-white"
+            className="text-sm border border-xxm-gray-200 rounded-lg px-2 py-1.5 text-xxm-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/20"
             defaultValue={year}
-            onChange={undefined}
           >
             {yearOptions.map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -124,7 +124,7 @@ export default async function AdminReportsPage({
           </select>
           <a
             href={`/api/v1/admin/reports/csv?month=${month}&year=${year}`}
-            className="px-3 py-1.5 text-xs rounded-lg bg-xxm-gold text-white font-medium hover:bg-xxm-gold/90 transition-colors whitespace-nowrap"
+            className="px-3 py-1.5 text-xs rounded-lg bg-xxm-gold text-white font-semibold hover:bg-xxm-gold/90 transition-colors whitespace-nowrap"
           >
             Export CSV
           </a>
@@ -134,48 +134,40 @@ export default async function AdminReportsPage({
       {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total Due',       value: formatZAR(totalDue),    className: 'text-gray-900' },
-          { label: 'Total Paid',      value: formatZAR(totalPaid),   className: 'text-green-600' },
-          { label: 'Outstanding',     value: formatZAR(Math.max(0, totalDue - totalPaid)), className: totalDue - totalPaid > 0 ? 'text-red-600' : 'text-green-600' },
-          { label: 'Pool Total',      value: formatZAR(poolTotal),   className: 'text-xxm-green' },
+          { label: 'Total Due',   value: formatZAR(totalDue),    className: 'text-xxm-gray-900' },
+          { label: 'Total Paid',  value: formatZAR(totalPaid),   className: 'text-green-600' },
+          { label: 'Outstanding', value: formatZAR(Math.max(0, totalDue - totalPaid)), className: totalDue - totalPaid > 0 ? 'text-red-600' : 'text-green-600' },
+          { label: 'Pool Total',  value: formatZAR(poolTotal),   className: 'text-xxm-green' },
         ].map(({ label, value, className }) => (
-          <div key={label} className="bg-white rounded-xl border border-gray-100 p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider font-semibold">{label}</p>
-            <p className={`text-xl font-bold mt-1 ${className}`}>{value}</p>
+          <div key={label} className="bg-white rounded-xl border border-xxm-gray-100 p-4">
+            <p className="text-xs text-xxm-gray-500 uppercase tracking-wider font-semibold">{label}</p>
+            <p className={`text-xl font-bold mt-1 tabular-nums ${className}`}>{value}</p>
           </div>
         ))}
       </div>
 
       {/* Collection progress */}
-      <div className="bg-white rounded-xl border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-xxm-green">Collection Progress</h2>
-          <span className="text-sm font-bold text-xxm-green">{collectionRate}%</span>
-        </div>
-        <div className="w-full bg-gray-100 rounded-full h-3 mb-3">
-          <div
-            className="bg-xxm-green h-3 rounded-full transition-all"
-            style={{ width: `${collectionRate}%` }}
-          />
-        </div>
-        <div className="flex gap-6 text-sm text-gray-500">
-          <span><strong className="text-green-600">{paidCount}</strong> paid</span>
-          <span><strong className="text-red-500">{overdueCount}</strong> overdue</span>
-          <span><strong className="text-gray-700">{contribs.length - paidCount - overdueCount}</strong> pending</span>
-          <span><strong className="text-gray-700">{members.length}</strong> members total</span>
-        </div>
+      <div className="bg-white rounded-xl border border-xxm-gray-100 p-5">
+        <h2 className="font-semibold text-xxm-green mb-4">Collection Progress</h2>
+        <ProgressBar
+          value={collectionRate}
+          label={`${paidCount} paid · ${overdueCount} overdue · ${contribs.length - paidCount - overdueCount} pending · ${members.length} members total`}
+          showValue
+          size="lg"
+          variant="default"
+        />
       </div>
 
-      {/* Member table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+      {/* Member breakdown table */}
+      <div className="bg-white rounded-xl border border-xxm-gray-100 overflow-hidden">
+        <div className="px-5 py-3 border-b border-xxm-gray-100 flex items-center justify-between">
           <h2 className="font-semibold text-xxm-green">Member Breakdown</h2>
-          <span className="text-xs text-gray-400">{members.length} active members</span>
+          <span className="text-xs text-xxm-gray-400">{members.length} active members</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-xs uppercase tracking-wider text-gray-500">
+              <tr className="bg-xxm-gray-50 text-xs uppercase tracking-wider text-xxm-gray-500">
                 <th className="px-4 py-3 text-left font-semibold">Member</th>
                 <th className="px-4 py-3 text-right font-semibold">Due</th>
                 <th className="px-4 py-3 text-right font-semibold">Paid</th>
@@ -184,33 +176,31 @@ export default async function AdminReportsPage({
                 <th className="px-4 py-3 text-center font-semibold hidden md:table-cell">Statement</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-xxm-gray-50">
               {(members as unknown as MemberRow[]).map((m, i) => {
                 const contrib = m.contributions[0]
-                const amountDue  = contrib ? Number(contrib.amountDue) : 0
-                const amountPaid = contrib ? Number(contrib.amountPaid) : 0
+                const amountDue   = contrib ? Number(contrib.amountDue)  : 0
+                const amountPaid  = contrib ? Number(contrib.amountPaid) : 0
                 const outstanding = Math.max(0, amountDue - amountPaid)
                 const status = contrib?.status ?? 'NO_RECORD'
                 const sc = STATUS_CONFIG[status as ContribStatus]
 
                 return (
-                  <tr key={m.id} className={`border-b border-gray-50 ${i % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                  <tr key={m.id} className={`hover:bg-xxm-green-50/30 transition-colors ${i % 2 === 1 ? 'bg-xxm-gray-50/40' : ''}`}>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{m.firstName} {m.lastName}</p>
-                      <p className="text-xs text-gray-400">{m.email}</p>
+                      <p className="font-medium text-xxm-gray-900">{m.firstName} {m.lastName}</p>
+                      <p className="text-xs text-xxm-gray-400">{m.email}</p>
                     </td>
-                    <td className="px-4 py-3 text-right text-gray-700">{formatZAR(amountDue)}</td>
-                    <td className="px-4 py-3 text-right text-green-600 font-medium">{formatZAR(amountPaid)}</td>
-                    <td className={`px-4 py-3 text-right font-medium ${outstanding > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                    <td className="px-4 py-3 text-right text-xxm-gray-700 tabular-nums">{formatZAR(amountDue)}</td>
+                    <td className="px-4 py-3 text-right text-green-600 font-medium tabular-nums">{formatZAR(amountPaid)}</td>
+                    <td className={`px-4 py-3 text-right font-medium tabular-nums ${outstanding > 0 ? 'text-red-600' : 'text-xxm-gray-400'}`}>
                       {formatZAR(outstanding)}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {sc ? (
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${sc.className}`}>
-                          {sc.label}
-                        </span>
+                        <span className={sc.className} role="status">{sc.label}</span>
                       ) : (
-                        <span className="text-xs text-gray-400">—</span>
+                        <span className="text-xs text-xxm-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-center hidden md:table-cell">

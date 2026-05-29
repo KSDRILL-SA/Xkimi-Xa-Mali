@@ -22,10 +22,10 @@ type ContribRow = {
 type ContribStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'WAIVED'
 
 const STATUS_CONFIG: Record<ContribStatus, { label: string; className: string }> = {
-  PENDING: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700' },
-  PAID:    { label: 'Paid',    className: 'bg-green-100 text-green-700' },
-  OVERDUE: { label: 'Overdue', className: 'bg-red-100 text-red-700' },
-  WAIVED:  { label: 'Waived',  className: 'bg-gray-100 text-gray-500' },
+  PENDING: { label: 'Pending', className: 'xxm-status-warning' },
+  PAID:    { label: 'Paid',    className: 'xxm-status-success' },
+  OVERDUE: { label: 'Overdue', className: 'xxm-status-danger'  },
+  WAIVED:  { label: 'Waived',  className: 'xxm-status-info'    },
 }
 
 export default async function StatementsPage() {
@@ -53,48 +53,46 @@ export default async function StatementsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-xxm-green">Statements</h1>
-        <p className="text-sm text-gray-500 mt-1">Download PDF statements for any contribution period</p>
+        <p className="text-sm text-xxm-gray-500 mt-1">Download PDF statements for any contribution period</p>
       </div>
 
       {contributions.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-400">
-          <FileText size={40} className="mx-auto mb-3 text-gray-300" aria-hidden />
+        <div className="bg-white rounded-xl border border-xxm-gray-100 p-12 text-center text-xxm-gray-400">
+          <FileText size={40} className="mx-auto mb-3 text-xxm-gray-300" aria-hidden />
           <p className="font-medium">No contribution periods yet</p>
           <p className="text-sm mt-1">Statements will appear once contributions are generated for your account</p>
         </div>
       ) : (
         <div className="space-y-6">
           {years.map((year) => (
-            <div key={year} className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-              <div className="px-4 py-3 bg-xxm-green/5 border-b border-gray-100">
+            <div key={year} className="bg-white rounded-xl border border-xxm-gray-100 overflow-hidden">
+              <div className="px-4 py-3 bg-xxm-green/5 border-b border-xxm-gray-100">
                 <h2 className="font-semibold text-xxm-green">{year}</h2>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-xxm-gray-50">
                 {byYear[year].map((c) => {
-                  const sc = STATUS_CONFIG[c.status as ContribStatus] ?? { label: c.status, className: 'bg-gray-100 text-gray-500' }
+                  const sc = STATUS_CONFIG[c.status as ContribStatus] ?? { label: c.status, className: 'xxm-status-info' }
                   const outstanding = Math.max(0, Number(c.amountDue) - Number(c.amountPaid))
 
                   return (
-                    <div key={`${c.periodYear}-${c.periodMonth}`} className="flex items-center gap-4 px-4 py-3">
+                    <div key={`${c.periodYear}-${c.periodMonth}`} className="flex items-center gap-4 px-4 py-3 hover:bg-xxm-green-50/20 transition-colors">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 text-sm">
+                        <p className="font-medium text-xxm-gray-900 text-sm">
                           {MONTHS[c.periodMonth - 1]} {c.periodYear}
                         </p>
                         <div className="flex items-center gap-3 mt-0.5">
-                          <span className="text-xs text-gray-500">Due {formatZAR(Number(c.amountDue))}</span>
-                          <span className="text-xs text-gray-400">·</span>
-                          <span className="text-xs text-gray-500">Paid {formatZAR(Number(c.amountPaid))}</span>
+                          <span className="text-xs text-xxm-gray-500 tabular-nums">Due {formatZAR(Number(c.amountDue))}</span>
+                          <span className="text-xs text-xxm-gray-400">·</span>
+                          <span className="text-xs text-xxm-gray-500 tabular-nums">Paid {formatZAR(Number(c.amountPaid))}</span>
                           {outstanding > 0 && (
                             <>
-                              <span className="text-xs text-gray-400">·</span>
-                              <span className="text-xs text-red-600 font-medium">Outstanding {formatZAR(outstanding)}</span>
+                              <span className="text-xs text-xxm-gray-400">·</span>
+                              <span className="text-xs text-red-600 font-medium tabular-nums">Outstanding {formatZAR(outstanding)}</span>
                             </>
                           )}
                         </div>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${sc.className}`}>
-                        {sc.label}
-                      </span>
+                      <span className={sc.className} role="status">{sc.label}</span>
                       <a
                         href={`/api/v1/transactions/statement?month=${c.periodMonth}&year=${c.periodYear}`}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-xxm-green text-white text-xs font-medium hover:bg-xxm-green/90 transition-colors"

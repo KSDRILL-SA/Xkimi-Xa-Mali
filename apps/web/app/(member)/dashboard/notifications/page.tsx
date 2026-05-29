@@ -35,9 +35,9 @@ const CHANNEL_ICONS: Record<NotifChannel, LucideIcon> = {
 }
 
 const STATUS_CONFIG: Record<NotifStatus, { label: string; className: string }> = {
-  QUEUED: { label: 'Queued', className: 'bg-gray-100 text-gray-600' },
-  SENT: { label: 'Sent', className: 'bg-green-100 text-green-700' },
-  FAILED: { label: 'Failed', className: 'bg-red-100 text-red-700' },
+  QUEUED: { label: 'Queued', className: 'xxm-status-info'    },
+  SENT:   { label: 'Sent',   className: 'xxm-status-success' },
+  FAILED: { label: 'Failed', className: 'xxm-status-danger'  },
 }
 
 function slugToTitle(slug: string): string {
@@ -147,7 +147,7 @@ export default async function NotificationsPage({
             active={channelFilter === ch}
           />
         ))}
-        <div className="w-px bg-gray-200 mx-1" />
+        <div className="w-px bg-xxm-gray-200 mx-1" />
         <FilterChip label="All status" href={buildUrl({ status: undefined, cursor: undefined }) as Route} active={!statusFilter} />
         {validStatuses.map((s) => (
           <FilterChip
@@ -168,29 +168,25 @@ export default async function NotificationsPage({
           </p>
         </div>
       ) : (
-        <div className="xxm-card divide-y divide-gray-100">
+        <div className="xxm-card divide-y divide-xxm-gray-100">
           {(items as NotificationItem[]).map((n) => {
             const cfg = STATUS_CONFIG[n.status as NotifStatus] ?? STATUS_CONFIG.QUEUED
             const date = n.sentAt ?? n.createdAt
             const ChannelIcon = CHANNEL_ICONS[n.channel as NotifChannel] ?? Bell
             return (
-              <div key={n.id} className="flex items-start gap-4 px-5 py-4">
+              <div key={n.id} className="flex items-start gap-4 px-5 py-4 hover:bg-xxm-green-50/20 transition-colors">
                 <div className="mt-0.5 w-8 h-8 rounded-full bg-xxm-green-50 flex items-center justify-center shrink-0" aria-hidden>
                   <ChannelIcon size={15} className="text-xxm-green" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">
+                  <p className="text-sm font-medium text-xxm-gray-800 truncate">
                     {slugToTitle(n.template.slug)}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-xs text-xxm-gray-400 mt-0.5">
                     {CHANNEL_LABELS[n.channel as NotifChannel] ?? n.channel} · {formatRelative(date)}
                   </p>
                 </div>
-                <span
-                  className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cfg.className}`}
-                >
-                  {cfg.label}
-                </span>
+                <span className={`shrink-0 ${cfg.className}`} role="status">{cfg.label}</span>
               </div>
             )
           })}
@@ -238,8 +234,8 @@ function FilterChip({
       href={href}
       className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
         active
-          ? 'bg-xxm-green-900 text-white'
-          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          ? 'bg-xxm-green text-white'
+          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gray-200'
       }`}
     >
       {label}
