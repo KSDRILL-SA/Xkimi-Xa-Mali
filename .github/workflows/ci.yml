@@ -28,6 +28,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
+      AUTH_SECRET: test_secret_32_chars_minimum_here_x
       NEXTAUTH_SECRET: test_secret_32_chars_minimum_here
       ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY_TEST }}
       NETCASH_SERVICE_KEY: test
@@ -43,6 +44,7 @@ jobs:
       UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN_TEST }}
       BLOB_READ_WRITE_TOKEN: test
       WHATSAPP_GROUP_LINK: https://chat.whatsapp.com/test
+      NEXT_PUBLIC_WEB_URL: http://localhost:3000
 
     steps:
       - name: Checkout
