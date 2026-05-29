@@ -5,17 +5,18 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllContributions, bulkGenerateContributions } from '@/services/admin.service'
 import { formatZAR } from '@/lib/formatters'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 
 export const metadata: Metadata = { title: 'Contributions — Admin' }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  PENDING: { label: 'Pending', className: 'bg-yellow-100 text-yellow-700' },
-  PARTIAL: { label: 'Partial', className: 'bg-blue-100 text-blue-700' },
-  PAID:    { label: 'Paid',    className: 'bg-green-100 text-green-700' },
-  OVERDUE: { label: 'Overdue', className: 'bg-red-100 text-red-700' },
-  WAIVED:  { label: 'Waived',  className: 'bg-gray-100 text-gray-500' },
+  PENDING: { label: 'Pending', className: 'xxm-status-warning' },
+  PARTIAL: { label: 'Partial', className: 'xxm-status-pending' },
+  PAID:    { label: 'Paid',    className: 'xxm-status-success' },
+  OVERDUE: { label: 'Overdue', className: 'xxm-status-danger'  },
+  WAIVED:  { label: 'Waived',  className: 'xxm-status-info'    },
 }
 
 export default async function AdminContributionsPage({
@@ -58,10 +59,11 @@ export default async function AdminContributionsPage({
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: 'Admin', href: '/admin' }, { label: 'Contributions' }]} />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-xxm-green">Contributions</h1>
-          <p className="text-sm text-gray-500 mt-1">{MONTHS[month - 1]} {year} · {total} records</p>
+          <p className="text-sm text-xxm-gray-500 mt-1">{MONTHS[month - 1]} {year} · {total} records</p>
         </div>
       </div>
 
@@ -157,7 +159,7 @@ export default async function AdminContributionsPage({
                       <td className="px-4 py-3 text-right text-gray-700">{formatZAR(Number(row.amountDue))}</td>
                       <td className="px-4 py-3 text-right text-green-600">{formatZAR(Number(row.amountPaid))}</td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${cfg.className}`}>{cfg.label}</span>
+                        <span className={cfg.className} role="status">{cfg.label}</span>
                       </td>
                     </tr>
                   )

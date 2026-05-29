@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Label } from '@/components/ui/Label'
+import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
 
 const Schema = z.object({ email: z.string().email('Please enter a valid email address') })
@@ -50,10 +50,9 @@ export function ForgotPasswordForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       {error && <Alert variant="error">{error}</Alert>}
-      <div>
-        <Label htmlFor="email" required>Email address</Label>
-        <Input id="email" type="email" placeholder="you@example.com" error={errors.email?.message} {...register('email')} />
-      </div>
+      <FormGroup label="Email address" htmlFor="email" required error={errors.email?.message}>
+        <Input id="email" type="email" placeholder="you@example.com" {...register('email')} />
+      </FormGroup>
       <Button type="submit" className="w-full" size="lg" loading={loading}>
         Send reset link
       </Button>

@@ -3,6 +3,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { listAuditLogs } from '@/services/admin.service'
+import { Breadcrumb } from '@/components/ui/Breadcrumb'
 
 export const metadata: Metadata = { title: 'Audit Log — Admin' }
 
@@ -19,12 +20,12 @@ function formatRelative(date: Date): string {
 }
 
 const ACTION_COLOR: Record<string, string> = {
-  ADMIN_MEMBER_STATUS_CHANGED:   'bg-orange-100 text-orange-700',
-  ADMIN_MANDATE_APPROVED:        'bg-green-100 text-green-700',
-  ADMIN_MANDATE_REJECTED:        'bg-red-100 text-red-700',
-  ADMIN_CONTRIBUTIONS_GENERATED: 'bg-blue-100 text-blue-700',
-  ADMIN_BROADCAST_SENT:          'bg-purple-100 text-purple-700',
-  WHATSAPP_PREFERENCE_UPDATED:   'bg-teal-100 text-teal-700',
+  ADMIN_MEMBER_STATUS_CHANGED:   'xxm-status-warning',
+  ADMIN_MANDATE_APPROVED:        'xxm-status-success',
+  ADMIN_MANDATE_REJECTED:        'xxm-status-danger',
+  ADMIN_CONTRIBUTIONS_GENERATED: 'xxm-status-pending',
+  ADMIN_BROADCAST_SENT:          'xxm-status-info',
+  WHATSAPP_PREFERENCE_UPDATED:   'xxm-status-info',
 }
 
 export default async function AdminAuditPage({
@@ -59,9 +60,10 @@ export default async function AdminAuditPage({
 
   return (
     <div className="space-y-6">
+      <Breadcrumb items={[{ label: 'Admin', href: '/admin' }, { label: 'Audit' }]} />
       <div>
         <h1 className="text-2xl font-bold text-xxm-green">Audit Log</h1>
-        <p className="text-sm text-gray-500 mt-1">{total} events · read-only</p>
+        <p className="text-sm text-xxm-gray-500 mt-1">{total} events · read-only</p>
       </div>
 
       {/* Filters */}
@@ -97,7 +99,7 @@ export default async function AdminAuditPage({
               <div key={log.id} className="px-5 py-4 flex items-start gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-mono font-medium ${color}`}>
+                    <span className={`${color} font-mono !text-[0.6rem] !tracking-tight`}>
                       {log.action}
                     </span>
                     <span className="text-xs text-gray-400">
