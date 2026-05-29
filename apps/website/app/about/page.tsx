@@ -16,7 +16,7 @@ import {
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, WA_LINK } from '@/lib/utils'
+import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 
 export const metadata: Metadata = {
   title: 'About',
@@ -348,7 +348,7 @@ export default function AboutPage() {
               <ArrowRight size={15} aria-hidden />
             </a>
             <a
-              href={WA_LINK}
+              href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xs text-xxm-green/60 hover:text-xxm-green transition-colors"
@@ -360,7 +360,7 @@ export default function AboutPage() {
               &ldquo;Blessed is the hand that giveth.&rdquo; — Acts 20:35
             </p>
             <p className="text-[11px] text-gray-300 mt-1">
-              A <span className="font-semibold text-gray-400">KSDRILL-SA</span> platform
+              By <span className="font-semibold text-gray-400">KSDRILL-SA</span> platform
             </p>
           </div>
         </section>
