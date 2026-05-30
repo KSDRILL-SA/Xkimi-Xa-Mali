@@ -88,7 +88,7 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
     select: {
       id: true, firstName: true, lastName: true, email: true,
       phone: true, status: true, createdAt: true, updatedAt: true,
-      popiaConsentAt: true,
+      popiaConsentAt: true, loginAttempts: true, lockedUntil: true,
       roles:      { select: { role: true } },
       bankAccounts: { select: { id: true, bankName: true, accountType: true, createdAt: true } },
       mandates: {
@@ -127,6 +127,30 @@ export async function setMemberStatus(
     userId: adminId, action: 'ADMIN_MEMBER_STATUS_CHANGED',
     entity: 'User', entityId: memberId,
     payload: { from: member.status, to: newStatus }, ipAddress: ip,
+  })
+
+  return updated
+}
+
+export async function unlockMember(
+  adminId: string, adminRoles: string[],
+  memberId: string, ip?: string,
+) {
+  assertAdmin(adminRoles)
+  const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true, lockedUntil: true, loginAttempts: true } })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  const updated = await db.user.update({
+    where: { id: memberId },
+    data: { lockedUntil: null, loginAttempts: 0 },
+    select: { id: true, lockedUntil: true, loginAttempts: true },
+  })
+
+  await writeAuditLog({
+    userId: adminId, action: 'ADMIN_MEMBER_UNLOCKED',
+    entity: 'User', entityId: memberId,
+    payload: { previousLockedUntil: member.lockedUntil, previousAttempts: member.loginAttempts },
+    ipAddress: ip,
   })
 
   return updated
@@ -234,6 +258,81 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+export async function createGoal(
+  adminId: string, adminRoles: string[],
+  data: { title: string; description?: string; type: string; targetAmount: number; deadline: string },
+) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.create({
+    data: {
+      title: data.title,
+      description: data.description ?? null,
+      type: data.type as 'MONTHLY' | 'YEARLY' | 'CUSTOM',
+      targetAmount: data.targetAmount,
+      currentAmount: 0,
+      deadline: new Date(data.deadline),
+      status: 'DRAFT',
+    },
+  })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_CREATED', entity: 'Goal', entityId: goal.id, payload: data })
+  return goal
+}
+
+export async function activateGoal(adminId: string, adminRoles: string[], goalId: string) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'DRAFT') throw new AdminConflictError('Only DRAFT goals can be activated')
+  const updated = await db.goal.update({ where: { id: goalId }, data: { status: 'ACTIVE' } })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_ACTIVATED', entity: 'Goal', entityId: goalId, payload: { title: goal.title } })
+  return updated
+}
+
+export async function lockGoal(adminId: string, adminRoles: string[], goalId: string) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.lockedAt) throw new AdminConflictError('Goal is already locked')
+  if (goal.status === 'DRAFT') throw new AdminConflictError('Activate the goal before locking it')
+  const updated = await db.goal.update({
+    where: { id: goalId },
+    data: { lockedAt: new Date(), lockedById: adminId },
+  })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_LOCKED', entity: 'Goal', entityId: goalId, payload: { title: goal.title } })
+  return updated
+}
+
+export async function deleteGoal(adminId: string, adminRoles: string[], goalId: string) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'DRAFT') throw new AdminConflictError('Only DRAFT goals can be deleted')
+  await db.goal.delete({ where: { id: goalId } })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_DELETED', entity: 'Goal', entityId: goalId, payload: { title: goal.title } })
+}
+
+export async function recordGoalProgress(
+  adminId: string, adminRoles: string[], goalId: string, amount: number, note?: string,
+) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'ACTIVE') throw new AdminConflictError('Progress can only be recorded on ACTIVE goals')
+  const newTotal = Number(goal.currentAmount) + amount
+  const [progress] = await db.$transaction([
+    db.goalProgress.create({ data: { goalId, amount } }),
+    db.goal.update({
+      where: { id: goalId },
+      data: {
+        currentAmount: newTotal,
+        ...(newTotal >= Number(goal.targetAmount) && { status: 'ACHIEVED' }),
+      },
+    }),
+  ])
+  await writeAuditLog({ userId: adminId, action: 'GOAL_PROGRESS_RECORDED', entity: 'Goal', entityId: goalId, payload: { amount, newTotal, note } })
+  return { id: progress.id, amount: Number(progress.amount), newTotal, achieved: newTotal >= Number(goal.targetAmount) }
+}
+
 // ─── Audit ────────────────────────────────────────────────────────────────────
 
 export async function listAuditLogs(
@@ -281,6 +380,76 @@ export async function listInvitations(adminRoles: string[], page = 1, limit = 20
     }),
     db.invitation.count(),
   ])
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+}
+
+export async function revokeInvitation(
+  adminId: string, adminRoles: string[],
+  invitationId: string, ip?: string,
+) {
+  assertAdmin(adminRoles)
+  const invite = await db.invitation.findUnique({ where: { id: invitationId }, select: { id: true, status: true, email: true } })
+  if (!invite) throw new AdminNotFoundError('Invitation not found')
+  if (invite.status !== 'PENDING') throw new AdminConflictError(`Invitation is already ${invite.status}`)
+
+  await db.invitation.update({
+    where: { id: invitationId },
+    data: { status: 'REVOKED' },
+  })
+
+  await writeAuditLog({
+    userId: adminId, action: 'ADMIN_INVITATION_REVOKED',
+    entity: 'Invitation', entityId: invitationId,
+    payload: { email: invite.email }, ipAddress: ip,
+  })
+}
+
+export async function setMemberRole(
+  adminId: string, adminRoles: string[],
+  memberId: string, role: 'ADMIN' | 'MEMBER', assign: boolean, ip?: string,
+) {
+  assertAdmin(adminRoles)
+  const roleRecord = await db.role.findUnique({ where: { name: role } })
+  if (!roleRecord) throw new AdminNotFoundError(`Role ${role} not found`)
+
+  const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true } })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  if (assign) {
+    await db.userRole.upsert({
+      where: { userId_roleId: { userId: memberId, roleId: roleRecord.id } },
+      create: { userId: memberId, roleId: roleRecord.id },
+      update: {},
+    })
+  } else {
+    await db.userRole.deleteMany({ where: { userId: memberId, roleId: roleRecord.id } })
+  }
+
+  await writeAuditLog({
+    userId: adminId, action: assign ? 'ADMIN_ROLE_ASSIGNED' : 'ADMIN_ROLE_REMOVED',
+    entity: 'User', entityId: memberId,
+    payload: { role, assign }, ipAddress: ip,
+  })
+
+  return { memberId, role, assigned: assign }
+}
+
+export async function getMemberLoginHistory(
+  adminRoles: string[], memberId: string, page = 1, limit = 20,
+) {
+  assertAdmin(adminRoles)
+  const skip = (page - 1) * limit
+
+  const [items, total] = await Promise.all([
+    db.loginHistory.findMany({
+      where: { userId: memberId },
+      skip, take: limit,
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, ipAddress: true, userAgent: true, success: true, createdAt: true },
+    }),
+    db.loginHistory.count({ where: { userId: memberId } }),
+  ])
+
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 

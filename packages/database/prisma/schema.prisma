@@ -176,6 +176,7 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
   @@map("password_reset_tokens")
 }
 
@@ -190,6 +191,7 @@ model EmailVerificationToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
   @@map("email_verification_tokens")
 }
 
@@ -253,6 +255,7 @@ model PaymentMandate {
   @@index([userId])
   @@index([bankAccountId])
   @@index([status])
+  @@index([delayedUntil])
   @@map("payment_mandates")
 }
 
@@ -303,6 +306,7 @@ model Transaction {
   @@index([mandateId])
   @@index([status, createdAt])
   @@index([gatewayRef])
+  @@index([type])
   @@map("transactions")
 }
 
@@ -325,6 +329,7 @@ model Goal {
   locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
   progress GoalProgress[]
 
+  @@index([lockedById])
   @@map("goals")
 }
 
