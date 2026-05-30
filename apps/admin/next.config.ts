@@ -7,12 +7,12 @@ const config: NextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
-  // Proxy /api/* calls to the web app so client components work without CORS issues
+  // Proxy member/web REST API only — never /api/auth (admin has its own NextAuth)
   async rewrites() {
     return [
       {
-        source: '/api/:path*',
-        destination: `${WEB_URL}/api/:path*`,
+        source: '/api/v1/:path*',
+        destination: `${WEB_URL}/api/v1/:path*`,
       },
     ]
   },

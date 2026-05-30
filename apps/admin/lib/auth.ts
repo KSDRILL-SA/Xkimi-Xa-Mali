@@ -16,6 +16,8 @@ async function recordLoginHistory(userId: string, success: boolean) {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: env.AUTH_SECRET,
+  trustHost: true,
   adapter: PrismaAdapter(db),
   session: { strategy: 'jwt' },
   pages: {
@@ -40,6 +42,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!roleNames.includes('ADMIN')) return null
 
         if (user.lockedUntil && user.lockedUntil > new Date()) {
+          await recordLoginHistory(user.id, false)
           throw new Error('ACCOUNT_LOCKED')
         }
 

@@ -32,7 +32,9 @@ export function AdminLoginForm() {
       setError(
         result.error === 'ACCOUNT_SUSPENDED'
           ? 'This account has been suspended.'
-          : 'Invalid credentials or insufficient permissions.',
+          : result.error === 'ACCOUNT_LOCKED'
+            ? 'Too many failed attempts. Try again later or contact support.'
+            : 'Invalid credentials or insufficient permissions.',
       )
       return
     }
