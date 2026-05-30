@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { CreateGoalSchema } from '@/lib/validation/goal'
 import { getGoals, createGoal } from '@/services/goal.service'
-import { GoalConflictError, GoalForbiddenError } from '@/services/goal.service'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -48,7 +47,6 @@ export async function POST(req: NextRequest) {
     const goal = await createGoal(parsed.data, session.user.id, ip)
     return apiSuccess(goal, 201)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }

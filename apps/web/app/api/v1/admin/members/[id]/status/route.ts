@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import { setMemberStatus, AdminForbiddenError, AdminNotFoundError, AdminConflictError } from '@/services/admin.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { setMemberStatus } from '@/services/admin.service'
 
 const VALID_STATUSES = ['ACTIVE', 'SUSPENDED', 'PENDING'] as const
 type UserStatus = typeof VALID_STATUSES[number]
@@ -27,9 +27,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const updated = await setMemberStatus(session.user.id, roles, id, status as UserStatus, ip)
     return apiSuccess(updated)
   } catch (e) {
-    if (e instanceof AdminForbiddenError) return apiError(e.code, e.message, 403)
-    if (e instanceof AdminNotFoundError)  return apiError(e.code, e.message, 404)
-    if (e instanceof AdminConflictError)  return apiError(e.code, e.message, 409)
-    throw e
+    return handleServiceError(e)
   }
 }

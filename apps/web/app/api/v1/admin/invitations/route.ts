@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import {
   generateInvite, listInvitations,
-  InviteForbiddenError, InviteDuplicateError,
 } from '@/services/invite.service'
 
 const SA_PHONE = /^(\+27|0)[6-8][0-9]{8}$/
@@ -24,8 +23,7 @@ export async function GET(req: NextRequest) {
       total: result.total, totalPages: result.totalPages,
     })
   } catch (e) {
-    if (e instanceof InviteForbiddenError) return apiError(e.code, e.message, 403)
-    throw e
+    return handleServiceError(e)
   }
 }
 
@@ -71,8 +69,6 @@ export async function POST(req: NextRequest) {
     )
     return apiSuccess(result, 201)
   } catch (e) {
-    if (e instanceof InviteForbiddenError) return apiError(e.code, e.message, 403)
-    if (e instanceof InviteDuplicateError) return apiError(e.code, e.message, 409)
-    throw e
+    return handleServiceError(e)
   }
 }

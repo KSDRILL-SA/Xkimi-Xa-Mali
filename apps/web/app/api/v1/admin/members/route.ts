@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import { listMembers, AdminForbiddenError } from '@/services/admin.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { listMembers } from '@/services/admin.service'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
       totalPages: result.totalPages,
     })
   } catch (e) {
-    if (e instanceof AdminForbiddenError) return apiError(e.code, e.message, 403)
-    throw e
+    return handleServiceError(e)
   }
 }

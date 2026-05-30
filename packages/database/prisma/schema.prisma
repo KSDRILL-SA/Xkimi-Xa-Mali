@@ -95,6 +95,8 @@ model User {
   image           String?
   status          UserStatus @default(PENDING)
   popiaConsentAt  DateTime?
+  loginAttempts   Int        @default(0)
+  lockedUntil     DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -107,6 +109,7 @@ model User {
   notifications          Notification[]
   notificationPreference NotificationPreference?
   auditLogs              AuditLog[]
+  loginHistory           LoginHistory[]
   lockedGoals            Goal[]                  @relation("GoalLocker")
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
@@ -238,6 +241,8 @@ model PaymentMandate {
   amount           Decimal       @db.Decimal(10, 2)
   status           MandateStatus @default(PENDING)
   netcashMandateId String?
+  delayedUntil     DateTime?
+  failureReason    String?
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
@@ -247,6 +252,7 @@ model PaymentMandate {
 
   @@index([userId])
   @@index([bankAccountId])
+  @@index([status])
   @@map("payment_mandates")
 }
 
@@ -269,6 +275,8 @@ model Contribution {
 
   @@unique([userId, periodMonth, periodYear])
   @@index([userId])
+  @@index([userId, status])
+  @@index([periodYear, periodMonth])
   @@index([status, dueDate])
   @@map("contributions")
 }
@@ -283,6 +291,8 @@ model Transaction {
   gatewayRef      String?
   gatewayResponse Json?
   idempotencyKey  String            @unique
+  retryCount      Int               @default(0)
+  failureReason   String?
   processedAt     DateTime?
   createdAt       DateTime          @default(now())
 
@@ -344,19 +354,22 @@ model NotificationTemplate {
 }
 
 model Notification {
-  id         String       @id @default(cuid())
-  userId     String
-  templateId String
-  channel    NotifChannel
-  status     NotifStatus  @default(QUEUED)
-  payload    Json
-  sentAt     DateTime?
-  createdAt  DateTime     @default(now())
+  id           String       @id @default(cuid())
+  userId       String
+  templateId   String
+  channel      NotifChannel
+  status       NotifStatus  @default(QUEUED)
+  payload      Json
+  retryCount   Int          @default(0)
+  errorMessage String?
+  sentAt       DateTime?
+  createdAt    DateTime     @default(now())
 
   user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   template NotificationTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt])
+  @@index([userId, status])
   @@index([templateId])
   @@index([status])
   @@map("notifications")
@@ -390,6 +403,7 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([userId, createdAt])
+  @@index([action, createdAt])
   @@map("audit_logs")
 }
 
@@ -399,6 +413,7 @@ enum InvitationStatus {
   PENDING
   ACCEPTED
   REVOKED
+  EXPIRED
 }
 
 model Invitation {
@@ -424,4 +439,31 @@ model Invitation {
   @@index([email])
   @@index([status])
   @@map("invitations")
+}
+
+// ─── Login history ────────────────────────────────────────────────────────────
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("login_history")
+}
+
+// ─── System configuration ─────────────────────────────────────────────────────
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("system_config")
 }

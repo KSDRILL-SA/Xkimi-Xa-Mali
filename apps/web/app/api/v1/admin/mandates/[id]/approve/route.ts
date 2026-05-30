@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import { approveMandate, AdminForbiddenError, AdminNotFoundError, AdminConflictError } from '@/services/admin.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { approveMandate } from '@/services/admin.service'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -15,9 +15,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const updated = await approveMandate(session.user.id, roles, id, ip)
     return apiSuccess(updated)
   } catch (e) {
-    if (e instanceof AdminForbiddenError) return apiError(e.code, e.message, 403)
-    if (e instanceof AdminNotFoundError)  return apiError(e.code, e.message, 404)
-    if (e instanceof AdminConflictError)  return apiError(e.code, e.message, 409)
-    throw e
+    return handleServiceError(e)
   }
 }

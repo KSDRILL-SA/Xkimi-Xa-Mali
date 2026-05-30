@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiError } from '@/lib/api-response'
+import { apiError, handleServiceError } from '@/lib/api-response'
 import { exportMemberData } from '@/services/member.service'
 
 type Params = { params: Promise<{ id: string }> }
@@ -21,9 +21,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
       },
     })
   } catch (err) {
-    const e = err as { code?: string; message: string }
-    if (e.code === 'SYS_003') return apiError('SYS_003', e.message, 403)
-    if (e.code === 'MBR_001') return apiError('MBR_001', e.message, 404)
-    return apiError('SYS_004', 'Something went wrong', 500)
+    return handleServiceError(err)
   }
 }

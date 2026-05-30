@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import { bulkGenerateContributions, AdminForbiddenError, AdminConflictError } from '@/services/admin.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { bulkGenerateContributions } from '@/services/admin.service'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -25,8 +25,6 @@ export async function POST(req: NextRequest) {
     const result = await bulkGenerateContributions(session.user.id, roles, month, year, ip)
     return apiSuccess(result, 201)
   } catch (e) {
-    if (e instanceof AdminForbiddenError) return apiError(e.code, e.message, 403)
-    if (e instanceof AdminConflictError)  return apiError(e.code, e.message, 409)
-    throw e
+    return handleServiceError(e)
   }
 }
