@@ -19,6 +19,18 @@ export const apiRatelimit = new Ratelimit({
   prefix: 'xxm:ratelimit:api',
 })
 
+export const paymentRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  prefix: 'xxm:ratelimit:payment',
+})
+
+export const mandateRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(3, '1 h'),
+  prefix: 'xxm:ratelimit:mandate',
+})
+
 export const statementRatelimit = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(10, '1 h'),

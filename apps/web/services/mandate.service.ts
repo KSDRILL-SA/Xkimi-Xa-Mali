@@ -201,7 +201,13 @@ export async function updateMandate(
     action: 'MANDATE_UPDATED',
     entity: 'PaymentMandate',
     entityId: mandateId,
-    payload: data as Prisma.InputJsonValue,
+    payload: {
+      changes: data,
+      previousState: {
+        debitDay: mandate.debitDay,
+        amount: Number(mandate.amount),
+      },
+    },
     ipAddress,
   })
 
@@ -236,7 +242,10 @@ export async function cancelMandate(
     action: 'MANDATE_CANCELLED',
     entity: 'PaymentMandate',
     entityId: mandateId,
-    payload: {},
+    payload: {
+      previousStatus: mandate.status,
+      hadNetcashMandate: !!mandate.netcashMandateId,
+    },
     ipAddress,
   })
 
