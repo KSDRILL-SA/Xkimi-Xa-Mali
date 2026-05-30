@@ -228,7 +228,7 @@ export async function exportMemberData(
       status: n.status,
       sentAt: n.sentAt,
     })),
-    notificationPreferences: user.notificationPreference ?? { sms: true, email: true, push: true },
+    notificationPreferences: user.notificationPreference ?? { sms: true, email: true, push: true, whatsapp: true },
   }
 }
 
@@ -367,7 +367,7 @@ export async function getNotificationPreferences(userId: string) {
     where: { userId },
     update: {},
     create: { userId },
-    select: { sms: true, email: true, push: true },
+    select: { sms: true, email: true, push: true, whatsapp: true },
   })
 }
 
@@ -380,7 +380,7 @@ export async function updateNotificationPreferences(
     where: { userId },
     update: input,
     create: { userId, ...input },
-    select: { sms: true, email: true, push: true },
+    select: { sms: true, email: true, push: true, whatsapp: true },
   })
 
   await writeAuditLog({

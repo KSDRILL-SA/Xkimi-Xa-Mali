@@ -190,7 +190,10 @@ export async function revokeInvitation(
   if (invite.status === 'ACCEPTED') throw new InviteUsedError()
   if (invite.status === 'REVOKED') throw new InviteRevokedError()
 
-  await db.invitation.update({ where: { id: inviteId }, data: { status: 'REVOKED' } })
+  await db.invitation.update({
+    where: { id: inviteId },
+    data: { status: 'REVOKED', revokedById: adminId, revokedAt: new Date() },
+  })
 
   await writeAuditLog({
     userId: adminId,

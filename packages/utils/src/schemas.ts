@@ -160,9 +160,10 @@ export const UpdateBankAccountSchema = z.object({
 })
 
 export const NotificationPreferencesSchema = z.object({
-  sms:   z.boolean().optional(),
-  email: z.boolean().optional(),
-  push:  z.boolean().optional(),
+  sms:      z.boolean().optional(),
+  email:    z.boolean().optional(),
+  push:     z.boolean().optional(),
+  whatsapp: z.boolean().optional(),
 })
 
 // ── Inferred types ─────────────────────────────────────────────────────────────
@@ -242,7 +243,7 @@ export const AdminReportRequestSchema = z.object({
 
 export const TransactionFilterSchema = z.object({
   status: z.enum(['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED']).optional(),
-  type:   z.enum(['DEBIT_ORDER', 'MANUAL', 'REVERSAL']).optional(),
+  type:   z.enum(['DEBIT_ORDER', 'MANUAL', 'REVERSAL', 'SCHEDULED']).optional(),
   from:   z.string().date().optional(),
   to:     z.string().date().optional(),
   page:   z.number().int().min(1).default(1),
