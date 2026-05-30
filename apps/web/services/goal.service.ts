@@ -140,6 +140,7 @@ export async function createGoal(
       currentAmount: 0,
       deadline: new Date(input.deadline),
       status: 'DRAFT',
+      createdById: adminUserId,
     },
   })
 
@@ -318,7 +319,6 @@ export async function recordProgress(
     )
   }
 
-  // Atomic: create progress entry + update currentAmount in one transaction
   const newTotal = Number(g.currentAmount) + input.amount
 
   const [progress] = await db.$transaction([
@@ -326,6 +326,8 @@ export async function recordProgress(
       data: {
         goalId,
         amount: input.amount,
+        note: input.note ?? null,
+        recordedById: adminUserId,
       },
     }),
     db.goal.update({

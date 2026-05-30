@@ -99,7 +99,7 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
         orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }], take: 12,
         select: { id: true, periodMonth: true, periodYear: true, amountDue: true, amountPaid: true, status: true },
       },
-      notificationPreference: { select: { sms: true, email: true, push: true } },
+      notificationPreference: { select: { sms: true, email: true, push: true, whatsapp: true } },
       _count: { select: { contributions: true, mandates: true } },
     },
   })
@@ -192,7 +192,7 @@ export async function approveMandate(
   if (mandate.status !== 'PENDING') throw new AdminConflictError('Only PENDING mandates can be approved')
 
   const updated = await db.paymentMandate.update({
-    where: { id: mandateId }, data: { status: 'ACTIVE' }, select: { id: true, status: true },
+    where: { id: mandateId }, data: { status: 'ACTIVE', approvedAt: new Date(), approvedById: adminId }, select: { id: true, status: true },
   })
   await writeAuditLog({ userId: adminId, action: 'ADMIN_MANDATE_APPROVED', entity: 'PaymentMandate', entityId: mandateId, payload: { memberId: mandate.userId }, ipAddress: ip })
   return updated
@@ -272,6 +272,7 @@ export async function createGoal(
       currentAmount: 0,
       deadline: new Date(data.deadline),
       status: 'DRAFT',
+      createdById: adminId,
     },
   })
   await writeAuditLog({ userId: adminId, action: 'GOAL_CREATED', entity: 'Goal', entityId: goal.id, payload: data })
@@ -320,7 +321,7 @@ export async function recordGoalProgress(
   if (goal.status !== 'ACTIVE') throw new AdminConflictError('Progress can only be recorded on ACTIVE goals')
   const newTotal = Number(goal.currentAmount) + amount
   const [progress] = await db.$transaction([
-    db.goalProgress.create({ data: { goalId, amount } }),
+    db.goalProgress.create({ data: { goalId, amount, note: note ?? null, recordedById: adminId } }),
     db.goal.update({
       where: { id: goalId },
       data: {
@@ -394,7 +395,7 @@ export async function revokeInvitation(
 
   await db.invitation.update({
     where: { id: invitationId },
-    data: { status: 'REVOKED' },
+    data: { status: 'REVOKED', revokedById: adminId, revokedAt: new Date() },
   })
 
   await writeAuditLog({

@@ -4,6 +4,7 @@ import type { ContributionStatus, TransactionStatus } from '@prisma/client'
 import { db } from '@/lib/db'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
+import { cache, CACHE_KEYS } from '@/lib/cache'
 import {
   ForbiddenError,
   ContributionNotFoundError,
@@ -192,6 +193,8 @@ export async function submitManualPayment(
     await recalculateContributionStatus(contribution.id)
   }
 
+  await cache.del(CACHE_KEYS.DASHBOARD_STATS)
+
   await writeAuditLog({
     userId,
     action: 'MANUAL_PAYMENT_SUBMITTED',
@@ -279,6 +282,7 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
   })
 
   await recalculateContributionStatus(transaction.contributionId)
+  await cache.del(CACHE_KEYS.DASHBOARD_STATS)
 
   logger.info('Transaction webhook processed', {
     transactionId: transaction.id,
