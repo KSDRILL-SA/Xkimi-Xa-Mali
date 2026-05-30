@@ -3,11 +3,11 @@ import { decrypt } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import {
-  ForbiddenError,
   MandateNotFoundError,
   MandateConflictError,
   BankAccountNotFoundError,
 } from '@/lib/errors'
+import { assertCanAccess } from '@/lib/authorization'
 import {
   createDebiCheckMandate,
   cancelDebiCheckMandate,
@@ -23,14 +23,6 @@ import { Prisma } from '@prisma/client'
 import type { MandateStatus, AccountType } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { redis } from '@/lib/redis'
-
-// ─── Access control ────────────────────────────────────────────────────────
-
-function assertCanAccess(targetUserId: string, requesterId: string, requesterRoles: string[]) {
-  if (targetUserId !== requesterId && !requesterRoles.includes('ADMIN')) {
-    throw new ForbiddenError('Access denied')
-  }
-}
 
 // ─── Queries ───────────────────────────────────────────────────────────────
 

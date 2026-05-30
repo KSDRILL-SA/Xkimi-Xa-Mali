@@ -106,6 +106,7 @@ model User {
   popiaConsentAt  DateTime?
   loginAttempts   Int        @default(0)
   lockedUntil     DateTime?
+  roleVersion     Int        @default(0)
   deletedAt       DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt

@@ -3,24 +3,17 @@ import { encrypt, decrypt, maskAccountNumber } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import {
-  ForbiddenError,
   MemberNotFoundError,
   BankAccountNotFoundError,
   BankAccountConflictError,
 } from '@/lib/errors'
+import { assertCanAccess } from '@/lib/authorization'
 import type {
   UpdateProfileInput,
   CreateBankAccountInput,
   UpdateBankAccountInput,
   NotificationPreferencesInput,
 } from '@/lib/validation/profile'
-
-// Members may only access their own resources; admins may access anyone's. [SEC-L4]
-function assertCanAccess(targetUserId: string, requesterId: string, requesterRoles: string[]) {
-  if (targetUserId !== requesterId && !requesterRoles.includes('ADMIN')) {
-    throw new ForbiddenError('You do not have access to this resource')
-  }
-}
 
 function maskIdNumber(encrypted: string | null): string | null {
   if (!encrypted) return null

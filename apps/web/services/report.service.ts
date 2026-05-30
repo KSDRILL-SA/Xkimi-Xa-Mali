@@ -4,7 +4,8 @@ import { renderStatementPDF } from '@/lib/pdf/statement'
 import type { StatementData } from '@/lib/pdf/statement'
 import type { TransactionFilter } from '@/lib/validation/report'
 import { MONTHS } from '@/lib/date'
-import { ForbiddenError, ReportNotFoundError } from '@/lib/errors'
+import { ReportNotFoundError } from '@/lib/errors'
+import { assertCanAccess } from '@/lib/authorization'
 
 export { ReportNotFoundError }
 
@@ -13,12 +14,6 @@ export { ReportNotFoundError }
 function periodLabel(month: number, year: number): string {
   const name = MONTHS?.[month - 1] ?? `Month ${month}`
   return `${name} ${year}`
-}
-
-function assertCanAccess(targetUserId: string, requesterId: string, roles: string[]) {
-  if (targetUserId !== requesterId && !roles.includes('ADMIN')) {
-    throw new ForbiddenError('Access denied')
-  }
 }
 
 // ─── Transaction history ──────────────────────────────────────────────────────
