@@ -11,6 +11,9 @@ const schema = z.object({
   // Shared secret for internal admin→web API authentication
   ADMIN_API_SECRET: z.string().min(32).optional(),
 
+  MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
+  LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
+
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
   SENTRY_AUTH_TOKEN:      z.string().optional(),
   SENTRY_ORG:             z.string().optional(),

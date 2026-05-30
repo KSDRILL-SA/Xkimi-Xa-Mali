@@ -1,11 +1,48 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
+import { Redis } from '@upstash/redis'
 
 const WEBHOOK_PREFIX = '/api/v1/webhooks'
 const HEALTH_PATH = '/api/v1/health'
 const AUTH_PREFIX = '/api/auth'
 
-export default auth((req) => {
+const ROLE_VERSION_PREFIX = 'xxm:role-version:'
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
+let _redis: Redis | null = null
+function getRedis(): Redis {
+  if (!_redis) {
+    _redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL!,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+    })
+  }
+  return _redis
+}
+
+async function isRoleVersionStale(userId: string, tokenVersion: number): Promise<boolean> {
+  try {
+    const cached = await getRedis().get<string>(`${ROLE_VERSION_PREFIX}${userId}`)
+    if (cached === null) return false
+    return Number(cached) > tokenVersion
+  } catch {
+    return false
+  }
+}
+
+function verifyCsrfOrigin(req: { headers: Headers; nextUrl: URL }): boolean {
+  const origin = req.headers.get('origin')
+  if (!origin) return false
+  const allowed = process.env.NEXTAUTH_URL
+  if (!allowed) return true
+  try {
+    return new URL(origin).origin === new URL(allowed).origin
+  } catch {
+    return false
+  }
+}
+
+export default auth(async (req) => {
   const { pathname } = req.nextUrl
 
   // Always allow: health, webhooks (self-verifying), NextAuth internals, SW + offline
@@ -43,7 +80,6 @@ export default auth((req) => {
     pathname === '/api/v1/auth/invitations/validate'
 
   if (isPublicPage || isPublicApi) {
-    // Redirect already-authed users away from auth pages
     if (session && (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password')) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
@@ -61,6 +97,31 @@ export default auth((req) => {
     const loginUrl = new URL('/login', req.url)
     loginUrl.searchParams.set('callbackUrl', pathname)
     return NextResponse.redirect(loginUrl)
+  }
+
+  // Role version check — force re-auth if roles/status changed since JWT was issued
+  const tokenVersion = (session.user as { roleVersion?: number }).roleVersion ?? 0
+  if (session.user?.id && await isRoleVersionStale(session.user.id, tokenVersion)) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: { code: 'SYS_006', message: 'Session expired — please sign in again', traceId: '' } },
+        { status: 401 },
+      )
+    }
+    const loginUrl = new URL('/login', req.url)
+    loginUrl.searchParams.set('callbackUrl', pathname)
+    loginUrl.searchParams.set('reason', 'session_expired')
+    return NextResponse.redirect(loginUrl)
+  }
+
+  // CSRF origin validation for all state-mutating requests on authenticated routes
+  if (MUTATING_METHODS.has(req.method) && pathname.startsWith('/api/')) {
+    if (!verifyCsrfOrigin(req)) {
+      return NextResponse.json(
+        { error: { code: 'SYS_007', message: 'Invalid request origin', traceId: '' } },
+        { status: 403 },
+      )
+    }
   }
 
   // Admin API routes require ADMIN role

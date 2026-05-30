@@ -17,15 +17,6 @@ export async function POST(req: NextRequest) {
   const { success } = await paymentRatelimit.limit(session.user.id)
   if (!success) return apiError('SYS_005', 'Payment limit reached. Please try again later.', 429)
 
-  const origin = req.headers.get('origin')
-  const referer = req.headers.get('referer')
-  if (origin && referer) {
-    const allowed = env.NEXTAUTH_URL ? new URL(env.NEXTAUTH_URL).origin : null
-    if (allowed && origin !== allowed) {
-      return apiError('SYS_007', 'Invalid request origin', 403)
-    }
-  }
-
   const body = await req.json().catch(() => null)
   const parsed = ManualContributionSchema.safeParse(body)
   if (!parsed.success) {
