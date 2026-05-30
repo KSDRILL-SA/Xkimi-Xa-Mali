@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: 'Transactions' }
 const PAGE_SIZE = 25
 
 type TxStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'REVERSED'
-type TxType   = 'DEBIT_ORDER' | 'MANUAL' | 'REVERSAL'
+type TxType   = 'DEBIT_ORDER' | 'MANUAL' | 'REVERSAL' | 'SCHEDULED'
 
 type TxRow = {
   id: string
@@ -38,6 +38,7 @@ const TYPE_LABELS: Record<TxType, string> = {
   DEBIT_ORDER: 'Debit Order',
   MANUAL:      'Manual',
   REVERSAL:    'Reversal',
+  SCHEDULED:   'Scheduled',
 }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -64,7 +65,7 @@ export default async function TransactionsPage({
   const skip = (page - 1) * PAGE_SIZE
 
   const validStatuses: TxStatus[] = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED']
-  const validTypes: TxType[]       = ['DEBIT_ORDER', 'MANUAL', 'REVERSAL']
+  const validTypes: TxType[]       = ['DEBIT_ORDER', 'MANUAL', 'REVERSAL', 'SCHEDULED']
 
   const statusFilter = params.status && validStatuses.includes(params.status as TxStatus) ? (params.status as TxStatus) : undefined
   const typeFilter   = params.type   && validTypes.includes(params.type as TxType)         ? (params.type   as TxType)   : undefined

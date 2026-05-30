@@ -12,7 +12,7 @@ import { Select } from '@/components/ui/Select'
 import { Alert } from '@/components/ui/Alert'
 import { DebitDayPicker } from './DebitDayPicker'
 import { api } from '@/lib/api'
-import { MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR, DEFAULT_DEBIT_DAY } from '@/lib/formatters'
+import { MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR, DEFAULT_DEBIT_DAY } from '@/lib/formatters'
 
 type BankAccountOption = {
   id: string
@@ -88,12 +88,13 @@ export function MandateForm({ bankAccounts }: Props) {
           id="amount"
           type="number"
           min={MIN_CONTRIBUTION_ZAR}
+          max={MAX_CONTRIBUTION_ZAR}
           step={CONTRIBUTION_STEP_ZAR}
           placeholder={`e.g. ${MIN_CONTRIBUTION_ZAR}`}
           error={errors.amount?.message}
           {...register('amount', { valueAsNumber: true })}
         />
-        <p className="text-xs text-gray-400 mt-1">Minimum R100 per month</p>
+        <p className="text-xs text-gray-400 mt-1">R{MIN_CONTRIBUTION_ZAR} – R{MAX_CONTRIBUTION_ZAR.toLocaleString()} per month</p>
       </div>
 
       <Button type="submit" className="w-full" size="lg" loading={isSubmitting}>
