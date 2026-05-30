@@ -93,7 +93,7 @@ export function RegisterForm() {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/v1/register', {
+    const res = await fetch('/api/v1/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

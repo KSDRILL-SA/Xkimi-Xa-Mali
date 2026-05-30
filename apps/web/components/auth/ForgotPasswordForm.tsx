@@ -27,7 +27,7 @@ export function ForgotPasswordForm() {
     setLoading(true)
     setError('')
     try {
-      await api.post('/api/v1/forgot-password', data)
+      await api.post('/api/v1/auth/forgot-password', data)
       setSent(true)
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.')

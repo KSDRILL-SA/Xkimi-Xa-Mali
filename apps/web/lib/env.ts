@@ -32,6 +32,8 @@ export const env = createEnv({
     // Security tunables — allows per-environment adjustment without code changes
     MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
     LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
+    // Shared secret for internal admin→web API calls (server-to-server, no session needed)
+    ADMIN_API_SECRET: z.string().min(32).optional(),
   },
   client: {
     NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
@@ -65,6 +67,7 @@ export const env = createEnv({
     SENTRY_DSN: process.env.SENTRY_DSN,
     MAX_LOGIN_ATTEMPTS: process.env.MAX_LOGIN_ATTEMPTS,
     LOCKOUT_DURATION_MINUTES: process.env.LOCKOUT_DURATION_MINUTES,
+    ADMIN_API_SECRET: process.env.ADMIN_API_SECRET,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
     NEXT_PUBLIC_ADMIN_URL: process.env.NEXT_PUBLIC_ADMIN_URL,
   },

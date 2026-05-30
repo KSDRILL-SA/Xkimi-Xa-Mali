@@ -16,7 +16,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 }
 
 type MandateRow = {
-  id: string; member: string; email: string; bank: string
+  id: string; mandateId: string; member: string; email: string; bank: string
   amount: string; debitDay: number; status: string; statusClass: string; createdAt: string
 }
 
@@ -36,15 +36,15 @@ const columns: Column<MandateRow>[] = [
   { key: 'status',   header: 'Status',   align: 'center', render: (r) => <span className={r.statusClass}>{r.status}</span> },
   { key: 'createdAt',header: 'Created' },
   {
-    key: 'id', header: 'Actions', align: 'center',
+    key: 'mandateId', header: 'Actions', align: 'center',
     render: (r) => (
       <div className="flex items-center gap-2 justify-center">
-        {r.status === 'PENDING' && (
+        {r.status === 'Pending' && (
           <>
-            <form action={async () => { 'use server'; const s = await auth(); await approveMandate(s!.user.id, s!.user.roles as string[], r.id); revalidatePath('/mandates') }}>
+            <form action={async () => { 'use server'; const s = await auth(); await approveMandate(s!.user.id, s!.user.roles as string[], r.mandateId); revalidatePath('/mandates') }}>
               <button type="submit" className="text-xs text-xxm-green hover:underline font-medium">Approve</button>
             </form>
-            <form action={async () => { 'use server'; const s = await auth(); await rejectMandate(s!.user.id, s!.user.roles as string[], r.id); revalidatePath('/mandates') }}>
+            <form action={async () => { 'use server'; const s = await auth(); await rejectMandate(s!.user.id, s!.user.roles as string[], r.mandateId); revalidatePath('/mandates') }}>
               <button type="submit" className="text-xs text-red-600 hover:underline font-medium">Reject</button>
             </form>
           </>
@@ -73,7 +73,8 @@ export default async function MandatesPage({
   const rows: MandateRow[] = (items as unknown as RawItem[]).map((m) => {
     const sc = STATUS_CONFIG[m.status] ?? { label: m.status, className: 'xxm-status-pending' }
     return {
-      id: m.user.id, member: `${m.user.firstName} ${m.user.lastName}`, email: m.user.email,
+      id: m.user.id, mandateId: m.id,
+      member: `${m.user.firstName} ${m.user.lastName}`, email: m.user.email,
       bank: m.bankAccount ? `${m.bankAccount.bankName} · ${m.bankAccount.accountType}` : 'Unknown',
       amount: formatZAR(m.amount as number), debitDay: m.debitDay,
       status: sc.label, statusClass: sc.className, createdAt: formatDate(m.createdAt),
@@ -94,7 +95,7 @@ export default async function MandatesPage({
         {status && <Link href="/mandates" className="px-4 py-2 rounded-xl border border-xxm-gray-200 text-sm text-xxm-gray-500 hover:bg-xxm-gray-50">Clear</Link>}
       </form>
 
-      <DataTable columns={columns} data={rows} keyExtractor={(r) => r.id} stickyHeader striped caption="Mandates" />
+      <DataTable columns={columns} data={rows} keyExtractor={(r) => r.mandateId} stickyHeader striped caption="Mandates" />
       <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl={`/mandates${status ? `?status=${status}` : ''}`} className="justify-center" />
     </div>
   )
