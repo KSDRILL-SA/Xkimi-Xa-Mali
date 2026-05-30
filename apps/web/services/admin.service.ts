@@ -2,15 +2,13 @@ import { db, Prisma } from '@/lib/db'
 import { writeAuditLog } from './audit.service'
 import { queueNotification } from './notification.service'
 import { logger } from '@/lib/logger'
-import { ForbiddenError, AdminNotFoundError, AdminConflictError } from '@/lib/errors'
+import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
+import { assertAdmin, assertNotSelf } from '@/lib/authorization'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import { sendWelcomeEmail } from '@/lib/email'
 import { generateMonthlyContributions } from './contribution.service'
 import { cache, CACHE_KEYS } from '@/lib/cache'
-
-function assertAdmin(roles: string[]) {
-  if (!roles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
-}
+import { bumpRoleVersion } from '@/lib/role-version'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,6 +156,10 @@ export async function setMemberStatus(
 ) {
   assertAdmin(adminRoles)
 
+  if (newStatus === 'SUSPENDED') {
+    assertNotSelf(adminId, memberId, 'suspend')
+  }
+
   const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true, status: true } })
   if (!member) throw new AdminNotFoundError('Member not found')
   if (member.status === newStatus) throw new AdminConflictError(`Member is already ${newStatus}`)
@@ -169,6 +171,7 @@ export async function setMemberStatus(
   })
 
   await Promise.all([
+    bumpRoleVersion(memberId),
     writeAuditLog({
       userId: adminId,
       action: 'ADMIN_MEMBER_STATUS_CHANGED',

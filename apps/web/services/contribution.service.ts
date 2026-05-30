@@ -6,25 +6,17 @@ import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import {
-  ForbiddenError,
   ContributionNotFoundError,
   ContributionConflictError,
   MandateConflictError,
   TransactionNotFoundError,
 } from '@/lib/errors'
+import { assertCanAccess, assertAdmin } from '@/lib/authorization'
 import { submitOnceOffDebit, mapNetcashTransactionStatus } from '@/lib/netcash'
 import type { ManualContributionInput, GenerateContributionsInput } from '@/lib/validation/contribution'
 import type { NetcashTransactionEvent } from '@/lib/netcash'
 
 const MAX_OPTIMISTIC_RETRIES = 3
-
-// ─── Access control ────────────────────────────────────────────────────────
-
-function assertCanAccess(targetUserId: string, requesterId: string, roles: string[]) {
-  if (targetUserId !== requesterId && !roles.includes('ADMIN')) {
-    throw new ForbiddenError('Access denied')
-  }
-}
 
 // ─── Queries ───────────────────────────────────────────────────────────────
 
@@ -385,7 +377,7 @@ export async function createReversal(
   adminRoles: string[],
   ip?: string,
 ) {
-  if (!adminRoles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
+  assertAdmin(adminRoles)
 
   const original = await db.transaction.findUnique({
     where: { id: transactionId },
@@ -486,7 +478,7 @@ export async function generateMonthlyContributions(
   adminId: string | undefined,
   adminRoles: string[],
 ) {
-  if (!adminRoles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
+  assertAdmin(adminRoles)
 
   const mandates = await db.paymentMandate.findMany({
     where: { status: 'ACTIVE' },

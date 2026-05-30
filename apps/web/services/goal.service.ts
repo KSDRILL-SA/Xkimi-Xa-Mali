@@ -3,6 +3,7 @@ import { env } from '@/lib/env'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/errors'
+import { isAdmin } from '@/lib/authorization'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 
@@ -66,8 +67,10 @@ export async function getGoals(
   status?: GoalStatus,
   page = 1,
   limit = 20,
+  roles: string[] = [],
 ) {
-  const cacheKey = CACHE_KEYS.goalsPage(status ?? 'all', page, limit)
+  const effectiveStatus = status === 'DRAFT' && !isAdmin(roles) ? undefined : status
+  const cacheKey = CACHE_KEYS.goalsPage(effectiveStatus ?? (isAdmin(roles) ? 'all' : 'public'), page, limit)
   const cached = await cache.get<{
     items: ReturnType<typeof serializeGoal>[]
     total: number
@@ -77,7 +80,11 @@ export async function getGoals(
   }>(cacheKey)
   if (cached) return cached
 
-  const where = status ? { status } : {}
+  const where = effectiveStatus
+    ? { status: effectiveStatus }
+    : isAdmin(roles)
+      ? {}
+      : { status: { not: 'DRAFT' as const } }
   const [items, total] = await Promise.all([
     db.goal.findMany({
       where,

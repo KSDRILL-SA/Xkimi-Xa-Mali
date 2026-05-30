@@ -8,10 +8,20 @@ import type { BroadcastChannel, BroadcastFilter } from '@/services/admin.service
 const VALID_CHANNELS: BroadcastChannel[] = ['SMS', 'EMAIL', 'BOTH']
 const VALID_FILTERS: BroadcastFilter[]  = ['ALL', 'ACTIVE', 'PENDING', 'SUSPENDED']
 
+const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000
+
+function isValidInternalRequest(req: NextRequest): boolean {
+  if (!env.ADMIN_API_SECRET) return false
+  const secret = req.headers.get('x-admin-secret')
+  if (secret !== env.ADMIN_API_SECRET) return false
+  const ts = req.headers.get('x-admin-timestamp')
+  if (!ts) return false
+  const drift = Math.abs(Date.now() - Number(ts))
+  return drift <= MAX_TIMESTAMP_DRIFT_MS
+}
+
 export async function POST(req: NextRequest) {
-  // Allow trusted internal requests from the admin app via shared secret
-  const incomingSecret = req.headers.get('x-admin-secret')
-  const isTrustedInternal = env.ADMIN_API_SECRET && incomingSecret === env.ADMIN_API_SECRET
+  const isTrustedInternal = isValidInternalRequest(req)
 
   const session = await auth()
   const roles = (session?.user?.roles as string[] | undefined) ?? []

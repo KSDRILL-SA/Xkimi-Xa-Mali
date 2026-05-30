@@ -16,6 +16,8 @@ import {
   InviteBindingError,
   InviteDuplicateError,
 } from '@/lib/errors'
+import { assertAdmin, assertNotSelf, ROLES } from '@/lib/authorization'
+import { bumpRoleVersion } from '@/lib/role-version'
 
 // Re-export domain errors for callers that import them from this module
 export {
@@ -69,9 +71,6 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-function assertAdmin(roles: string[]) {
-  if (!roles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
-}
 
 // ─── Create invite ────────────────────────────────────────────────────────────
 
@@ -329,6 +328,22 @@ export async function setMemberRole(
 ) {
   assertAdmin(adminRoles)
 
+  if (!assign && roleName === ROLES.ADMIN) {
+    assertNotSelf(adminId, memberId, 'revoke your own admin role')
+
+    const adminRole = await db.role.findUnique({ where: { name: ROLES.ADMIN } })
+    if (adminRole) {
+      const adminCount = await db.userRole.count({ where: { roleId: adminRole.id } })
+      if (adminCount <= 1) {
+        throw new ForbiddenError('Cannot remove the last admin — at least one admin must remain')
+      }
+    }
+  }
+
+  if (!assign && roleName === ROLES.MEMBER) {
+    assertNotSelf(adminId, memberId, 'revoke your own member role')
+  }
+
   const [member, role] = await Promise.all([
     db.user.findUnique({ where: { id: memberId }, select: { id: true, email: true } }),
     db.role.findUniqueOrThrow({ where: { name: roleName } }),
@@ -345,6 +360,8 @@ export async function setMemberRole(
   } else {
     await db.userRole.deleteMany({ where: { userId: memberId, roleId: role.id } })
   }
+
+  await bumpRoleVersion(memberId)
 
   await writeAuditLog({
     userId: adminId,
