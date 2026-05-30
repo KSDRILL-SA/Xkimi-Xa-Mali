@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getMemberDetail, setMemberStatus, unlockMember } from '@/lib/services'
+import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory } from '@/lib/services'
 import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader } from '@xxm/ui'
 import { revalidatePath } from 'next/cache'
@@ -14,22 +14,27 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const { id }  = await params
 
   let member
+  let loginHistory: { id: string; ipAddress: string | null; userAgent: string | null; success: boolean; createdAt: Date }[] = []
   try {
-    member = await getMemberDetail(roles, id)
+    const [detail, history] = await Promise.all([
+      getMemberDetail(roles, id),
+      getMemberLoginHistory(roles, id, 1, 10),
+    ])
+    member = detail
+    loginHistory = history.items
   } catch {
     notFound()
   }
 
   const STATUS_STYLES = SHARED_STATUS_STYLES.user
-
   const isLocked = member.lockedUntil && new Date(member.lockedUntil) > new Date()
+  const isAdmin  = member.roles.some((r) => r.role.name === 'ADMIN')
 
   async function handleStatusChange(fd: FormData) {
     'use server'
-    const s       = await auth()
-    const r       = (s!.user.roles as string[] | undefined) ?? []
-    const newStatus = fd.get('status') as string
-    await setMemberStatus(s!.user.id, r, id, newStatus)
+    const s = await auth()
+    const r = (s!.user.roles as string[] | undefined) ?? []
+    await setMemberStatus(s!.user.id, r, id, fd.get('status') as string)
     revalidatePath(`/members/${id}`)
   }
 
@@ -41,6 +46,22 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     revalidatePath(`/members/${id}`)
   }
 
+  async function handlePromoteAdmin() {
+    'use server'
+    const s = await auth()
+    const r = (s!.user.roles as string[] | undefined) ?? []
+    await setMemberRole(s!.user.id, r, id, 'ADMIN', true)
+    revalidatePath(`/members/${id}`)
+  }
+
+  async function handleRemoveAdmin() {
+    'use server'
+    const s = await auth()
+    const r = (s!.user.roles as string[] | undefined) ?? []
+    await setMemberRole(s!.user.id, r, id, 'ADMIN', false)
+    revalidatePath(`/members/${id}`)
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Members', href: '/members' }, { label: `${member.firstName} ${member.lastName}` }]} />
@@ -48,15 +69,30 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         title={`${member.firstName} ${member.lastName}`}
         subtitle={member.email}
         action={
-          <form action={handleStatusChange} className="flex items-center gap-2">
-            <select name="status" defaultValue={member.status}
-              className="rounded-lg border border-xxm-gray-200 px-2 py-1.5 text-sm text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25">
-              <option value="ACTIVE">Active</option>
-              <option value="PENDING">Pending</option>
-              <option value="SUSPENDED">Suspended</option>
-            </select>
-            <button type="submit" className="px-4 py-1.5 rounded-lg bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors">Update</button>
-          </form>
+          <div className="flex items-center gap-2 flex-wrap">
+            <form action={handleStatusChange} className="flex items-center gap-2">
+              <select name="status" defaultValue={member.status}
+                className="rounded-lg border border-xxm-gray-200 px-2 py-1.5 text-sm text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25">
+                <option value="ACTIVE">Active</option>
+                <option value="PENDING">Pending</option>
+                <option value="SUSPENDED">Suspended</option>
+              </select>
+              <button type="submit" className="px-4 py-1.5 rounded-lg bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors">Update status</button>
+            </form>
+            {isAdmin ? (
+              <form action={handleRemoveAdmin}>
+                <button type="submit" className="px-4 py-1.5 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors">
+                  Remove admin
+                </button>
+              </form>
+            ) : (
+              <form action={handlePromoteAdmin}>
+                <button type="submit" className="px-4 py-1.5 rounded-lg border border-xxm-green/30 text-xxm-green text-sm font-medium hover:bg-xxm-green/5 transition-colors">
+                  Make admin
+                </button>
+              </form>
+            )}
+          </div>
         }
       />
 
@@ -84,9 +120,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             {[
               ['Phone',          member.phone],
               ['Status',         <span key="s" className={(STATUS_STYLES[member.status as keyof typeof STATUS_STYLES] ?? { className: '' }).className}>{member.status}</span>],
-              ['Joined',         formatDate(member.createdAt)],
-              ['POPIA',          member.popiaConsentAt ? formatDate(member.popiaConsentAt) : 'Not consented'],
               ['Roles',          member.roles.map((r) => r.role.name).join(', ')],
+              ['Joined',         formatDate(member.createdAt)],
+              ['POPIA consent',  member.popiaConsentAt ? formatDate(member.popiaConsentAt) : 'Not consented'],
               ['Login attempts', member.loginAttempts > 0 ? <span key="la" className="text-orange-600 font-medium">{member.loginAttempts}</span> : '0'],
             ].map(([k, v]) => (
               <div key={String(k)} className="flex justify-between text-sm">
@@ -156,6 +192,45 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                   </li>
                 ))}
               </ul>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* Login history */}
+        <Card className="md:col-span-2">
+          <CardHeader title="Login History" description="Last 10 attempts" />
+          <CardBody>
+            {loginHistory.length === 0 ? (
+              <p className="text-sm text-xxm-gray-400">No login history.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-xxm-gray-100">
+                      <th className="text-left py-2 pr-4 text-xs font-medium text-xxm-gray-500 uppercase tracking-wide">Time</th>
+                      <th className="text-left py-2 pr-4 text-xs font-medium text-xxm-gray-500 uppercase tracking-wide">IP Address</th>
+                      <th className="text-left py-2 pr-4 text-xs font-medium text-xxm-gray-500 uppercase tracking-wide">Device</th>
+                      <th className="text-center py-2 text-xs font-medium text-xxm-gray-500 uppercase tracking-wide">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-xxm-gray-50">
+                    {loginHistory.map((h) => (
+                      <tr key={h.id}>
+                        <td className="py-2 pr-4 text-xxm-gray-600 whitespace-nowrap">{formatDate(h.createdAt)}</td>
+                        <td className="py-2 pr-4 font-mono text-xs text-xxm-gray-500">{h.ipAddress ?? '—'}</td>
+                        <td className="py-2 pr-4 text-xxm-gray-400 text-xs truncate max-w-[200px]">
+                          {h.userAgent ? h.userAgent.split(' ').slice(0, 3).join(' ') : '—'}
+                        </td>
+                        <td className="py-2 text-center">
+                          <span className={h.success ? 'xxm-status-success' : 'xxm-status-danger'}>
+                            {h.success ? 'Success' : 'Failed'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </CardBody>
         </Card>

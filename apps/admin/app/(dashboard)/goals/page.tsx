@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { listAllGoals, createGoal, activateGoal, lockGoal, deleteGoal } from '@/lib/services'
+import { listAllGoals, createGoal, activateGoal, lockGoal, deleteGoal, recordGoalProgress } from '@/lib/services'
 import { formatZAR, formatDate, MONTHS } from '@xxm/utils'
 import { Breadcrumb, DataTable, type Column, RouterPagination, PageHeader, ProgressBar } from '@xxm/ui'
 
@@ -60,17 +60,36 @@ const columns: Column<GoalRow>[] = [
             </form>
           </>
         )}
-        {r.status === 'Active' && !r.locked && (
-          <form action={async () => {
-            'use server'
-            const s = await auth()
-            await lockGoal(s!.user.id, s!.user.roles as string[], r.id)
-            revalidatePath('/goals')
-          }}>
-            <button type="submit" className="text-xs text-xxm-gray-500 hover:underline font-medium">Lock</button>
-          </form>
+        {r.status === 'Active' && (
+          <>
+            {!r.locked && (
+              <form action={async () => {
+                'use server'
+                const s = await auth()
+                await lockGoal(s!.user.id, s!.user.roles as string[], r.id)
+                revalidatePath('/goals')
+              }}>
+                <button type="submit" className="text-xs text-xxm-gray-500 hover:underline font-medium">Lock</button>
+              </form>
+            )}
+            <form action={async (fd: FormData) => {
+              'use server'
+              const s = await auth()
+              const amount = Number(fd.get('amount'))
+              if (!amount || amount <= 0) return
+              await recordGoalProgress(s!.user.id, s!.user.roles as string[], r.id, amount)
+              revalidatePath('/goals')
+            }} className="flex items-center gap-1">
+              <input
+                type="number" name="amount" min={1} step={50} required
+                placeholder="R amount"
+                className="w-20 rounded-lg border border-xxm-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-xxm-green/30"
+              />
+              <button type="submit" className="text-xs text-xxm-green hover:underline font-medium">+Progress</button>
+            </form>
+          </>
         )}
-        {r.locked && <span className="text-xs text-xxm-gray-400">Locked</span>}
+        {r.locked && r.status !== 'Active' && <span className="text-xs text-xxm-gray-400">Locked</span>}
       </div>
     ),
   },
