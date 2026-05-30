@@ -11,7 +11,7 @@ import { cache, CACHE_KEYS } from '@/lib/cache'
 
 export const debitRun = inngest.createFunction(
   { id: 'debit-run', name: 'Monthly Debit Run' },
-  { cron: '0 18 * * *' }, // 20:00 SAST (UTC+2)
+  { cron: '0 16 * * *' }, // 18:00 SAST (UTC+2)
   async ({ step }) => {
     const today = await step.run('get-today', () => todaySAST())
     const parts = today.split('-')
