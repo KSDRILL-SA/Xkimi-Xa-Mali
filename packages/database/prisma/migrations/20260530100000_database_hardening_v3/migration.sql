@@ -138,6 +138,12 @@ ALTER TABLE "users"
 ALTER TABLE "notifications"
   ADD CONSTRAINT "chk_notification_retry_nonneg" CHECK ("retryCount" >= 0);
 
+ALTER TABLE "contributions"
+  ADD CONSTRAINT "chk_contribution_paid_lte_due" CHECK ("amountPaid" <= "amountDue");
+
+ALTER TABLE "payment_mandates"
+  ADD CONSTRAINT "chk_mandate_delay_after_create" CHECK ("delayedUntil" IS NULL OR "delayedUntil" > "createdAt");
+
 -- ============================================================================
 -- 6. ADVANCED INDEXES
 -- ============================================================================
