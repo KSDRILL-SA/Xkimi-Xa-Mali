@@ -137,7 +137,7 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
         take: 12,
         select: { id: true, periodMonth: true, periodYear: true, amountDue: true, amountPaid: true, status: true },
       },
-      notificationPreference: { select: { sms: true, email: true, push: true } },
+      notificationPreference: { select: { sms: true, email: true, push: true, whatsapp: true } },
       _count: {
         select: { contributions: true, mandates: true },
       },
@@ -228,7 +228,7 @@ export async function approveMandate(
 
   const updated = await db.paymentMandate.update({
     where: { id: mandateId },
-    data: { status: 'ACTIVE' },
+    data: { status: 'ACTIVE', approvedAt: new Date(), approvedById: adminId },
     select: { id: true, status: true },
   })
 

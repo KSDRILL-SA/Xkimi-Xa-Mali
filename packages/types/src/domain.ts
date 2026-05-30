@@ -17,7 +17,7 @@ import type {
   TransactionStatus,
   GoalStatus,
   GoalType,
-  NotificationChannel,
+  NotifChannel,
 } from '@prisma/client'
 
 export type {
@@ -39,7 +39,7 @@ export type {
   TransactionStatus,
   GoalStatus,
   GoalType,
-  NotificationChannel,
+  NotifChannel as NotificationChannel,
 }
 
 export type UserWithRoles = User & {
@@ -73,7 +73,7 @@ export type MemberDetail = User & {
   bankAccounts: Pick<BankAccount, 'id' | 'bankName' | 'accountType' | 'createdAt'>[]
   mandates: Pick<PaymentMandate, 'id' | 'status' | 'amount' | 'debitDay' | 'createdAt'>[]
   contributions: Pick<Contribution, 'id' | 'periodMonth' | 'periodYear' | 'amountDue' | 'amountPaid' | 'status'>[]
-  notificationPreference: Pick<NotificationPreference, 'sms' | 'email' | 'push'> | null
+  notificationPreference: Pick<NotificationPreference, 'sms' | 'email' | 'push' | 'whatsapp'> | null
   _count: { contributions: number; mandates: number }
 }
 
