@@ -5,8 +5,9 @@ import { db } from '@/lib/db'
 import { todaySAST } from '@/lib/date'
 import { redis } from '@/lib/redis'
 import { submitScheduledDebit } from '@/lib/netcash'
-import { recalculateContributionStatus } from '@/services/contribution.service'
+import { recalculateContributionStatus, invalidateContributionSummaryCache } from '@/services/contribution.service'
 import { queueNotification } from '@/services/notification.service'
+import { cache, CACHE_KEYS } from '@/lib/cache'
 
 export const debitRun = inngest.createFunction(
   { id: 'debit-run', name: 'Monthly Debit Run' },
@@ -36,14 +37,19 @@ export const debitRun = inngest.createFunction(
       if (delayed) continue
 
       const idempotencyKey = `debit:run:${mandate.id}:${periodKey}`
-      const alreadyRan = await step.run(`check-idempotency-${mandate.id}`, () =>
-        redis.get(idempotencyKey),
-      )
+      const alreadyRan = await step.run(`check-idempotency-${mandate.id}`, async () => {
+        const redisCheck = await redis.get(idempotencyKey)
+        if (redisCheck) return true
+        const dbCheck = await db.transaction.findUnique({
+          where: { idempotencyKey },
+          select: { id: true },
+        })
+        return !!dbCheck
+      })
       if (alreadyRan) continue
 
-      // Claim the slot before touching Netcash — prevents double-charge on retry
       await step.run(`claim-${mandate.id}`, () =>
-        redis.set(idempotencyKey, '1', { ex: 60 * 60 * 48 }),
+        redis.set(idempotencyKey, '1', { ex: 60 * 60 * 72 }),
       )
 
       const contribution = await step.run(`upsert-contribution-${mandate.id}`, async () => {
@@ -105,9 +111,13 @@ export const debitRun = inngest.createFunction(
       )
 
       if (txStatus === 'SUCCESS') {
-        await step.run(`recalculate-${mandate.id}`, () =>
-          recalculateContributionStatus(contribution.id),
-        )
+        await step.run(`recalculate-${mandate.id}`, async () => {
+          await recalculateContributionStatus(contribution.id)
+          await Promise.all([
+            cache.del(CACHE_KEYS.DASHBOARD_STATS),
+            invalidateContributionSummaryCache(mandate.userId),
+          ])
+        })
       }
 
       await step.run(`notify-${mandate.id}`, () =>

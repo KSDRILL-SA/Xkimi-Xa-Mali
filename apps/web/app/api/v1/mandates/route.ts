@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiRatelimit } from '@/lib/redis'
+import { mandateRatelimit } from '@/lib/redis'
 import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { getMandates, createMandate } from '@/services/mandate.service'
 import { CreateMandateSchema } from '@/lib/validation/mandate'
@@ -24,9 +24,8 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user) return apiError('SYS_001', 'Authentication required', 401)
 
-  // Mandate creation triggers an external Netcash call — rate-limit per user.
-  const { success } = await apiRatelimit.limit(`mandate:${session.user.id}`)
-  if (!success) return apiError('SYS_005', 'Too many requests. Please try again later.', 429)
+  const { success } = await mandateRatelimit.limit(session.user.id)
+  if (!success) return apiError('SYS_005', 'Mandate operations are limited. Please try again later.', 429)
 
   const body = await req.json().catch(() => null)
   const parsed = CreateMandateSchema.safeParse(body)

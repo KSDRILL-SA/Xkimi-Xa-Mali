@@ -89,12 +89,12 @@ export const ChangePasswordSchema = z
 export const CreateMandateSchema = z.object({
   bankAccountId: z.string().cuid('Invalid bank account'),
   debitDay:      z.number().int().min(1, 'Debit day must be between 1 and 28').max(28, 'Debit day must be between 1 and 28'),
-  amount:        z.number().min(100, 'Minimum contribution is R100'),
+  amount:        z.number().min(100, 'Minimum contribution is R100').max(10_000, 'Maximum contribution is R10,000'),
 })
 
 export const UpdateMandateSchema = z.object({
   debitDay: z.number().int().min(1).max(28).optional(),
-  amount:   z.number().min(100).optional(),
+  amount:   z.number().min(100).max(10_000, 'Maximum contribution is R10,000').optional(),
 })
 
 export const DelayMandateSchema = z.object({
@@ -105,9 +105,9 @@ export const DelayMandateSchema = z.object({
 // ── Contributions ─────────────────────────────────────────────────────────────
 
 export const ManualContributionSchema = z.object({
-  amount:      z.number().min(100, 'Minimum contribution is R100'),
+  amount:      z.number().min(100, 'Minimum contribution is R100').max(10_000, 'Maximum contribution is R10,000'),
   periodMonth: z.number().int().min(1).max(12),
-  periodYear:  z.number().int().min(2024),
+  periodYear:  z.number().int().min(2024).max(new Date().getFullYear() + 1, 'Cannot pay for periods too far in the future'),
 })
 
 export const GenerateContributionsSchema = z.object({

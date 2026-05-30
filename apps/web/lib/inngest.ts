@@ -6,6 +6,9 @@ type XXMEvents = {
   'xxm/debit.run': { data: { date: string } }
   'xxm/debit.overdue-reminder': { data: { date: string } }
   'xxm/contribution.month-rollover': { data: { month: number; year: number } }
+  'xxm/contribution.overdue-sweep': { data: Record<string, never> }
+  'xxm/contribution.ledger-reconciliation': { data: Record<string, never> }
+  'xxm/transaction.retry-failed': { data: Record<string, never> }
   'xxm/mandate.delay-handler': {
     data: {
       mandateId: string
@@ -30,6 +33,9 @@ export const InngestEvents = {
   DEBIT_RUN: 'xxm/debit.run',
   DEBIT_OVERDUE_REMINDER: 'xxm/debit.overdue-reminder',
   CONTRIBUTION_MONTH_ROLLOVER: 'xxm/contribution.month-rollover',
+  CONTRIBUTION_OVERDUE_SWEEP: 'xxm/contribution.overdue-sweep',
+  CONTRIBUTION_LEDGER_RECONCILIATION: 'xxm/contribution.ledger-reconciliation',
+  TRANSACTION_RETRY_FAILED: 'xxm/transaction.retry-failed',
   MANDATE_DELAY_HANDLER: 'xxm/mandate.delay-handler',
   NOTIFICATIONS_FLUSH: 'xxm/notifications.flush',
   MANDATE_STATUS_SYNC: 'xxm/mandate.status-sync',

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { statementRatelimit } from '@/lib/redis'
 import { apiError, handleServiceError } from '@/lib/api-response'
 import { StatementRequestSchema } from '@/lib/validation/report'
 import { generateMemberStatement } from '@/services/report.service'
@@ -7,6 +8,9 @@ import { generateMemberStatement } from '@/services/report.service'
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
+
+  const { success } = await statementRatelimit.limit(session.user.id)
+  if (!success) return apiError('SYS_005', 'Statement download limit reached. Please try again later.', 429)
 
   const { searchParams } = new URL(req.url)
   const roles = (session.user.roles as string[] | undefined) ?? []

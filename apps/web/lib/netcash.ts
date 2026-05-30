@@ -63,6 +63,7 @@ export type NetcashDebitResponse = {
   transactionRef?: string
   status: 'SUCCESS' | 'PENDING' | 'FAILED'
   message?: string
+  reason?: string
   errorCode?: string
 }
 
@@ -75,27 +76,42 @@ class NetcashError extends Error {
   }
 }
 
+const NETCASH_TIMEOUT_MS = 30_000
+
 async function netcashPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await fetch(`${env.NETCASH_API_URL}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Service-Key': env.NETCASH_SERVICE_KEY,
-    },
-    body: JSON.stringify(body),
-  })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), NETCASH_TIMEOUT_MS)
 
-  const json = (await res.json()) as T & { errorCode?: string; message?: string }
+  try {
+    const res = await fetch(`${env.NETCASH_API_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Service-Key': env.NETCASH_SERVICE_KEY,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    })
 
-  if (!res.ok || json.errorCode) {
-    throw new NetcashError(
-      res.status,
-      json.message ?? `Netcash HTTP ${res.status}`,
-      json.errorCode,
-    )
+    const json = (await res.json()) as T & { errorCode?: string; message?: string }
+
+    if (!res.ok || json.errorCode) {
+      throw new NetcashError(
+        res.status,
+        json.message ?? `Netcash HTTP ${res.status}`,
+        json.errorCode,
+      )
+    }
+
+    return json
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new NetcashError(408, 'Netcash request timed out', 'TIMEOUT')
+    }
+    throw err
+  } finally {
+    clearTimeout(timeout)
   }
-
-  return json
 }
 
 // Retry wrapper: retries on network errors and 5xx, not on 4xx (bad request).
@@ -205,16 +221,27 @@ export function verifyWebhookSignature(rawBody: string, signatureHeader: string)
   return timingSafeEqual(expBuf, gotBuf)
 }
 
-// Documented Netcash outbound IP addresses. Reject webhook calls from outside this set.
-export const NETCASH_WEBHOOK_IPS: ReadonlySet<string> = new Set([
+const DEFAULT_WEBHOOK_IPS = [
   '196.10.1.152',
   '196.10.1.153',
   '196.10.3.152',
   '196.10.3.153',
-])
+]
+
+let _webhookIpSet: ReadonlySet<string> | null = null
+
+function getWebhookIps(): ReadonlySet<string> {
+  if (_webhookIpSet) return _webhookIpSet
+  const envIps = process.env.NETCASH_WEBHOOK_IPS
+  const ips = envIps
+    ? envIps.split(',').map((ip) => ip.trim()).filter(Boolean)
+    : DEFAULT_WEBHOOK_IPS
+  _webhookIpSet = new Set(ips)
+  return _webhookIpSet
+}
 
 export function isAllowedNetcashIp(ip: string): boolean {
-  return NETCASH_WEBHOOK_IPS.has(ip)
+  return getWebhookIps().has(ip)
 }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
