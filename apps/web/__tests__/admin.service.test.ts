@@ -30,13 +30,18 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-vi.mock('@/lib/bulksms', () => ({
-  sendSMS: vi.fn(),
-  normalisePhone: vi.fn((p: string) => p),
+vi.mock('@/integrations/sms', () => ({
+  smsProvider: {
+    send: vi.fn(),
+    sendBulk: vi.fn(),
+    normalisePhone: vi.fn((p: string) => p),
+  },
 }))
 
-vi.mock('@/lib/email', () => ({
-  sendWelcomeEmail: vi.fn(),
+vi.mock('@/integrations/email', () => ({
+  emailProvider: {
+    sendWelcomeEmail: vi.fn(),
+  },
 }))
 
 vi.mock('@/services/contribution.service', () => ({
@@ -91,8 +96,8 @@ vi.mock('@/lib/cache', () => ({
 import { db } from '@/lib/db'
 import { writeAuditLog } from '@/services/audit.service'
 import { generateMonthlyContributions } from '@/services/contribution.service'
-import { sendSMS } from '@/lib/bulksms'
-import { sendWelcomeEmail } from '@/lib/email'
+import { smsProvider } from '@/integrations/sms'
+import { emailProvider } from '@/integrations/email'
 import { ForbiddenError, AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import {
   listMembers,
@@ -141,8 +146,8 @@ const mockDb = db as {
 
 const mockWriteAuditLog  = writeAuditLog as MockedFunction<typeof writeAuditLog>
 const mockGenContribs    = generateMonthlyContributions as unknown as MockedFunction<() => Promise<{ created: number; skipped: number }>>
-const mockSendSMS        = sendSMS as MockedFunction<typeof sendSMS>
-const mockSendEmail      = sendWelcomeEmail as MockedFunction<typeof sendWelcomeEmail>
+const mockSendSMS        = smsProvider.send as MockedFunction<typeof smsProvider.send>
+const mockSendEmail      = emailProvider.sendWelcomeEmail as MockedFunction<typeof emailProvider.sendWelcomeEmail>
 
 const ADMIN_ROLES = ['ADMIN', 'MEMBER']
 const MEMBER_ROLES = ['MEMBER']

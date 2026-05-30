@@ -1,15 +1,8 @@
-import { Resend } from 'resend'
 import { Prisma } from '@prisma/client'
 import { notificationRepo } from '@/repositories/notification.repository'
 import { userRepo } from '@/repositories/user.repository'
-import { env } from '@/lib/env'
-import { sendSMS, normalisePhone } from '@/lib/bulksms'
-import {
-  sendWelcomeEmail,
-  sendPaymentSuccessEmail,
-  sendPaymentFailedEmail,
-  sendOverdueReminderEmail,
-} from '@/lib/email'
+import { smsProvider } from '@/integrations/sms'
+import { emailProvider } from '@/integrations/email'
 
 // Defined locally to avoid dependency on Prisma client generation state
 type NotifChannel = 'SMS' | 'EMAIL' | 'PUSH' | 'WHATSAPP'
@@ -27,8 +20,6 @@ type QueuedNotification = {
   template: { id: string; slug: string; channel: string; body: string }
   user: { email: string | null; phone: string | null }
 }
-
-const resend = new Resend(env.RESEND_API_KEY)
 
 // ---------------------------------------------------------------------------
 // Template interpolation
@@ -73,25 +64,23 @@ async function dispatchEmail(
 
   switch (slug) {
     case 'welcome-email':
-      await sendWelcomeEmail(to, firstName)
+      await emailProvider.sendWelcomeEmail(to, firstName)
       break
     case 'payment-success-email':
-      await sendPaymentSuccessEmail(to, firstName, amount, period)
+      await emailProvider.sendPaymentSuccessEmail(to, firstName, amount, period)
       break
     case 'payment-failed-email':
-      await sendPaymentFailedEmail(to, firstName, amount, period, dashboardUrl)
+      await emailProvider.sendPaymentFailedEmail(to, firstName, amount, period, dashboardUrl)
       break
     case 'overdue-reminder-email':
-      await sendOverdueReminderEmail(to, firstName, amount, period, dashboardUrl)
+      await emailProvider.sendOverdueReminderEmail(to, firstName, amount, period, dashboardUrl)
       break
     default:
-      // Generic fallback — interpolate the template body and send as HTML
-      await resend.emails.send({
-        from: env.RESEND_FROM_EMAIL,
+      await emailProvider.sendGenericEmail(
         to,
-        subject: `Xkimm Xa Mali`,
-        html: `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">${interpolate(body, payload)}</div>`,
-      })
+        `Xkimm Xa Mali`,
+        `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">${interpolate(body, payload)}</div>`,
+      )
   }
 
   await notificationRepo.update(notificationId, { status: 'SENT', sentAt: new Date() })
@@ -109,9 +98,9 @@ async function dispatchSMS(
   payload: Record<string, unknown>,
 ): Promise<void> {
   const text = interpolate(body, payload)
-  const normalised = normalisePhone(phone)
+  const normalised = smsProvider.normalisePhone(phone)
 
-  const [message] = await sendSMS({
+  const [message] = await smsProvider.send({
     to: normalised,
     body: text,
     userSuppliedId: notificationId,
