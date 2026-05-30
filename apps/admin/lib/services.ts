@@ -234,6 +234,81 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+export async function createGoal(
+  adminId: string, adminRoles: string[],
+  data: { title: string; description?: string; type: string; targetAmount: number; deadline: string },
+) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.create({
+    data: {
+      title: data.title,
+      description: data.description ?? null,
+      type: data.type as 'MONTHLY' | 'YEARLY' | 'CUSTOM',
+      targetAmount: data.targetAmount,
+      currentAmount: 0,
+      deadline: new Date(data.deadline),
+      status: 'DRAFT',
+    },
+  })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_CREATED', entity: 'Goal', entityId: goal.id, payload: data })
+  return goal
+}
+
+export async function activateGoal(adminId: string, adminRoles: string[], goalId: string) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'DRAFT') throw new AdminConflictError('Only DRAFT goals can be activated')
+  const updated = await db.goal.update({ where: { id: goalId }, data: { status: 'ACTIVE' } })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_ACTIVATED', entity: 'Goal', entityId: goalId, payload: { title: goal.title } })
+  return updated
+}
+
+export async function lockGoal(adminId: string, adminRoles: string[], goalId: string) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.lockedAt) throw new AdminConflictError('Goal is already locked')
+  if (goal.status === 'DRAFT') throw new AdminConflictError('Activate the goal before locking it')
+  const updated = await db.goal.update({
+    where: { id: goalId },
+    data: { lockedAt: new Date(), lockedById: adminId },
+  })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_LOCKED', entity: 'Goal', entityId: goalId, payload: { title: goal.title } })
+  return updated
+}
+
+export async function deleteGoal(adminId: string, adminRoles: string[], goalId: string) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'DRAFT') throw new AdminConflictError('Only DRAFT goals can be deleted')
+  await db.goal.delete({ where: { id: goalId } })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_DELETED', entity: 'Goal', entityId: goalId, payload: { title: goal.title } })
+}
+
+export async function recordGoalProgress(
+  adminId: string, adminRoles: string[], goalId: string, amount: number, note?: string,
+) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'ACTIVE') throw new AdminConflictError('Progress can only be recorded on ACTIVE goals')
+  const newTotal = Number(goal.currentAmount) + amount
+  const [progress] = await db.$transaction([
+    db.goalProgress.create({ data: { goalId, amount } }),
+    db.goal.update({
+      where: { id: goalId },
+      data: {
+        currentAmount: newTotal,
+        ...(newTotal >= Number(goal.targetAmount) && { status: 'ACHIEVED' }),
+      },
+    }),
+  ])
+  await writeAuditLog({ userId: adminId, action: 'GOAL_PROGRESS_RECORDED', entity: 'Goal', entityId: goalId, payload: { amount, newTotal, note } })
+  return { id: progress.id, amount: Number(progress.amount), newTotal, achieved: newTotal >= Number(goal.targetAmount) }
+}
+
 // ─── Audit ────────────────────────────────────────────────────────────────────
 
 export async function listAuditLogs(

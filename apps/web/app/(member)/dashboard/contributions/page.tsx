@@ -17,12 +17,13 @@ const PAGE_SIZE = 12
 export default async function ContributionsPage({
   searchParams,
 }: {
-  searchParams: { page?: string }
+  searchParams: Promise<{ page?: string }>
 }) {
   const session = await auth()
   const userId  = session!.user.id
   const roles   = session!.user.roles ?? []
-  const page    = Math.max(1, Number(searchParams.page ?? '1'))
+  const params  = await searchParams
+  const page    = Math.max(1, Number(params.page ?? '1'))
 
   const [summary, paginated, activeMandate] = await Promise.all([
     getContributionSummary(userId, userId, roles),

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { getMonthlyReportSummary } from '@/lib/services'
 import { formatZAR, formatMonth, MONTHS } from '@xxm/utils'
 import { Breadcrumb, PageHeader, Card, CardHeader, CardBody, ProgressBar } from '@xxm/ui'
+import { Download } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Reports' }
 
@@ -31,7 +32,20 @@ export default async function ReportsPage({
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Reports' }]} />
-      <PageHeader title="Reports" subtitle="Monthly contribution summaries." />
+      <PageHeader
+        title="Reports"
+        subtitle="Monthly contribution summaries."
+        action={
+          <a
+            href={`/api/v1/admin/reports/csv?month=${month}&year=${year}`}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-canopy transition-colors"
+            download={`xkimm-xa-mali-${month}-${year}.csv`}
+          >
+            <Download size={14} aria-hidden />
+            Export CSV
+          </a>
+        }
+      />
 
       {/* Period selector */}
       <form method="GET" action="/reports" className="flex flex-wrap gap-2">

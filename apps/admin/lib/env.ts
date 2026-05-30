@@ -6,6 +6,11 @@ const schema = z.object({
   NEXTAUTH_URL:    z.string().url().optional(),
   NODE_ENV:        z.enum(['development', 'test', 'production']).default('development'),
 
+  // URL of the web app — used for internal server-to-server API calls
+  WEB_INTERNAL_URL: z.string().url().optional(),
+  // Shared secret for internal admin→web API authentication
+  ADMIN_API_SECRET: z.string().min(32).optional(),
+
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
   SENTRY_AUTH_TOKEN:      z.string().optional(),
   SENTRY_ORG:             z.string().optional(),

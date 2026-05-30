@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getMemberDetail, setMemberStatus } from '@/lib/services'
-import { formatDate, formatZAR, formatMonth, STATUS_STYLES } from '@xxm/utils'
+import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader } from '@xxm/ui'
 import { revalidatePath } from 'next/cache'
 
@@ -20,11 +20,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     notFound()
   }
 
-  const STATUS_STYLES: Record<string, string> = {
-    ACTIVE:    'xxm-status-success',
-    PENDING:   'xxm-status-warning',
-    SUSPENDED: 'xxm-status-danger',
-  }
+  const STATUS_STYLES = SHARED_STATUS_STYLES.user
 
   async function handleStatusChange(fd: FormData) {
     'use server'
@@ -61,7 +57,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           <CardBody className="space-y-3">
             {[
               ['Phone',    member.phone],
-              ['Status',   <span key="s" className={STATUS_STYLES[member.status] ?? ''}>{member.status}</span>],
+              ['Status',   <span key="s" className={(STATUS_STYLES[member.status as keyof typeof STATUS_STYLES] ?? { className: '' }).className}>{member.status}</span>],
               ['Joined',   formatDate(member.createdAt)],
               ['POPIA',    member.popiaConsentAt ? formatDate(member.popiaConsentAt) : 'Not consented'],
               ['Roles',    member.roles.map((r) => r.role.name).join(', ')],
@@ -106,7 +102,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                     <span className="text-xxm-gray-600">{formatMonth(c.periodMonth, c.periodYear)}</span>
                     <div className="flex items-center gap-3">
                       <span className="text-xxm-gray-500">{formatZAR(c.amountPaid)} / {formatZAR(c.amountDue)}</span>
-                      <span className={(STATUS_STYLES.contribution[c.status as keyof typeof STATUS_STYLES.contribution] ?? STATUS_STYLES.contribution.PENDING).className}>{c.status}</span>
+                      <span className={(SHARED_STATUS_STYLES.contribution[c.status as keyof typeof SHARED_STATUS_STYLES.contribution] ?? SHARED_STATUS_STYLES.contribution.PENDING).className}>{c.status}</span>
                     </div>
                   </li>
                 ))}
@@ -129,7 +125,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                       <span className="font-medium text-xxm-green-900">{formatZAR(m.amount)}</span>
                       <span className="text-xxm-gray-400 text-xs ml-2">Day {m.debitDay}</span>
                     </div>
-                    <span className={(STATUS_STYLES.mandate[m.status as keyof typeof STATUS_STYLES.mandate] ?? STATUS_STYLES.mandate.PENDING).className}>{m.status}</span>
+                    <span className={(SHARED_STATUS_STYLES.mandate[m.status as keyof typeof SHARED_STATUS_STYLES.mandate] ?? SHARED_STATUS_STYLES.mandate.PENDING).className}>{m.status}</span>
                   </li>
                 ))}
               </ul>

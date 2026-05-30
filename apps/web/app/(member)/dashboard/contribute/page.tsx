@@ -65,16 +65,15 @@ export default function ContributePage() {
   useEffect(() => {
     async function load() {
       try {
-        const [contribRes, mandateRes] = await Promise.all([
-          api.get<{ data: { periodMonth: number; periodYear: number; amountDue: number; amountPaid: number; status: string }[] }>(
-            '/api/v1/contributions',
-          ),
-          api.get<{ data: { status: string; amount: number; bankAccount: { bankName: string; accountNumberMasked: string } }[] }>(
-            '/api/v1/mandates',
-          ),
+        type ContribItem = { periodMonth: number; periodYear: number; amountDue: number; amountPaid: number; status: string }
+        type MandateItem = { status: string; amount: string | number; bankAccount: { bankName: string; accountNumberMasked: string } }
+
+        const [contribs, mandates] = await Promise.all([
+          api.get<ContribItem[]>('/api/v1/contributions'),
+          api.get<MandateItem[]>('/api/v1/mandates'),
         ])
 
-        const open = contribRes.data
+        const open = contribs
           .filter((c) => ['PENDING', 'PARTIAL', 'OVERDUE'].includes(c.status))
           .map((c) => ({
             ...c,
@@ -103,7 +102,7 @@ export default function ContributePage() {
           setValue('periodYear', open[0].periodYear)
         }
 
-        const active = mandateRes.data.find((m) => m.status === 'ACTIVE')
+        const active = mandates.find((m) => m.status === 'ACTIVE')
         if (active) {
           setMandate({
             bankName: active.bankAccount.bankName,
@@ -188,20 +187,24 @@ export default function ContributePage() {
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
                 <div>
                   <Label htmlFor="period" required>Period</Label>
-                  <div className="flex gap-2">
-                    <Select
-                      {...register('periodMonth', { valueAsNumber: true })}
-                      error={errors.periodMonth?.message}
-                    >
-                      {openPeriods.map((p) => (
-                        <option key={`${p.periodYear}-${p.periodMonth}`} value={p.periodMonth}>
-                          {formatMonth(p.periodMonth, p.periodYear)}
-                          {p.status !== 'PENDING' ? ` (${p.status})` : ''}
-                        </option>
-                      ))}
-                    </Select>
-                    <input type="hidden" {...register('periodYear', { valueAsNumber: true })} />
-                  </div>
+                  {/* A single combined key encodes both month+year so changing period always updates both */}
+                  <Select
+                    id="period"
+                    value={`${watch('periodYear')}-${watch('periodMonth')}`}
+                    onChange={(e) => {
+                      const [y, m] = e.target.value.split('-').map(Number)
+                      setValue('periodMonth', m, { shouldValidate: true })
+                      setValue('periodYear', y, { shouldValidate: true })
+                    }}
+                    error={errors.periodMonth?.message ?? errors.periodYear?.message}
+                  >
+                    {openPeriods.map((p) => (
+                      <option key={`${p.periodYear}-${p.periodMonth}`} value={`${p.periodYear}-${p.periodMonth}`}>
+                        {formatMonth(p.periodMonth, p.periodYear)}
+                        {p.status !== 'PENDING' ? ` (${p.status})` : ''}
+                      </option>
+                    ))}
+                  </Select>
                 </div>
 
                 {selectedPeriod && selectedPeriod.amountPaid > 0 && (
