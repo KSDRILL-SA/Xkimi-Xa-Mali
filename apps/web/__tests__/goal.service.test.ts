@@ -29,11 +29,31 @@ vi.mock('@/lib/env', () => ({
   env: { ENABLE_GOAL_LOCKING: true },
 }))
 
+vi.mock('@/lib/cache', () => ({
+  cache: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    del: vi.fn().mockResolvedValue(undefined),
+  },
+  CACHE_KEYS: {
+    DASHBOARD_STATS: 'xxm:cache:stats',
+    DASHBOARD_STATS_TTL: 300,
+    goalsPage: (s: string, p: number, l: number) => `xxm:cache:goals:${s}:${p}:${l}`,
+    GOALS_TTL: 120,
+  },
+}))
+
+vi.mock('@/services/audit.service', () => ({
+  writeAuditLog: vi.fn().mockResolvedValue(undefined),
+}))
+
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
 import { db } from '@/lib/db'
+import { writeAuditLog } from '@/services/audit.service'
+import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/errors'
 import {
   createGoal,
   updateGoal,
@@ -42,10 +62,10 @@ import {
   lockGoal,
   recordProgress,
   markExpiredGoalsFailed,
-  GoalNotFoundError,
-  GoalConflictError,
-  GoalForbiddenError,
 } from '@/services/goal.service'
+
+const GoalForbiddenError = ForbiddenError
+const mockWriteAuditLog = writeAuditLog as ReturnType<typeof vi.fn>
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -78,7 +98,6 @@ describe('createGoal', () => {
 
   it('creates a DRAFT goal and writes audit log', async () => {
     ;(db.goal.create as MockedFunction<typeof db.goal.create>).mockResolvedValue(DRAFT_GOAL as never)
-    ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
     const result = await createGoal(
       { title: 'End-of-year fund', type: 'YEARLY', targetAmount: 50000, deadline: '2026-12-31' },
@@ -92,7 +111,7 @@ describe('createGoal', () => {
         data: expect.objectContaining({ status: 'DRAFT', currentAmount: 0 }),
       }),
     )
-    expect(db.auditLog.create).toHaveBeenCalledOnce()
+    expect(mockWriteAuditLog).toHaveBeenCalledOnce()
     expect(result.status).toBe('DRAFT')
     expect(result.progressPct).toBe(0)
   })
@@ -195,14 +214,11 @@ describe('lockGoal', () => {
   it('locks an ACTIVE goal', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(ACTIVE_GOAL as never)
     ;(db.goal.update as MockedFunction<typeof db.goal.update>).mockResolvedValue(LOCKED_GOAL as never)
-    ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
     const result = await lockGoal('goal-1', 'admin-1', '127.0.0.1')
     expect(result.isLocked).toBe(true)
-    expect(db.auditLog.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ action: 'GOAL_LOCKED' }),
-      }),
+    expect(mockWriteAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'GOAL_LOCKED' }),
     )
   })
 

@@ -37,14 +37,15 @@ vi.mock('@/lib/pdf/statement', () => ({
 import { db } from '@/lib/db'
 import { put, getDownloadUrl } from '@vercel/blob'
 import { renderStatementPDF } from '@/lib/pdf/statement'
+import { ForbiddenError, ReportNotFoundError } from '@/lib/errors'
 import {
   getTransactionHistory,
   generateMemberStatement,
   getAdminReport,
   exportAdminReportCSV,
-  ReportNotFoundError,
-  ReportForbiddenError,
 } from '@/services/report.service'
+
+const ReportForbiddenError = ForbiddenError
 
 // ---------------------------------------------------------------------------
 // Typed mocks

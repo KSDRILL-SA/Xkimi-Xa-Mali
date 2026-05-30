@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyWebhookSignature, isAllowedNetcashIp } from '@/lib/netcash'
 import { processMandateWebhook } from '@/services/mandate.service'
 import { processTransactionWebhook } from '@/services/contribution.service'
+import { logger } from '@/lib/logger'
 
 // Raw webhook payload — Netcash may send mandate events, transaction events, or both.
 type WebhookPayload = {
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true }, { status: 200 })
   } catch (err) {
     // Transient failure. Return 500 so Netcash retries — a 200 would permanently drop it.
-    console.error('[netcash-webhook] processing failed', err)
+    logger.error('Netcash webhook processing failed', { err })
     return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
   }
 }

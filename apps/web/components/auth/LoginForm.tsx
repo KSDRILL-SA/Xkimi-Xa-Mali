@@ -14,6 +14,7 @@ import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
 
 const ERROR_MESSAGES: Record<string, string> = {
+  ACCOUNT_LOCKED: 'Your account has been temporarily locked due to too many failed attempts. Please try again later or contact the admin.',
   EMAIL_NOT_VERIFIED: 'Please verify your email before logging in.',
   ACCOUNT_SUSPENDED: 'Your account has been suspended. Contact the admin.',
   CredentialsSignin: 'Incorrect email or password.',

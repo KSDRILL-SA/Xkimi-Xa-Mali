@@ -1,6 +1,6 @@
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import { getMemberDetail, AdminForbiddenError, AdminNotFoundError } from '@/services/admin.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { getMemberDetail } from '@/services/admin.service'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -13,8 +13,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const member = await getMemberDetail(roles, id)
     return apiSuccess(member)
   } catch (e) {
-    if (e instanceof AdminForbiddenError) return apiError(e.code, e.message, 403)
-    if (e instanceof AdminNotFoundError)  return apiError(e.code, e.message, 404)
-    throw e
+    return handleServiceError(e)
   }
 }

@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { apiRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { requestDelay } from '@/services/mandate.service'
 import { DelayMandateSchema } from '@/lib/validation/mandate'
 
@@ -27,7 +27,6 @@ export async function POST(req: NextRequest, { params }: Params) {
     const result = await requestDelay(id, parsed.data, session.user.id, session.user.roles ?? [], ip)
     return apiSuccess(result)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }

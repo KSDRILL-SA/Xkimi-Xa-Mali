@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { apiRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { getMandates, createMandate } from '@/services/mandate.service'
 import { CreateMandateSchema } from '@/lib/validation/mandate'
 
@@ -16,8 +16,7 @@ export async function GET(req: NextRequest) {
     const mandates = await getMandates(userId, session.user.id, session.user.roles ?? [])
     return apiSuccess(mandates)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }
 
@@ -47,7 +46,6 @@ export async function POST(req: NextRequest) {
     )
     return apiSuccess(mandate, 201)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }

@@ -84,6 +84,8 @@ export const debitRun = inngest.createFunction(
       )
 
       const txStatus: TransactionStatus = gatewayRes.status === 'SUCCESS' ? 'SUCCESS' : 'PENDING'
+      const failureReason =
+        gatewayRes.status !== 'SUCCESS' ? (gatewayRes.reason ?? gatewayRes.status ?? null) : null
 
       const transaction = await step.run(`create-tx-${mandate.id}`, () =>
         db.transaction.create({
@@ -96,6 +98,7 @@ export const debitRun = inngest.createFunction(
             gatewayRef: gatewayRes.transactionRef ?? null,
             gatewayResponse: gatewayRes as unknown as Prisma.InputJsonValue,
             idempotencyKey,
+            failureReason,
             processedAt: txStatus === 'SUCCESS' ? new Date() : null,
           },
         }),

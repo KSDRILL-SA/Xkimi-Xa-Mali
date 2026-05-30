@@ -1,15 +1,8 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { UpdateGoalSchema } from '@/lib/validation/goal'
-import {
-  getGoal,
-  updateGoal,
-  deleteGoal,
-  GoalNotFoundError,
-  GoalConflictError,
-  GoalForbiddenError,
-} from '@/services/goal.service'
+import { getGoal, updateGoal, deleteGoal } from '@/services/goal.service'
 
 export async function GET(
   _req: NextRequest,
@@ -22,10 +15,8 @@ export async function GET(
   try {
     const goal = await getGoal(id)
     return apiSuccess(goal)
-  } catch (err: unknown) {
-    if (err instanceof GoalNotFoundError) return apiError(err.code, err.message, err.status)
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+  } catch (err) {
+    return handleServiceError(err)
   }
 }
 
@@ -54,12 +45,8 @@ export async function PATCH(
   try {
     const goal = await updateGoal(id, parsed.data, session.user.id, ip)
     return apiSuccess(goal)
-  } catch (err: unknown) {
-    if (err instanceof GoalNotFoundError) return apiError(err.code, err.message, err.status)
-    if (err instanceof GoalConflictError) return apiError(err.code, err.message, err.status)
-    if (err instanceof GoalForbiddenError) return apiError(err.code, err.message, err.status)
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+  } catch (err) {
+    return handleServiceError(err)
   }
 }
 
@@ -78,11 +65,7 @@ export async function DELETE(
   try {
     await deleteGoal(id, session.user.id, ip)
     return apiSuccess({ deleted: true })
-  } catch (err: unknown) {
-    if (err instanceof GoalNotFoundError) return apiError(err.code, err.message, err.status)
-    if (err instanceof GoalConflictError) return apiError(err.code, err.message, err.status)
-    if (err instanceof GoalForbiddenError) return apiError(err.code, err.message, err.status)
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+  } catch (err) {
+    return handleServiceError(err)
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { getContribution } from '@/services/contribution.service'
 
 type Params = { params: Promise<{ id: string }> }
@@ -15,7 +15,6 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const contribution = await getContribution(id, session.user.id, session.user.roles ?? [])
     return apiSuccess(contribution)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }
