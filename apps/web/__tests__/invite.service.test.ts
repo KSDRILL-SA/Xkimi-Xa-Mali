@@ -41,13 +41,14 @@ import { db } from '@/lib/db'
 import { sendInviteEmail, sendVerificationEmail } from '@/lib/email'
 import { sendSMS } from '@/lib/bulksms'
 import { writeAuditLog } from '@/services/audit.service'
+import { ForbiddenError, InviteNotFoundError, InviteUsedError, InviteRevokedError, InviteExpiredError, InviteDuplicateError, InviteBindingError } from '@/lib/errors'
 import {
   generateInvite, listInvitations, revokeInvitation,
   validateInviteCode, acceptInviteRegistration, setMemberRole,
-  InviteForbiddenError, InviteNotFoundError, InviteUsedError,
-  InviteRevokedError, InviteExpiredError, InviteDuplicateError,
-  InviteBindingError,
 } from '@/services/invite.service'
+
+const InviteForbiddenError = ForbiddenError
+const RoleForbiddenError   = ForbiddenError
 
 const mockDb = db as {
   user:       { findUnique: MockedFunction<typeof db.user.findUnique>; findFirst: MockedFunction<typeof db.user.findFirst> }
@@ -273,7 +274,6 @@ describe('acceptInviteRegistration', () => {
 
 describe('setMemberRole', () => {
   it('throws RoleForbiddenError for non-admin', async () => {
-    const { RoleForbiddenError } = await import('@/services/invite.service')
     await expect(setMemberRole('u1', MEMBER, 'u2', 'ADMIN', true)).rejects.toBeInstanceOf(RoleForbiddenError)
   })
 

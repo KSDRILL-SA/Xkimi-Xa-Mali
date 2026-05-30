@@ -3,26 +3,30 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
-import { getContributionSummary } from '@/services/contribution.service'
+import { getContributions, getContributionSummary } from '@/services/contribution.service'
 import { ContributionSummaryCards } from '@/components/contribution/SummaryCards'
 import { ContributionRow } from '@/components/contribution/ContributionRow'
+import { RouterPagination } from '@/components/ui/RouterPagination'
 import { Button } from '@/components/ui/Button'
 import { PageHeader } from '@/components/ui/PageHeader'
 
 export const metadata: Metadata = { title: 'Contributions' }
 
-export default async function ContributionsPage() {
-  const session = await auth()
-  const userId = session!.user.id
-  const roles = session!.user.roles ?? []
+const PAGE_SIZE = 12
 
-  const [summary, contributions, activeMandate] = await Promise.all([
+export default async function ContributionsPage({
+  searchParams,
+}: {
+  searchParams: { page?: string }
+}) {
+  const session = await auth()
+  const userId  = session!.user.id
+  const roles   = session!.user.roles ?? []
+  const page    = Math.max(1, Number(searchParams.page ?? '1'))
+
+  const [summary, paginated, activeMandate] = await Promise.all([
     getContributionSummary(userId, userId, roles),
-    db.contribution.findMany({
-      where: { userId },
-      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
-      include: { transactions: { orderBy: { createdAt: 'desc' }, take: 10 } },
-    }),
+    getContributions(userId, userId, roles, page, PAGE_SIZE),
     db.paymentMandate.findFirst({
       where: { userId, status: 'ACTIVE' },
       include: {
@@ -30,6 +34,8 @@ export default async function ContributionsPage() {
       },
     }),
   ])
+
+  const { items: contributions, total, totalPages } = paginated
 
   // Mask encrypted account number before passing to client components
   const mandateInfo = activeMandate
@@ -39,15 +45,18 @@ export default async function ContributionsPage() {
       }
     : null
 
+  type RawContrib = typeof contributions[number]
+  type RawTx = RawContrib['transactions'][number]
+
   // Serialize Decimal/Date fields for client components
-  const serialized = contributions.map((c) => ({
+  const serialized = contributions.map((c: RawContrib) => ({
     ...c,
     amountDue: c.amountDue.toString(),
     amountPaid: c.amountPaid.toString(),
     dueDate: c.dueDate.toISOString(),
     createdAt: c.createdAt.toISOString(),
     updatedAt: c.updatedAt.toISOString(),
-    transactions: c.transactions.map((t) => ({
+    transactions: c.transactions.map((t: RawTx) => ({
       ...t,
       amount: t.amount.toString(),
       createdAt: t.createdAt.toISOString(),
@@ -55,7 +64,7 @@ export default async function ContributionsPage() {
     })),
   }))
 
-  const hasOpen = contributions.some((c) =>
+  const hasOpen = contributions.some((c: RawContrib) =>
     ['PENDING', 'PARTIAL', 'OVERDUE'].includes(c.status),
   )
 
@@ -104,10 +113,18 @@ export default async function ContributionsPage() {
             History
           </h2>
           <div className="space-y-2">
-            {serialized.map((c) => (
+            {serialized.map((c: (typeof serialized)[number]) => (
               <ContributionRow key={c.id} contribution={c} mandate={mandateInfo} />
             ))}
           </div>
+          {totalPages > 1 && (
+            <RouterPagination
+              totalItems={total}
+              itemsPerPage={PAGE_SIZE}
+              currentPage={page}
+              baseUrl="/dashboard/contributions"
+            />
+          )}
         </section>
       )}
     </div>

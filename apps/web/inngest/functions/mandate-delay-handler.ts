@@ -79,6 +79,8 @@ export const mandateDelayHandler = inngest.createFunction(
     )
 
     const txStatus: TransactionStatus = gatewayRes.status === 'SUCCESS' ? 'SUCCESS' : 'PENDING'
+    const failureReason =
+      gatewayRes.status !== 'SUCCESS' ? (gatewayRes.reason ?? gatewayRes.status ?? null) : null
 
     await step.run('create-tx', () =>
       db.transaction.create({
@@ -91,6 +93,7 @@ export const mandateDelayHandler = inngest.createFunction(
           gatewayRef: gatewayRes.transactionRef ?? null,
           gatewayResponse: gatewayRes as unknown as Prisma.InputJsonValue,
           idempotencyKey,
+          failureReason,
           processedAt: txStatus === 'SUCCESS' ? new Date() : null,
         },
       }),

@@ -1,13 +1,8 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { RecordProgressSchema } from '@/lib/validation/goal'
-import {
-  getGoalProgress,
-  recordProgress,
-  GoalNotFoundError,
-  GoalConflictError,
-} from '@/services/goal.service'
+import { getGoalProgress, recordProgress } from '@/services/goal.service'
 
 export async function GET(
   req: NextRequest,
@@ -29,10 +24,8 @@ export async function GET(
       total: result.total,
       totalPages: result.totalPages,
     })
-  } catch (err: unknown) {
-    if (err instanceof GoalNotFoundError) return apiError(err.code, err.message, err.status)
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+  } catch (err) {
+    return handleServiceError(err)
   }
 }
 
@@ -61,10 +54,7 @@ export async function POST(
   try {
     const result = await recordProgress(id, parsed.data, session.user.id, ip)
     return apiSuccess(result, 201)
-  } catch (err: unknown) {
-    if (err instanceof GoalNotFoundError) return apiError(err.code, err.message, err.status)
-    if (err instanceof GoalConflictError) return apiError(err.code, err.message, err.status)
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+  } catch (err) {
+    return handleServiceError(err)
   }
 }

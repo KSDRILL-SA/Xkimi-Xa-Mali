@@ -1,11 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import {
-  activateGoal,
-  GoalNotFoundError,
-  GoalConflictError,
-} from '@/services/goal.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { activateGoal } from '@/services/goal.service'
 
 export async function POST(
   req: NextRequest,
@@ -22,10 +18,7 @@ export async function POST(
   try {
     const goal = await activateGoal(id, session.user.id, ip)
     return apiSuccess(goal)
-  } catch (err: unknown) {
-    if (err instanceof GoalNotFoundError) return apiError(err.code, err.message, err.status)
-    if (err instanceof GoalConflictError) return apiError(err.code, err.message, err.status)
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+  } catch (err) {
+    return handleServiceError(err)
   }
 }

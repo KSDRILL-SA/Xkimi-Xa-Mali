@@ -1,10 +1,7 @@
 import { NextRequest } from 'next/server'
 import { authRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import {
-  validateInviteCode,
-  InviteNotFoundError, InviteUsedError, InviteRevokedError, InviteExpiredError,
-} from '@/services/invite.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { validateInviteCode } from '@/services/invite.service'
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
@@ -22,11 +19,7 @@ export async function POST(req: NextRequest) {
   try {
     const result = await validateInviteCode(code.trim().toUpperCase())
     return apiSuccess(result)
-  } catch (e) {
-    if (e instanceof InviteNotFoundError) return apiError(e.code, e.message, 400)
-    if (e instanceof InviteUsedError)     return apiError(e.code, e.message, 400)
-    if (e instanceof InviteRevokedError)  return apiError(e.code, e.message, 400)
-    if (e instanceof InviteExpiredError)  return apiError(e.code, e.message, 400)
-    throw e
+  } catch (err) {
+    return handleServiceError(err)
   }
 }

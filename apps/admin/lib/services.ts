@@ -284,6 +284,33 @@ export async function listInvitations(adminRoles: string[], page = 1, limit = 20
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+// ─── Dashboard stats ──────────────────────────────────────────────────────────
+
+export async function getDashboardStats(adminRoles: string[]) {
+  assertAdmin(adminRoles)
+
+  const now       = new Date()
+  const month     = now.getMonth() + 1
+  const year      = now.getFullYear()
+
+  const [memberCount, activeContribs, poolResult, pendingMandates] = await Promise.all([
+    db.user.count({ where: { status: 'ACTIVE' } }),
+    db.contribution.findMany({
+      where: { periodMonth: month, periodYear: year },
+      select: { amountDue: true, amountPaid: true, status: true },
+    }),
+    db.contribution.aggregate({ where: { status: 'PAID' }, _sum: { amountPaid: true } }),
+    db.paymentMandate.count({ where: { status: 'PENDING' } }),
+  ])
+
+  const totalDue       = activeContribs.reduce((s, c) => s + Number(c.amountDue),  0)
+  const totalPaid      = activeContribs.reduce((s, c) => s + Number(c.amountPaid), 0)
+  const poolTotal      = Number(poolResult._sum.amountPaid ?? 0)
+  const collectionRate = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0
+
+  return { month, year, memberCount, totalDue, totalPaid, poolTotal, collectionRate, pendingMandates }
+}
+
 // ─── Reports ──────────────────────────────────────────────────────────────────
 
 export async function getMonthlyReportSummary(adminRoles: string[], month: number, year: number) {

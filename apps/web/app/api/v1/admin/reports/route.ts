@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
 import { AdminReportRequestSchema } from '@/lib/validation/report'
 import { getAdminReport } from '@/services/report.service'
 
@@ -24,7 +24,6 @@ export async function GET(req: NextRequest) {
     const report = await getAdminReport(parsed.data.month, parsed.data.year)
     return apiSuccess(report)
   } catch (err: unknown) {
-    const e = err as { code?: string; message?: string; status?: number }
-    return apiError(e.code ?? 'SYS_500', e.message ?? 'Server error', e.status ?? 500)
+    return handleServiceError(err)
   }
 }

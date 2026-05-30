@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { getDashboardStats } from '@/lib/services'
 import { formatZAR } from '@xxm/utils'
+import { MONTHS } from '@xxm/utils'
 import { BarChart3, Target, Wallet, Users, FileText } from 'lucide-react'
 import { Breadcrumb, ProgressBar } from '@xxm/ui'
 
@@ -10,34 +11,18 @@ export const metadata: Metadata = { title: 'Overview' }
 
 export default async function AdminOverviewPage() {
   const session = await auth()
-  const now = new Date()
-  const month = now.getMonth() + 1
-  const year  = now.getFullYear()
+  const roles   = (session?.user as { roles?: string[] })?.roles ?? ['ADMIN']
 
-  const [memberCount, activeContribs, poolResult, pendingMandates] = await Promise.all([
-    db.user.count({ where: { status: 'ACTIVE' } }),
-    db.contribution.findMany({
-      where: { periodMonth: month, periodYear: year },
-      select: { amountDue: true, amountPaid: true, status: true },
-    }),
-    db.contribution.aggregate({
-      _sum: { amountPaid: true },
-    }),
-    db.paymentMandate.count({ where: { status: 'PENDING' } }),
-  ])
-
-  const totalDue    = activeContribs.reduce((s, c) => s + Number(c.amountDue),  0)
-  const totalPaid   = activeContribs.reduce((s, c) => s + Number(c.amountPaid), 0)
-  const poolTotal   = Number(poolResult._sum.amountPaid ?? 0)
-  const collectionRate = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0
+  const { memberCount, totalDue, totalPaid, poolTotal, collectionRate, pendingMandates, month, year } =
+    await getDashboardStats(roles)
 
   const greeting = session?.user?.name ? `Hello, ${session.user.name.split(' ')[0]}` : 'Hello'
 
   const stats = [
-    { icon: Users,    label: 'Active Members',    value: memberCount,           color: 'bg-xxm-green-50 text-xxm-green' },
-    { icon: Wallet,   label: 'Pool Total (All)',   value: formatZAR(poolTotal),  color: 'bg-xxm-gold-50 text-xxm-gold-dark' },
-    { icon: BarChart3,label: 'This Month Due',     value: formatZAR(totalDue),   color: 'bg-blue-50 text-blue-600' },
-    { icon: Target,   label: 'Pending Mandates',   value: pendingMandates,       color: 'xxm-icon-bg-warning' },
+    { icon: Users,    label: 'Active Members',             value: memberCount,           color: 'bg-xxm-green-50 text-xxm-green' },
+    { icon: Wallet,   label: 'Pool Total (All)',            value: formatZAR(poolTotal),  color: 'bg-xxm-gold-50 text-xxm-gold-dark' },
+    { icon: BarChart3,label: `${MONTHS[month - 1]} Due`,   value: formatZAR(totalDue),   color: 'bg-blue-50 text-blue-600' },
+    { icon: Target,   label: 'Pending Mandates',            value: pendingMandates,       color: 'xxm-icon-bg-warning' },
   ]
 
   const quickLinks = [
@@ -55,7 +40,7 @@ export default async function AdminOverviewPage() {
 
       <div>
         <h1 className="text-2xl font-bold text-xxm-green">{greeting}</h1>
-        <p className="text-sm text-xxm-gray-500 mt-1">Here&apos;s your platform overview for {now.toLocaleString('en-ZA', { month: 'long', year: 'numeric' })}.</p>
+        <p className="text-sm text-xxm-gray-500 mt-1">Here&apos;s your platform overview for {MONTHS[month - 1]} {year}.</p>
       </div>
 
       {/* Stats grid */}

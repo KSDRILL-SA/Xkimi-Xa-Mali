@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError } from '@/lib/api-response'
-import { broadcastNotification, AdminForbiddenError } from '@/services/admin.service'
+import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { broadcastNotification } from '@/services/admin.service'
 import type { BroadcastChannel, BroadcastFilter } from '@/services/admin.service'
 
 const VALID_CHANNELS: BroadcastChannel[] = ['SMS', 'EMAIL', 'BOTH']
@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
     )
     return apiSuccess(result)
   } catch (e) {
-    if (e instanceof AdminForbiddenError) return apiError(e.code, e.message, 403)
-    throw e
+    return handleServiceError(e)
   }
 }

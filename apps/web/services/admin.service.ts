@@ -1,29 +1,14 @@
 import { db, Prisma } from '@/lib/db'
 import { writeAuditLog } from './audit.service'
+import { logger } from '@/lib/logger'
+import { ForbiddenError, AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import { sendWelcomeEmail } from '@/lib/email'
 import { generateMonthlyContributions } from './contribution.service'
-
-// ─── Domain errors ────────────────────────────────────────────────────────────
-
-export class AdminForbiddenError extends Error {
-  code = 'SYS_003'
-  status = 403
-  constructor() { super('Admin access required') }
-}
-export class AdminNotFoundError extends Error {
-  code = 'ADM_001'
-  status = 404
-  constructor(msg = 'Resource not found') { super(msg) }
-}
-export class AdminConflictError extends Error {
-  code = 'ADM_002'
-  status = 409
-  constructor(msg: string) { super(msg) }
-}
+import { cache, CACHE_KEYS } from '@/lib/cache'
 
 function assertAdmin(roles: string[]) {
-  if (!roles.includes('ADMIN')) throw new AdminForbiddenError()
+  if (!roles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -62,6 +47,19 @@ export type ListAuditParams = {
 
 export type BroadcastChannel = 'SMS' | 'EMAIL' | 'BOTH'
 export type BroadcastFilter = 'ALL' | 'ACTIVE' | 'PENDING' | 'SUSPENDED'
+
+type DashboardStats = {
+  members: { total: number; active: number; pending: number; suspended: number }
+  mandates: { active: number; pending: number; suspended: number; cancelled: number }
+  contributions: {
+    thisMonthTotal: number; thisMonthDue: number; thisMonthPaid: number
+    thisMonthOutstanding: number; collectionRate: number; newThisMonth: number
+  }
+  pool: { total: number }
+  invitations: { pending: number }
+  recentActivity: unknown[]
+  generatedAt: string
+}
 
 // ─── Members ─────────────────────────────────────────────────────────────────
 
@@ -120,6 +118,8 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
       email: true,
       phone: true,
       status: true,
+      loginAttempts: true,
+      lockedUntil: true,
       createdAt: true,
       updatedAt: true,
       popiaConsentAt: true,
@@ -167,14 +167,17 @@ export async function setMemberStatus(
     select: { id: true, status: true, firstName: true, lastName: true },
   })
 
-  await writeAuditLog({
-    userId: adminId,
-    action: 'ADMIN_MEMBER_STATUS_CHANGED',
-    entity: 'User',
-    entityId: memberId,
-    payload: { from: member.status, to: newStatus },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminId,
+      action: 'ADMIN_MEMBER_STATUS_CHANGED',
+      entity: 'User',
+      entityId: memberId,
+      payload: { from: member.status, to: newStatus },
+      ipAddress: ip,
+    }),
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+  ])
 
   return updated
 }
@@ -229,14 +232,17 @@ export async function approveMandate(
     select: { id: true, status: true },
   })
 
-  await writeAuditLog({
-    userId: adminId,
-    action: 'ADMIN_MANDATE_APPROVED',
-    entity: 'PaymentMandate',
-    entityId: mandateId,
-    payload: { memberId: mandate.userId },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminId,
+      action: 'ADMIN_MANDATE_APPROVED',
+      entity: 'PaymentMandate',
+      entityId: mandateId,
+      payload: { memberId: mandate.userId },
+      ipAddress: ip,
+    }),
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+  ])
 
   return updated
 }
@@ -259,14 +265,17 @@ export async function rejectMandate(
     select: { id: true, status: true },
   })
 
-  await writeAuditLog({
-    userId: adminId,
-    action: 'ADMIN_MANDATE_REJECTED',
-    entity: 'PaymentMandate',
-    entityId: mandateId,
-    payload: { memberId: mandate.userId },
-    ipAddress: ip,
-  })
+  await Promise.all([
+    writeAuditLog({
+      userId: adminId,
+      action: 'ADMIN_MANDATE_REJECTED',
+      entity: 'PaymentMandate',
+      entityId: mandateId,
+      payload: { memberId: mandate.userId },
+      ipAddress: ip,
+    }),
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+  ])
 
   return updated
 }
@@ -423,6 +432,115 @@ export async function listAuditLogs(adminRoles: string[], params: ListAuditParam
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+// ─── Dashboard stats ──────────────────────────────────────────────────────────
+
+export async function getDashboardStats(adminRoles: string[]) {
+  assertAdmin(adminRoles)
+
+  const cached = await cache.get<DashboardStats>(CACHE_KEYS.DASHBOARD_STATS)
+  if (cached) return cached
+
+  const now = new Date()
+  const thisMonth = now.getMonth() + 1
+  const thisYear = now.getFullYear()
+  const monthStart = new Date(thisYear, thisMonth - 1, 1)
+
+  const [
+    memberCounts,
+    mandateCounts,
+    contributionSummary,
+    recentAuditLogs,
+    poolTotal,
+    pendingInvites,
+  ] = await Promise.all([
+    // Member counts by status
+    db.user.groupBy({ by: ['status'], _count: { status: true } }),
+
+    // Mandate counts by status
+    db.paymentMandate.groupBy({ by: ['status'], _count: { status: true } }),
+
+    // This month's contribution stats
+    db.contribution.aggregate({
+      where: { periodMonth: thisMonth, periodYear: thisYear },
+      _count: { id: true },
+      _sum: { amountDue: true, amountPaid: true },
+    }),
+
+    // Last 10 audit events for the activity feed
+    db.auditLog.findMany({
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        action: true,
+        entity: true,
+        entityId: true,
+        createdAt: true,
+        user: { select: { firstName: true, lastName: true } },
+      },
+    }),
+
+    // All-time pool total (sum of all paid contributions)
+    db.contribution.aggregate({
+      where: { status: 'PAID' },
+      _sum: { amountPaid: true },
+    }),
+
+    // Open invitation count
+    db.invitation.count({ where: { status: 'PENDING', expiresAt: { gt: now } } }),
+  ])
+
+  // Contributions received this calendar month
+  const newContributionsThisMonth = await db.contribution.count({
+    where: { createdAt: { gte: monthStart } },
+  })
+
+  const memberMap = Object.fromEntries(
+    memberCounts.map((r) => [r.status, r._count.status]),
+  )
+  const mandateMap = Object.fromEntries(
+    mandateCounts.map((r) => [r.status, r._count.status]),
+  )
+
+  const thisMonthDue = Number(contributionSummary._sum.amountDue ?? 0)
+  const thisMonthPaid = Number(contributionSummary._sum.amountPaid ?? 0)
+
+  const stats: DashboardStats = {
+    members: {
+      total: Object.values(memberMap).reduce((a, b) => a + b, 0),
+      active: memberMap['ACTIVE'] ?? 0,
+      pending: memberMap['PENDING'] ?? 0,
+      suspended: memberMap['SUSPENDED'] ?? 0,
+    },
+    mandates: {
+      active: mandateMap['ACTIVE'] ?? 0,
+      pending: mandateMap['PENDING'] ?? 0,
+      suspended: mandateMap['SUSPENDED'] ?? 0,
+      cancelled: mandateMap['CANCELLED'] ?? 0,
+    },
+    contributions: {
+      thisMonthTotal: contributionSummary._count.id,
+      thisMonthDue,
+      thisMonthPaid,
+      thisMonthOutstanding: thisMonthDue - thisMonthPaid,
+      collectionRate:
+        thisMonthDue > 0 ? Math.round((thisMonthPaid / thisMonthDue) * 100) : 0,
+      newThisMonth: newContributionsThisMonth,
+    },
+    pool: {
+      total: Number(poolTotal._sum.amountPaid ?? 0),
+    },
+    invitations: {
+      pending: pendingInvites,
+    },
+    recentActivity: recentAuditLogs,
+    generatedAt: now.toISOString(),
+  }
+
+  await cache.set(CACHE_KEYS.DASHBOARD_STATS, stats, CACHE_KEYS.DASHBOARD_STATS_TTL)
+  return stats
+}
+
 // ─── Goals (admin read + force-expire) ───────────────────────────────────────
 
 export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
@@ -447,6 +565,65 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
       },
     }),
     db.goal.count(),
+  ])
+
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+}
+
+// ─── Security ─────────────────────────────────────────────────────────────────
+
+export async function unlockMember(
+  adminId: string,
+  adminRoles: string[],
+  memberId: string,
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const member = await db.user.findUnique({
+    where: { id: memberId },
+    select: { id: true, loginAttempts: true, lockedUntil: true },
+  })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  await db.user.update({
+    where: { id: memberId },
+    data: { loginAttempts: 0, lockedUntil: null },
+  })
+
+  await writeAuditLog({
+    userId: adminId,
+    action: 'ADMIN_MEMBER_UNLOCKED',
+    entity: 'User',
+    entityId: memberId,
+    payload: { previousAttempts: member.loginAttempts, wasLockedUntil: member.lockedUntil },
+    ipAddress: ip,
+  })
+
+  return { memberId, unlocked: true }
+}
+
+export async function getMemberLoginHistory(
+  adminRoles: string[],
+  memberId: string,
+  page = 1,
+  limit = 20,
+) {
+  assertAdmin(adminRoles)
+
+  const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true } })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  const skip = (page - 1) * limit
+  const [items, total] = await Promise.all([
+    db.loginHistory.findMany({
+      where: { userId: memberId },
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take: limit,
+      select: { id: true, success: true, ipAddress: true, userAgent: true, createdAt: true },
+    }),
+    db.loginHistory.count({ where: { userId: memberId } }),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
