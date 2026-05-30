@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input'
 import { Alert } from '@/components/ui/Alert'
 import { DebitDayPicker } from './DebitDayPicker'
 import { api } from '@/lib/api'
+import { MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
 
 interface Props {
   mandateId: string
@@ -72,11 +73,13 @@ export function EditMandateForm({ mandateId, currentDebitDay, currentAmount, onC
         <Input
           id="amount"
           type="number"
-          min={100}
-          step={50}
+          min={MIN_CONTRIBUTION_ZAR}
+          max={MAX_CONTRIBUTION_ZAR}
+          step={CONTRIBUTION_STEP_ZAR}
           error={errors.amount?.message}
           {...register('amount', { valueAsNumber: true })}
         />
+        <p className="text-xs text-gray-400 mt-1">R{MIN_CONTRIBUTION_ZAR} – R{MAX_CONTRIBUTION_ZAR.toLocaleString()}</p>
       </div>
 
       <div className="flex gap-3 pt-1">

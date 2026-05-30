@@ -10,10 +10,13 @@ import {
   ContributionNotFoundError,
   ContributionConflictError,
   MandateConflictError,
+  TransactionNotFoundError,
 } from '@/lib/errors'
 import { submitOnceOffDebit, mapNetcashTransactionStatus } from '@/lib/netcash'
 import type { ManualContributionInput, GenerateContributionsInput } from '@/lib/validation/contribution'
 import type { NetcashTransactionEvent } from '@/lib/netcash'
+
+const MAX_OPTIMISTIC_RETRIES = 3
 
 // ─── Access control ────────────────────────────────────────────────────────
 
@@ -63,13 +66,16 @@ export async function getContribution(id: string, requesterId: string, roles: st
   return contribution
 }
 
-// DB-aggregated summary — does NOT load all contributions into memory.
 export async function getContributionSummary(
   userId: string,
   requesterId: string,
   roles: string[],
 ) {
   assertCanAccess(userId, requesterId, roles)
+
+  const cacheKey = userSummaryCacheKey(userId)
+  const cached = await cache.get<ReturnType<typeof buildSummary>>(cacheKey)
+  if (cached) return cached
 
   const currentYear = new Date().getFullYear()
 
@@ -94,6 +100,16 @@ export async function getContributionSummary(
     byStatus.map((r) => [r.status, r._count.status]),
   )
 
+  const summary = buildSummary(totals, yearTotals, statusCounts)
+  await cache.set(cacheKey, summary, 180)
+  return summary
+}
+
+function buildSummary(
+  totals: { _sum: { amountPaid: unknown }; _count: { id: number } },
+  yearTotals: { _sum: { amountPaid: unknown } },
+  statusCounts: Record<string, number>,
+) {
   return {
     totalPaid: Number(totals._sum.amountPaid ?? 0),
     yearlyPaid: Number(yearTotals._sum.amountPaid ?? 0),
@@ -163,6 +179,10 @@ export async function submitManualPayment(
     )
   }
 
+  if (data.amount < 0) {
+    throw new ContributionConflictError('Payment amount must be positive', 'CTR_005')
+  }
+
   const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${randomUUID()}`
 
   const gatewayRes = await submitOnceOffDebit({
@@ -197,7 +217,10 @@ export async function submitManualPayment(
     return created
   })
 
-  await cache.del(CACHE_KEYS.DASHBOARD_STATS)
+  await Promise.all([
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+    invalidateContributionSummaryCache(userId),
+  ])
 
   await writeAuditLog({
     userId,
@@ -214,58 +237,73 @@ export async function submitManualPayment(
     ipAddress: ip,
   })
 
+  const receiptRef = `XXM-${transaction.id.slice(-8).toUpperCase()}`
+
   logger.info('Manual payment submitted', {
     userId,
     contributionId: contribution.id,
     amount: data.amount,
     gatewayStatus: gatewayRes.status,
+    receiptRef,
   })
 
-  return { contribution, transaction }
+  return { contribution, transaction, receiptRef }
 }
 
 // ─── Status engine ─────────────────────────────────────────────────────────
 
-// Derives contribution status from the sum of all SUCCESS transactions.
-// Always called after a transaction status change so the ledger stays consistent.
 type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
+
+function deriveContributionStatus(
+  amountPaid: number,
+  amountDue: number,
+  dueDate: Date,
+): ContributionStatus {
+  if (amountPaid >= amountDue) return 'PAID'
+  if (amountPaid > 0) return 'PARTIAL'
+  if (new Date() > dueDate) return 'OVERDUE'
+  return 'PENDING'
+}
 
 export async function recalculateContributionStatus(
   contributionId: string,
   tx: TxClient = db as unknown as TxClient,
 ) {
-  const [contribution, aggr] = await Promise.all([
-    tx.contribution.findUnique({ where: { id: contributionId } }),
-    tx.transaction.aggregate({
-      where: { contributionId, status: 'SUCCESS' },
-      _sum: { amount: true },
-    }),
-  ])
+  for (let attempt = 1; attempt <= MAX_OPTIMISTIC_RETRIES; attempt++) {
+    const [contribution, aggr] = await Promise.all([
+      tx.contribution.findUnique({ where: { id: contributionId } }),
+      tx.transaction.aggregate({
+        where: { contributionId, status: 'SUCCESS' },
+        _sum: { amount: true },
+      }),
+    ])
 
-  if (!contribution) return
+    if (!contribution) return
 
-  const newAmountPaid = Number(aggr._sum.amount ?? 0)
-  const amountDue = Number(contribution.amountDue)
-  const now = new Date()
+    const newAmountPaid = Number(aggr._sum.amount ?? 0)
+    const status = deriveContributionStatus(
+      newAmountPaid,
+      Number(contribution.amountDue),
+      contribution.dueDate,
+    )
 
-  let status: ContributionStatus
-  if (newAmountPaid >= amountDue) {
-    status = 'PAID'
-  } else if (newAmountPaid > 0) {
-    status = 'PARTIAL'
-  } else if (now > contribution.dueDate) {
-    status = 'OVERDUE'
-  } else {
-    status = 'PENDING'
-  }
+    const updated = await tx.contribution.updateMany({
+      where: { id: contributionId, version: contribution.version },
+      data: { amountPaid: newAmountPaid, status, version: contribution.version + 1 },
+    })
 
-  const updated = await tx.contribution.updateMany({
-    where: { id: contributionId, version: contribution.version },
-    data: { amountPaid: newAmountPaid, status, version: contribution.version + 1 },
-  })
+    if (updated.count > 0) return
 
-  if (updated.count === 0) {
-    throw new Error('Concurrent modification detected on contribution — retry required')
+    if (attempt < MAX_OPTIMISTIC_RETRIES) {
+      logger.warn('Optimistic lock conflict on contribution, retrying', {
+        contributionId,
+        attempt,
+      })
+      continue
+    }
+
+    logger.error('Optimistic lock conflict exhausted retries', { contributionId })
+    throw new Error('Concurrent modification detected on contribution — retries exhausted')
   }
 }
 
@@ -274,6 +312,9 @@ export async function recalculateContributionStatus(
 export async function processTransactionWebhook(event: NetcashTransactionEvent) {
   const transaction = await db.transaction.findFirst({
     where: { gatewayRef: event.transactionRef },
+    include: {
+      contribution: { select: { userId: true } },
+    },
   })
 
   if (!transaction) return
@@ -284,6 +325,19 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
   const terminal: TransactionStatus[] = ['SUCCESS', 'REVERSED']
   if (terminal.includes(transaction.status as TransactionStatus)) return
   if (transaction.status === newStatus) return
+
+  // Reject stale webhooks — if we have a processedAt that's newer than the event
+  if (event.processedAt && transaction.processedAt) {
+    const eventTime = new Date(event.processedAt)
+    if (eventTime < transaction.processedAt) {
+      logger.warn('Stale webhook rejected', {
+        transactionId: transaction.id,
+        eventTime: event.processedAt,
+        existingTime: transaction.processedAt.toISOString(),
+      })
+      return
+    }
+  }
 
   await db.$transaction(async (tx) => {
     await tx.transaction.update({
@@ -298,7 +352,10 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
     await recalculateContributionStatus(transaction.contributionId, tx)
   })
 
-  await cache.del(CACHE_KEYS.DASHBOARD_STATS)
+  await Promise.all([
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+    invalidateContributionSummaryCache(transaction.contribution.userId),
+  ])
 
   logger.info('Transaction webhook processed', {
     transactionId: transaction.id,
@@ -318,6 +375,108 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
       reason: event.reason ?? null,
     } as Prisma.InputJsonValue,
   })
+}
+
+// ─── Transaction reversal ─────────────────────────────────────────────────
+
+export async function createReversal(
+  transactionId: string,
+  adminId: string,
+  adminRoles: string[],
+  ip?: string,
+) {
+  if (!adminRoles.includes('ADMIN')) throw new ForbiddenError('Admin access required')
+
+  const original = await db.transaction.findUnique({
+    where: { id: transactionId },
+    include: { reversal: true },
+  })
+
+  if (!original) throw new TransactionNotFoundError()
+  if (original.status !== 'SUCCESS') {
+    throw new ContributionConflictError('Only successful transactions can be reversed', 'TXN_002')
+  }
+  if (original.reversal) {
+    throw new ContributionConflictError('Transaction already has a reversal', 'TXN_003')
+  }
+
+  const idempotencyKey = `reversal:${transactionId}:${randomUUID()}`
+
+  const reversal = await db.$transaction(async (tx) => {
+    const rev = await tx.transaction.create({
+      data: {
+        contributionId: original.contributionId,
+        mandateId: original.mandateId,
+        amount: original.amount,
+        type: 'REVERSAL',
+        status: 'SUCCESS',
+        idempotencyKey,
+        reversalOfId: original.id,
+        processedAt: new Date(),
+      },
+    })
+
+    await tx.transaction.update({
+      where: { id: original.id },
+      data: { status: 'REVERSED' },
+    })
+
+    await recalculateContributionStatus(original.contributionId, tx)
+
+    return rev
+  })
+
+  await cache.del(CACHE_KEYS.DASHBOARD_STATS)
+
+  await writeAuditLog({
+    userId: adminId,
+    action: 'TRANSACTION_REVERSED',
+    entity: 'Transaction',
+    entityId: reversal.id,
+    payload: {
+      originalTransactionId: transactionId,
+      contributionId: original.contributionId,
+      amount: Number(original.amount),
+    },
+    ipAddress: ip,
+  })
+
+  logger.info('Transaction reversed', {
+    reversalId: reversal.id,
+    originalId: transactionId,
+    amount: Number(original.amount),
+  })
+
+  return reversal
+}
+
+// ─── Overdue sweep ────────────────────────────────────────────────────────
+
+export async function sweepOverdueContributions(): Promise<number> {
+  const result = await db.contribution.updateMany({
+    where: {
+      status: 'PENDING',
+      dueDate: { lt: new Date() },
+    },
+    data: { status: 'OVERDUE' },
+  })
+
+  if (result.count > 0) {
+    logger.info('Overdue sweep completed', { updated: result.count })
+    await cache.del(CACHE_KEYS.DASHBOARD_STATS)
+  }
+
+  return result.count
+}
+
+// ─── Contribution summary with per-user caching ──────────────────────────
+
+function userSummaryCacheKey(userId: string): string {
+  return `xxm:cache:contrib-summary:${userId}`
+}
+
+export async function invalidateContributionSummaryCache(userId: string) {
+  await cache.del(userSummaryCacheKey(userId))
 }
 
 // ─── Admin: generate monthly contribution records ──────────────────────────

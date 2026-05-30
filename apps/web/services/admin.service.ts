@@ -1,5 +1,6 @@
 import { db, Prisma } from '@/lib/db'
 import { writeAuditLog } from './audit.service'
+import { queueNotification } from './notification.service'
 import { logger } from '@/lib/logger'
 import { ForbiddenError, AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
@@ -238,10 +239,16 @@ export async function approveMandate(
       action: 'ADMIN_MANDATE_APPROVED',
       entity: 'PaymentMandate',
       entityId: mandateId,
-      payload: { memberId: mandate.userId },
+      payload: { memberId: mandate.userId, previousStatus: mandate.status },
       ipAddress: ip,
     }),
     cache.del(CACHE_KEYS.DASHBOARD_STATS),
+    queueNotification({
+      userId: mandate.userId,
+      templateSlug: 'mandate-approved',
+      channel: 'SMS',
+      payload: { mandateId },
+    }),
   ])
 
   return updated
@@ -271,10 +278,16 @@ export async function rejectMandate(
       action: 'ADMIN_MANDATE_REJECTED',
       entity: 'PaymentMandate',
       entityId: mandateId,
-      payload: { memberId: mandate.userId },
+      payload: { memberId: mandate.userId, previousStatus: mandate.status },
       ipAddress: ip,
     }),
     cache.del(CACHE_KEYS.DASHBOARD_STATS),
+    queueNotification({
+      userId: mandate.userId,
+      templateSlug: 'mandate-rejected',
+      channel: 'SMS',
+      payload: { mandateId },
+    }),
   ])
 
   return updated

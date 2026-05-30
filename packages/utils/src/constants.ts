@@ -1,9 +1,12 @@
 export const APP_NAME     = 'Xkimm Xa Mali'
 export const APP_ABBR    = 'XXM'
 export const MIN_CONTRIBUTION_ZAR  = 100
+export const MAX_CONTRIBUTION_ZAR  = 10_000
 export const CONTRIBUTION_STEP_ZAR = 50
 export const DEFAULT_DEBIT_DAY     = 1
 export const DEFAULT_INVITE_AMOUNT = 200
+export const MAX_TRANSACTION_RETRY = 3
+export const IDEMPOTENCY_TTL_SECONDS = 60 * 60 * 72
 
 export const USER_STATUS = {
   PENDING:   'PENDING',

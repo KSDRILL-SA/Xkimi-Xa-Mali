@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
+import { env } from '@/lib/env'
 import { getContributions, getContributionSummary } from '@/services/contribution.service'
 import { ContributionSummaryCards } from '@/components/contribution/SummaryCards'
 import { ContributionRow } from '@/components/contribution/ContributionRow'
@@ -38,8 +39,9 @@ export default async function ContributionsPage({
 
   const { items: contributions, total, totalPages } = paginated
 
-  // Mask encrypted account number before passing to client components
-  const mandateInfo = activeMandate
+  const manualPaymentsEnabled = env.ENABLE_MANUAL_PAYMENTS
+
+  const mandateInfo = activeMandate && manualPaymentsEnabled
     ? {
         bankName: activeMandate.bankAccount.bankName,
         accountNumberMasked: maskAccount(activeMandate.bankAccount.accountNumber),
