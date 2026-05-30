@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { apiSuccess, apiError } from '@/lib/api-response'
 
-type NotifChannel = 'SMS' | 'EMAIL' | 'PUSH'
+type NotifChannel = 'SMS' | 'EMAIL' | 'PUSH' | 'WHATSAPP'
 type NotifStatus = 'QUEUED' | 'SENT' | 'FAILED'
 
 type NotificationRow = {
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
   const channel = searchParams.get('channel') as NotifChannel | null
   const status = searchParams.get('status') as NotifStatus | null
 
-  const validChannels: NotifChannel[] = ['SMS', 'EMAIL', 'PUSH']
+  const validChannels: NotifChannel[] = ['SMS', 'EMAIL', 'PUSH', 'WHATSAPP']
   const validStatuses: NotifStatus[] = ['QUEUED', 'SENT', 'FAILED']
 
   const channelFilter =

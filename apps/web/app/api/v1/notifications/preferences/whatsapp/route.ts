@@ -14,11 +14,11 @@ export async function GET() {
     }),
     db.notificationPreference.findUnique({
       where: { userId: session.user.id },
-      select: { push: true },
+      select: { whatsapp: true },
     }),
   ])
 
-  return apiSuccess({ enabled: pref?.push ?? true, phone: user?.phone ?? null })
+  return apiSuccess({ enabled: pref?.whatsapp ?? true, phone: user?.phone ?? null })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -40,9 +40,9 @@ export async function PATCH(req: NextRequest) {
 
   const pref = await db.notificationPreference.upsert({
     where: { userId: session.user.id },
-    create: { userId: session.user.id, sms: true, email: true, push: enabled },
-    update: { push: enabled },
-    select: { push: true },
+    create: { userId: session.user.id, sms: true, email: true, push: true, whatsapp: enabled },
+    update: { whatsapp: enabled },
+    select: { whatsapp: true },
   })
 
   await db.auditLog.create({
@@ -55,5 +55,5 @@ export async function PATCH(req: NextRequest) {
     },
   })
 
-  return apiSuccess({ enabled: pref.push })
+  return apiSuccess({ enabled: pref.whatsapp })
 }

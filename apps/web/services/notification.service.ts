@@ -10,10 +10,10 @@ import {
 } from '@/lib/email'
 
 // Defined locally to avoid dependency on Prisma client generation state
-type NotifChannel = 'SMS' | 'EMAIL' | 'PUSH'
+type NotifChannel = 'SMS' | 'EMAIL' | 'PUSH' | 'WHATSAPP'
 type NotifStatus = 'QUEUED' | 'SENT' | 'FAILED'
 
-type NotifPrefs = { userId: string; sms: boolean; email: boolean; push: boolean }
+type NotifPrefs = { userId: string; sms: boolean; email: boolean; push: boolean; whatsapp: boolean }
 
 type QueuedNotification = {
   id: string
@@ -188,6 +188,7 @@ export async function sendNotificationNow(params: {
     if (params.channel === 'SMS' && !typedPrefs.sms) return
     if (params.channel === 'EMAIL' && !typedPrefs.email) return
     if (params.channel === 'PUSH' && !typedPrefs.push) return
+    if (params.channel === 'WHATSAPP' && !typedPrefs.whatsapp) return
   }
 
   const notification = await db.notification.create({
@@ -276,7 +277,8 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
         if (
           (notification.channel === 'SMS' && !prefs.sms) ||
           (notification.channel === 'EMAIL' && !prefs.email) ||
-          (notification.channel === 'PUSH' && !prefs.push)
+          (notification.channel === 'PUSH' && !prefs.push) ||
+          (notification.channel === 'WHATSAPP' && !prefs.whatsapp)
         ) {
           await db.notification.update({
             where: { id: notification.id },

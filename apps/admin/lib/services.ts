@@ -99,7 +99,7 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
         orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }], take: 12,
         select: { id: true, periodMonth: true, periodYear: true, amountDue: true, amountPaid: true, status: true },
       },
-      notificationPreference: { select: { sms: true, email: true, push: true } },
+      notificationPreference: { select: { sms: true, email: true, push: true, whatsapp: true } },
       _count: { select: { contributions: true, mandates: true } },
     },
   })
@@ -192,7 +192,7 @@ export async function approveMandate(
   if (mandate.status !== 'PENDING') throw new AdminConflictError('Only PENDING mandates can be approved')
 
   const updated = await db.paymentMandate.update({
-    where: { id: mandateId }, data: { status: 'ACTIVE' }, select: { id: true, status: true },
+    where: { id: mandateId }, data: { status: 'ACTIVE', approvedAt: new Date(), approvedById: adminId }, select: { id: true, status: true },
   })
   await writeAuditLog({ userId: adminId, action: 'ADMIN_MANDATE_APPROVED', entity: 'PaymentMandate', entityId: mandateId, payload: { memberId: mandate.userId }, ipAddress: ip })
   return updated
@@ -272,6 +272,7 @@ export async function createGoal(
       currentAmount: 0,
       deadline: new Date(data.deadline),
       status: 'DRAFT',
+      createdById: adminId,
     },
   })
   await writeAuditLog({ userId: adminId, action: 'GOAL_CREATED', entity: 'Goal', entityId: goal.id, payload: data })
@@ -319,16 +320,20 @@ export async function recordGoalProgress(
   if (!goal) throw new AdminNotFoundError('Goal not found')
   if (goal.status !== 'ACTIVE') throw new AdminConflictError('Progress can only be recorded on ACTIVE goals')
   const newTotal = Number(goal.currentAmount) + amount
-  const [progress] = await db.$transaction([
-    db.goalProgress.create({ data: { goalId, amount } }),
-    db.goal.update({
-      where: { id: goalId },
+  const goalVersion = (goal as typeof goal & { version: number }).version
+  const progress = await db.$transaction(async (tx) => {
+    const record = await tx.goalProgress.create({ data: { goalId, amount, note: note ?? null, recordedById: adminId } })
+    const updated = await tx.goal.updateMany({
+      where: { id: goalId, version: goalVersion },
       data: {
         currentAmount: newTotal,
+        version: goalVersion + 1,
         ...(newTotal >= Number(goal.targetAmount) && { status: 'ACHIEVED' }),
       },
-    }),
-  ])
+    })
+    if (updated.count === 0) throw new AdminConflictError('Concurrent modification detected — retry required')
+    return record
+  })
   await writeAuditLog({ userId: adminId, action: 'GOAL_PROGRESS_RECORDED', entity: 'Goal', entityId: goalId, payload: { amount, newTotal, note } })
   return { id: progress.id, amount: Number(progress.amount), newTotal, achieved: newTotal >= Number(goal.targetAmount) }
 }
@@ -394,7 +399,7 @@ export async function revokeInvitation(
 
   await db.invitation.update({
     where: { id: invitationId },
-    data: { status: 'REVOKED' },
+    data: { status: 'REVOKED', revokedById: adminId, revokedAt: new Date() },
   })
 
   await writeAuditLog({
