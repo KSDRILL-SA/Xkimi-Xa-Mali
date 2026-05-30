@@ -175,23 +175,27 @@ export async function submitManualPayment(
   const txStatus: TransactionStatus =
     gatewayRes.status === 'SUCCESS' ? 'SUCCESS' : 'PENDING'
 
-  const transaction = await db.transaction.create({
-    data: {
-      contributionId: contribution.id,
-      mandateId: mandate.id,
-      amount: data.amount,
-      type: 'MANUAL',
-      status: txStatus,
-      gatewayRef: gatewayRes.transactionRef ?? null,
-      gatewayResponse: gatewayRes as unknown as Prisma.InputJsonValue,
-      idempotencyKey,
-      processedAt: txStatus === 'SUCCESS' ? new Date() : null,
-    },
-  })
+  const transaction = await db.$transaction(async (tx) => {
+    const created = await tx.transaction.create({
+      data: {
+        contributionId: contribution.id,
+        mandateId: mandate.id,
+        amount: data.amount,
+        type: 'MANUAL',
+        status: txStatus,
+        gatewayRef: gatewayRes.transactionRef ?? null,
+        gatewayResponse: gatewayRes as unknown as Prisma.InputJsonValue,
+        idempotencyKey,
+        processedAt: txStatus === 'SUCCESS' ? new Date() : null,
+      },
+    })
 
-  if (txStatus === 'SUCCESS') {
-    await recalculateContributionStatus(contribution.id)
-  }
+    if (txStatus === 'SUCCESS') {
+      await recalculateContributionStatus(contribution.id, tx)
+    }
+
+    return created
+  })
 
   await cache.del(CACHE_KEYS.DASHBOARD_STATS)
 
@@ -224,10 +228,15 @@ export async function submitManualPayment(
 
 // Derives contribution status from the sum of all SUCCESS transactions.
 // Always called after a transaction status change so the ledger stays consistent.
-export async function recalculateContributionStatus(contributionId: string) {
+type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
+
+export async function recalculateContributionStatus(
+  contributionId: string,
+  tx: TxClient = db as unknown as TxClient,
+) {
   const [contribution, aggr] = await Promise.all([
-    db.contribution.findUnique({ where: { id: contributionId } }),
-    db.transaction.aggregate({
+    tx.contribution.findUnique({ where: { id: contributionId } }),
+    tx.transaction.aggregate({
       where: { contributionId, status: 'SUCCESS' },
       _sum: { amount: true },
     }),
@@ -250,10 +259,14 @@ export async function recalculateContributionStatus(contributionId: string) {
     status = 'PENDING'
   }
 
-  await db.contribution.update({
-    where: { id: contributionId },
-    data: { amountPaid: newAmountPaid, status },
+  const updated = await tx.contribution.updateMany({
+    where: { id: contributionId, version: contribution.version },
+    data: { amountPaid: newAmountPaid, status, version: contribution.version + 1 },
   })
+
+  if (updated.count === 0) {
+    throw new Error('Concurrent modification detected on contribution — retry required')
+  }
 }
 
 // ─── Webhook: transaction settlement ──────────────────────────────────────
@@ -272,16 +285,19 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
   if (terminal.includes(transaction.status as TransactionStatus)) return
   if (transaction.status === newStatus) return
 
-  await db.transaction.update({
-    where: { id: transaction.id },
-    data: {
-      status: newStatus,
-      processedAt: newStatus === 'SUCCESS' ? new Date() : null,
-      gatewayResponse: event as unknown as Prisma.InputJsonValue,
-    },
+  await db.$transaction(async (tx) => {
+    await tx.transaction.update({
+      where: { id: transaction.id },
+      data: {
+        status: newStatus,
+        processedAt: newStatus === 'SUCCESS' ? new Date() : null,
+        gatewayResponse: event as unknown as Prisma.InputJsonValue,
+      },
+    })
+
+    await recalculateContributionStatus(transaction.contributionId, tx)
   })
 
-  await recalculateContributionStatus(transaction.contributionId)
   await cache.del(CACHE_KEYS.DASHBOARD_STATS)
 
   logger.info('Transaction webhook processed', {

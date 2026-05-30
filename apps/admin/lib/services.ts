@@ -320,16 +320,20 @@ export async function recordGoalProgress(
   if (!goal) throw new AdminNotFoundError('Goal not found')
   if (goal.status !== 'ACTIVE') throw new AdminConflictError('Progress can only be recorded on ACTIVE goals')
   const newTotal = Number(goal.currentAmount) + amount
-  const [progress] = await db.$transaction([
-    db.goalProgress.create({ data: { goalId, amount, note: note ?? null, recordedById: adminId } }),
-    db.goal.update({
-      where: { id: goalId },
+  const goalVersion = (goal as typeof goal & { version: number }).version
+  const progress = await db.$transaction(async (tx) => {
+    const record = await tx.goalProgress.create({ data: { goalId, amount, note: note ?? null, recordedById: adminId } })
+    const updated = await tx.goal.updateMany({
+      where: { id: goalId, version: goalVersion },
       data: {
         currentAmount: newTotal,
+        version: goalVersion + 1,
         ...(newTotal >= Number(goal.targetAmount) && { status: 'ACHIEVED' }),
       },
-    }),
-  ])
+    })
+    if (updated.count === 0) throw new AdminConflictError('Concurrent modification detected — retry required')
+    return record
+  })
   await writeAuditLog({ userId: adminId, action: 'GOAL_PROGRESS_RECORDED', entity: 'Goal', entityId: goalId, payload: { amount, newTotal, note } })
   return { id: progress.id, amount: Number(progress.amount), newTotal, achieved: newTotal >= Number(goal.targetAmount) }
 }

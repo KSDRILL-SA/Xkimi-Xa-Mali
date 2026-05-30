@@ -1,5 +1,12 @@
 -- Database Hardening V3: Schema enrichment, CHECK constraints, advanced indexes
 -- ─────────────────────────────────────────────────────────────────────────────
+--
+-- DEPLOYMENT NOTE: This migration contains ALTER COLUMN TYPE statements that
+-- acquire ACCESS EXCLUSIVE locks. Schedule during a maintenance window or
+-- low-traffic period. Expected lock duration scales with table size.
+--
+-- For tables exceeding ~100k rows, consider splitting index creation into a
+-- follow-up migration using CREATE INDEX CONCURRENTLY to avoid write locks.
 
 -- ============================================================================
 -- 1. ENUM ADDITIONS
@@ -62,6 +69,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS "transactions_reversalOfId_key"
 -- Invitation: revocation tracking
 ALTER TABLE "invitations" ADD COLUMN IF NOT EXISTS "revokedById" TEXT;
 ALTER TABLE "invitations" ADD COLUMN IF NOT EXISTS "revokedAt" TIMESTAMP(3);
+
+-- User: soft-delete support
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
+
+-- Currency field on monetary tables (multi-currency readiness)
+ALTER TABLE "payment_mandates" ADD COLUMN IF NOT EXISTS "currency" TEXT NOT NULL DEFAULT 'ZAR';
+ALTER TABLE "contributions" ADD COLUMN IF NOT EXISTS "currency" TEXT NOT NULL DEFAULT 'ZAR';
+ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "currency" TEXT NOT NULL DEFAULT 'ZAR';
+ALTER TABLE "goals" ADD COLUMN IF NOT EXISTS "currency" TEXT NOT NULL DEFAULT 'ZAR';
+ALTER TABLE "invitations" ADD COLUMN IF NOT EXISTS "currency" TEXT NOT NULL DEFAULT 'ZAR';
+
+-- Optimistic locking version counters
+ALTER TABLE "contributions" ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "goals" ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 0;
 
 -- ============================================================================
 -- 4. FOREIGN KEYS FOR NEW COLUMNS
@@ -138,6 +159,9 @@ ALTER TABLE "users"
 ALTER TABLE "notifications"
   ADD CONSTRAINT "chk_notification_retry_nonneg" CHECK ("retryCount" >= 0);
 
+-- Data guard: fix any existing overpayment anomalies before adding constraint
+UPDATE "contributions" SET "amountDue" = "amountPaid" WHERE "amountPaid" > "amountDue";
+
 ALTER TABLE "contributions"
   ADD CONSTRAINT "chk_contribution_paid_lte_due" CHECK ("amountPaid" <= "amountDue");
 
@@ -203,6 +227,13 @@ CREATE INDEX IF NOT EXISTS "login_history_userId_success_idx"
 -- AuditLog: time-based scans for dashboard activity feed
 CREATE INDEX IF NOT EXISTS "audit_logs_createdAt_idx" ON "audit_logs"("createdAt");
 
+-- Contribution: admin dashboard ordered listing
+CREATE INDEX IF NOT EXISTS "contributions_userId_createdAt_idx"
+  ON "contributions"("userId", "createdAt");
+
+-- Notification: channel-based filtering
+CREATE INDEX IF NOT EXISTS "notifications_channel_idx" ON "notifications"("channel");
+
 -- ============================================================================
 -- 7. PARTIAL INDEXES (PostgreSQL-specific, high-value)
 -- ============================================================================
@@ -246,3 +277,8 @@ CREATE INDEX IF NOT EXISTS "idx_tokens_unused_password"
 CREATE INDEX IF NOT EXISTS "idx_tokens_unused_email"
   ON "email_verification_tokens"("expiresAt")
   WHERE "usedAt" IS NULL;
+
+-- User: active (non-deleted) users for all application queries
+CREATE INDEX IF NOT EXISTS "idx_users_active"
+  ON "users"("status")
+  WHERE "deletedAt" IS NULL;

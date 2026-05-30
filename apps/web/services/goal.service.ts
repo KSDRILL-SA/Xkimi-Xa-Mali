@@ -19,6 +19,7 @@ type GoalRow = {
   currentAmount: unknown
   deadline: Date
   status: string
+  version: number
   lockedAt: Date | null
   lockedById: string | null
   createdAt: Date
@@ -321,24 +322,31 @@ export async function recordProgress(
 
   const newTotal = Number(g.currentAmount) + input.amount
 
-  const [progress] = await db.$transaction([
-    db.goalProgress.create({
+  const progress = await db.$transaction(async (tx) => {
+    const record = await tx.goalProgress.create({
       data: {
         goalId,
         amount: input.amount,
         note: input.note ?? null,
         recordedById: adminUserId,
       },
-    }),
-    db.goal.update({
-      where: { id: goalId },
+    })
+
+    const updated = await tx.goal.updateMany({
+      where: { id: goalId, version: g.version },
       data: {
         currentAmount: newTotal,
-        // Auto-achieve when target is reached
+        version: g.version + 1,
         ...(newTotal >= Number(g.targetAmount) && { status: 'ACHIEVED' }),
       },
-    }),
-  ])
+    })
+
+    if (updated.count === 0) {
+      throw new Error('Concurrent modification detected on goal — retry required')
+    }
+
+    return record
+  })
 
   await Promise.all([
     writeAuditLog({

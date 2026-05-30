@@ -106,6 +106,7 @@ model User {
   popiaConsentAt  DateTime?
   loginAttempts   Int        @default(0)
   lockedUntil     DateTime?
+  deletedAt       DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
@@ -131,6 +132,7 @@ model User {
 
   @@index([status])
   @@index([email, status])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -259,6 +261,7 @@ model PaymentMandate {
   bankAccountId    String
   debitDay         Int
   amount           Decimal       @db.Decimal(12, 2)
+  currency         String        @default("ZAR")
   status           MandateStatus @default(PENDING)
   netcashMandateId String?       @unique
   delayedUntil     DateTime?
@@ -290,8 +293,10 @@ model Contribution {
   periodYear  Int
   amountDue   Decimal            @db.Decimal(12, 2)
   amountPaid  Decimal            @default(0) @db.Decimal(12, 2)
+  currency    String             @default("ZAR")
   dueDate     DateTime
   status      ContributionStatus @default(PENDING)
+  version     Int                @default(0)
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
@@ -304,6 +309,7 @@ model Contribution {
   @@index([periodYear, periodMonth])
   @@index([status, dueDate])
   @@index([status, periodYear, periodMonth])
+  @@index([userId, createdAt])
   @@map("contributions")
 }
 
@@ -312,6 +318,7 @@ model Transaction {
   contributionId  String
   mandateId       String
   amount          Decimal           @db.Decimal(12, 2)
+  currency        String            @default("ZAR")
   type            TransactionType
   status          TransactionStatus @default(PENDING)
   gatewayRef      String?
@@ -346,8 +353,10 @@ model Goal {
   description   String?
   targetAmount  Decimal    @db.Decimal(12, 2)
   currentAmount Decimal    @default(0) @db.Decimal(12, 2)
+  currency      String     @default("ZAR")
   deadline      DateTime
   status        GoalStatus @default(DRAFT)
+  version       Int        @default(0)
   lockedAt      DateTime?
   lockedById    String?
   createdById   String?
@@ -416,6 +425,7 @@ model Notification {
   @@index([userId, status])
   @@index([templateId])
   @@index([status])
+  @@index([channel])
   @@index([status, createdAt])
   @@index([externalRef])
   @@map("notifications")
@@ -466,6 +476,7 @@ model Invitation {
   email         String           @unique
   phone         String           @unique
   minimumAmount Decimal          @db.Decimal(12, 2)
+  currency      String           @default("ZAR")
   status        InvitationStatus @default(PENDING)
   invitedById   String
   acceptedById  String?          @unique
