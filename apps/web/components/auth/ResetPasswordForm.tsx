@@ -29,7 +29,7 @@ export function ResetPasswordForm({ token }: Props) {
     setLoading(true)
     setServerError('')
     try {
-      await api.post('/api/v1/reset-password', { ...data, token })
+      await api.post('/api/v1/auth/reset-password', { ...data, token })
       router.push('/login?reset=1')
     } catch (err) {
       setServerError(err instanceof ApiClientError ? err.message : 'Reset failed. Please try again.')

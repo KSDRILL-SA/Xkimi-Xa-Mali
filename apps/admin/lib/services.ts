@@ -88,7 +88,7 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
     select: {
       id: true, firstName: true, lastName: true, email: true,
       phone: true, status: true, createdAt: true, updatedAt: true,
-      popiaConsentAt: true,
+      popiaConsentAt: true, loginAttempts: true, lockedUntil: true,
       roles:      { select: { role: true } },
       bankAccounts: { select: { id: true, bankName: true, accountType: true, createdAt: true } },
       mandates: {
@@ -127,6 +127,30 @@ export async function setMemberStatus(
     userId: adminId, action: 'ADMIN_MEMBER_STATUS_CHANGED',
     entity: 'User', entityId: memberId,
     payload: { from: member.status, to: newStatus }, ipAddress: ip,
+  })
+
+  return updated
+}
+
+export async function unlockMember(
+  adminId: string, adminRoles: string[],
+  memberId: string, ip?: string,
+) {
+  assertAdmin(adminRoles)
+  const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true, lockedUntil: true, loginAttempts: true } })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  const updated = await db.user.update({
+    where: { id: memberId },
+    data: { lockedUntil: null, loginAttempts: 0 },
+    select: { id: true, lockedUntil: true, loginAttempts: true },
+  })
+
+  await writeAuditLog({
+    userId: adminId, action: 'ADMIN_MEMBER_UNLOCKED',
+    entity: 'User', entityId: memberId,
+    payload: { previousLockedUntil: member.lockedUntil, previousAttempts: member.loginAttempts },
+    ipAddress: ip,
   })
 
   return updated

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getMemberDetail, setMemberStatus } from '@/lib/services'
+import { getMemberDetail, setMemberStatus, unlockMember } from '@/lib/services'
 import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader } from '@xxm/ui'
 import { revalidatePath } from 'next/cache'
@@ -22,12 +22,22 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
   const STATUS_STYLES = SHARED_STATUS_STYLES.user
 
+  const isLocked = member.lockedUntil && new Date(member.lockedUntil) > new Date()
+
   async function handleStatusChange(fd: FormData) {
     'use server'
     const s       = await auth()
     const r       = (s!.user.roles as string[] | undefined) ?? []
     const newStatus = fd.get('status') as string
     await setMemberStatus(s!.user.id, r, id, newStatus)
+    revalidatePath(`/members/${id}`)
+  }
+
+  async function handleUnlock() {
+    'use server'
+    const s = await auth()
+    const r = (s!.user.roles as string[] | undefined) ?? []
+    await unlockMember(s!.user.id, r, id)
     revalidatePath(`/members/${id}`)
   }
 
@@ -50,17 +60,34 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         }
       />
 
+      {isLocked && (
+        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-red-700">Account locked</p>
+            <p className="text-xs text-red-500 mt-0.5">
+              Locked until {formatDate(member.lockedUntil!)} after {member.loginAttempts} failed login attempts.
+            </p>
+          </div>
+          <form action={handleUnlock}>
+            <button type="submit" className="px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors shrink-0">
+              Unlock account
+            </button>
+          </form>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-2 gap-4">
         {/* Profile */}
         <Card>
           <CardHeader title="Profile" />
           <CardBody className="space-y-3">
             {[
-              ['Phone',    member.phone],
-              ['Status',   <span key="s" className={(STATUS_STYLES[member.status as keyof typeof STATUS_STYLES] ?? { className: '' }).className}>{member.status}</span>],
-              ['Joined',   formatDate(member.createdAt)],
-              ['POPIA',    member.popiaConsentAt ? formatDate(member.popiaConsentAt) : 'Not consented'],
-              ['Roles',    member.roles.map((r) => r.role.name).join(', ')],
+              ['Phone',          member.phone],
+              ['Status',         <span key="s" className={(STATUS_STYLES[member.status as keyof typeof STATUS_STYLES] ?? { className: '' }).className}>{member.status}</span>],
+              ['Joined',         formatDate(member.createdAt)],
+              ['POPIA',          member.popiaConsentAt ? formatDate(member.popiaConsentAt) : 'Not consented'],
+              ['Roles',          member.roles.map((r) => r.role.name).join(', ')],
+              ['Login attempts', member.loginAttempts > 0 ? <span key="la" className="text-orange-600 font-medium">{member.loginAttempts}</span> : '0'],
             ].map(([k, v]) => (
               <div key={String(k)} className="flex justify-between text-sm">
                 <span className="text-xxm-gray-500">{k}</span>
