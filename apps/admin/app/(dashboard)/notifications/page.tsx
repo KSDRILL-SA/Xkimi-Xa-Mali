@@ -36,7 +36,11 @@ export default async function NotificationsPage({
       const webUrl = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? ''
       await fetch(`${webUrl}/api/v1/admin/notifications/broadcast`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-secret': process.env['ADMIN_API_SECRET'] ?? '' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-secret': process.env['ADMIN_API_SECRET'] ?? '',
+          'x-admin-timestamp': String(Date.now()),
+        },
         body: JSON.stringify({ message, channel, filter }),
       })
       redirect('/notifications?sent=1')

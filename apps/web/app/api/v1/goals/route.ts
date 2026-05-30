@@ -15,8 +15,9 @@ export async function GET(req: NextRequest) {
 
   const validStatuses = ['DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED']
   const statusFilter = status && validStatuses.includes(status) ? status : undefined
+  const roles = (session.user.roles as string[] | undefined) ?? []
 
-  const result = await getGoals(statusFilter, page, limit)
+  const result = await getGoals(statusFilter, page, limit, roles)
   return apiSuccess(result.items, 200, {
     page: result.page,
     limit: result.limit,

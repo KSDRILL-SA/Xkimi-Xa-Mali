@@ -3,6 +3,7 @@ export type SessionUser = {
   email: string
   name: string
   roles: string[]
+  roleVersion: number
 }
 
 export type AuthSession = {

@@ -28,6 +28,8 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
 
   if (!user?.password) return null
 
+  if (user.deletedAt) return null
+
   // Account lockout check — checked before bcrypt to short-circuit fast
   if (user.lockedUntil && user.lockedUntil > new Date()) {
     const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000)
@@ -74,6 +76,7 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
     email: user.email,
     name: `${user.firstName} ${user.lastName}`,
     roles: user.roles.map((ur) => ur.role.name),
+    roleVersion: user.roleVersion,
   }
 }
 
@@ -94,12 +97,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id
         token.roles = (user as { roles?: string[] }).roles ?? []
+        token.roleVersion = (user as { roleVersion?: number }).roleVersion ?? 0
       }
       return token
     },
     session({ session, token }) {
       session.user.id = token.id as string
       session.user.roles = token.roles as string[]
+      session.user.roleVersion = token.roleVersion as number
       return session
     },
   },
