@@ -3,7 +3,7 @@ import type { NextConfig } from 'next'
 const WEB_URL = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000'
 
 const config: NextConfig = {
-  transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/types', '@xxm/config'],
+  transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/types', '@xxm/config', 'geist'],
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
