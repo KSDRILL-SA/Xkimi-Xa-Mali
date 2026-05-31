@@ -12,20 +12,20 @@ Each module has a definition of done. PR is not merged until DoD is met.
 | Module | Status | Notes |
 |---|---|---|
 | M01 Foundation | ✅ Done | |
-| M02 Auth | ✅ Done | Will receive patch from M11a |
+| M02 Auth | ✅ Done | Patched by M11a (invite-gated registration) |
 | M03 Profile | ✅ Done | |
-| M04 Mandates | ✅ Merged (PR #7) | |
-| M05 Contributions | ✅ Merged (PR #8) | |
-| M06 Job Engine | ✅ Built — **PR needed** | Branch `feat/m06-job-engine`. Code review recommended before merge (touches live debit logic) |
-| M07 Notifications | ⬜ Next | Unblocks M06 — `queueNotification` stubs go nowhere until templates are seeded |
-| M08 Goals | ⬜ | |
-| M09 Reporting | ⬜ | |
-| M10 WhatsApp page | ⬜ | |
-| M11 Admin Dashboard | ⬜ | |
-| M11a Invite & Access Control | ⬜ Queued | Builds with M11. Patches M02 register flow + adds admin invite UI. Closes open registration |
-| M12 PWA + Optimisation | ⬜ | |
+| M04 Mandates | ✅ Done | Netcash DebiCheck integration |
+| M05 Contributions | ✅ Done | Monthly records, manual payments, status tracking |
+| M06 Job Engine | ✅ Done | Inngest durable jobs — debit run, morning warning, overdue reminders, month rollover |
+| M07 Notifications | ✅ Done | BulkSMS + Resend integration, notification flush job, preference enforcement |
+| M08 Goals | ✅ Done | CRUD, progress tracking, locking, deadline checker job |
+| M09 Reporting | ✅ Done | PDF statements (React PDF + Vercel Blob), CSV export, transaction history |
+| M10 WhatsApp page | ✅ Done | Group link, opt-in preferences, deep link |
+| M11 Admin Dashboard | ✅ Done | Standalone admin app — members, mandates, goals, contributions, audit, reports, notifications |
+| M11a Invite & Access Control | ✅ Done | XKM-code invite system, two-step signup, email/phone binding, 7-day expiry |
+| M12 PWA + Optimisation | ✅ Done | Manifest, service worker, offline fallback, Sentry tracking |
 
-**Progress: 6 of 13 modules complete (~15 of ~30 developer-days)**
+**Progress: 13 of 13 modules complete (~30 developer-days)**
 
 ---
 
@@ -450,12 +450,12 @@ Step 2 — Complete signup
 | M03 Profile | 2 days | ✅ Done |
 | M04 Mandates | 3 days | ✅ Done |
 | M05 Contributions | 2 days | ✅ Done |
-| M06 Job Engine | 3 days | ✅ Done (PR pending) |
-| M07 Notifications | 2 days | ⬜ |
-| M08 Goals | 2 days | ⬜ |
-| M09 Reporting | 3 days | ⬜ |
-| M10 WhatsApp page | 1 day | ⬜ |
-| M11 Admin Dashboard | 3 days | ⬜ |
-| M11a Invite & Access Control | 2 days | ⬜ |
-| M12 PWA | 2 days | ⬜ |
-| **Total** | **~30 developer-days** | **~15 done** |
+| M06 Job Engine | 3 days | ✅ Done |
+| M07 Notifications | 2 days | ✅ Done |
+| M08 Goals | 2 days | ✅ Done |
+| M09 Reporting | 3 days | ✅ Done |
+| M10 WhatsApp page | 1 day | ✅ Done |
+| M11 Admin Dashboard | 3 days | ✅ Done |
+| M11a Invite & Access Control | 2 days | ✅ Done |
+| M12 PWA | 2 days | ✅ Done |
+| **Total** | **~30 developer-days** | **30 done** |
