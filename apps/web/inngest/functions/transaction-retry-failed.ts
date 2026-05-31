@@ -11,7 +11,7 @@ import { MAX_TRANSACTION_RETRY } from '@xxm/utils'
 
 export const transactionRetryFailed = inngest.createFunction(
   { id: 'transaction-retry-failed', name: 'Retry Failed Transactions' },
-  { cron: '0 10 * * *' },
+  { cron: '0 10 * * *' }, // 12:00 SAST (UTC+2)
   async ({ step }) => {
     const candidates = await step.run('find-retryable', () =>
       db.transaction.findMany({

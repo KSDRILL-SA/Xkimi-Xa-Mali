@@ -6,7 +6,7 @@ import { writeAuditLog } from '@/services/audit.service'
 
 export const ledgerReconciliation = inngest.createFunction(
   { id: 'ledger-reconciliation', name: 'Nightly Ledger Reconciliation' },
-  { cron: '0 3 * * *' },
+  { cron: '0 3 * * *' }, // 05:00 SAST (UTC+2)
   async ({ step }) => {
     const drifted = await step.run('find-drift', async () => {
       const contributions = await db.contribution.findMany({

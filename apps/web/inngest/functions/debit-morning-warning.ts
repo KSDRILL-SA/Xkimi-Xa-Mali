@@ -6,7 +6,7 @@ import { queueNotification } from '@/services/notification.service'
 
 export const debitMorningWarning = inngest.createFunction(
   { id: 'debit-morning-warning', name: 'Debit Morning Warning' },
-  { cron: '0 5 * * *' }, // 07:00 SAST (UTC+2)
+  { cron: '0 6 * * *' }, // 08:00 SAST (UTC+2)
   async ({ step }) => {
     const today = await step.run('get-today', () => todaySAST())
     const dayOfMonth = parseInt(today.split('-')[2], 10)
