@@ -1,3 +1,4 @@
+import { ContributionStatus, MandateStatus, UserStatus } from '@prisma/client'
 import { db, Prisma } from '@/lib/db'
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
@@ -51,8 +52,8 @@ export async function listMembers(
   const { search, status, page = 1, limit = 25 } = params
   const skip = (page - 1) * limit
 
-  const where = {
-    ...(status && { status }),
+  const where: Prisma.UserWhereInput = {
+    ...(status && { status: status as UserStatus }),
     ...(search && {
       OR: [
         { firstName: { contains: search, mode: 'insensitive' as const } },
@@ -165,7 +166,9 @@ export async function listAllMandates(
   assertAdmin(adminRoles)
   const { status, page = 1, limit = 20 } = params
   const skip = (page - 1) * limit
-  const where = { ...(status && { status }) }
+  const where: Prisma.PaymentMandateWhereInput = {
+    ...(status && { status: status as MandateStatus }),
+  }
 
   const [items, total] = await Promise.all([
     db.paymentMandate.findMany({
@@ -225,7 +228,7 @@ export async function listAllContributions(
 
   const where: Prisma.ContributionWhereInput = {
     periodMonth: month, periodYear: year,
-    ...(status && { status: status as Prisma.EnumContributionStatusFilter }),
+    ...(status && { status: status as ContributionStatus }),
   }
 
   const [items, total] = await Promise.all([

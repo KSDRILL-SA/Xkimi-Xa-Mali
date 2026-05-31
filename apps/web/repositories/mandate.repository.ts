@@ -76,7 +76,11 @@ export const mandateRepo = {
     return db.paymentMandate.create({ data })
   },
 
-  update(id: string, data: Prisma.PaymentMandateUpdateInput, opts?: { select?: Prisma.PaymentMandateSelect; tx?: TxClient }) {
+  update(
+    id: string,
+    data: Prisma.PaymentMandateUpdateInput | Prisma.PaymentMandateUncheckedUpdateInput,
+    opts?: { select?: Prisma.PaymentMandateSelect; tx?: TxClient },
+  ) {
     const client = opts?.tx ?? db
     return client.paymentMandate.update({
       where: { id },

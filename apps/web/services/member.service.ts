@@ -13,6 +13,7 @@ import type {
   UpdateBankAccountInput,
   NotificationPreferencesInput,
 } from '@/lib/validation/profile'
+import type { Prisma } from '@prisma/client'
 import { userRepo } from '@/repositories/user.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
@@ -35,20 +36,39 @@ export async function getMemberProfile(
 ) {
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
-  const user = await userRepo.findById(targetUserId, {
-    id: true,
-    email: true,
-    phone: true,
-    firstName: true,
-    lastName: true,
-    idNumber: true,
-    address: true,
-    status: true,
-    emailVerified: true,
-    popiaConsentAt: true,
-    createdAt: true,
-    roles: { select: { role: { select: { name: true } } } },
-  })
+  type ProfileUser = Prisma.UserGetPayload<{
+    select: {
+      id: true
+      email: true
+      phone: true
+      firstName: true
+      lastName: true
+      idNumber: true
+      address: true
+      status: true
+      emailVerified: true
+      popiaConsentAt: true
+      createdAt: true
+      roles: { select: { role: { select: { name: true } } } }
+    }
+  }>
+
+  const user = (await userRepo.findById(targetUserId, {
+    select: {
+      id: true,
+      email: true,
+      phone: true,
+      firstName: true,
+      lastName: true,
+      idNumber: true,
+      address: true,
+      status: true,
+      emailVerified: true,
+      popiaConsentAt: true,
+      createdAt: true,
+      roles: { select: { role: { select: { name: true } } } },
+    },
+  })) as ProfileUser | null
 
   if (!user) throw new MemberNotFoundError()
 
@@ -123,11 +143,19 @@ export async function getMemberSummary(
     mandateRepo.findActiveByUser(targetUserId, { id: true, amount: true, debitDay: true }),
   ])
 
-  const statusMap = Object.fromEntries(statusCounts.map((r) => [r.status, r._count.status]))
+  const statusMap = Object.fromEntries(
+    statusCounts.map((r) => {
+      const count =
+        typeof r._count === 'object' && r._count !== null && 'status' in r._count
+          ? Number((r._count as { status: number }).status)
+          : 0
+      return [r.status, count]
+    }),
+  )
 
   return {
-    totalContributed: Number(allTimeTotals._sum.amountPaid ?? 0),
-    yearlyContributed: Number(yearlyTotals._sum.amountPaid ?? 0),
+    totalContributed: Number(allTimeTotals._sum?.amountPaid ?? 0),
+    yearlyContributed: Number(yearlyTotals._sum?.amountPaid ?? 0),
     paidCount: statusMap['PAID'] ?? 0,
     overdueCount: statusMap['OVERDUE'] ?? 0,
     activeMandate: activeMandate
@@ -145,16 +173,30 @@ export async function exportMemberData(
 ) {
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
-  const user = await userRepo.findById(targetUserId, undefined, {
-    roles: { include: { role: true } },
-    bankAccounts: true,
-    mandates: true,
-    contributions: { include: { transactions: true } },
-    notifications: true,
-    notificationPreference: true,
+  type ExportUser = Prisma.UserGetPayload<{
+    include: {
+      roles: { include: { role: true } }
+      bankAccounts: true
+      mandates: true
+      contributions: { include: { transactions: true } }
+      notifications: true
+      notificationPreference: true
+    }
+  }>
+
+  const rawUser = await userRepo.findById(targetUserId, {
+    include: {
+      roles: { include: { role: true } },
+      bankAccounts: true,
+      mandates: true,
+      contributions: { include: { transactions: true } },
+      notifications: true,
+      notificationPreference: true,
+    },
   })
 
-  if (!user) throw new MemberNotFoundError()
+  if (!rawUser) throw new MemberNotFoundError()
+  const user = rawUser as ExportUser
 
   await writeAuditLog({
     userId: requesterId,
@@ -309,9 +351,9 @@ export async function updateBankAccount(
 }
 
 export async function removeBankAccount(accountId: string, userId: string, ipAddress?: string) {
-  const account = await bankAccountRepo.findByIdAndUser(accountId, userId, {
+  const account = (await bankAccountRepo.findByIdAndUser(accountId, userId, {
     mandates: { where: { status: { in: ['PENDING', 'ACTIVE'] } } },
-  })
+  })) as Prisma.BankAccountGetPayload<{ include: { mandates: true } }> | null
   if (!account) throw new BankAccountNotFoundError()
 
   if (account.mandates.length > 0) {

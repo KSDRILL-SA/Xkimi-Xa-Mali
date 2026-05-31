@@ -1,4 +1,5 @@
-export function formatZAR(amount: number | string): string {
+/** Accepts plain numbers, strings, or Prisma Decimal-like values. */
+export function formatZAR(amount: number | string | { toString(): string }): string {
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
     currency: 'ZAR',

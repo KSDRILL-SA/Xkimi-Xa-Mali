@@ -1,5 +1,8 @@
 import type { Config } from 'tailwindcss'
 
+/** Tailwind v4-style config types omit nested `theme.colors`; use a local palette type. */
+type ColorScale = Record<string, string | Record<string, string>>
+
 export const xxmColors = {
   'xxm-green': {
     DEFAULT: '#1B4332',
@@ -29,7 +32,7 @@ export const xxmColors = {
     600: '#4B5563', 700: '#374151', 800: '#1F2937',
     900: '#111827',
   },
-} satisfies Config['theme']['colors']
+} satisfies ColorScale
 
 export const xxmFontSize = {
   'display': ['4.5rem',   { lineHeight: '1.05', fontWeight: '900', letterSpacing: '-0.02em' }],
@@ -41,7 +44,7 @@ export const xxmFontSize = {
   'body':    ['0.9375rem',{ lineHeight: '1.6'  }],
   'caption': ['0.8125rem',{ lineHeight: '1.45', fontWeight: '500' }],
   'label':   ['0.75rem',  { lineHeight: '1.4',  fontWeight: '600', letterSpacing: '0.04em' }],
-} satisfies Config['theme']['fontSize']
+} satisfies Record<string, string | [string, Record<string, string>]>
 
 export const xxmBoxShadow = {
   'xxm-sm': '0 1px 3px rgba(27,67,50,0.08), 0 1px 2px rgba(27,67,50,0.04)',
@@ -49,7 +52,7 @@ export const xxmBoxShadow = {
   'xxm-lg': '0 10px 30px rgba(27,67,50,0.14), 0 4px 10px rgba(27,67,50,0.08)',
   'gold-sm': '0 2px 8px rgba(212,175,55,0.20)',
   'gold':    '0 4px 16px rgba(212,175,55,0.30)',
-} satisfies Config['theme']['boxShadow']
+} satisfies Record<string, string>
 
 export const xxmAnimations = {
   animation: {

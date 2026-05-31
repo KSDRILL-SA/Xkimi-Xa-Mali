@@ -4,8 +4,17 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/cache', () => ({
+  cache: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    del: vi.fn().mockResolvedValue(undefined),
+  },
+  CACHE_KEYS: { DASHBOARD_STATS: 'xxm:cache:stats' },
+}))
+
+vi.mock('@/lib/db', () => {
+  const db = {
     contribution: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -14,6 +23,7 @@ vi.mock('@/lib/db', () => ({
       create: vi.fn(),
       createMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       aggregate: vi.fn(),
       groupBy: vi.fn(),
     },
@@ -28,9 +38,11 @@ vi.mock('@/lib/db', () => ({
       findFirst: vi.fn(),
     },
     auditLog: { create: vi.fn() },
-  },
-  Prisma: {},
-}))
+    $transaction: vi.fn(),
+  }
+  db.$transaction = vi.fn(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db))
+  return { db, Prisma: {} }
+})
 
 vi.mock('@/integrations/payment', () => ({
   paymentGateway: {
@@ -85,8 +97,14 @@ const baseContribution = {
   amountPaid: 0,
   dueDate: new Date('2025-06-01'),
   status: 'PENDING',
+  version: 1,
   createdAt: NOW,
   updatedAt: NOW,
+}
+
+function mockRecalculateUpdate() {
+  ;(db.contribution.updateMany as MockedFunction<typeof db.contribution.updateMany>)
+    .mockResolvedValue({ count: 1 } as never)
 }
 
 // ---------------------------------------------------------------------------
@@ -101,14 +119,14 @@ describe('recalculateContributionStatus', () => {
       .mockResolvedValue({ ...baseContribution, amountDue: 500, dueDate: new Date(Date.now() + 86400_000) } as never)
     ;(db.transaction.aggregate as MockedFunction<typeof db.transaction.aggregate>)
       .mockResolvedValue({ _sum: { amount: 500 } } as never)
-    ;(db.contribution.update as MockedFunction<typeof db.contribution.update>)
-      .mockResolvedValue({} as never)
+    mockRecalculateUpdate()
 
     await recalculateContributionStatus('ctr-1')
 
-    expect(db.contribution.update).toHaveBeenCalledWith(
+    expect(db.contribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ status: 'PAID', amountPaid: 500 }),
+        where: { id: 'ctr-1', version: 1 },
+        data: expect.objectContaining({ status: 'PAID', amountPaid: 500, version: 2 }),
       }),
     )
   })
@@ -118,12 +136,11 @@ describe('recalculateContributionStatus', () => {
       .mockResolvedValue({ ...baseContribution, amountDue: 500, dueDate: new Date(Date.now() + 86400_000) } as never)
     ;(db.transaction.aggregate as MockedFunction<typeof db.transaction.aggregate>)
       .mockResolvedValue({ _sum: { amount: 200 } } as never)
-    ;(db.contribution.update as MockedFunction<typeof db.contribution.update>)
-      .mockResolvedValue({} as never)
+    mockRecalculateUpdate()
 
     await recalculateContributionStatus('ctr-1')
 
-    expect(db.contribution.update).toHaveBeenCalledWith(
+    expect(db.contribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'PARTIAL', amountPaid: 200 }),
       }),
@@ -135,12 +152,11 @@ describe('recalculateContributionStatus', () => {
       .mockResolvedValue({ ...baseContribution, amountDue: 500, dueDate: PAST } as never)
     ;(db.transaction.aggregate as MockedFunction<typeof db.transaction.aggregate>)
       .mockResolvedValue({ _sum: { amount: null } } as never)
-    ;(db.contribution.update as MockedFunction<typeof db.contribution.update>)
-      .mockResolvedValue({} as never)
+    mockRecalculateUpdate()
 
     await recalculateContributionStatus('ctr-1')
 
-    expect(db.contribution.update).toHaveBeenCalledWith(
+    expect(db.contribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'OVERDUE', amountPaid: 0 }),
       }),
@@ -153,12 +169,11 @@ describe('recalculateContributionStatus', () => {
       .mockResolvedValue({ ...baseContribution, amountDue: 500, dueDate: futureDue } as never)
     ;(db.transaction.aggregate as MockedFunction<typeof db.transaction.aggregate>)
       .mockResolvedValue({ _sum: { amount: 0 } } as never)
-    ;(db.contribution.update as MockedFunction<typeof db.contribution.update>)
-      .mockResolvedValue({} as never)
+    mockRecalculateUpdate()
 
     await recalculateContributionStatus('ctr-1')
 
-    expect(db.contribution.update).toHaveBeenCalledWith(
+    expect(db.contribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'PENDING' }) }),
     )
   })
@@ -170,7 +185,7 @@ describe('recalculateContributionStatus', () => {
       .mockResolvedValue({ _sum: { amount: 0 } } as never)
 
     await recalculateContributionStatus('does-not-exist')
-    expect(db.contribution.update).not.toHaveBeenCalled()
+    expect(db.contribution.updateMany).not.toHaveBeenCalled()
   })
 })
 
@@ -182,20 +197,25 @@ describe('processTransactionWebhook', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('updates transaction status and recalculates contribution on settlement', async () => {
-    const tx = { id: 'tx-1', contributionId: 'ctr-1', status: 'PENDING', gatewayRef: 'ref-1' }
+    const tx = {
+      id: 'tx-1',
+      contributionId: 'ctr-1',
+      status: 'PENDING',
+      gatewayRef: 'ref-1',
+      processedAt: null,
+      contribution: { userId: 'user-1' },
+    }
     ;(db.transaction.findFirst as MockedFunction<typeof db.transaction.findFirst>)
       .mockResolvedValue(tx as never)
     ;(paymentGateway.mapTransactionStatus as MockedFunction<typeof paymentGateway.mapTransactionStatus>)
       .mockReturnValue('SUCCESS')
     ;(db.transaction.update as MockedFunction<typeof db.transaction.update>)
       .mockResolvedValue({} as never)
-    // recalculate calls findUnique + aggregate + update
     ;(db.contribution.findUnique as MockedFunction<typeof db.contribution.findUnique>)
       .mockResolvedValue({ ...baseContribution, amountDue: 500, dueDate: new Date(Date.now() + 86400_000) } as never)
     ;(db.transaction.aggregate as MockedFunction<typeof db.transaction.aggregate>)
       .mockResolvedValue({ _sum: { amount: 500 } } as never)
-    ;(db.contribution.update as MockedFunction<typeof db.contribution.update>)
-      .mockResolvedValue({} as never)
+    mockRecalculateUpdate()
 
     await processTransactionWebhook({
       transactionRef: 'ref-1',
@@ -209,8 +229,7 @@ describe('processTransactionWebhook', () => {
         data: expect.objectContaining({ status: 'SUCCESS' }),
       }),
     )
-    // recalculation runs after status update
-    expect(db.contribution.update).toHaveBeenCalledWith(
+    expect(db.contribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
     )
   })
@@ -246,7 +265,7 @@ describe('processTransactionWebhook', () => {
     await processTransactionWebhook({ transactionRef: 'unknown-ref', status: 'SUCCESSFUL' })
 
     expect(db.transaction.update).not.toHaveBeenCalled()
-    expect(db.contribution.update).not.toHaveBeenCalled()
+    expect(db.contribution.updateMany).not.toHaveBeenCalled()
   })
 })
 

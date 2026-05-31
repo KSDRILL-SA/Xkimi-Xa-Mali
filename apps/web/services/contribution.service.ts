@@ -31,7 +31,7 @@ export async function getContributions(
 ) {
   assertCanAccess(userId, requesterId, roles)
 
-  const [items, total] = await Promise.all([
+  const [rawItems, total] = await Promise.all([
     contributionRepo.findMany(
       { userId },
       {
@@ -48,6 +48,11 @@ export async function getContributions(
     ),
     contributionRepo.count({ userId }),
   ])
+
+  type ContributionListItem = Prisma.ContributionGetPayload<{
+    include: { transactions: true }
+  }>
+  const items = rawItems as ContributionListItem[]
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
@@ -75,7 +80,11 @@ export async function getContributionSummary(
   const currentYear = new Date().getFullYear()
 
   const [byStatus, totals, yearTotals] = await Promise.all([
-    contributionRepo.groupBy({ userId }),
+    contributionRepo.groupBy({
+      by: ['status'],
+      where: { userId },
+      _count: { status: true },
+    }),
     contributionRepo.aggregate({ userId }, {
       _sum: { amountPaid: true },
       _count: { id: true },
@@ -86,22 +95,32 @@ export async function getContributionSummary(
   ])
 
   const statusCounts = Object.fromEntries(
-    byStatus.map((r) => [r.status, r._count.status]),
+    byStatus.map((r) => {
+      const count =
+        typeof r._count === 'object' && r._count !== null && 'status' in r._count
+          ? Number((r._count as { status: number }).status)
+          : 0
+      return [r.status, count]
+    }),
   )
 
-  const summary = buildSummary(totals, yearTotals, statusCounts)
+  const summary = buildSummary(
+    totals as Parameters<typeof buildSummary>[0],
+    yearTotals as Parameters<typeof buildSummary>[1],
+    statusCounts,
+  )
   await cache.set(cacheKey, summary, 180)
   return summary
 }
 
 function buildSummary(
-  totals: { _sum: { amountPaid: unknown }; _count: { id: number } },
-  yearTotals: { _sum: { amountPaid: unknown } },
+  totals: { _sum?: { amountPaid: unknown }; _count: { id: number } },
+  yearTotals: { _sum?: { amountPaid: unknown } },
   statusCounts: Record<string, number>,
 ) {
   return {
-    totalPaid: Number(totals._sum.amountPaid ?? 0),
-    yearlyPaid: Number(yearTotals._sum.amountPaid ?? 0),
+    totalPaid: Number(totals._sum?.amountPaid ?? 0),
+    yearlyPaid: Number(yearTotals._sum?.amountPaid ?? 0),
     totalContributions: totals._count.id,
     paid:    statusCounts['PAID']    ?? 0,
     partial: statusCounts['PARTIAL'] ?? 0,
@@ -289,12 +308,14 @@ export async function recalculateContributionStatus(
 // ─── Webhook: transaction settlement ──────────────────────────────────────
 
 export async function processTransactionWebhook(event: TransactionEvent) {
-  const transaction = await transactionRepo.findByGatewayRef(
+  const transaction = (await transactionRepo.findByGatewayRef(
     event.transactionRef,
     { contribution: { select: { userId: true } } },
-  )
+  )) as Prisma.TransactionGetPayload<{
+    include: { contribution: { select: { userId: true } } }
+  }> | null
 
-  if (!transaction) return
+  if (!transaction?.contribution) return
 
   const newStatus = paymentGateway.mapTransactionStatus(event.status)
   if (!newStatus) return
@@ -367,7 +388,7 @@ export async function createReversal(
 
   const original = await transactionRepo.findById(transactionId, {
     reversal: true,
-  })
+  }) as Prisma.TransactionGetPayload<{ include: { reversal: true } }> | null
 
   if (!original) throw new TransactionNotFoundError()
   if (original.status !== 'SUCCESS') {
@@ -460,9 +481,13 @@ export async function generateMonthlyContributions(
 ) {
   assertAdmin(adminRoles)
 
-  const mandates = await mandateRepo.findAllActive({
+  type ActiveMandateWithUser = Prisma.PaymentMandateGetPayload<{
+    include: { user: { select: { id: true; status: true } } }
+  }>
+
+  const mandates = (await mandateRepo.findAllActive({
     user: { select: { id: true, status: true } },
-  })
+  })) as ActiveMandateWithUser[]
 
   const eligible = mandates.filter((m) => m.user.status === 'ACTIVE')
 

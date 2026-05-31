@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { MessageCircle } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
+import { APP_URL, ADMIN_URL, adminWhatsAppUrl } from '@/lib/utils'
 
 const year = new Date().getFullYear()
 
@@ -15,7 +15,7 @@ const links = {
   Account: [
     { label: 'Sign In',       href: `${APP_URL}/login` },
     { label: 'Member Portal', href: `${APP_URL}/dashboard` },
-    { label: 'Admin Panel',   href: `${APP_URL}/admin` },
+    { label: 'Admin Panel',   href: ADMIN_URL },
   ],
   Legal: [
     { label: 'About',         href: '/about' },
@@ -69,7 +69,7 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {items.map(({ label, href }) => (
                   <li key={label}>
-                    {href.startsWith('http') || href.startsWith(APP_URL) ? (
+                    {href.startsWith('http') || href.startsWith(APP_URL) || href.startsWith(ADMIN_URL) ? (
                       <a
                         href={href}
                         className="text-white/55 hover:text-white text-sm transition-colors duration-200"
