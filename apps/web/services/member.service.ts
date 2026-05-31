@@ -1,4 +1,3 @@
-import { db } from '@/lib/db'
 import { encrypt, decrypt, maskAccountNumber } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
@@ -14,6 +13,12 @@ import type {
   UpdateBankAccountInput,
   NotificationPreferencesInput,
 } from '@/lib/validation/profile'
+import { userRepo } from '@/repositories/user.repository'
+import { bankAccountRepo } from '@/repositories/bank-account.repository'
+import { contributionRepo } from '@/repositories/contribution.repository'
+import { runTransaction } from '@/repositories/user.repository'
+import { mandateRepo } from '@/repositories/mandate.repository'
+import { notificationRepo } from '@/repositories/notification.repository'
 
 function maskIdNumber(encrypted: string | null): string | null {
   if (!encrypted) return null
@@ -30,22 +35,19 @@ export async function getMemberProfile(
 ) {
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
-  const user = await db.user.findUnique({
-    where: { id: targetUserId },
-    select: {
-      id: true,
-      email: true,
-      phone: true,
-      firstName: true,
-      lastName: true,
-      idNumber: true,
-      address: true,
-      status: true,
-      emailVerified: true,
-      popiaConsentAt: true,
-      createdAt: true,
-      roles: { select: { role: { select: { name: true } } } },
-    },
+  const user = await userRepo.findById(targetUserId, {
+    id: true,
+    email: true,
+    phone: true,
+    firstName: true,
+    lastName: true,
+    idNumber: true,
+    address: true,
+    status: true,
+    emailVerified: true,
+    popiaConsentAt: true,
+    createdAt: true,
+    roles: { select: { role: { select: { name: true } } } },
   })
 
   if (!user) throw new MemberNotFoundError()
@@ -68,22 +70,16 @@ export async function updateMemberProfile(
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
   if (input.phone) {
-    const clash = await db.user.findFirst({
-      where: { phone: input.phone, id: { not: targetUserId } },
-    })
+    const clash = await userRepo.findByEmailOrPhone(undefined, input.phone, targetUserId)
     if (clash) throw new BankAccountConflictError('That phone number is already in use', 'MBR_003')
   }
 
-  const updated = await db.user.update({
-    where: { id: targetUserId },
-    data: {
-      ...(input.firstName && { firstName: input.firstName }),
-      ...(input.lastName && { lastName: input.lastName }),
-      ...(input.phone && { phone: input.phone }),
-      ...(input.address && { address: input.address }),
-    },
-    select: { id: true, firstName: true, lastName: true, phone: true, address: true },
-  })
+  const updated = await userRepo.update(targetUserId, {
+    ...(input.firstName && { firstName: input.firstName }),
+    ...(input.lastName && { lastName: input.lastName }),
+    ...(input.phone && { phone: input.phone }),
+    ...(input.address && { address: input.address }),
+  }, { id: true, firstName: true, lastName: true, phone: true, address: true })
 
   await writeAuditLog({
     userId: requesterId,
@@ -111,23 +107,20 @@ export async function getMemberSummary(
 
   // All aggregation pushed to DB — avoids loading the full contributions table into memory.
   const [allTimeTotals, yearlyTotals, statusCounts, activeMandate] = await Promise.all([
-    db.contribution.aggregate({
-      where: { userId: targetUserId },
-      _sum: { amountPaid: true },
-    }),
-    db.contribution.aggregate({
-      where: { userId: targetUserId, periodYear: currentYear },
-      _sum: { amountPaid: true },
-    }),
-    db.contribution.groupBy({
+    contributionRepo.aggregate(
+      { userId: targetUserId },
+      { _sum: { amountPaid: true } },
+    ),
+    contributionRepo.aggregate(
+      { userId: targetUserId, periodYear: currentYear },
+      { _sum: { amountPaid: true } },
+    ),
+    contributionRepo.groupBy({
       by: ['status'],
       where: { userId: targetUserId },
       _count: { status: true },
     }),
-    db.paymentMandate.findFirst({
-      where: { userId: targetUserId, status: 'ACTIVE' },
-      select: { id: true, amount: true, debitDay: true },
-    }),
+    mandateRepo.findActiveByUser(targetUserId, { id: true, amount: true, debitDay: true }),
   ])
 
   const statusMap = Object.fromEntries(statusCounts.map((r) => [r.status, r._count.status]))
@@ -152,16 +145,13 @@ export async function exportMemberData(
 ) {
   assertCanAccess(targetUserId, requesterId, requesterRoles)
 
-  const user = await db.user.findUnique({
-    where: { id: targetUserId },
-    include: {
-      roles: { include: { role: true } },
-      bankAccounts: true,
-      mandates: true,
-      contributions: { include: { transactions: true } },
-      notifications: true,
-      notificationPreference: true,
-    },
+  const user = await userRepo.findById(targetUserId, undefined, {
+    roles: { include: { role: true } },
+    bankAccounts: true,
+    mandates: true,
+    contributions: { include: { transactions: true } },
+    notifications: true,
+    notificationPreference: true,
   })
 
   if (!user) throw new MemberNotFoundError()
@@ -228,10 +218,7 @@ export async function exportMemberData(
 // ─── Bank accounts ────────────────────────────────────────────────────────────
 
 export async function listBankAccounts(userId: string) {
-  const accounts = await db.bankAccount.findMany({
-    where: { userId },
-    orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-  })
+  const accounts = await bankAccountRepo.findByUser(userId, [{ isPrimary: 'desc' }, { createdAt: 'asc' }])
 
   return accounts.map((a) => ({
     id: a.id,
@@ -250,23 +237,21 @@ export async function addBankAccount(
   input: CreateBankAccountInput,
   ipAddress?: string,
 ) {
-  const existingCount = await db.bankAccount.count({ where: { userId } })
+  const existingCount = await bankAccountRepo.count({ userId })
   const makePrimary = input.isPrimary || existingCount === 0
 
-  const account = await db.$transaction(async (tx) => {
+  const account = await runTransaction(async (tx) => {
     if (makePrimary) {
-      await tx.bankAccount.updateMany({ where: { userId }, data: { isPrimary: false } })
+      await bankAccountRepo.updateManyByUser(userId, { isPrimary: false }, tx)
     }
-    return tx.bankAccount.create({
-      data: {
-        userId,
-        bankName: input.bankName,
-        accountNumber: encrypt(input.accountNumber),
-        accountType: input.accountType,
-        branchCode: input.branchCode,
-        isPrimary: makePrimary,
-      },
-    })
+    return bankAccountRepo.create({
+      userId,
+      bankName: input.bankName,
+      accountNumber: encrypt(input.accountNumber),
+      accountType: input.accountType,
+      branchCode: input.branchCode,
+      isPrimary: makePrimary,
+    }, tx)
   })
 
   await writeAuditLog({
@@ -294,26 +279,23 @@ export async function updateBankAccount(
   input: UpdateBankAccountInput,
   ipAddress?: string,
 ) {
-  const account = await db.bankAccount.findFirst({ where: { id: accountId, userId } })
+  const account = await bankAccountRepo.findByIdAndUser(accountId, userId)
   if (!account) throw new BankAccountNotFoundError()
 
   if (account.verifiedAt && (input.bankName || input.branchCode || input.accountType)) {
     throw new BankAccountConflictError('Verified accounts cannot be edited', 'BNK_003')
   }
 
-  await db.$transaction(async (tx) => {
+  await runTransaction(async (tx) => {
     if (input.isPrimary) {
-      await tx.bankAccount.updateMany({ where: { userId }, data: { isPrimary: false } })
+      await bankAccountRepo.updateManyByUser(userId, { isPrimary: false }, tx)
     }
-    await tx.bankAccount.update({
-      where: { id: accountId },
-      data: {
-        ...(input.bankName && { bankName: input.bankName }),
-        ...(input.accountType && { accountType: input.accountType }),
-        ...(input.branchCode && { branchCode: input.branchCode }),
-        ...(input.isPrimary !== undefined && { isPrimary: input.isPrimary }),
-      },
-    })
+    await bankAccountRepo.update(accountId, {
+      ...(input.bankName && { bankName: input.bankName }),
+      ...(input.accountType && { accountType: input.accountType }),
+      ...(input.branchCode && { branchCode: input.branchCode }),
+      ...(input.isPrimary !== undefined && { isPrimary: input.isPrimary }),
+    }, tx)
   })
 
   await writeAuditLog({
@@ -327,9 +309,8 @@ export async function updateBankAccount(
 }
 
 export async function removeBankAccount(accountId: string, userId: string, ipAddress?: string) {
-  const account = await db.bankAccount.findFirst({
-    where: { id: accountId, userId },
-    include: { mandates: { where: { status: { in: ['PENDING', 'ACTIVE'] } } } },
+  const account = await bankAccountRepo.findByIdAndUser(accountId, userId, {
+    mandates: { where: { status: { in: ['PENDING', 'ACTIVE'] } } },
   })
   if (!account) throw new BankAccountNotFoundError()
 
@@ -337,11 +318,11 @@ export async function removeBankAccount(accountId: string, userId: string, ipAdd
     throw new BankAccountConflictError('Cannot remove an account with an active mandate', 'BNK_004')
   }
 
-  await db.bankAccount.delete({ where: { id: accountId } })
+  await bankAccountRepo.delete(accountId)
 
   if (account.isPrimary) {
-    const next = await db.bankAccount.findFirst({ where: { userId }, orderBy: { createdAt: 'asc' } })
-    if (next) await db.bankAccount.update({ where: { id: next.id }, data: { isPrimary: true } })
+    const next = await bankAccountRepo.findFirst({ userId }, { createdAt: 'asc' })
+    if (next) await bankAccountRepo.update(next.id, { isPrimary: true })
   }
 
   await writeAuditLog({
@@ -356,12 +337,7 @@ export async function removeBankAccount(accountId: string, userId: string, ipAdd
 // ─── Notification preferences ─────────────────────────────────────────────────
 
 export async function getNotificationPreferences(userId: string) {
-  return db.notificationPreference.upsert({
-    where: { userId },
-    update: {},
-    create: { userId },
-    select: { sms: true, email: true, push: true, whatsapp: true },
-  })
+  return notificationRepo.upsertPreference(userId, {})
 }
 
 export async function updateNotificationPreferences(
@@ -369,12 +345,7 @@ export async function updateNotificationPreferences(
   input: NotificationPreferencesInput,
   ipAddress?: string,
 ) {
-  const prefs = await db.notificationPreference.upsert({
-    where: { userId },
-    update: input,
-    create: { userId, ...input },
-    select: { sms: true, email: true, push: true, whatsapp: true },
-  })
+  const prefs = await notificationRepo.upsertPreference(userId, input)
 
   await writeAuditLog({
     userId,

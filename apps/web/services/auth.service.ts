@@ -1,11 +1,12 @@
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'crypto'
-import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { encrypt } from '@/lib/encryption'
 import { sendVerificationEmail, sendPasswordResetEmail } from '@/lib/email'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
+import { userRepo, runTransaction } from '@/repositories/user.repository'
+import { authTokenRepo } from '@/repositories/auth-token.repository'
 import {
   UserAlreadyExistsError,
   InvalidTokenError,
@@ -30,9 +31,7 @@ export async function registerUser(
   baseUrl: string,
   ipAddress?: string,
 ) {
-  const existing = await db.user.findFirst({
-    where: { OR: [{ email: input.email }, { phone: input.phone }] },
-  })
+  const existing = await userRepo.findByEmailOrPhone(input.email, input.phone)
 
   if (existing) {
     const field = existing.email === input.email ? 'email' : 'phone'
@@ -41,40 +40,36 @@ export async function registerUser(
 
   const [passwordHash, memberRole] = await Promise.all([
     bcrypt.hash(input.password, BCRYPT_ROUNDS),
-    db.role.findUniqueOrThrow({ where: { name: 'MEMBER' } }),
+    userRepo.findRoleOrThrow('MEMBER'),
   ])
 
-  const adminRole = await db.role.findUnique({ where: { name: 'ADMIN' } })
+  const adminRole = await userRepo.findRole('ADMIN')
   const founderEmail = env.FOUNDER_EMAIL
   const isFounder = founderEmail && input.email.toLowerCase() === founderEmail.toLowerCase()
 
   const roleConnections = [{ roleId: memberRole.id }]
   if (isFounder && adminRole) roleConnections.push({ roleId: adminRole.id })
 
-  const user = await db.user.create({
-    data: {
-      email: input.email,
-      phone: input.phone,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      idNumber: input.idNumber ? encrypt(input.idNumber) : null,
-      password: passwordHash,
-      popiaConsentAt: input.consentToPopia ? new Date() : null,
-      status: 'PENDING',
-      roles: { create: roleConnections },
-    },
+  const user = await userRepo.create({
+    email: input.email,
+    phone: input.phone,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    idNumber: input.idNumber ? encrypt(input.idNumber) : null,
+    password: passwordHash,
+    popiaConsentAt: input.consentToPopia ? new Date() : null,
+    status: 'PENDING',
+    roles: { create: roleConnections },
   })
 
   // Issue email verification token
   const rawToken = generateToken()
   const tokenHash = hashToken(rawToken)
 
-  await db.emailVerificationToken.create({
-    data: {
-      userId: user.id,
-      tokenHash,
-      expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
-    },
+  await authTokenRepo.createVerificationToken({
+    userId: user.id,
+    tokenHash,
+    expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
   })
 
   await sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
@@ -94,21 +89,18 @@ export async function registerUser(
 export async function verifyEmail(rawToken: string, ipAddress?: string) {
   const tokenHash = hashToken(rawToken)
 
-  const record = await db.emailVerificationToken.findUnique({ where: { tokenHash } })
+  const record = await authTokenRepo.findVerificationToken(tokenHash)
 
   if (!record || record.expiresAt < new Date()) throw new InvalidTokenError('Invalid or expired verification link')
   if (record.usedAt) throw new InvalidTokenError('This verification link has already been used')
 
-  await db.$transaction([
-    db.emailVerificationToken.update({
-      where: { tokenHash },
-      data: { usedAt: new Date() },
-    }),
-    db.user.update({
+  await runTransaction(async (tx) => {
+    await authTokenRepo.updateVerificationToken(tokenHash, { usedAt: new Date() }, tx)
+    await tx.user.update({
       where: { id: record.userId },
       data: { status: 'ACTIVE', emailVerified: new Date() },
-    }),
-  ])
+    })
+  })
 
   await writeAuditLog({
     userId: record.userId,
@@ -121,24 +113,19 @@ export async function verifyEmail(rawToken: string, ipAddress?: string) {
 
 export async function requestPasswordReset(email: string, baseUrl: string, ipAddress?: string) {
   // Always return without revealing whether email exists
-  const user = await db.user.findUnique({ where: { email } })
+  const user = await userRepo.findByEmail(email)
   if (!user) return
 
   // Invalidate any existing unused tokens
-  await db.passwordResetToken.updateMany({
-    where: { userId: user.id, usedAt: null },
-    data: { usedAt: new Date() },
-  })
+  await authTokenRepo.invalidateResetTokens(user.id)
 
   const rawToken = generateToken()
   const tokenHash = hashToken(rawToken)
 
-  await db.passwordResetToken.create({
-    data: {
-      userId: user.id,
-      tokenHash,
-      expiresAt: new Date(Date.now() + RESET_TTL_MS),
-    },
+  await authTokenRepo.createResetToken({
+    userId: user.id,
+    tokenHash,
+    expiresAt: new Date(Date.now() + RESET_TTL_MS),
   })
 
   await sendPasswordResetEmail(user.email, user.firstName, rawToken, baseUrl)
@@ -155,23 +142,23 @@ export async function requestPasswordReset(email: string, baseUrl: string, ipAdd
 export async function resetPassword(rawToken: string, newPassword: string, ipAddress?: string) {
   const tokenHash = hashToken(rawToken)
 
-  const record = await db.passwordResetToken.findUnique({ where: { tokenHash } })
+  const record = await authTokenRepo.findResetToken(tokenHash)
 
   if (!record || record.expiresAt < new Date()) throw new InvalidTokenError('Invalid or expired reset link')
   if (record.usedAt) throw new InvalidTokenError('This reset link has already been used')
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
-  await db.$transaction([
-    db.passwordResetToken.update({
+  await runTransaction(async (tx) => {
+    await tx.passwordResetToken.update({
       where: { tokenHash },
       data: { usedAt: new Date() },
-    }),
-    db.user.update({
+    })
+    await tx.user.update({
       where: { id: record.userId },
       data: { password: passwordHash },
-    }),
-  ])
+    })
+  })
 
   await writeAuditLog({
     userId: record.userId,
@@ -188,7 +175,7 @@ export async function changePassword(
   newPassword: string,
   ipAddress?: string,
 ) {
-  const user = await db.user.findUniqueOrThrow({ where: { id: userId } })
+  const user = await userRepo.findByIdOrThrow(userId)
 
   if (!user.password) throw new InvalidCredentialsError('No password set on this account')
 
@@ -200,7 +187,7 @@ export async function changePassword(
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
-  await db.user.update({ where: { id: userId }, data: { password: passwordHash } })
+  await userRepo.update(userId, { password: passwordHash })
 
   await writeAuditLog({
     userId,

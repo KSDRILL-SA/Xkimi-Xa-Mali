@@ -1,11 +1,13 @@
 import { put, getDownloadUrl } from '@vercel/blob'
-import { db } from '@/lib/db'
 import { renderStatementPDF } from '@/lib/pdf/statement'
 import type { StatementData } from '@/lib/pdf/statement'
 import type { TransactionFilter } from '@/lib/validation/report'
 import { MONTHS } from '@/lib/date'
 import { ReportNotFoundError } from '@/lib/errors'
 import { assertCanAccess } from '@/lib/authorization'
+import { transactionRepo } from '@/repositories/transaction.repository'
+import { userRepo } from '@/repositories/user.repository'
+import { contributionRepo } from '@/repositories/contribution.repository'
 
 export { ReportNotFoundError }
 
@@ -60,8 +62,7 @@ export async function getTransactionHistory(
   }
 
   const [items, total] = await Promise.all([
-    db.transaction.findMany({
-      where,
+    transactionRepo.findMany(where, {
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
@@ -71,7 +72,7 @@ export async function getTransactionHistory(
         },
       },
     }),
-    db.transaction.count({ where }),
+    transactionRepo.count(where),
   ])
 
   return {
@@ -115,21 +116,24 @@ export async function generateMemberStatement(
 ): Promise<{ url: string; signedUrl: string }> {
   assertCanAccess(userId, requesterId, roles)
 
-  const user = await db.user.findUnique({
-    where: { id: userId },
+  const userResults = await userRepo.findMany({ id: userId }, {
+    take: 1,
     select: { firstName: true, lastName: true, email: true, phone: true },
   })
+  const user = userResults[0] ?? null
   if (!user) throw new ReportNotFoundError('Member not found')
 
-  const contributions = await db.contribution.findMany({
-    where: { userId, periodYear: year },
-    orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
-    include: {
-      transactions: {
-        orderBy: { createdAt: 'desc' },
+  const contributions = await contributionRepo.findMany(
+    { userId, periodYear: year },
+    {
+      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+      include: {
+        transactions: {
+          orderBy: { createdAt: 'desc' },
+        },
       },
     },
-  })
+  )
 
   const periodContributions = (contributions as unknown as ContribWithTx[]).filter(
     (c) => c.periodMonth === month && c.periodYear === year,
@@ -219,34 +223,38 @@ type MemberReportRow = {
 }
 
 export async function getAdminReport(month: number, year: number) {
-  const members = await db.user.findMany({
-    where: { status: 'ACTIVE' },
-    orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      phone: true,
-      status: true,
-      contributions: {
-        where: { periodMonth: month, periodYear: year },
-        select: {
-          id: true,
-          periodMonth: true,
-          periodYear: true,
-          amountDue: true,
-          amountPaid: true,
-          status: true,
+  const members = await userRepo.findMany(
+    { status: 'ACTIVE' },
+    {
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        status: true,
+        contributions: {
+          where: { periodMonth: month, periodYear: year },
+          select: {
+            id: true,
+            periodMonth: true,
+            periodYear: true,
+            amountDue: true,
+            amountPaid: true,
+            status: true,
+          },
         },
       },
     },
-  })
+  )
 
-  const allContribs = await db.contribution.findMany({
-    where: { periodMonth: month, periodYear: year },
-    select: { amountDue: true, amountPaid: true, status: true },
-  })
+  const allContribs = await contributionRepo.findMany(
+    { periodMonth: month, periodYear: year },
+    {
+      select: { amountDue: true, amountPaid: true, status: true },
+    },
+  )
 
   const typed = allContribs as RawContrib[]
   const totalDue   = typed.reduce((s, c) => s + Number(c.amountDue), 0)
@@ -256,10 +264,10 @@ export async function getAdminReport(month: number, year: number) {
     ? Math.round((paidCount / typed.length) * 100)
     : 0
 
-  const poolTotal = await db.contribution.aggregate({
-    where: { status: 'PAID' },
-    _sum: { amountPaid: true },
-  })
+  const poolTotal = await contributionRepo.aggregate(
+    { status: 'PAID' },
+    { _sum: { amountPaid: true } },
+  )
 
   return {
     period: { month, year, label: periodLabel(month, year) },

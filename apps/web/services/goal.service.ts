@@ -1,4 +1,5 @@
-import { db, Prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
+import { goalRepo, runTransaction } from '@/repositories/goal.repository'
 import { env } from '@/lib/env'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
@@ -86,13 +87,12 @@ export async function getGoals(
       ? {}
       : { status: { not: 'DRAFT' as const } }
   const [items, total] = await Promise.all([
-    db.goal.findMany({
-      where,
+    goalRepo.findMany(where, {
       orderBy: { deadline: 'asc' },
       skip: (page - 1) * limit,
       take: limit,
     }),
-    db.goal.count({ where }),
+    goalRepo.count(where),
   ])
 
   const result = {
@@ -108,13 +108,10 @@ export async function getGoals(
 }
 
 export async function getGoal(id: string) {
-  const goal = await db.goal.findUnique({
-    where: { id },
-    include: {
-      progress: {
-        orderBy: { recordedAt: 'desc' },
-        take: 50,
-      },
+  const goal = await goalRepo.findById(id, {
+    progress: {
+      orderBy: { recordedAt: 'desc' },
+      take: 50,
     },
   })
 
@@ -139,17 +136,15 @@ export async function createGoal(
   adminUserId: string,
   ip: string,
 ) {
-  const goal = await db.goal.create({
-    data: {
-      title: input.title,
-      description: input.description ?? null,
-      type: input.type,
-      targetAmount: input.targetAmount,
-      currentAmount: 0,
-      deadline: new Date(input.deadline),
-      status: 'DRAFT',
-      createdById: adminUserId,
-    },
+  const goal = await goalRepo.create({
+    title: input.title,
+    description: input.description ?? null,
+    type: input.type,
+    targetAmount: input.targetAmount,
+    currentAmount: 0,
+    deadline: new Date(input.deadline),
+    status: 'DRAFT',
+    createdById: adminUserId,
   })
 
   await Promise.all([
@@ -173,7 +168,7 @@ export async function updateGoal(
   adminUserId: string,
   ip: string,
 ) {
-  const existing = await db.goal.findUnique({ where: { id } })
+  const existing = await goalRepo.findById(id)
   if (!existing) throw new GoalNotFoundError()
 
   const g = existing as GoalRow
@@ -187,15 +182,12 @@ export async function updateGoal(
     throw new ForbiddenError('Goal is locked and cannot be modified')
   }
 
-  const updated = await db.goal.update({
-    where: { id },
-    data: {
-      ...(input.title && { title: input.title }),
-      ...(input.description !== undefined && { description: input.description }),
-      ...(input.type && { type: input.type }),
-      ...(input.targetAmount !== undefined && { targetAmount: input.targetAmount }),
-      ...(input.deadline && { deadline: new Date(input.deadline) }),
-    },
+  const updated = await goalRepo.update(id, {
+    ...(input.title && { title: input.title }),
+    ...(input.description !== undefined && { description: input.description }),
+    ...(input.type && { type: input.type }),
+    ...(input.targetAmount !== undefined && { targetAmount: input.targetAmount }),
+    ...(input.deadline && { deadline: new Date(input.deadline) }),
   })
 
   await Promise.all([
@@ -214,7 +206,7 @@ export async function updateGoal(
 }
 
 export async function deleteGoal(id: string, adminUserId: string, ip: string) {
-  const existing = await db.goal.findUnique({ where: { id } })
+  const existing = await goalRepo.findById(id)
   if (!existing) throw new GoalNotFoundError()
 
   const g = existing as GoalRow
@@ -225,7 +217,7 @@ export async function deleteGoal(id: string, adminUserId: string, ip: string) {
     throw new ForbiddenError('Goal is locked and cannot be deleted')
   }
 
-  await db.goal.delete({ where: { id } })
+  await goalRepo.delete(id)
 
   await Promise.all([
     writeAuditLog({
@@ -241,7 +233,7 @@ export async function deleteGoal(id: string, adminUserId: string, ip: string) {
 }
 
 export async function activateGoal(id: string, adminUserId: string, ip: string) {
-  const existing = await db.goal.findUnique({ where: { id } })
+  const existing = await goalRepo.findById(id)
   if (!existing) throw new GoalNotFoundError()
 
   const g = existing as GoalRow
@@ -252,10 +244,7 @@ export async function activateGoal(id: string, adminUserId: string, ip: string) 
     )
   }
 
-  const updated = await db.goal.update({
-    where: { id },
-    data: { status: 'ACTIVE' },
-  })
+  const updated = await goalRepo.update(id, { status: 'ACTIVE' })
 
   await Promise.all([
     writeAuditLog({
@@ -277,7 +266,7 @@ export async function lockGoal(id: string, adminUserId: string, ip: string) {
     throw new ForbiddenError('Goal locking is disabled in this environment')
   }
 
-  const existing = await db.goal.findUnique({ where: { id } })
+  const existing = await goalRepo.findById(id)
   if (!existing) throw new GoalNotFoundError()
 
   const g = existing as GoalRow
@@ -288,10 +277,7 @@ export async function lockGoal(id: string, adminUserId: string, ip: string) {
     throw new GoalConflictError('Activate the goal before locking it', 'GOL_008')
   }
 
-  const updated = await db.goal.update({
-    where: { id },
-    data: { lockedAt: new Date(), lockedById: adminUserId },
-  })
+  const updated = await goalRepo.update(id, { lockedAt: new Date(), lockedById: adminUserId })
 
   await Promise.all([
     writeAuditLog({
@@ -316,7 +302,7 @@ export async function recordProgress(
   adminUserId: string,
   ip: string,
 ) {
-  const existing = await db.goal.findUnique({ where: { id: goalId } })
+  const existing = await goalRepo.findById(goalId)
   if (!existing) throw new GoalNotFoundError()
 
   const g = existing as GoalRow
@@ -329,24 +315,26 @@ export async function recordProgress(
 
   const newTotal = Number(g.currentAmount) + input.amount
 
-  const progress = await db.$transaction(async (tx) => {
-    const record = await tx.goalProgress.create({
-      data: {
+  const progress = await runTransaction(async (tx) => {
+    const record = await goalRepo.createProgress(
+      {
         goalId,
         amount: input.amount,
         note: input.note ?? null,
         recordedById: adminUserId,
       },
-    })
+      tx,
+    )
 
-    const updated = await tx.goal.updateMany({
-      where: { id: goalId, version: g.version },
-      data: {
+    const updated = await goalRepo.updateGoalInTx(
+      { id: goalId, version: g.version },
+      {
         currentAmount: newTotal,
         version: g.version + 1,
         ...(newTotal >= Number(g.targetAmount) && { status: 'ACHIEVED' }),
       },
-    })
+      tx,
+    )
 
     if (updated.count === 0) {
       throw new Error('Concurrent modification detected on goal — retry required')
@@ -377,17 +365,16 @@ export async function recordProgress(
 }
 
 export async function getGoalProgress(goalId: string, page = 1, limit = 20) {
-  const existing = await db.goal.findUnique({ where: { id: goalId } })
+  const existing = await goalRepo.findById(goalId)
   if (!existing) throw new GoalNotFoundError()
 
   const [items, total] = await Promise.all([
-    db.goalProgress.findMany({
-      where: { goalId },
+    goalRepo.findProgress(goalId, {
       orderBy: { recordedAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
     }),
-    db.goalProgress.count({ where: { goalId } }),
+    goalRepo.countProgress({ goalId }),
   ])
 
   return {
@@ -408,13 +395,13 @@ export async function getGoalProgress(goalId: string, page = 1, limit = 20) {
 export async function markExpiredGoalsFailed(): Promise<number> {
   const now = new Date()
 
-  const result = await db.goal.updateMany({
-    where: {
+  const result = await goalRepo.updateMany(
+    {
       status: 'ACTIVE',
       deadline: { lt: now },
     },
-    data: { status: 'FAILED' },
-  })
+    { status: 'FAILED' },
+  )
 
   return result.count
 }
