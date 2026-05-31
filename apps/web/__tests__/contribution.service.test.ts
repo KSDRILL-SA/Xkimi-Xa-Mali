@@ -32,9 +32,18 @@ vi.mock('@/lib/db', () => ({
   Prisma: {},
 }))
 
-vi.mock('@/lib/netcash', () => ({
-  submitOnceOffDebit: vi.fn(),
-  mapNetcashTransactionStatus: vi.fn(),
+vi.mock('@/integrations/payment', () => ({
+  paymentGateway: {
+    submitOnceOffDebit: vi.fn(),
+    mapTransactionStatus: vi.fn((status: string) => {
+      const map: Record<string, string> = {
+        SUCCESS: 'SUCCESS',
+        FAILED: 'FAILED',
+        REVERSED: 'REVERSED',
+      }
+      return map[status] ?? status
+    }),
+  },
 }))
 
 vi.mock('@/services/audit.service', () => ({
@@ -50,7 +59,7 @@ vi.mock('@/lib/logger', () => ({
 // ---------------------------------------------------------------------------
 
 import { db } from '@/lib/db'
-import { mapNetcashTransactionStatus } from '@/lib/netcash'
+import { paymentGateway } from '@/integrations/payment'
 import {
   recalculateContributionStatus,
   processTransactionWebhook,
@@ -176,7 +185,7 @@ describe('processTransactionWebhook', () => {
     const tx = { id: 'tx-1', contributionId: 'ctr-1', status: 'PENDING', gatewayRef: 'ref-1' }
     ;(db.transaction.findFirst as MockedFunction<typeof db.transaction.findFirst>)
       .mockResolvedValue(tx as never)
-    ;(mapNetcashTransactionStatus as MockedFunction<typeof mapNetcashTransactionStatus>)
+    ;(paymentGateway.mapTransactionStatus as MockedFunction<typeof paymentGateway.mapTransactionStatus>)
       .mockReturnValue('SUCCESS')
     ;(db.transaction.update as MockedFunction<typeof db.transaction.update>)
       .mockResolvedValue({} as never)
@@ -210,7 +219,7 @@ describe('processTransactionWebhook', () => {
     const tx = { id: 'tx-2', contributionId: 'ctr-1', status: 'SUCCESS', gatewayRef: 'ref-2' }
     ;(db.transaction.findFirst as MockedFunction<typeof db.transaction.findFirst>)
       .mockResolvedValue(tx as never)
-    ;(mapNetcashTransactionStatus as MockedFunction<typeof mapNetcashTransactionStatus>)
+    ;(paymentGateway.mapTransactionStatus as MockedFunction<typeof paymentGateway.mapTransactionStatus>)
       .mockReturnValue('SUCCESS')
 
     await processTransactionWebhook({ transactionRef: 'ref-2', status: 'SUCCESSFUL' })
@@ -222,7 +231,7 @@ describe('processTransactionWebhook', () => {
     const tx = { id: 'tx-3', contributionId: 'ctr-1', status: 'SUCCESS', gatewayRef: 'ref-3' }
     ;(db.transaction.findFirst as MockedFunction<typeof db.transaction.findFirst>)
       .mockResolvedValue(tx as never)
-    ;(mapNetcashTransactionStatus as MockedFunction<typeof mapNetcashTransactionStatus>)
+    ;(paymentGateway.mapTransactionStatus as MockedFunction<typeof paymentGateway.mapTransactionStatus>)
       .mockReturnValue('PENDING')
 
     await processTransactionWebhook({ transactionRef: 'ref-3', status: 'PENDING' })

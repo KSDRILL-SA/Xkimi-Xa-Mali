@@ -1,4 +1,4 @@
-import { put, getDownloadUrl } from '@vercel/blob'
+import { storageProvider } from '@/integrations/storage'
 import { renderStatementPDF } from '@/lib/pdf/statement'
 import type { StatementData } from '@/lib/pdf/statement'
 import type { TransactionFilter } from '@/lib/validation/report'
@@ -185,16 +185,13 @@ export async function generateMemberStatement(
   const pdfBuffer = await renderStatementPDF(data)
 
   const blobPath = `statements/${userId}/${year}-${String(month).padStart(2, '0')}.pdf`
-  const blob = await put(blobPath, pdfBuffer, {
+  const result = await storageProvider.upload(blobPath, pdfBuffer, {
     access: 'public',
     contentType: 'application/pdf',
     addRandomSuffix: false,
   })
 
-  // Generate a download-forced URL (content-disposition: attachment)
-  const signedUrl = getDownloadUrl(blob.url)
-
-  return { url: blob.url, signedUrl }
+  return { url: result.url, signedUrl: result.signedUrl }
 }
 
 // ─── Admin reports ────────────────────────────────────────────────────────────

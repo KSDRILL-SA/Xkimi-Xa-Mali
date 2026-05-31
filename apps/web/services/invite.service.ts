@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'crypto'
-import { sendInviteEmail, sendVerificationEmail } from '@/lib/email'
-import { sendSMS, normalisePhone } from '@/lib/bulksms'
+import { emailProvider } from '@/integrations/email'
+import { smsProvider } from '@/integrations/sms'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import { encrypt } from '@/lib/encryption'
@@ -94,7 +94,7 @@ export async function generateInvite(
   assertAdmin(adminRoles)
 
   const { firstName, lastName, email, phone, minimumAmount } = params
-  const normPhone = normalisePhone(phone)
+  const normPhone = smsProvider.normalisePhone(phone)
 
   const [existingInvite, existingUser] = await Promise.all([
     invitationRepo.findByEmailOrPhone(email, normPhone, {
@@ -117,7 +117,7 @@ export async function generateInvite(
     invitedById: adminId,
   })
 
-  sendSMS({
+  smsProvider.send({
     to: normPhone,
     body: [
       `Hi ${firstName}, you have been invited to join Xkimm Xa Mali.`,
@@ -128,7 +128,7 @@ export async function generateInvite(
     userSuppliedId: `invite-${invite.id}`,
   }).catch((err) => logger.warn('Invite SMS delivery failed', { err, inviteId: invite.id }))
 
-  sendInviteEmail(email, firstName, code, registrationUrl)
+  emailProvider.sendInviteEmail(email, firstName, code, registrationUrl)
     .catch((err) => logger.warn('Invite email delivery failed', { err, inviteId: invite.id }))
 
   await writeAuditLog({
@@ -252,7 +252,7 @@ export async function acceptInviteRegistration(
 
   if (input.email.toLowerCase().trim() !== invite.email.toLowerCase())
     throw new InviteBindingError()
-  if (normalisePhone(input.phone) !== invite.phone)
+  if (smsProvider.normalisePhone(input.phone) !== invite.phone)
     throw new InviteBindingError()
 
   const [passwordHash, memberRole] = await Promise.all([
@@ -289,7 +289,7 @@ export async function acceptInviteRegistration(
     return created
   })
 
-  await sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
+  await emailProvider.sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
 
   await writeAuditLog({
     userId: user.id,

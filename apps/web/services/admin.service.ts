@@ -4,8 +4,8 @@ import { queueNotification } from './notification.service'
 import { logger } from '@/lib/logger'
 import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { assertAdmin, assertNotSelf } from '@/lib/authorization'
-import { sendSMS, normalisePhone } from '@/lib/bulksms'
-import { sendWelcomeEmail } from '@/lib/email'
+import { smsProvider } from '@/integrations/sms'
+import { emailProvider } from '@/integrations/email'
 import { generateMonthlyContributions } from './contribution.service'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { bumpRoleVersion } from '@/lib/role-version'
@@ -386,14 +386,14 @@ export async function broadcastNotification(
   for (const m of members) {
     try {
       if ((channel === 'SMS' || channel === 'BOTH') && m.phone) {
-        const phone = normalisePhone(m.phone)
+        const phone = smsProvider.normalisePhone(m.phone)
         if (phone) {
-          await sendSMS({ to: phone, body: message })
+          await smsProvider.send({ to: phone, body: message })
           smsSent++
         }
       }
       if ((channel === 'EMAIL' || channel === 'BOTH') && m.email) {
-        await sendWelcomeEmail(m.email, m.firstName)
+        await emailProvider.sendWelcomeEmail(m.email, m.firstName)
         emailSent++
       }
     } catch {

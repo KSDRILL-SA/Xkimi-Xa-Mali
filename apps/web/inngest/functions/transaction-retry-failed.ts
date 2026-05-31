@@ -3,7 +3,7 @@ import type { TransactionStatus } from '@prisma/client'
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { submitScheduledDebit, submitOnceOffDebit } from '@/lib/netcash'
+import { paymentGateway } from '@/integrations/payment'
 import { recalculateContributionStatus } from '@/services/contribution.service'
 import { writeAuditLog } from '@/services/audit.service'
 import { queueNotification } from '@/services/notification.service'
@@ -42,7 +42,7 @@ export const transactionRetryFailed = inngest.createFunction(
       }
 
       const result = await step.run(`retry-${tx.id}`, async () => {
-        const submitFn = tx.type === 'MANUAL' ? submitOnceOffDebit : submitScheduledDebit
+        const submitFn = tx.type === 'MANUAL' ? paymentGateway.submitOnceOffDebit : paymentGateway.submitScheduledDebit
 
         try {
           const gatewayRes = await submitFn({
