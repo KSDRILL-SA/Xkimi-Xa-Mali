@@ -52,6 +52,14 @@ vi.mock('@/services/audit.service', () => ({
   writeAuditLog: vi.fn(),
 }))
 
+vi.mock('@/services/notification.service', () => ({
+  queueNotification: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@/lib/role-version', () => ({
+  bumpRoleVersion: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@/lib/env', () => ({
   env: {
     DATABASE_URL: 'postgresql://x:x@localhost/x',
@@ -195,7 +203,7 @@ describe('listMembers', () => {
 
 describe('setMemberStatus', () => {
   it('updates status and writes audit log', async () => {
-    mockDb.user.findUnique.mockResolvedValue({ id: 'u1', status: 'PENDING' } as never)
+    mockDb.user.findMany.mockResolvedValue([{ id: 'u1', status: 'PENDING' }] as never)
     mockDb.user.update.mockResolvedValue({ id: 'u1', status: 'ACTIVE', firstName: 'X', lastName: 'Y' } as never)
     mockWriteAuditLog.mockResolvedValue(undefined)
 
@@ -207,12 +215,12 @@ describe('setMemberStatus', () => {
   })
 
   it('throws AdminNotFoundError when member does not exist', async () => {
-    mockDb.user.findUnique.mockResolvedValue(null as never)
+    mockDb.user.findMany.mockResolvedValue([] as never)
     await expect(setMemberStatus('a', ADMIN_ROLES, 'no-exist', 'ACTIVE')).rejects.toBeInstanceOf(AdminNotFoundError)
   })
 
   it('throws AdminConflictError when status is unchanged', async () => {
-    mockDb.user.findUnique.mockResolvedValue({ id: 'u1', status: 'ACTIVE' } as never)
+    mockDb.user.findMany.mockResolvedValue([{ id: 'u1', status: 'ACTIVE' }] as never)
     await expect(setMemberStatus('a', ADMIN_ROLES, 'u1', 'ACTIVE')).rejects.toBeInstanceOf(AdminConflictError)
   })
 })

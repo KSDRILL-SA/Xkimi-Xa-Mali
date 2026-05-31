@@ -52,7 +52,7 @@ describe('GET /api/v1/notifications/preferences/whatsapp', () => {
   it('returns enabled=true and phone when preference exists', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'u1' } } as never)
     mockDb.user.findUnique.mockResolvedValue({ phone: '+27821234567' } as never)
-    mockDb.notificationPreference.findUnique.mockResolvedValue({ push: true } as never)
+    mockDb.notificationPreference.findUnique.mockResolvedValue({ whatsapp: true } as never)
 
     const { GET } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
     const res = await GET()
@@ -88,7 +88,7 @@ describe('PATCH /api/v1/notifications/preferences/whatsapp', () => {
 
   it('upserts preference and returns updated value', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'u3' } } as never)
-    mockDb.notificationPreference.upsert.mockResolvedValue({ push: false } as never)
+    mockDb.notificationPreference.upsert.mockResolvedValue({ whatsapp: false } as never)
     mockDb.auditLog.create.mockResolvedValue({} as never)
 
     const { PATCH } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
@@ -96,7 +96,7 @@ describe('PATCH /api/v1/notifications/preferences/whatsapp', () => {
     const body = await (res as Response).json()
 
     expect(mockDb.notificationPreference.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ update: { push: false } }),
+      expect.objectContaining({ update: { whatsapp: false } }),
     )
     expect(body.data.enabled).toBe(false)
   })

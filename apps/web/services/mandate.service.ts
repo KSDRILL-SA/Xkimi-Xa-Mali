@@ -13,25 +13,35 @@ import {
   type AccountType as GatewayAccountType,
 } from '@/integrations/payment'
 import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '@/lib/validation/mandate'
-import type { MandateStatus, AccountType } from '@prisma/client'
+import type { MandateStatus, AccountType, Prisma } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { redis } from '@/lib/redis'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
+
+const mandateBankInclude = {
+  bankAccount: {
+    select: { bankName: true, accountNumber: true, accountType: true, branchCode: true },
+  },
+} as const
+
+type MandateWithBank = Prisma.PaymentMandateGetPayload<{
+  include: typeof mandateBankInclude
+}>
+
+type BankAccountWithUser = Prisma.BankAccountGetPayload<{
+  include: { user: { select: { firstName: true; lastName: true; idNumber: true } } }
+}>
 
 // ─── Queries ───────────────────────────────────────────────────────────────
 
 export async function getMandates(userId: string, requesterId: string, requesterRoles: string[]) {
   assertCanAccess(userId, requesterId, requesterRoles)
 
-  const mandates = await mandateRepo.findByUser(userId, {
+  const mandates = (await mandateRepo.findByUser(userId, {
     orderBy: { createdAt: 'desc' },
-    include: {
-      bankAccount: {
-        select: { bankName: true, accountNumber: true, accountType: true, branchCode: true },
-      },
-    },
-  })
+    include: mandateBankInclude,
+  })) as MandateWithBank[]
 
   // Mask encrypted account numbers before returning
   return mandates.map((m) => ({
@@ -45,11 +55,7 @@ export async function getMandates(userId: string, requesterId: string, requester
 }
 
 export async function getMandate(mandateId: string, requesterId: string, requesterRoles: string[]) {
-  const mandate = await mandateRepo.findById(mandateId, {
-    bankAccount: {
-      select: { bankName: true, accountNumber: true, accountType: true, branchCode: true },
-    },
-  })
+  const mandate = (await mandateRepo.findById(mandateId, mandateBankInclude)) as MandateWithBank | null
 
   if (!mandate) throw new MandateNotFoundError()
   assertCanAccess(mandate.userId, requesterId, requesterRoles)
@@ -82,9 +88,9 @@ export async function createMandate(
     throw new MandateConflictError('An active or pending mandate already exists', 'MND_002')
   }
 
-  const bankAccount = await bankAccountRepo.findById(data.bankAccountId, {
+  const bankAccount = (await bankAccountRepo.findById(data.bankAccountId, {
     user: { select: { firstName: true, lastName: true, idNumber: true } },
-  })
+  })) as BankAccountWithUser | null
   if (!bankAccount || bankAccount.userId !== userId) {
     throw new BankAccountNotFoundError()
   }

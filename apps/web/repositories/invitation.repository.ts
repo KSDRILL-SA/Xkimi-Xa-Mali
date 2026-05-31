@@ -1,5 +1,5 @@
+import { InvitationStatus, type Prisma, type PrismaClient } from '@prisma/client'
 import { db } from '@/lib/db'
-import type { PrismaClient, Prisma } from '@prisma/client'
 
 type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
 
@@ -18,7 +18,7 @@ export const invitationRepo = {
     })
   },
 
-  findByEmailOrPhone(email: string, phone: string, opts?: { status?: string; select?: Prisma.InvitationSelect }) {
+  findByEmailOrPhone(email: string, phone: string, opts?: { status?: InvitationStatus; select?: Prisma.InvitationSelect }) {
     return db.invitation.findFirst({
       where: {
         OR: [{ email }, { phone }],
@@ -42,7 +42,11 @@ export const invitationRepo = {
     return db.invitation.create({ data })
   },
 
-  update(id: string, data: Prisma.InvitationUpdateInput, tx?: TxClient) {
+  update(
+    id: string,
+    data: Prisma.InvitationUpdateInput | Prisma.InvitationUncheckedUpdateInput,
+    tx?: TxClient,
+  ) {
     const client = tx ?? db
     return client.invitation.update({ where: { id }, data })
   },

@@ -1,5 +1,5 @@
+import { RoleName, type Prisma, type PrismaClient } from '@prisma/client'
 import { db } from '@/lib/db'
-import type { PrismaClient, Prisma } from '@prisma/client'
 
 export type TxClient = Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>
 
@@ -7,11 +7,14 @@ export async function runTransaction<T>(fn: (tx: TxClient) => Promise<T>): Promi
   return db.$transaction(fn)
 }
 
+type FindByIdArgs = { select?: Prisma.UserSelect; include?: Prisma.UserInclude }
+
 export const userRepo = {
-  findById(id: string, include?: Prisma.UserInclude) {
+  findById(id: string, args?: FindByIdArgs) {
     return db.user.findUnique({
       where: { id },
-      ...(include && { include }),
+      ...(args?.select && { select: args.select }),
+      ...(args?.include && { include: args.include }),
     })
   },
 
@@ -19,9 +22,15 @@ export const userRepo = {
     return db.user.findUnique({ where: { email } })
   },
 
-  findByEmailOrPhone(email: string, phone: string) {
+  findByEmailOrPhone(email: string | undefined, phone: string, excludeUserId?: string) {
     return db.user.findFirst({
-      where: { OR: [{ email }, { phone }] },
+      where: {
+        ...(excludeUserId && { NOT: { id: excludeUserId } }),
+        OR: [
+          ...(email ? [{ email }] : []),
+          { phone },
+        ],
+      },
     })
   },
 
@@ -57,17 +66,15 @@ export const userRepo = {
   },
 
   groupBy<T extends Prisma.UserGroupByArgs>(args: T) {
-    return (db.user.groupBy as CallableFunction)(args)
+    return (db.user.groupBy as unknown as (a: T) => ReturnType<typeof db.user.groupBy>)(args)
   },
 
-  // ─── Role-related ──────────────────────────────────────────────────────────
-
-  findRole(name: string) {
-    return db.role.findUnique({ where: { name } })
+  findRole(name: RoleName | string) {
+    return db.role.findUnique({ where: { name: name as RoleName } })
   },
 
-  findRoleOrThrow(name: string) {
-    return db.role.findUniqueOrThrow({ where: { name } })
+  findRoleOrThrow(name: RoleName | string) {
+    return db.role.findUniqueOrThrow({ where: { name: name as RoleName } })
   },
 
   createUserRole(data: Prisma.UserRoleUncheckedCreateInput, tx?: TxClient) {
@@ -86,8 +93,6 @@ export const userRepo = {
   countUserRoles(where: Prisma.UserRoleWhereInput) {
     return db.userRole.count({ where })
   },
-
-  // ─── Login history ─────────────────────────────────────────────────────────
 
   findLoginHistory(where: Prisma.LoginHistoryWhereInput, opts?: { skip?: number; take?: number; orderBy?: Prisma.LoginHistoryOrderByWithRelationInput; select?: Prisma.LoginHistorySelect }) {
     return db.loginHistory.findMany({

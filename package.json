@@ -1,12 +1,16 @@
 {
   "name": "xkimm-xa-mali",
   "private": true,
+  "packageManager": "npm@10.9.7",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "turbo run dev",
+    "dev": "turbo run dev --parallel",
+    "dev:web": "npm run dev -w @xxm/web",
+    "dev:admin": "npm run dev -w @xxm/admin",
+    "dev:website": "npm run dev -w @xxm/website",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",

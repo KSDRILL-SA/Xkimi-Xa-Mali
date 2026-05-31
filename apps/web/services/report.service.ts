@@ -76,7 +76,7 @@ export async function getTransactionHistory(
   ])
 
   return {
-    items: (items as TxRow[]).map((t) => ({
+    items: (items as unknown as TxRow[]).map((t) => ({
       id: t.id,
       amount: Number(t.amount),
       type: t.type,
@@ -278,7 +278,7 @@ export async function getAdminReport(month: number, year: number) {
       overdueCount: typed.filter((c) => c.status === 'OVERDUE').length,
       poolTotal: Number(poolTotal._sum?.amountPaid ?? 0),
     },
-    members: (members as MemberReportRow[]).map((m) => {
+    members: (members as unknown as MemberReportRow[]).map((m) => {
       const contrib = m.contributions[0]
       return {
         id: m.id,

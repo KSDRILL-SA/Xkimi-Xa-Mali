@@ -41,7 +41,7 @@ export const goalRepo = {
   },
 
   /** Update a single goal by ID. */
-  update(id: string, data: Prisma.GoalUpdateInput) {
+  update(id: string, data: Prisma.GoalUpdateInput | Prisma.GoalUncheckedUpdateInput) {
     return db.goal.update({ where: { id }, data })
   },
 

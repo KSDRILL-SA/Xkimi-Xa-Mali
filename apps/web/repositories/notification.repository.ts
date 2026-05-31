@@ -54,7 +54,7 @@ export const notificationRepo = {
         FOR UPDATE SKIP LOCKED
       )
       RETURNING "id"
-    `.then((rows: Array<{ id: string }>) => rows.map((r) => r.id))
+    `.then((rows) => (rows as Array<{ id: string }>).map((r) => r.id))
   },
 
   /** Create a notification. */

@@ -7,8 +7,9 @@ export const vercelBlobStorage: IStorageProvider = {
     data: Buffer | Uint8Array,
     options: StorageUploadOptions,
   ): Promise<StorageUploadResult> => {
-    const blob = await put(path, data, {
-      access: options.access ?? 'public',
+    const body: BlobPart = data instanceof Buffer ? data : new Uint8Array(data)
+    const blob = await put(path, body as Parameters<typeof put>[1], {
+      access: (options.access ?? 'public') as 'public',
       contentType: options.contentType,
       addRandomSuffix: options.addRandomSuffix ?? false,
     })
