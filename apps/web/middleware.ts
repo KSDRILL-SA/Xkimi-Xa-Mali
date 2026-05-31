@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
@@ -44,6 +45,7 @@ function verifyCsrfOrigin(req: { headers: Headers; nextUrl: URL }): boolean {
 
 export default auth(async (req) => {
   const { pathname } = req.nextUrl
+  const traceId = req.headers.get('x-trace-id') ?? randomUUID()
 
   // Always allow: health, webhooks (self-verifying), NextAuth internals, SW + offline
   if (
@@ -90,8 +92,8 @@ export default auth(async (req) => {
   if (!session) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
-        { error: { code: 'SYS_002', message: 'Unauthorised', traceId: '' } },
-        { status: 401 },
+        { error: { code: 'SYS_002', message: 'Unauthorised', traceId } },
+        { status: 401, headers: { 'x-trace-id': traceId } },
       )
     }
     const loginUrl = new URL('/login', req.url)
@@ -104,8 +106,8 @@ export default auth(async (req) => {
   if (session.user?.id && await isRoleVersionStale(session.user.id, tokenVersion)) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
-        { error: { code: 'SYS_006', message: 'Session expired — please sign in again', traceId: '' } },
-        { status: 401 },
+        { error: { code: 'SYS_006', message: 'Session expired — please sign in again', traceId } },
+        { status: 401, headers: { 'x-trace-id': traceId } },
       )
     }
     const loginUrl = new URL('/login', req.url)
@@ -118,8 +120,8 @@ export default auth(async (req) => {
   if (MUTATING_METHODS.has(req.method) && pathname.startsWith('/api/')) {
     if (!verifyCsrfOrigin(req)) {
       return NextResponse.json(
-        { error: { code: 'SYS_007', message: 'Invalid request origin', traceId: '' } },
-        { status: 403 },
+        { error: { code: 'SYS_007', message: 'Invalid request origin', traceId } },
+        { status: 403, headers: { 'x-trace-id': traceId } },
       )
     }
   }
@@ -129,13 +131,15 @@ export default auth(async (req) => {
     const roles = Array.isArray(session.user?.roles) ? (session.user.roles as string[]) : []
     if (!roles.includes('ADMIN')) {
       return NextResponse.json(
-        { error: { code: 'SYS_003', message: 'Forbidden', traceId: '' } },
-        { status: 403 },
+        { error: { code: 'SYS_003', message: 'Forbidden', traceId } },
+        { status: 403, headers: { 'x-trace-id': traceId } },
       )
     }
   }
 
-  return NextResponse.next()
+  const response = NextResponse.next()
+  response.headers.set('x-trace-id', traceId)
+  return response
 })
 
 export const config = {

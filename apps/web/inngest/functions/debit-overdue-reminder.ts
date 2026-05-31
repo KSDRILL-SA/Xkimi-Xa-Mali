@@ -5,7 +5,7 @@ import { queueNotification } from '@/services/notification.service'
 
 export const debitOverdueReminder = inngest.createFunction(
   { id: 'debit-overdue-reminder', name: 'Overdue Contribution Reminder' },
-  { cron: '0 6 * * *' }, // 08:00 SAST (UTC+2)
+  { cron: '0 7 * * *' }, // 09:00 SAST (UTC+2)
   async ({ step }) => {
     const overdue = await step.run('find-overdue', () =>
       db.contribution.findMany({
