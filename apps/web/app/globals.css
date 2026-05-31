@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import '../../packages/ui/src/globals.css';
+@import '../../../packages/ui/src/globals.css';
 
 /* ── Typography ───────────────────────────────────────────────────────────── */
 body {
