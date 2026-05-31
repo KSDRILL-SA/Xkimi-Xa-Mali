@@ -44,25 +44,36 @@ A full-featured web platform that handles:
 ```
 xkimm-xa-mali/
 ├── apps/
-│   └── web/                    # Next.js application
-│       ├── app/                # App Router pages + API routes
-│       │   ├── (public)/       # Homepage, WhatsApp page
-│       │   ├── (auth)/         # Login, register, password reset
-│       │   ├── (member)/       # Member dashboard, contributions, goals
-│       │   ├── (admin)/        # Admin dashboard, member management
-│       │   └── api/v1/         # REST API endpoints
-│       ├── components/         # UI components
-│       ├── lib/                # Clients, utilities, validation schemas
-│       ├── services/           # Business logic (service layer)
-│       └── types/              # Shared TypeScript types
+│   ├── web/                    # Member portal + API backend (port 3000)
+│   │   ├── app/                # Next.js 15 App Router
+│   │   │   ├── (auth)/         # Login, register, password reset
+│   │   │   ├── (member)/       # Member dashboard, contributions, goals
+│   │   │   └── api/v1/         # REST API endpoints (49 routes)
+│   │   ├── components/         # UI components
+│   │   ├── lib/                # Clients, utilities, validation schemas
+│   │   ├── services/           # Business logic (service layer)
+│   │   └── inngest/            # Durable scheduled jobs
+│   ├── admin/                  # Admin dashboard (port 3002)
+│   │   ├── app/(dashboard)/    # Members, mandates, goals, audit, reports
+│   │   ├── components/         # Admin-specific UI
+│   │   └── lib/                # Auth, services, utilities
+│   └── website/                # Marketing landing page (port 3001)
+│       ├── app/                # Public pages (home, about)
+│       └── components/         # Hero, features, CTA sections
 ├── packages/
-│   └── database/               # Prisma schema + migrations + seed
+│   ├── database/               # Prisma schema + migrations + seed
+│   ├── types/                  # Shared TypeScript types
+│   ├── ui/                     # Shared React component library
+│   ├── utils/                  # Shared utilities (formatters, validators)
+│   └── config/                 # Shared tsconfig, tailwind, eslint
 ├── docs/                       # System design documentation
-│   ├── system-overview.md      # Full 6-phase system design
+│   ├── system-overview.md      # Full system design
 │   ├── erd.md                  # Entity relationships
 │   ├── api-contract.yaml       # OpenAPI specification
 │   ├── security-model.md       # Auth + permissions
-│   ├── build-order.md          # Sequential module build plan
+│   ├── build-order.md          # Module build plan
+│   ├── architecture/           # C4 architecture diagrams
+│   ├── flows/                  # Auth, payment, contribution lifecycle flows
 │   └── constitutions/          # Coding standards per layer
 ├── .github/workflows/          # CI/CD
 ├── docker-compose.yml          # Local dev (PostgreSQL + Redis)
@@ -143,15 +154,16 @@ See [build-order.md](docs/build-order.md) for the full dependency-ordered module
 | M01 | Project Foundation | Complete |
 | M02 | Auth System | Complete |
 | M03 | Member Profile | Complete |
-| M04 | Payment Mandates | Pending |
-| M05 | Contribution Engine | Pending |
-| M06 | Job Engine (Inngest) | Pending |
-| M07 | Notification System | Pending |
-| M08 | Goals System | Pending |
-| M09 | Reporting & Statements | Pending |
-| M10 | WhatsApp Integration | Pending |
-| M11 | Admin Dashboard | Pending |
-| M12 | PWA + Optimisation | Pending |
+| M04 | Payment Mandates | Complete |
+| M05 | Contribution Engine | Complete |
+| M06 | Job Engine (Inngest) | Complete |
+| M07 | Notification System | Complete |
+| M08 | Goals System | Complete |
+| M09 | Reporting & Statements | Complete |
+| M10 | WhatsApp Integration | Complete |
+| M11 | Admin Dashboard | Complete |
+| M11a | Invite & Access Control | Complete |
+| M12 | PWA + Optimisation | Complete |
 
 ---
 
