@@ -20,17 +20,21 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-vi.mock('@/lib/bulksms', () => ({
-  sendSMS: vi.fn(),
-  sendBulkSMS: vi.fn(),
-  normalisePhone: (phone: string) => phone.startsWith('+27') ? phone : `+27${phone.slice(1)}`,
+vi.mock('@/integrations/sms', () => ({
+  smsProvider: {
+    send: vi.fn(),
+    normalisePhone: vi.fn((p: string) => p),
+  },
 }))
 
-vi.mock('@/lib/email', () => ({
-  sendWelcomeEmail: vi.fn(),
-  sendPaymentSuccessEmail: vi.fn(),
-  sendPaymentFailedEmail: vi.fn(),
-  sendOverdueReminderEmail: vi.fn(),
+vi.mock('@/integrations/email', () => ({
+  emailProvider: {
+    sendWelcomeEmail: vi.fn(),
+    sendPaymentSuccessEmail: vi.fn(),
+    sendPaymentFailedEmail: vi.fn(),
+    sendOverdueReminderEmail: vi.fn(),
+    sendGenericEmail: vi.fn(),
+  },
 }))
 
 vi.mock('@/lib/env', () => ({
@@ -53,7 +57,7 @@ vi.mock('resend', () => ({
 // ---------------------------------------------------------------------------
 
 import { db } from '@/lib/db'
-import { sendSMS } from '@/lib/bulksms'
+import { smsProvider } from '@/integrations/sms'
 import {
   queueNotification,
   updateSMSDeliveryStatus,
@@ -204,15 +208,15 @@ describe('flushQueuedNotifications', () => {
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
       .mockResolvedValue([mockPrefs] as never)
-    ;(sendSMS as MockedFunction<typeof sendSMS>)
+    ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
       .mockResolvedValue([{ id: 'sms-1', status: { type: 'ACCEPTED' } }] as never)
     ;(db.notification.update as MockedFunction<typeof db.notification.update>)
       .mockResolvedValue({} as never)
 
     const result = await flushQueuedNotifications()
 
-    expect(sendSMS).toHaveBeenCalledOnce()
-    expect(sendSMS).toHaveBeenCalledWith(
+    expect(smsProvider.send).toHaveBeenCalledOnce()
+    expect(smsProvider.send).toHaveBeenCalledWith(
       expect.objectContaining({
         body: 'Xkimm Xa Mali: R500 received. Thanks, Kurhula!',
       }),
@@ -248,7 +252,7 @@ describe('flushQueuedNotifications', () => {
     const result = await flushQueuedNotifications()
 
     // Should still count as "sent" (gracefully skipped, not failed)
-    expect(sendSMS).not.toHaveBeenCalled()
+    expect(smsProvider.send).not.toHaveBeenCalled()
     expect(result.processed).toBe(1)
     expect(result.sent).toBe(1)
     expect(result.failed).toBe(0)
@@ -274,7 +278,7 @@ describe('flushQueuedNotifications', () => {
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
       .mockResolvedValue([prefsNoSMS] as never)
-    ;(sendSMS as MockedFunction<typeof sendSMS>)
+    ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
       .mockResolvedValue([{ id: 'sms-3', status: { type: 'ACCEPTED' } }] as never)
     ;(db.notification.update as MockedFunction<typeof db.notification.update>)
       .mockResolvedValue({} as never)
@@ -282,7 +286,7 @@ describe('flushQueuedNotifications', () => {
     const result = await flushQueuedNotifications()
 
     // Mandatory slug bypasses the preference — SMS must be sent
-    expect(sendSMS).toHaveBeenCalledOnce()
+    expect(smsProvider.send).toHaveBeenCalledOnce()
     expect(result.sent).toBe(1)
   })
 
@@ -305,7 +309,7 @@ describe('flushQueuedNotifications', () => {
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
       .mockResolvedValue([mockPrefs] as never)
-    ;(sendSMS as MockedFunction<typeof sendSMS>)
+    ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
       .mockRejectedValue(new Error('BulkSMS error 503'))
     ;(db.notification.update as MockedFunction<typeof db.notification.update>)
       .mockResolvedValue({} as never)
@@ -353,14 +357,14 @@ describe('template interpolation', () => {
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
       .mockResolvedValue([mockPrefs] as never)
-    ;(sendSMS as MockedFunction<typeof sendSMS>)
+    ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
       .mockResolvedValue([{ id: 'sms-5', status: { type: 'DELIVERED' } }] as never)
     ;(db.notification.update as MockedFunction<typeof db.notification.update>)
       .mockResolvedValue({} as never)
 
     await flushQueuedNotifications()
 
-    expect(sendSMS).toHaveBeenCalledWith(
+    expect(smsProvider.send).toHaveBeenCalledWith(
       expect.objectContaining({ body: 'R750 for 2025-01 from Busi' }),
     )
   })
@@ -389,14 +393,14 @@ describe('template interpolation', () => {
       .mockResolvedValue(queued as never)
     ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
       .mockResolvedValue([mockPrefs] as never)
-    ;(sendSMS as MockedFunction<typeof sendSMS>)
+    ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
       .mockResolvedValue([{ id: 'sms-6', status: { type: 'ACCEPTED' } }] as never)
     ;(db.notification.update as MockedFunction<typeof db.notification.update>)
       .mockResolvedValue({} as never)
 
     await flushQueuedNotifications()
 
-    expect(sendSMS).toHaveBeenCalledWith(
+    expect(smsProvider.send).toHaveBeenCalledWith(
       expect.objectContaining({ body: 'Hello Lee, amount 200 missing {{missing}}' }),
     )
   })

@@ -21,9 +21,10 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-vi.mock('@vercel/blob', () => ({
-  put: vi.fn(),
-  getDownloadUrl: vi.fn(),
+vi.mock('@/integrations/storage', () => ({
+  storageProvider: {
+    upload: vi.fn(),
+  },
 }))
 
 vi.mock('@/lib/pdf/statement', () => ({
@@ -35,7 +36,7 @@ vi.mock('@/lib/pdf/statement', () => ({
 // ---------------------------------------------------------------------------
 
 import { db } from '@/lib/db'
-import { put, getDownloadUrl } from '@vercel/blob'
+import { storageProvider } from '@/integrations/storage'
 import { renderStatementPDF } from '@/lib/pdf/statement'
 import { ForbiddenError, ReportNotFoundError } from '@/lib/errors'
 import {
@@ -57,8 +58,7 @@ const mockUserFindUnique = db.user.findUnique as MockedFunction<typeof db.user.f
 const mockUserFindMany   = db.user.findMany   as MockedFunction<typeof db.user.findMany>
 const mockContribFindMany = db.contribution.findMany as MockedFunction<typeof db.contribution.findMany>
 const mockContribAggregate = db.contribution.aggregate as MockedFunction<typeof db.contribution.aggregate>
-const mockPut            = put as MockedFunction<typeof put>
-const mockGetDownloadUrl = getDownloadUrl as MockedFunction<typeof getDownloadUrl>
+const mockUpload = storageProvider.upload as MockedFunction<typeof storageProvider.upload>
 const mockRenderPDF      = renderStatementPDF as MockedFunction<typeof renderStatementPDF>
 
 // ---------------------------------------------------------------------------
@@ -195,19 +195,20 @@ describe('generateMemberStatement', () => {
 
     const fakeBuffer = Buffer.from('PDF_CONTENT')
     mockRenderPDF.mockResolvedValueOnce(fakeBuffer)
-    mockPut.mockResolvedValueOnce({ url: 'https://blob.vercel.com/statements/user-1/2025-05.pdf' } as never)
-    mockGetDownloadUrl.mockReturnValueOnce('https://blob.vercel.com/signed-url')
+    mockUpload.mockResolvedValueOnce({
+      url: 'https://blob.vercel.com/statements/user-1/2025-05.pdf',
+      signedUrl: 'https://blob.vercel.com/signed-url',
+    })
 
     const result = await generateMemberStatement('user-1', 'user-1', MEMBER_ROLES, 5, 2025)
 
-    expect(mockPut).toHaveBeenCalledWith(
+    expect(mockUpload).toHaveBeenCalledWith(
       'statements/user-1/2025-05.pdf',
       fakeBuffer,
       expect.objectContaining({ access: 'public', contentType: 'application/pdf', addRandomSuffix: false }),
     )
     expect(result.url).toBe('https://blob.vercel.com/statements/user-1/2025-05.pdf')
     expect(result.signedUrl).toBe('https://blob.vercel.com/signed-url')
-    expect(mockGetDownloadUrl).toHaveBeenCalledWith(result.url)
   })
 })
 
