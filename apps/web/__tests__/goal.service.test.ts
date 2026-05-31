@@ -86,8 +86,22 @@ const DRAFT_GOAL = {
   updatedAt: new Date(),
 }
 
-const ACTIVE_GOAL = { ...DRAFT_GOAL, status: 'ACTIVE', currentAmount: 10000 }
+const ACTIVE_GOAL = { ...DRAFT_GOAL, status: 'ACTIVE', currentAmount: 10000, version: 1 }
 const LOCKED_GOAL = { ...ACTIVE_GOAL, lockedAt: new Date(), lockedById: 'admin-1' }
+
+function mockGoalTransaction(progress: { id: string; amount: number; recordedAt: Date }) {
+  ;(db.$transaction as MockedFunction<typeof db.$transaction>).mockImplementation(async (fn) => {
+    const tx = {
+      goalProgress: {
+        create: vi.fn().mockResolvedValue(progress),
+      },
+      goal: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    }
+    return fn(tx as never)
+  })
+}
 
 // ---------------------------------------------------------------------------
 // createGoal
@@ -243,7 +257,7 @@ describe('recordProgress', () => {
   it('records progress and updates currentAmount', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(ACTIVE_GOAL as never)
     const newProgress = { id: 'prog-1', amount: 5000, recordedAt: new Date() }
-    ;(db.$transaction as MockedFunction<typeof db.$transaction>).mockResolvedValue([newProgress] as never)
+    mockGoalTransaction(newProgress)
     ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
     const result = await recordProgress('goal-1', { amount: 5000 }, 'admin-1', '127.0.0.1')
@@ -258,7 +272,7 @@ describe('recordProgress', () => {
     const nearlyDone = { ...ACTIVE_GOAL, currentAmount: 49500 }
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(nearlyDone as never)
     const newProgress = { id: 'prog-2', amount: 500, recordedAt: new Date() }
-    ;(db.$transaction as MockedFunction<typeof db.$transaction>).mockResolvedValue([newProgress] as never)
+    mockGoalTransaction(newProgress)
     ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
     const result = await recordProgress('goal-1', { amount: 500 }, 'admin-1', '127.0.0.1')

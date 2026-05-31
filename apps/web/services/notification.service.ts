@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client'
+import { env } from '@/lib/env'
 import { notificationRepo } from '@/repositories/notification.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { smsProvider } from '@/integrations/sms'
@@ -223,7 +224,7 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
   )
 
   const allPrefs = await notificationRepo.findPreferences({
-    userId: { in: [...new Set((claimed as QueuedNotification[]).map((n) => n.userId))] },
+    userId: { in: [...new Set((claimed as unknown as QueuedNotification[]).map((n) => n.userId))] },
   })
   const prefsMap = new Map((allPrefs as NotifPrefs[]).map((p) => [p.userId, p]))
 
@@ -231,7 +232,7 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
   let failed = 0
 
   await Promise.all(
-    (claimed as QueuedNotification[]).map(async (notification) => {
+    (claimed as unknown as QueuedNotification[]).map(async (notification) => {
       const prefs = prefsMap.get(notification.userId)
       const payload = notification.payload as Record<string, unknown>
       const slug = notification.template.slug

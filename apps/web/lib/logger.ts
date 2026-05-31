@@ -19,7 +19,7 @@ function serialize(value: unknown): unknown {
       name: value.name,
       message: value.message,
       stack: isDev ? value.stack : undefined,
-      ...(value as Record<string, unknown>),
+      ...(value as unknown as Record<string, unknown>),
     }
   }
   return value

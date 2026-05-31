@@ -106,13 +106,9 @@ export const contributionRepo = {
     return db.contribution.updateMany({ where, data })
   },
 
-  /** Group contributions by status. */
-  groupBy(where: Prisma.ContributionWhereInput) {
-    return db.contribution.groupBy({
-      by: ['status'],
-      where,
-      _count: { status: true },
-    })
+  /** Group contributions (pass full Prisma groupBy args). */
+  groupBy<T extends Prisma.ContributionGroupByArgs>(args: T) {
+    return (db.contribution.groupBy as unknown as (a: T) => ReturnType<typeof db.contribution.groupBy>)(args)
   },
 
   /** Aggregate _sum and _count over contributions. */

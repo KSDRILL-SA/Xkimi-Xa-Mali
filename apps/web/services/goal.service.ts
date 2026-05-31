@@ -117,7 +117,7 @@ export async function getGoal(id: string) {
 
   if (!goal) throw new GoalNotFoundError()
 
-  const g = goal as GoalRow & { progress: Array<{ id: string; amount: unknown; recordedAt: Date }> }
+  const g = goal as unknown as GoalRow & { progress: Array<{ id: string; amount: unknown; recordedAt: Date }> }
 
   return {
     ...serializeGoal(g),

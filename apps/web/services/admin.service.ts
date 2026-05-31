@@ -511,14 +511,26 @@ export async function getDashboardStats(adminRoles: string[]) {
   )
 
   const memberMap = Object.fromEntries(
-    memberCounts.map((r) => [r.status, r._count.status]),
+    memberCounts.map((r) => {
+      const count =
+        typeof r._count === 'object' && r._count !== null && 'status' in r._count
+          ? Number((r._count as { status: number }).status)
+          : 0
+      return [r.status, count]
+    }),
   )
   const mandateMap = Object.fromEntries(
-    mandateCounts.map((r) => [r.status, r._count.status]),
+    mandateCounts.map((r: { status: string; _count: unknown }) => {
+      const count =
+        typeof r._count === 'object' && r._count !== null && 'status' in r._count
+          ? Number((r._count as { status: number }).status)
+          : 0
+      return [r.status, count]
+    }),
   )
 
-  const thisMonthDue = Number(contributionSummary._sum.amountDue ?? 0)
-  const thisMonthPaid = Number(contributionSummary._sum.amountPaid ?? 0)
+  const thisMonthDue = Number(contributionSummary._sum?.amountDue ?? 0)
+  const thisMonthPaid = Number(contributionSummary._sum?.amountPaid ?? 0)
 
   const stats: DashboardStats = {
     members: {
@@ -534,7 +546,7 @@ export async function getDashboardStats(adminRoles: string[]) {
       cancelled: mandateMap['CANCELLED'] ?? 0,
     },
     contributions: {
-      thisMonthTotal: contributionSummary._count.id,
+      thisMonthTotal: contributionSummary._count?.id ?? 0,
       thisMonthDue,
       thisMonthPaid,
       thisMonthOutstanding: thisMonthDue - thisMonthPaid,
@@ -543,7 +555,7 @@ export async function getDashboardStats(adminRoles: string[]) {
       newThisMonth: newContributionsThisMonth,
     },
     pool: {
-      total: Number(poolTotal._sum.amountPaid ?? 0),
+      total: Number(poolTotal._sum?.amountPaid ?? 0),
     },
     invitations: {
       pending: pendingInvites,

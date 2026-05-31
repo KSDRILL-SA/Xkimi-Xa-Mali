@@ -29,7 +29,12 @@ async function main() {
 
     const founder = await prisma.user.upsert({
       where: { email: founderEmail },
-      update: {},
+      update: {
+        password: passwordHash,
+        loginAttempts: 0,
+        lockedUntil: null,
+        status: 'ACTIVE',
+      },
       create: {
         email: founderEmail,
         phone: founderPhone,

@@ -64,11 +64,33 @@ export default async function ContributionsPage({
     const m = parseInt(fd.get('month') as string, 10)
     const y = parseInt(fd.get('year')  as string, 10)
 
-    const activeMembers = await db.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true } })
+    const activeMembers = await db.user.findMany({
+      where: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        mandates: {
+          where: { status: 'ACTIVE' },
+          select: { debitDay: true, amount: true },
+          take: 1,
+        },
+      },
+    })
     for (const member of activeMembers) {
+      const mandate = member.mandates[0]
+      const debitDay = mandate?.debitDay ?? 1
+      const amountDue = mandate?.amount ?? 100
+      const dueDate = new Date(y, m - 1, debitDay)
       await db.contribution.upsert({
         where: { userId_periodMonth_periodYear: { userId: member.id, periodMonth: m, periodYear: y } },
-        create: { userId: member.id, periodMonth: m, periodYear: y, amountDue: 100, amountPaid: 0, status: 'PENDING' },
+        create: {
+          userId: member.id,
+          periodMonth: m,
+          periodYear: y,
+          amountDue,
+          amountPaid: 0,
+          dueDate,
+          status: 'PENDING',
+        },
         update: {},
       })
     }

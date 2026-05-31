@@ -11,8 +11,8 @@ vi.mock('@/lib/db', () => ({
       count:      vi.fn(),
       update:     vi.fn(),
     },
-    role:     { findUniqueOrThrow: vi.fn() },
-    userRole: { create: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn() },
+    role:     { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
+    userRole: { create: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     notificationPreference:   { create: vi.fn() },
     emailVerificationToken:   { create: vi.fn() },
     $transaction: vi.fn(),
@@ -41,6 +41,10 @@ vi.mock('@/services/audit.service', () => ({
   writeAuditLog: vi.fn(),
 }))
 
+vi.mock('@/lib/role-version', () => ({
+  bumpRoleVersion: vi.fn().mockResolvedValue(undefined),
+}))
+
 import { db } from '@/lib/db'
 import { emailProvider } from '@/integrations/email'
 import { smsProvider } from '@/integrations/sms'
@@ -64,8 +68,15 @@ const mockDb = db as {
     count:      MockedFunction<typeof db.invitation.count>
     update:     MockedFunction<typeof db.invitation.update>
   }
-  role:     { findUniqueOrThrow: MockedFunction<typeof db.role.findUniqueOrThrow> }
-  userRole: { upsert: MockedFunction<typeof db.userRole.upsert>; deleteMany: MockedFunction<typeof db.userRole.deleteMany> }
+  role:     {
+    findUniqueOrThrow: MockedFunction<typeof db.role.findUniqueOrThrow>
+    findUnique: MockedFunction<typeof db.role.findUnique>
+  }
+  userRole: {
+    upsert: MockedFunction<typeof db.userRole.upsert>
+    deleteMany: MockedFunction<typeof db.userRole.deleteMany>
+    count: MockedFunction<typeof db.userRole.count>
+  }
   $transaction: MockedFunction<typeof db.$transaction>
 }
 
@@ -216,7 +227,10 @@ describe('revokeInvitation', () => {
 
     expect(mockDb.invitation.update).toHaveBeenCalledWith({
       where: { id: 'inv1' },
-      data: { status: 'REVOKED' },
+      data: expect.objectContaining({
+        status: 'REVOKED',
+        revokedById: 'a1',
+      }),
     })
     expect(mockWriteAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'ADMIN_INVITE_REVOKED' }),
@@ -230,7 +244,7 @@ describe('acceptInviteRegistration', () => {
   const input = {
     inviteCode: 'XKM-ABCD-1234',
     firstName: 'Kurhula', lastName: 'Maluleke',
-    email: 'k@x.co.za', phone: '0821234567',
+    email: 'k@x.co.za', phone: '+27821234567',
     password: 'Password1',
     consentToPopia: true as const,
   }
@@ -297,6 +311,8 @@ describe('setMemberRole', () => {
 
   it('deletes UserRole when revoking', async () => {
     mockDb.user.findUnique.mockResolvedValue({ id: 'u2', email: 'x@x.co.za' } as never)
+    mockDb.role.findUnique.mockResolvedValue({ id: 'role1' } as never)
+    mockDb.userRole.count.mockResolvedValue(2)
     mockDb.role.findUniqueOrThrow.mockResolvedValue({ id: 'role1' } as never)
     mockDb.userRole.deleteMany.mockResolvedValue({ count: 1 } as never)
     mockWriteAuditLog.mockResolvedValue(undefined)
