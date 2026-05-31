@@ -1,5 +1,6 @@
 'use client'
 
+import type { Route } from 'next'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Bell, ChevronRight } from 'lucide-react'
@@ -51,7 +52,7 @@ export function AppHeader({
 
       <div className={`${fixedHeight ? 'h-full' : 'h-14'} flex items-center gap-3 px-4 md:px-6 max-w-screen-2xl mx-auto`}>
         <Link
-          href={homeHref}
+          href={homeHref as Route}
           className="flex items-center gap-2.5 mr-auto min-w-0 group outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg p-1 -m-1"
           aria-label="Go to dashboard"
         >
@@ -71,7 +72,7 @@ export function AppHeader({
         <div className="flex items-center gap-2">
           {showBell && (
             <Link
-              href={bellHref}
+              href={bellHref as Route}
               aria-label="Notifications"
               className="relative w-9 h-9 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold"
             >

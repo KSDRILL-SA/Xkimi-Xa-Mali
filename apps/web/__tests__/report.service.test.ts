@@ -168,7 +168,7 @@ describe('generateMemberStatement', () => {
   })
 
   it('throws ReportNotFoundError when user does not exist', async () => {
-    mockUserFindUnique.mockResolvedValueOnce(null)
+    mockUserFindMany.mockResolvedValueOnce([])
 
     await expect(
       generateMemberStatement('user-1', 'user-1', MEMBER_ROLES, 5, 2025),
@@ -176,9 +176,9 @@ describe('generateMemberStatement', () => {
   })
 
   it('generates PDF, uploads to blob and returns urls', async () => {
-    mockUserFindUnique.mockResolvedValueOnce({
+    mockUserFindMany.mockResolvedValueOnce([{
       firstName: 'Sipho', lastName: 'Dlamini', email: 's@test.com', phone: '+27821234567',
-    } as never)
+    }] as never)
 
     mockContribFindMany.mockResolvedValueOnce([
       {
@@ -219,10 +219,13 @@ describe('generateMemberStatement', () => {
 describe('getAdminReport', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUserFindMany.mockReset()
+    mockContribFindMany.mockReset()
+    mockContribAggregate.mockReset()
   })
 
   it('returns period label, summary and per-member rows', async () => {
-    mockUserFindMany.mockResolvedValueOnce([
+    mockUserFindMany.mockResolvedValue([
       {
         id: 'user-1',
         firstName: 'Sipho',
@@ -234,11 +237,11 @@ describe('getAdminReport', () => {
       },
     ] as never)
 
-    mockContribFindMany.mockResolvedValueOnce([
+    mockContribFindMany.mockResolvedValue([
       { amountDue: 500, amountPaid: 500, status: 'PAID' },
     ] as never)
 
-    mockContribAggregate.mockResolvedValueOnce({ _sum: { amountPaid: 5000 } } as never)
+    mockContribAggregate.mockResolvedValue({ _sum: { amountPaid: 5000 } } as never)
 
     const report = await getAdminReport(5, 2025)
 
@@ -252,7 +255,7 @@ describe('getAdminReport', () => {
   })
 
   it('returns NO_RECORD status for members with no contribution this period', async () => {
-    mockUserFindMany.mockResolvedValueOnce([
+    mockUserFindMany.mockResolvedValue([
       {
         id: 'user-2',
         firstName: 'Jane',
@@ -264,8 +267,8 @@ describe('getAdminReport', () => {
       },
     ] as never)
 
-    mockContribFindMany.mockResolvedValueOnce([] as never)
-    mockContribAggregate.mockResolvedValueOnce({ _sum: { amountPaid: null } } as never)
+    mockContribFindMany.mockResolvedValue([] as never)
+    mockContribAggregate.mockResolvedValue({ _sum: { amountPaid: null } } as never)
 
     const report = await getAdminReport(6, 2025)
 
@@ -283,10 +286,13 @@ describe('getAdminReport', () => {
 describe('exportAdminReportCSV', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockUserFindMany.mockReset()
+    mockContribFindMany.mockReset()
+    mockContribAggregate.mockReset()
   })
 
   it('returns a valid CSV string with header and summary rows', async () => {
-    mockUserFindMany.mockResolvedValueOnce([
+    mockUserFindMany.mockResolvedValue([
       {
         id: 'user-1',
         firstName: 'Sipho',
@@ -298,11 +304,11 @@ describe('exportAdminReportCSV', () => {
       },
     ] as never)
 
-    mockContribFindMany.mockResolvedValueOnce([
+    mockContribFindMany.mockResolvedValue([
       { amountDue: 500, amountPaid: 500, status: 'PAID' },
     ] as never)
 
-    mockContribAggregate.mockResolvedValueOnce({ _sum: { amountPaid: 5000 } } as never)
+    mockContribAggregate.mockResolvedValue({ _sum: { amountPaid: 5000 } } as never)
 
     const csv = await exportAdminReportCSV(5, 2025)
     const lines = csv.split('\n')

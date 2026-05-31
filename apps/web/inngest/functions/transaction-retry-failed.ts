@@ -96,13 +96,13 @@ export const transactionRetryFailed = inngest.createFunction(
             entityId: tx.id,
             payload: {
               attempt: tx.retryCount + 1,
-              newStatus: result.newStatus,
+              newStatus: 'newStatus' in result ? result.newStatus : undefined,
               source: 'transaction-retry-job',
             },
           }),
         )
 
-        if (result.newStatus === 'SUCCESS') {
+        if ('newStatus' in result && result.newStatus === 'SUCCESS') {
           await step.run(`notify-${tx.id}`, () =>
             queueNotification({
               userId: tx.mandate.userId,

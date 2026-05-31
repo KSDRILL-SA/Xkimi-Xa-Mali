@@ -99,15 +99,34 @@ npm install
 
 ### 2. Configure environment
 
+Copy and fill in `.env.local` for each app (see `.env.example` for all variables):
+
 ```bash
 cp .env.example apps/web/.env.local
-# Fill in required values — see .env.example for descriptions
+cp .env.example apps/admin/.env.local
+cp .env.example apps/website/.env.local
 ```
+
+**Local dev URLs** (set these in the website and web/admin env files):
+
+| Variable | Value |
+|---|---|
+| `NEXTAUTH_URL` (web) | `http://localhost:3000` |
+| `NEXTAUTH_URL` (admin) | `http://localhost:3002` |
+| `NEXT_PUBLIC_SITE_URL` | `http://localhost:3001` |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` |
+| `NEXT_PUBLIC_ADMIN_URL` | `http://localhost:3002` |
+| `WEB_INTERNAL_URL` | `http://localhost:3000` |
+| `DATABASE_URL` | `postgresql://xxm:xxm_local_password@localhost:5432/xxm_dev` |
+
+Generate secrets: `openssl rand -base64 32` (auth) and `openssl rand -hex 32` (encryption).
+
+Set `FOUNDER_EMAIL`, `FOUNDER_PHONE`, and `FOUNDER_PASSWORD` in `apps/web/.env.local` before seeding.
 
 ### 3. Start local services
 
 ```bash
-docker-compose up -d
+docker-compose up -d   # PostgreSQL + Redis
 ```
 
 ### 4. Set up database
@@ -115,16 +134,26 @@ docker-compose up -d
 ```bash
 npm run db:generate
 npm run db:migrate
-npm run db:seed   # requires FOUNDER_EMAIL/PHONE/PASSWORD in .env.local
+npm run db:seed
 ```
 
-### 5. Start development server
+### 5. Start development servers
 
 ```bash
 npm run dev
-# App: http://localhost:3000
-# Prisma Studio: npm run db:studio
 ```
+
+| App | URL |
+|---|---|
+| Website (marketing) | http://localhost:3001 |
+| Web (member portal + API) | http://localhost:3000 |
+| Admin dashboard | http://localhost:3002 |
+
+Start a single app: `npm run dev:web`, `npm run dev:admin`, or `npm run dev:website`.
+
+Prisma Studio: `npm run db:studio`
+
+**Optional — Inngest jobs (debits, reminders):** run the [Inngest dev server](https://www.inngest.com/docs/local-development) alongside the web app so scheduled functions execute locally.
 
 ---
 
