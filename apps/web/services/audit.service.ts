@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import { db } from '@/lib/db'
+import { auditRepo } from '@/repositories/audit.repository'
 
 type AuditParams = {
   userId?: string
@@ -11,14 +11,12 @@ type AuditParams = {
 }
 
 export async function writeAuditLog({ userId, action, entity, entityId, payload, ipAddress }: AuditParams) {
-  await db.auditLog.create({
-    data: {
-      userId: userId ?? null,
-      action,
-      entity,
-      entityId,
-      payload: payload ?? {},
-      ipAddress: ipAddress ?? null,
-    },
+  await auditRepo.create({
+    userId: userId ?? null,
+    action,
+    entity,
+    entityId,
+    payload: payload ?? {},
+    ipAddress: ipAddress ?? null,
   })
 }

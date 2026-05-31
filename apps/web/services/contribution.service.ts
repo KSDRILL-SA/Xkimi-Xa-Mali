@@ -2,6 +2,9 @@ import { randomUUID } from 'crypto'
 import { Prisma } from '@prisma/client'
 import type { ContributionStatus, TransactionStatus } from '@prisma/client'
 import { db } from '@/lib/db'
+import { contributionRepo, runTransaction, type TxClient } from '@/repositories/contribution.repository'
+import { transactionRepo } from '@/repositories/transaction.repository'
+import { mandateRepo } from '@/repositories/mandate.repository'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import { cache, CACHE_KEYS } from '@/lib/cache'
@@ -30,28 +33,29 @@ export async function getContributions(
   assertCanAccess(userId, requesterId, roles)
 
   const [items, total] = await Promise.all([
-    db.contribution.findMany({
-      where: { userId },
-      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
-      skip: (page - 1) * limit,
-      take: limit,
-      include: {
-        transactions: {
-          orderBy: { createdAt: 'desc' },
-          take: 10,
+    contributionRepo.findMany(
+      { userId },
+      {
+        orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          transactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+          },
         },
       },
-    }),
-    db.contribution.count({ where: { userId } }),
+    ),
+    contributionRepo.count({ userId }),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
 export async function getContribution(id: string, requesterId: string, roles: string[]) {
-  const contribution = await db.contribution.findUnique({
-    where: { id },
-    include: { transactions: { orderBy: { createdAt: 'desc' } } },
+  const contribution = await contributionRepo.findById(id, {
+    transactions: { orderBy: { createdAt: 'desc' } },
   })
   if (!contribution) throw new ContributionNotFoundError()
   assertCanAccess(contribution.userId, requesterId, roles)
@@ -72,18 +76,12 @@ export async function getContributionSummary(
   const currentYear = new Date().getFullYear()
 
   const [byStatus, totals, yearTotals] = await Promise.all([
-    db.contribution.groupBy({
-      by: ['status'],
-      where: { userId },
-      _count: { status: true },
-    }),
-    db.contribution.aggregate({
-      where: { userId },
+    contributionRepo.groupBy({ userId }),
+    contributionRepo.aggregate({ userId }, {
       _sum: { amountPaid: true },
       _count: { id: true },
     }),
-    db.contribution.aggregate({
-      where: { userId, periodYear: currentYear },
+    contributionRepo.aggregate({ userId, periodYear: currentYear }, {
       _sum: { amountPaid: true },
     }),
   ])
@@ -124,9 +122,7 @@ export async function submitManualPayment(
 ) {
   assertCanAccess(userId, requesterId, roles)
 
-  const mandate = await db.paymentMandate.findFirst({
-    where: { userId, status: 'ACTIVE' },
-  })
+  const mandate = await mandateRepo.findActiveByUser(userId)
   if (!mandate?.netcashMandateId) {
     throw new MandateConflictError(
       'An active payment mandate is required to make a manual payment',
@@ -135,27 +131,21 @@ export async function submitManualPayment(
   }
 
   const dueDate = new Date(data.periodYear, data.periodMonth - 1, mandate.debitDay)
-  let contribution = await db.contribution.findUnique({
-    where: {
-      userId_periodMonth_periodYear: {
-        userId,
-        periodMonth: data.periodMonth,
-        periodYear: data.periodYear,
-      },
-    },
-  })
+  let contribution = await contributionRepo.findByPeriod(
+    userId,
+    data.periodMonth,
+    data.periodYear,
+  )
 
   if (!contribution) {
-    contribution = await db.contribution.create({
-      data: {
-        userId,
-        periodMonth: data.periodMonth,
-        periodYear: data.periodYear,
-        amountDue: Number(mandate.amount),
-        amountPaid: 0,
-        dueDate,
-        status: 'PENDING',
-      },
+    contribution = await contributionRepo.create({
+      userId,
+      periodMonth: data.periodMonth,
+      periodYear: data.periodYear,
+      amountDue: Number(mandate.amount),
+      amountPaid: 0,
+      dueDate,
+      status: 'PENDING',
     })
   }
 
@@ -187,9 +177,9 @@ export async function submitManualPayment(
   const txStatus: TransactionStatus =
     gatewayRes.status === 'SUCCESS' ? 'SUCCESS' : 'PENDING'
 
-  const transaction = await db.$transaction(async (tx) => {
-    const created = await tx.transaction.create({
-      data: {
+  const transaction = await runTransaction(async (tx) => {
+    const created = await transactionRepo.create(
+      {
         contributionId: contribution.id,
         mandateId: mandate.id,
         amount: data.amount,
@@ -200,7 +190,8 @@ export async function submitManualPayment(
         idempotencyKey,
         processedAt: txStatus === 'SUCCESS' ? new Date() : null,
       },
-    })
+      tx,
+    )
 
     if (txStatus === 'SUCCESS') {
       await recalculateContributionStatus(contribution.id, tx)
@@ -244,8 +235,6 @@ export async function submitManualPayment(
 
 // ─── Status engine ─────────────────────────────────────────────────────────
 
-type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0]
-
 function deriveContributionStatus(
   amountPaid: number,
   amountDue: number,
@@ -263,11 +252,8 @@ export async function recalculateContributionStatus(
 ) {
   for (let attempt = 1; attempt <= MAX_OPTIMISTIC_RETRIES; attempt++) {
     const [contribution, aggr] = await Promise.all([
-      tx.contribution.findUnique({ where: { id: contributionId } }),
-      tx.transaction.aggregate({
-        where: { contributionId, status: 'SUCCESS' },
-        _sum: { amount: true },
-      }),
+      contributionRepo.findUniqueWithVersion(contributionId, tx),
+      transactionRepo.aggregate({ contributionId, status: 'SUCCESS' }, tx),
     ])
 
     if (!contribution) return
@@ -279,10 +265,12 @@ export async function recalculateContributionStatus(
       contribution.dueDate,
     )
 
-    const updated = await tx.contribution.updateMany({
-      where: { id: contributionId, version: contribution.version },
-      data: { amountPaid: newAmountPaid, status, version: contribution.version + 1 },
-    })
+    const updated = await contributionRepo.updateByVersion(
+      contributionId,
+      contribution.version,
+      { amountPaid: newAmountPaid, status, version: contribution.version + 1 },
+      tx,
+    )
 
     if (updated.count > 0) return
 
@@ -302,12 +290,10 @@ export async function recalculateContributionStatus(
 // ─── Webhook: transaction settlement ──────────────────────────────────────
 
 export async function processTransactionWebhook(event: NetcashTransactionEvent) {
-  const transaction = await db.transaction.findFirst({
-    where: { gatewayRef: event.transactionRef },
-    include: {
-      contribution: { select: { userId: true } },
-    },
-  })
+  const transaction = await transactionRepo.findByGatewayRef(
+    event.transactionRef,
+    { contribution: { select: { userId: true } } },
+  )
 
   if (!transaction) return
 
@@ -331,15 +317,16 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
     }
   }
 
-  await db.$transaction(async (tx) => {
-    await tx.transaction.update({
-      where: { id: transaction.id },
-      data: {
+  await runTransaction(async (tx) => {
+    await transactionRepo.update(
+      transaction.id,
+      {
         status: newStatus,
         processedAt: newStatus === 'SUCCESS' ? new Date() : null,
         gatewayResponse: event as unknown as Prisma.InputJsonValue,
       },
-    })
+      tx,
+    )
 
     await recalculateContributionStatus(transaction.contributionId, tx)
   })
@@ -379,9 +366,8 @@ export async function createReversal(
 ) {
   assertAdmin(adminRoles)
 
-  const original = await db.transaction.findUnique({
-    where: { id: transactionId },
-    include: { reversal: true },
+  const original = await transactionRepo.findById(transactionId, {
+    reversal: true,
   })
 
   if (!original) throw new TransactionNotFoundError()
@@ -394,9 +380,9 @@ export async function createReversal(
 
   const idempotencyKey = `reversal:${transactionId}:${randomUUID()}`
 
-  const reversal = await db.$transaction(async (tx) => {
-    const rev = await tx.transaction.create({
-      data: {
+  const reversal = await runTransaction(async (tx) => {
+    const rev = await transactionRepo.create(
+      {
         contributionId: original.contributionId,
         mandateId: original.mandateId,
         amount: original.amount,
@@ -406,12 +392,10 @@ export async function createReversal(
         reversalOfId: original.id,
         processedAt: new Date(),
       },
-    })
+      tx,
+    )
 
-    await tx.transaction.update({
-      where: { id: original.id },
-      data: { status: 'REVERSED' },
-    })
+    await transactionRepo.update(original.id, { status: 'REVERSED' }, tx)
 
     await recalculateContributionStatus(original.contributionId, tx)
 
@@ -445,13 +429,10 @@ export async function createReversal(
 // ─── Overdue sweep ────────────────────────────────────────────────────────
 
 export async function sweepOverdueContributions(): Promise<number> {
-  const result = await db.contribution.updateMany({
-    where: {
-      status: 'PENDING',
-      dueDate: { lt: new Date() },
-    },
-    data: { status: 'OVERDUE' },
-  })
+  const result = await contributionRepo.updateMany(
+    { status: 'PENDING', dueDate: { lt: new Date() } },
+    { status: 'OVERDUE' },
+  )
 
   if (result.count > 0) {
     logger.info('Overdue sweep completed', { updated: result.count })
@@ -480,29 +461,26 @@ export async function generateMonthlyContributions(
 ) {
   assertAdmin(adminRoles)
 
-  const mandates = await db.paymentMandate.findMany({
-    where: { status: 'ACTIVE' },
-    include: { user: { select: { id: true, status: true } } },
+  const mandates = await mandateRepo.findAllActive({
+    user: { select: { id: true, status: true } },
   })
 
   const eligible = mandates.filter((m) => m.user.status === 'ACTIVE')
 
   // Bulk-check for existing records in one query instead of N per-mandate lookups.
-  const existing = await db.contribution.findMany({
-    where: {
-      userId: { in: eligible.map((m) => m.userId) },
-      periodMonth: data.month,
-      periodYear: data.year,
-    },
-    select: { userId: true },
-  })
+  const existing = await contributionRepo.findByUserIds(
+    eligible.map((m) => m.userId),
+    data.month,
+    data.year,
+    { userId: true },
+  )
   const alreadyHas = new Set(existing.map((c) => c.userId))
 
   const toCreate = eligible.filter((m) => !alreadyHas.has(m.userId))
 
   if (toCreate.length > 0) {
-    await db.contribution.createMany({
-      data: toCreate.map((m) => ({
+    await contributionRepo.createMany(
+      toCreate.map((m) => ({
         userId: m.userId,
         periodMonth: data.month,
         periodYear: data.year,
@@ -511,8 +489,8 @@ export async function generateMonthlyContributions(
         dueDate: new Date(data.year, data.month - 1, m.debitDay),
         status: 'PENDING' as const,
       })),
-      skipDuplicates: true,
-    })
+      true,
+    )
   }
 
   const created = toCreate.length

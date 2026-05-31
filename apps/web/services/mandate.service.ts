@@ -1,4 +1,3 @@
-import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
@@ -19,18 +18,18 @@ import {
   type NetcashAccountType,
 } from '@/lib/netcash'
 import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '@/lib/validation/mandate'
-import { Prisma } from '@prisma/client'
 import type { MandateStatus, AccountType } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { redis } from '@/lib/redis'
+import { mandateRepo } from '@/repositories/mandate.repository'
+import { bankAccountRepo } from '@/repositories/bank-account.repository'
 
 // ─── Queries ───────────────────────────────────────────────────────────────
 
 export async function getMandates(userId: string, requesterId: string, requesterRoles: string[]) {
   assertCanAccess(userId, requesterId, requesterRoles)
 
-  const mandates = await db.paymentMandate.findMany({
-    where: { userId },
+  const mandates = await mandateRepo.findByUser(userId, {
     orderBy: { createdAt: 'desc' },
     include: {
       bankAccount: {
@@ -51,12 +50,9 @@ export async function getMandates(userId: string, requesterId: string, requester
 }
 
 export async function getMandate(mandateId: string, requesterId: string, requesterRoles: string[]) {
-  const mandate = await db.paymentMandate.findUnique({
-    where: { id: mandateId },
-    include: {
-      bankAccount: {
-        select: { bankName: true, accountNumber: true, accountType: true, branchCode: true },
-      },
+  const mandate = await mandateRepo.findById(mandateId, {
+    bankAccount: {
+      select: { bankName: true, accountNumber: true, accountType: true, branchCode: true },
     },
   })
 
@@ -84,16 +80,15 @@ export async function createMandate(
 ) {
   assertCanAccess(userId, requesterId, requesterRoles)
 
-  const existingActive = await db.paymentMandate.findFirst({
-    where: { userId, status: { in: ['PENDING', 'ACTIVE'] } },
+  const existingActive = await mandateRepo.findFirst({
+    userId, status: { in: ['PENDING', 'ACTIVE'] },
   })
   if (existingActive) {
     throw new MandateConflictError('An active or pending mandate already exists', 'MND_002')
   }
 
-  const bankAccount = await db.bankAccount.findUnique({
-    where: { id: data.bankAccountId },
-    include: { user: { select: { firstName: true, lastName: true, idNumber: true } } },
+  const bankAccount = await bankAccountRepo.findById(data.bankAccountId, {
+    user: { select: { firstName: true, lastName: true, idNumber: true } },
   })
   if (!bankAccount || bankAccount.userId !== userId) {
     throw new BankAccountNotFoundError()
@@ -125,15 +120,13 @@ export async function createMandate(
   // must cancel it, otherwise we orphan a debit authorisation with no local record.
   let mandate
   try {
-    mandate = await db.paymentMandate.create({
-      data: {
-        userId,
-        bankAccountId: data.bankAccountId,
-        debitDay: data.debitDay,
-        amount: data.amount,
-        status,
-        netcashMandateId: netcashRes.mandateId,
-      },
+    mandate = await mandateRepo.create({
+      userId,
+      bankAccountId: data.bankAccountId,
+      debitDay: data.debitDay,
+      amount: data.amount,
+      status,
+      netcashMandateId: netcashRes.mandateId,
     })
   } catch (dbErr) {
     await cancelDebiCheckMandate(netcashRes.mandateId).catch(() => {})
@@ -159,7 +152,7 @@ export async function updateMandate(
   requesterRoles: string[],
   ipAddress?: string,
 ) {
-  const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
+  const mandate = await mandateRepo.findById(mandateId)
   if (!mandate) throw new MandateNotFoundError()
   assertCanAccess(mandate.userId, requesterId, requesterRoles)
 
@@ -180,12 +173,9 @@ export async function updateMandate(
     )
   }
 
-  const updated = await db.paymentMandate.update({
-    where: { id: mandateId },
-    data: {
-      ...(data.debitDay !== undefined && { debitDay: data.debitDay }),
-      ...(data.amount !== undefined && { amount: data.amount }),
-    },
+  const updated = await mandateRepo.update(mandateId, {
+    ...(data.debitDay !== undefined && { debitDay: data.debitDay }),
+    ...(data.amount !== undefined && { amount: data.amount }),
   })
 
   await writeAuditLog({
@@ -212,7 +202,7 @@ export async function cancelMandate(
   requesterRoles: string[],
   ipAddress?: string,
 ) {
-  const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
+  const mandate = await mandateRepo.findById(mandateId)
   if (!mandate) throw new MandateNotFoundError()
   assertCanAccess(mandate.userId, requesterId, requesterRoles)
 
@@ -224,10 +214,7 @@ export async function cancelMandate(
     await cancelDebiCheckMandate(mandate.netcashMandateId)
   }
 
-  const updated = await db.paymentMandate.update({
-    where: { id: mandateId },
-    data: { status: 'CANCELLED' },
-  })
+  const updated = await mandateRepo.update(mandateId, { status: 'CANCELLED' })
 
   await writeAuditLog({
     userId: mandate.userId,
@@ -251,7 +238,7 @@ export async function requestDelay(
   requesterRoles: string[],
   ipAddress?: string,
 ) {
-  const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId } })
+  const mandate = await mandateRepo.findById(mandateId)
   if (!mandate) throw new MandateNotFoundError()
   assertCanAccess(mandate.userId, requesterId, requesterRoles)
 
@@ -304,8 +291,8 @@ export async function requestDelay(
 // ─── Webhook processing ────────────────────────────────────────────────────
 
 export async function processMandateWebhook(event: NetcashWebhookEvent) {
-  const mandate = await db.paymentMandate.findFirst({
-    where: { netcashMandateId: event.mandateId },
+  const mandate = await mandateRepo.findFirst({
+    netcashMandateId: event.mandateId,
   })
 
   if (!mandate) return // unknown mandate ID — no-op
@@ -320,10 +307,7 @@ export async function processMandateWebhook(event: NetcashWebhookEvent) {
   // audit rows). Netcash retries on non-2xx and may also deliver duplicates.
   if (mandate.status === newStatus) return
 
-  await db.paymentMandate.update({
-    where: { id: mandate.id },
-    data: { status: newStatus },
-  })
+  await mandateRepo.update(mandate.id, { status: newStatus })
 
   await writeAuditLog({
     action: 'MANDATE_WEBHOOK_RECEIVED',
