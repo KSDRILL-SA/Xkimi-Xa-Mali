@@ -19,14 +19,18 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
-vi.mock('@/lib/email', () => ({
-  sendInviteEmail:      vi.fn(),
-  sendVerificationEmail: vi.fn(),
+vi.mock('@/integrations/email', () => ({
+  emailProvider: {
+    sendInviteEmail:      vi.fn(),
+    sendVerificationEmail: vi.fn(),
+  },
 }))
 
-vi.mock('@/lib/bulksms', () => ({
-  sendSMS:        vi.fn(),
-  normalisePhone: vi.fn((p: string) => p.startsWith('+27') ? p : `+27${p.slice(1)}`),
+vi.mock('@/integrations/sms', () => ({
+  smsProvider: {
+    send:          vi.fn(),
+    normalisePhone: vi.fn((p: string) => p),
+  },
 }))
 
 vi.mock('@/lib/encryption', () => ({
@@ -38,8 +42,8 @@ vi.mock('@/services/audit.service', () => ({
 }))
 
 import { db } from '@/lib/db'
-import { sendInviteEmail, sendVerificationEmail } from '@/lib/email'
-import { sendSMS } from '@/lib/bulksms'
+import { emailProvider } from '@/integrations/email'
+import { smsProvider } from '@/integrations/sms'
 import { writeAuditLog } from '@/services/audit.service'
 import { ForbiddenError, InviteNotFoundError, InviteUsedError, InviteRevokedError, InviteExpiredError, InviteDuplicateError, InviteBindingError } from '@/lib/errors'
 import {
@@ -65,9 +69,9 @@ const mockDb = db as {
   $transaction: MockedFunction<typeof db.$transaction>
 }
 
-const mockSendInviteEmail      = sendInviteEmail      as MockedFunction<typeof sendInviteEmail>
-const mockSendVerificationEmail = sendVerificationEmail as MockedFunction<typeof sendVerificationEmail>
-const mockSendSMS              = sendSMS              as MockedFunction<typeof sendSMS>
+const mockSendInviteEmail      = emailProvider.sendInviteEmail      as MockedFunction<typeof emailProvider.sendInviteEmail>
+const mockSendVerificationEmail = emailProvider.sendVerificationEmail as MockedFunction<typeof emailProvider.sendVerificationEmail>
+const mockSendSMS              = smsProvider.send              as MockedFunction<typeof smsProvider.send>
 const mockWriteAuditLog        = writeAuditLog        as MockedFunction<typeof writeAuditLog>
 
 const ADMIN  = ['ADMIN', 'MEMBER']

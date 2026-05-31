@@ -15,9 +15,8 @@ import {
   TransactionNotFoundError,
 } from '@/lib/errors'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
-import { submitOnceOffDebit, mapNetcashTransactionStatus } from '@/lib/netcash'
+import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import type { ManualContributionInput, GenerateContributionsInput } from '@/lib/validation/contribution'
-import type { NetcashTransactionEvent } from '@/lib/netcash'
 
 const MAX_OPTIMISTIC_RETRIES = 3
 
@@ -167,7 +166,7 @@ export async function submitManualPayment(
 
   const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${randomUUID()}`
 
-  const gatewayRes = await submitOnceOffDebit({
+  const gatewayRes = await paymentGateway.submitOnceOffDebit({
     mandateId: mandate.netcashMandateId,
     amount: data.amount,
     reference: `XXM-${data.periodYear}-${String(data.periodMonth).padStart(2, '0')}`,
@@ -289,7 +288,7 @@ export async function recalculateContributionStatus(
 
 // ─── Webhook: transaction settlement ──────────────────────────────────────
 
-export async function processTransactionWebhook(event: NetcashTransactionEvent) {
+export async function processTransactionWebhook(event: TransactionEvent) {
   const transaction = await transactionRepo.findByGatewayRef(
     event.transactionRef,
     { contribution: { select: { userId: true } } },
@@ -297,7 +296,7 @@ export async function processTransactionWebhook(event: NetcashTransactionEvent) 
 
   if (!transaction) return
 
-  const newStatus = mapNetcashTransactionStatus(event.status)
+  const newStatus = paymentGateway.mapTransactionStatus(event.status)
   if (!newStatus) return
 
   const terminal: TransactionStatus[] = ['SUCCESS', 'REVERSED']

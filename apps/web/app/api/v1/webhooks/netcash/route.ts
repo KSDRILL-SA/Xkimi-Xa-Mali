@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { verifyWebhookSignature, isAllowedNetcashIp } from '@/lib/netcash'
+import { paymentGateway } from '@/integrations/payment'
 import { processMandateWebhook } from '@/services/mandate.service'
 import { processTransactionWebhook } from '@/services/contribution.service'
 import { logger } from '@/lib/logger'
@@ -32,13 +32,13 @@ export async function POST(req: NextRequest) {
   const rawBody = await req.text()
 
   const signature = req.headers.get('x-netcash-signature') ?? ''
-  if (!signature || !verifyWebhookSignature(rawBody, signature)) {
+  if (!signature || !paymentGateway.verifyWebhookSignature(rawBody, signature)) {
     logger.warn('Webhook signature verification failed')
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
-  if (!isAllowedNetcashIp(clientIp)) {
+  if (!paymentGateway.isAllowedWebhookIp(clientIp)) {
     logger.warn('Webhook from disallowed IP', { clientIp })
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }

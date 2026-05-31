@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client'
 import type { TransactionStatus } from '@prisma/client'
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
-import { submitScheduledDebit } from '@/lib/netcash'
+import { paymentGateway } from '@/integrations/payment'
 import { recalculateContributionStatus } from '@/services/contribution.service'
 import { queueNotification } from '@/services/notification.service'
 
@@ -70,7 +70,7 @@ export const mandateDelayHandler = inngest.createFunction(
     if (contribution.status === 'PAID') return
 
     const gatewayRes = await step.run('submit-debit', () =>
-      submitScheduledDebit({
+      paymentGateway.submitScheduledDebit({
         mandateId: mandate.netcashMandateId!,
         amount: Number(mandate.amount),
         reference: `XXM-${periodYear}-${String(periodMonth).padStart(2, '0')}-DELAY`,

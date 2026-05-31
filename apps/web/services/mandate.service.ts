@@ -8,15 +8,10 @@ import {
 } from '@/lib/errors'
 import { assertCanAccess } from '@/lib/authorization'
 import {
-  createDebiCheckMandate,
-  cancelDebiCheckMandate,
-  delayMandate as netcashDelay,
-  updateDebiCheckMandate,
-  mapNetcashStatus,
-  getNextDebitDate,
-  type NetcashWebhookEvent,
-  type NetcashAccountType,
-} from '@/lib/netcash'
+  paymentGateway,
+  type WebhookEvent,
+  type AccountType as GatewayAccountType,
+} from '@/integrations/payment'
 import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '@/lib/validation/mandate'
 import type { MandateStatus, AccountType } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
@@ -96,11 +91,11 @@ export async function createMandate(
 
   const decryptedAccountNumber = decrypt(bankAccount.accountNumber)
   const accountType = mapAccountType(bankAccount.accountType)
-  const startDate = getNextDebitDate(data.debitDay)
+  const startDate = paymentGateway.getNextDebitDate(data.debitDay)
   const accountName = `${bankAccount.user.firstName} ${bankAccount.user.lastName}`
   const idNumber = bankAccount.user.idNumber ? decrypt(bankAccount.user.idNumber) : undefined
 
-  const netcashRes = await createDebiCheckMandate({
+  const netcashRes = await paymentGateway.createMandate({
     accountNumber: decryptedAccountNumber,
     branchCode: bankAccount.branchCode,
     accountType,
@@ -114,7 +109,7 @@ export async function createMandate(
 
   // Persist the status Netcash actually returned (a 200 response may still carry
   // a REJECTED/CANCELLED status), not an assumed PENDING.
-  const status = mapNetcashStatus(netcashRes.status)
+  const status = paymentGateway.mapMandateStatus(netcashRes.status)
 
   // The DebiCheck mandate is already live at Netcash. If the local write fails we
   // must cancel it, otherwise we orphan a debit authorisation with no local record.
@@ -129,7 +124,7 @@ export async function createMandate(
       netcashMandateId: netcashRes.mandateId,
     })
   } catch (dbErr) {
-    await cancelDebiCheckMandate(netcashRes.mandateId).catch(() => {})
+    await paymentGateway.cancelMandate(netcashRes.mandateId).catch(() => {})
     throw dbErr
   }
 
@@ -165,8 +160,8 @@ export async function updateMandate(
   // on the old day while our records show the new one.
   const hasChange = data.amount !== undefined || data.debitDay !== undefined
   if (hasChange && mandate.netcashMandateId) {
-    const effectiveDate = getNextDebitDate(data.debitDay ?? mandate.debitDay)
-    await updateDebiCheckMandate(
+    const effectiveDate = paymentGateway.getNextDebitDate(data.debitDay ?? mandate.debitDay)
+    await paymentGateway.updateMandate(
       mandate.netcashMandateId,
       { amount: data.amount, debitDay: data.debitDay },
       effectiveDate,
@@ -211,7 +206,7 @@ export async function cancelMandate(
   }
 
   if (mandate.netcashMandateId) {
-    await cancelDebiCheckMandate(mandate.netcashMandateId)
+    await paymentGateway.cancelMandate(mandate.netcashMandateId)
   }
 
   const updated = await mandateRepo.update(mandateId, { status: 'CANCELLED' })
@@ -252,12 +247,12 @@ export async function requestDelay(
   }
 
   if (mandate.netcashMandateId) {
-    await netcashDelay(mandate.netcashMandateId, data.newDate)
+    await paymentGateway.delayMandate(mandate.netcashMandateId, data.newDate)
   }
 
   // Mark this period's debit as delayed so the nightly debit-run skips it.
   // Key derived from getNextDebitDate so it matches what debit-run checks.
-  const nextDebit = getNextDebitDate(mandate.debitDay)
+  const nextDebit = paymentGateway.getNextDebitDate(mandate.debitDay)
   const [periodYear, periodMonth] = nextDebit.split('-')
   await redis.set(
     `xxm:delay:${mandateId}:${periodYear}-${periodMonth}`,
@@ -290,14 +285,14 @@ export async function requestDelay(
 
 // ─── Webhook processing ────────────────────────────────────────────────────
 
-export async function processMandateWebhook(event: NetcashWebhookEvent) {
+export async function processMandateWebhook(event: WebhookEvent) {
   const mandate = await mandateRepo.findFirst({
     netcashMandateId: event.mandateId,
   })
 
   if (!mandate) return // unknown mandate ID — no-op
 
-  const newStatus = mapNetcashStatus(event.status) as MandateStatus
+  const newStatus = paymentGateway.mapMandateStatus(event.status) as MandateStatus
 
   // CANCELLED is terminal — never let a replayed or out-of-order event revive a
   // cancelled mandate (which would resume debiting an account the member closed).
@@ -331,8 +326,8 @@ function maskBankAccount(encrypted: string): string {
   return plain.slice(-4).padStart(plain.length, '*')
 }
 
-function mapAccountType(type: AccountType): NetcashAccountType {
-  const map: Record<AccountType, NetcashAccountType> = {
+function mapAccountType(type: AccountType): GatewayAccountType {
+  const map: Record<AccountType, GatewayAccountType> = {
     CHEQUE: 'Cheque',
     SAVINGS: 'Savings',
     TRANSMISSION: 'Transmission',

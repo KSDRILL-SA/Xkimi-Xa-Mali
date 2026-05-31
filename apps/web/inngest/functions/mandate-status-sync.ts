@@ -1,6 +1,6 @@
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
-import { getMandateStatus, mapNetcashStatus } from '@/lib/netcash'
+import { paymentGateway } from '@/integrations/payment'
 import { logger } from '@/lib/logger'
 import { writeAuditLog } from '@/services/audit.service'
 import type { MandateStatus } from '@prisma/client'
@@ -28,8 +28,8 @@ export const mandateStatusSync = inngest.createFunction(
     for (const mandate of mandates) {
       try {
         const result = await step.run(`sync-${mandate.id}`, async () => {
-          const gatewayRes = await getMandateStatus(mandate.netcashMandateId!)
-          const newStatus = mapNetcashStatus(gatewayRes.status) as MandateStatus
+          const gatewayRes = await paymentGateway.getMandateStatus(mandate.netcashMandateId!)
+          const newStatus = paymentGateway.mapMandateStatus(gatewayRes.status) as MandateStatus
 
           // Idempotent: skip if already matching
           if (mandate.status === newStatus) return 'unchanged'

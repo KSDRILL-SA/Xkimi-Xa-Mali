@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'crypto'
 import { env } from '@/lib/env'
 import { encrypt } from '@/lib/encryption'
-import { sendVerificationEmail, sendPasswordResetEmail } from '@/lib/email'
+import { emailProvider } from '@/integrations/email'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import { userRepo, runTransaction } from '@/repositories/user.repository'
@@ -72,7 +72,7 @@ export async function registerUser(
     expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
   })
 
-  await sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
+  await emailProvider.sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
 
   await writeAuditLog({
     userId: user.id,
@@ -128,7 +128,7 @@ export async function requestPasswordReset(email: string, baseUrl: string, ipAdd
     expiresAt: new Date(Date.now() + RESET_TTL_MS),
   })
 
-  await sendPasswordResetEmail(user.email, user.firstName, rawToken, baseUrl)
+  await emailProvider.sendPasswordResetEmail(user.email, user.firstName, rawToken, baseUrl)
 
   await writeAuditLog({
     userId: user.id,
