@@ -1,4 +1,4 @@
-import { db, Prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 import { writeAuditLog } from './audit.service'
 import { queueNotification } from './notification.service'
 import { logger } from '@/lib/logger'
@@ -9,6 +9,12 @@ import { sendWelcomeEmail } from '@/lib/email'
 import { generateMonthlyContributions } from './contribution.service'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { bumpRoleVersion } from '@/lib/role-version'
+import { userRepo } from '@/repositories/user.repository'
+import { mandateRepo } from '@/repositories/mandate.repository'
+import { contributionRepo } from '@/repositories/contribution.repository'
+import { auditRepo } from '@/repositories/audit.repository'
+import { goalRepo } from '@/repositories/goal.repository'
+import { invitationRepo } from '@/repositories/invitation.repository'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,8 +86,7 @@ export async function listMembers(adminRoles: string[], params: ListMembersParam
   }
 
   const [items, total] = await Promise.all([
-    db.user.findMany({
-      where,
+    userRepo.findMany(where, {
       skip,
       take: limit,
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -99,7 +104,7 @@ export async function listMembers(adminRoles: string[], params: ListMembersParam
         },
       },
     }),
-    db.user.count({ where }),
+    userRepo.count(where),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
@@ -108,8 +113,8 @@ export async function listMembers(adminRoles: string[], params: ListMembersParam
 export async function getMemberDetail(adminRoles: string[], memberId: string) {
   assertAdmin(adminRoles)
 
-  const member = await db.user.findUnique({
-    where: { id: memberId },
+  const members = await userRepo.findMany({ id: memberId }, {
+    take: 1,
     select: {
       id: true,
       firstName: true,
@@ -142,6 +147,7 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
       },
     },
   })
+  const member = members[0] ?? null
 
   if (!member) throw new AdminNotFoundError('Member not found')
   return member
@@ -160,14 +166,16 @@ export async function setMemberStatus(
     assertNotSelf(adminId, memberId, 'suspend')
   }
 
-  const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true, status: true } })
+  const memberResults = await userRepo.findMany({ id: memberId }, {
+    take: 1,
+    select: { id: true, status: true },
+  })
+  const member = memberResults[0] ?? null
   if (!member) throw new AdminNotFoundError('Member not found')
   if (member.status === newStatus) throw new AdminConflictError(`Member is already ${newStatus}`)
 
-  const updated = await db.user.update({
-    where: { id: memberId },
-    data: { status: newStatus },
-    select: { id: true, status: true, firstName: true, lastName: true },
+  const updated = await userRepo.update(memberId, { status: newStatus }, {
+    id: true, status: true, firstName: true, lastName: true,
   })
 
   await Promise.all([
@@ -196,8 +204,7 @@ export async function listAllMandates(adminRoles: string[], params: ListMandates
   const where = { ...(status && { status }) }
 
   const [items, total] = await Promise.all([
-    db.paymentMandate.findMany({
-      where,
+    mandateRepo.findMany(where, {
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -212,7 +219,7 @@ export async function listAllMandates(adminRoles: string[], params: ListMandates
         bankAccount: { select: { bankName: true, accountType: true } },
       },
     }),
-    db.paymentMandate.count({ where }),
+    mandateRepo.count(where),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
@@ -226,13 +233,11 @@ export async function approveMandate(
 ) {
   assertAdmin(adminRoles)
 
-  const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId }, select: { id: true, status: true, userId: true } })
+  const mandate = await mandateRepo.findByIdWithSelect(mandateId, { id: true, status: true, userId: true })
   if (!mandate) throw new AdminNotFoundError('Mandate not found')
   if (mandate.status !== 'PENDING') throw new AdminConflictError('Only PENDING mandates can be approved')
 
-  const updated = await db.paymentMandate.update({
-    where: { id: mandateId },
-    data: { status: 'ACTIVE', approvedAt: new Date(), approvedById: adminId },
+  const updated = await mandateRepo.update(mandateId, { status: 'ACTIVE', approvedAt: new Date(), approvedById: adminId }, {
     select: { id: true, status: true },
   })
 
@@ -265,13 +270,11 @@ export async function rejectMandate(
 ) {
   assertAdmin(adminRoles)
 
-  const mandate = await db.paymentMandate.findUnique({ where: { id: mandateId }, select: { id: true, status: true, userId: true } })
+  const mandate = await mandateRepo.findByIdWithSelect(mandateId, { id: true, status: true, userId: true })
   if (!mandate) throw new AdminNotFoundError('Mandate not found')
   if (mandate.status === 'CANCELLED') throw new AdminConflictError('Mandate is already cancelled')
 
-  const updated = await db.paymentMandate.update({
-    where: { id: mandateId },
-    data: { status: 'CANCELLED' },
+  const updated = await mandateRepo.update(mandateId, { status: 'CANCELLED' }, {
     select: { id: true, status: true },
   })
 
@@ -310,11 +313,10 @@ export async function listAllContributions(adminRoles: string[], params: ListCon
   }
 
   const [items, total] = await Promise.all([
-    db.contribution.findMany({
-      where,
+    contributionRepo.findMany(where, {
       skip,
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }],
       select: {
         id: true,
         periodMonth: true,
@@ -326,7 +328,7 @@ export async function listAllContributions(adminRoles: string[], params: ListCon
         user: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     }),
-    db.contribution.count({ where }),
+    contributionRepo.count(where),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
@@ -373,8 +375,7 @@ export async function broadcastNotification(
 
   const statusFilter = filter !== 'ALL' ? { status: filter as UserStatus } : {}
 
-  const members = await db.user.findMany({
-    where: statusFilter,
+  const members = await userRepo.findMany(statusFilter, {
     select: { id: true, email: true, phone: true, firstName: true },
   })
 
@@ -426,8 +427,7 @@ export async function listAuditLogs(adminRoles: string[], params: ListAuditParam
   }
 
   const [items, total] = await Promise.all([
-    db.auditLog.findMany({
-      where,
+    auditRepo.findMany(where, {
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -442,7 +442,7 @@ export async function listAuditLogs(adminRoles: string[], params: ListAuditParam
         user: { select: { id: true, firstName: true, lastName: true, email: true } },
       },
     }),
-    db.auditLog.count({ where }),
+    auditRepo.count(where),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
@@ -470,20 +470,19 @@ export async function getDashboardStats(adminRoles: string[]) {
     pendingInvites,
   ] = await Promise.all([
     // Member counts by status
-    db.user.groupBy({ by: ['status'], _count: { status: true } }),
+    userRepo.groupBy({ by: ['status'], _count: { status: true } }),
 
     // Mandate counts by status
-    db.paymentMandate.groupBy({ by: ['status'], _count: { status: true } }),
+    mandateRepo.groupBy({ by: ['status'], _count: { status: true } }),
 
     // This month's contribution stats
-    db.contribution.aggregate({
-      where: { periodMonth: thisMonth, periodYear: thisYear },
-      _count: { id: true },
-      _sum: { amountDue: true, amountPaid: true },
-    }),
+    contributionRepo.aggregate(
+      { periodMonth: thisMonth, periodYear: thisYear },
+      { _count: { id: true }, _sum: { amountDue: true, amountPaid: true } },
+    ),
 
     // Last 10 audit events for the activity feed
-    db.auditLog.findMany({
+    auditRepo.findMany({}, {
       take: 10,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -497,19 +496,19 @@ export async function getDashboardStats(adminRoles: string[]) {
     }),
 
     // All-time pool total (sum of all paid contributions)
-    db.contribution.aggregate({
-      where: { status: 'PAID' },
-      _sum: { amountPaid: true },
-    }),
+    contributionRepo.aggregate(
+      { status: 'PAID' },
+      { _sum: { amountPaid: true } },
+    ),
 
     // Open invitation count
-    db.invitation.count({ where: { status: 'PENDING', expiresAt: { gt: now } } }),
+    invitationRepo.count({ status: 'PENDING', expiresAt: { gt: now } }),
   ])
 
   // Contributions received this calendar month
-  const newContributionsThisMonth = await db.contribution.count({
-    where: { createdAt: { gte: monthStart } },
-  })
+  const newContributionsThisMonth = await contributionRepo.count(
+    { createdAt: { gte: monthStart } },
+  )
 
   const memberMap = Object.fromEntries(
     memberCounts.map((r) => [r.status, r._count.status]),
@@ -564,7 +563,7 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
   const skip = (page - 1) * limit
 
   const [items, total] = await Promise.all([
-    db.goal.findMany({
+    goalRepo.findMany({}, {
       skip,
       take: limit,
       orderBy: { createdAt: 'desc' },
@@ -580,7 +579,7 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
         createdAt: true,
       },
     }),
-    db.goal.count(),
+    goalRepo.count(),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
@@ -596,16 +595,14 @@ export async function unlockMember(
 ) {
   assertAdmin(adminRoles)
 
-  const member = await db.user.findUnique({
-    where: { id: memberId },
+  const memberResults = await userRepo.findMany({ id: memberId }, {
+    take: 1,
     select: { id: true, loginAttempts: true, lockedUntil: true },
   })
+  const member = memberResults[0] ?? null
   if (!member) throw new AdminNotFoundError('Member not found')
 
-  await db.user.update({
-    where: { id: memberId },
-    data: { loginAttempts: 0, lockedUntil: null },
-  })
+  await userRepo.update(memberId, { loginAttempts: 0, lockedUntil: null })
 
   await writeAuditLog({
     userId: adminId,
@@ -627,19 +624,24 @@ export async function getMemberLoginHistory(
 ) {
   assertAdmin(adminRoles)
 
-  const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true } })
-  if (!member) throw new AdminNotFoundError('Member not found')
+  const memberResults = await userRepo.findMany({ id: memberId }, {
+    take: 1,
+    select: { id: true },
+  })
+  if (!memberResults[0]) throw new AdminNotFoundError('Member not found')
 
   const skip = (page - 1) * limit
   const [items, total] = await Promise.all([
-    db.loginHistory.findMany({
-      where: { userId: memberId },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: limit,
-      select: { id: true, success: true, ipAddress: true, userAgent: true, createdAt: true },
-    }),
-    db.loginHistory.count({ where: { userId: memberId } }),
+    userRepo.findLoginHistory(
+      { userId: memberId },
+      {
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        select: { id: true, success: true, ipAddress: true, userAgent: true, createdAt: true },
+      },
+    ),
+    userRepo.countLoginHistory({ userId: memberId }),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }

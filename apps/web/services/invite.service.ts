@@ -1,6 +1,5 @@
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'crypto'
-import { db, Prisma } from '@/lib/db'
 import { sendInviteEmail, sendVerificationEmail } from '@/lib/email'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import { writeAuditLog } from './audit.service'
@@ -18,6 +17,9 @@ import {
 } from '@/lib/errors'
 import { assertAdmin, assertNotSelf, ROLES } from '@/lib/authorization'
 import { bumpRoleVersion } from '@/lib/role-version'
+import { userRepo, runTransaction } from '@/repositories/user.repository'
+import { invitationRepo } from '@/repositories/invitation.repository'
+import { authTokenRepo } from '@/repositories/auth-token.repository'
 
 // Re-export domain errors for callers that import them from this module
 export {
@@ -95,14 +97,11 @@ export async function generateInvite(
   const normPhone = normalisePhone(phone)
 
   const [existingInvite, existingUser] = await Promise.all([
-    db.invitation.findFirst({
-      where: { OR: [{ email }, { phone: normPhone }], status: 'PENDING' },
+    invitationRepo.findByEmailOrPhone(email, normPhone, {
+      status: 'PENDING',
       select: { id: true },
     }),
-    db.user.findFirst({
-      where: { OR: [{ email }, { phone: normPhone }] },
-      select: { id: true },
-    }),
+    userRepo.findByEmailOrPhone(email, normPhone),
   ])
   if (existingInvite || existingUser) throw new InviteDuplicateError()
 
@@ -112,12 +111,10 @@ export async function generateInvite(
   const expiresAt       = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
   const registrationUrl = `${baseUrl}/auth/register?code=${encodeURIComponent(code)}`
 
-  const invite = await db.invitation.create({
-    data: {
-      codeHash, codePrefix, firstName, lastName,
-      email, phone: normPhone, minimumAmount, expiresAt,
-      invitedById: adminId,
-    },
+  const invite = await invitationRepo.create({
+    codeHash, codePrefix, firstName, lastName,
+    email, phone: normPhone, minimumAmount, expiresAt,
+    invitedById: adminId,
   })
 
   sendSMS({
@@ -155,7 +152,7 @@ export async function listInvitations(adminRoles: string[], page = 1, limit = 20
   const skip = (page - 1) * limit
 
   const [items, total] = await Promise.all([
-    db.invitation.findMany({
+    invitationRepo.findMany({}, {
       skip, take: limit,
       orderBy: { createdAt: 'desc' },
       select: {
@@ -165,7 +162,7 @@ export async function listInvitations(adminRoles: string[], page = 1, limit = 20
         invitedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     }),
-    db.invitation.count(),
+    invitationRepo.count(),
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
@@ -181,17 +178,15 @@ export async function revokeInvitation(
 ) {
   assertAdmin(adminRoles)
 
-  const invite = await db.invitation.findUnique({
-    where: { id: inviteId },
-    select: { id: true, email: true, status: true },
+  const invite = await invitationRepo.findById(inviteId, {
+    id: true, email: true, status: true,
   })
   if (!invite) throw new InviteNotFoundError()
   if (invite.status === 'ACCEPTED') throw new InviteUsedError()
   if (invite.status === 'REVOKED') throw new InviteRevokedError()
 
-  await db.invitation.update({
-    where: { id: inviteId },
-    data: { status: 'REVOKED', revokedById: adminId, revokedAt: new Date() },
+  await invitationRepo.update(inviteId, {
+    status: 'REVOKED', revokedById: adminId, revokedAt: new Date(),
   })
 
   await writeAuditLog({
@@ -208,12 +203,9 @@ export async function revokeInvitation(
 
 export async function validateInviteCode(code: string) {
   const codeHash = hashCode(code)
-  const invite = await db.invitation.findUnique({
-    where: { codeHash },
-    select: {
-      id: true, status: true, expiresAt: true,
-      firstName: true, lastName: true, email: true, phone: true, minimumAmount: true,
-    },
+  const invite = await invitationRepo.findByCodeHash(codeHash, {
+    id: true, status: true, expiresAt: true,
+    firstName: true, lastName: true, email: true, phone: true, minimumAmount: true,
   })
 
   if (!invite) throw new InviteNotFoundError()
@@ -249,9 +241,8 @@ export async function acceptInviteRegistration(
   ip?: string,
 ) {
   const codeHash = hashCode(input.inviteCode)
-  const invite = await db.invitation.findUnique({
-    where: { codeHash },
-    select: { id: true, status: true, expiresAt: true, email: true, phone: true, invitedById: true },
+  const invite = await invitationRepo.findByCodeHash(codeHash, {
+    id: true, status: true, expiresAt: true, email: true, phone: true, invitedById: true,
   })
 
   if (!invite) throw new InviteNotFoundError()
@@ -266,36 +257,34 @@ export async function acceptInviteRegistration(
 
   const [passwordHash, memberRole] = await Promise.all([
     bcrypt.hash(input.password, BCRYPT_ROUNDS),
-    db.role.findUniqueOrThrow({ where: { name: 'MEMBER' } }),
+    userRepo.findRoleOrThrow('MEMBER'),
   ])
 
   const encryptedId = input.idNumber ? encrypt(input.idNumber) : null
   const rawToken    = generateToken()
   const tokenHash   = hashToken(rawToken)
 
-  const user = await db.$transaction(async (tx: Prisma.TransactionClient) => {
-    const created = await tx.user.create({
-      data: {
-        email:          invite.email,
-        phone:          invite.phone,
-        firstName:      input.firstName.trim(),
-        lastName:       input.lastName.trim(),
-        password:       passwordHash,
-        idNumber:       encryptedId,
-        status:         'PENDING',
-        popiaConsentAt: new Date(),
-      },
-    })
+  const user = await runTransaction(async (tx) => {
+    const created = await userRepo.create({
+      email:          invite.email,
+      phone:          invite.phone,
+      firstName:      input.firstName.trim(),
+      lastName:       input.lastName.trim(),
+      password:       passwordHash,
+      idNumber:       encryptedId,
+      status:         'PENDING',
+      popiaConsentAt: new Date(),
+    }, tx)
 
-    await tx.userRole.create({ data: { userId: created.id, roleId: memberRole.id } })
+    await userRepo.createUserRole({ userId: created.id, roleId: memberRole.id }, tx)
     await tx.notificationPreference.create({ data: { userId: created.id } })
-    await tx.emailVerificationToken.create({
-      data: { userId: created.id, tokenHash, expiresAt: new Date(Date.now() + VERIF_TTL_MS) },
-    })
-    await tx.invitation.update({
-      where: { id: invite.id },
-      data: { status: 'ACCEPTED', acceptedById: created.id, acceptedAt: new Date() },
-    })
+    await authTokenRepo.createVerificationTokenInTx(
+      { userId: created.id, tokenHash, expiresAt: new Date(Date.now() + VERIF_TTL_MS) },
+      tx,
+    )
+    await invitationRepo.update(invite.id, {
+      status: 'ACCEPTED', acceptedById: created.id, acceptedAt: new Date(),
+    }, tx)
 
     return created
   })
@@ -331,9 +320,9 @@ export async function setMemberRole(
   if (!assign && roleName === ROLES.ADMIN) {
     assertNotSelf(adminId, memberId, 'revoke your own admin role')
 
-    const adminRole = await db.role.findUnique({ where: { name: ROLES.ADMIN } })
+    const adminRole = await userRepo.findRole(ROLES.ADMIN)
     if (adminRole) {
-      const adminCount = await db.userRole.count({ where: { roleId: adminRole.id } })
+      const adminCount = await userRepo.countUserRoles({ roleId: adminRole.id })
       if (adminCount <= 1) {
         throw new ForbiddenError('Cannot remove the last admin — at least one admin must remain')
       }
@@ -345,20 +334,20 @@ export async function setMemberRole(
   }
 
   const [member, role] = await Promise.all([
-    db.user.findUnique({ where: { id: memberId }, select: { id: true, email: true } }),
-    db.role.findUniqueOrThrow({ where: { name: roleName } }),
+    userRepo.findById(memberId),
+    userRepo.findRoleOrThrow(roleName),
   ])
 
   if (!member) throw new AdminNotFoundError('Member not found')
 
   if (assign) {
-    await db.userRole.upsert({
-      where: { userId_roleId: { userId: memberId, roleId: role.id } },
-      create: { userId: memberId, roleId: role.id },
-      update: {},
-    })
+    await userRepo.upsertUserRole(
+      { userId_roleId: { userId: memberId, roleId: role.id } },
+      { userId: memberId, roleId: role.id },
+      {},
+    )
   } else {
-    await db.userRole.deleteMany({ where: { userId: memberId, roleId: role.id } })
+    await userRepo.deleteUserRoles({ userId: memberId, roleId: role.id })
   }
 
   await bumpRoleVersion(memberId)

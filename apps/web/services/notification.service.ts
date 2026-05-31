@@ -1,5 +1,7 @@
 import { Resend } from 'resend'
-import { db, Prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
+import { notificationRepo } from '@/repositories/notification.repository'
+import { userRepo } from '@/repositories/user.repository'
 import { env } from '@/lib/env'
 import { sendSMS, normalisePhone } from '@/lib/bulksms'
 import {
@@ -92,10 +94,7 @@ async function dispatchEmail(
       })
   }
 
-  await db.notification.update({
-    where: { id: notificationId },
-    data: { status: 'SENT', sentAt: new Date() },
-  })
+  await notificationRepo.update(notificationId, { status: 'SENT', sentAt: new Date() })
 }
 
 // ---------------------------------------------------------------------------
@@ -124,12 +123,9 @@ async function dispatchSMS(
       ? 'SENT'
       : 'QUEUED'
 
-  await db.notification.update({
-    where: { id: notificationId },
-    data: {
-      status: delivered,
-      sentAt: delivered === 'SENT' ? new Date() : null,
-    },
+  await notificationRepo.update(notificationId, {
+    status: delivered,
+    sentAt: delivered === 'SENT' ? new Date() : null,
   })
 }
 
@@ -143,21 +139,17 @@ export async function queueNotification(params: {
   channel: NotifChannel
   payload: Record<string, unknown>
 }): Promise<void> {
-  const template = await db.notificationTemplate.findUnique({
-    where: { slug: params.templateSlug },
-  })
+  const template = await notificationRepo.findTemplate(params.templateSlug)
 
   // Soft-fail when template doesn't exist — jobs may call this before seeding
   if (!template) return
 
-  await db.notification.create({
-    data: {
-      userId: params.userId,
-      templateId: template.id,
-      channel: params.channel,
-      status: 'QUEUED',
-      payload: params.payload as Prisma.InputJsonValue,
-    },
+  await notificationRepo.create({
+    userId: params.userId,
+    templateId: template.id,
+    channel: params.channel,
+    status: 'QUEUED',
+    payload: params.payload as Prisma.InputJsonValue,
   })
 }
 
@@ -172,12 +164,9 @@ export async function sendNotificationNow(params: {
   payload: Record<string, unknown>
 }): Promise<void> {
   const [template, user, prefs] = await Promise.all([
-    db.notificationTemplate.findUnique({ where: { slug: params.templateSlug } }),
-    db.user.findUnique({
-      where: { id: params.userId },
-      select: { email: true, phone: true },
-    }),
-    db.notificationPreference.findUnique({ where: { userId: params.userId } }),
+    notificationRepo.findTemplate(params.templateSlug),
+    userRepo.findById(params.userId),
+    notificationRepo.findPreference(params.userId),
   ])
 
   if (!template || !user) return
@@ -191,14 +180,12 @@ export async function sendNotificationNow(params: {
     if (params.channel === 'WHATSAPP' && !typedPrefs.whatsapp) return
   }
 
-  const notification = await db.notification.create({
-    data: {
-      userId: params.userId,
-      templateId: template.id,
-      channel: params.channel,
-      status: 'QUEUED',
-      payload: params.payload as Prisma.InputJsonValue,
-    },
+  const notification = await notificationRepo.create({
+    userId: params.userId,
+    templateId: template.id,
+    channel: params.channel,
+    status: 'QUEUED',
+    payload: params.payload as Prisma.InputJsonValue,
   })
 
   const payload = params.payload
@@ -210,10 +197,7 @@ export async function sendNotificationNow(params: {
       await dispatchSMS(notification.id, user.phone, template.slug, template.body, payload)
     }
   } catch (err) {
-    await db.notification.update({
-      where: { id: notification.id },
-      data: { status: 'FAILED' },
-    })
+    await notificationRepo.update(notification.id, { status: 'FAILED' })
     throw err
   }
 }
@@ -235,31 +219,22 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
   // duplicate dispatch when multiple Inngest replays run in parallel. Use a
   // transaction to find-and-mark in one round-trip.
   const now = new Date()
-  const ids: string[] = await db.$queryRaw`
-    UPDATE "notifications"
-    SET "status" = 'FAILED', "errorMessage" = 'in-flight'
-    WHERE "id" IN (
-      SELECT "id" FROM "notifications"
-      WHERE "status" = 'QUEUED' AND "retryCount" < ${MAX_RETRIES}
-      ORDER BY "createdAt" ASC
-      LIMIT ${batchSize}
-      FOR UPDATE SKIP LOCKED
-    )
-    RETURNING "id"
-  `.then((rows: Array<{ id: string }>) => rows.map((r) => r.id))
+  const ids = await notificationRepo.findReady(batchSize, MAX_RETRIES)
 
   if (ids.length === 0) return { processed: 0, sent: 0, failed: 0 }
 
-  const claimed = await db.notification.findMany({
-    where: { id: { in: ids } },
-    include: {
-      template: true,
-      user: { select: { email: true, phone: true } },
+  const claimed = await notificationRepo.findMany(
+    { id: { in: ids } },
+    {
+      include: {
+        template: true,
+        user: { select: { email: true, phone: true } },
+      },
     },
-  })
+  )
 
-  const allPrefs = await db.notificationPreference.findMany({
-    where: { userId: { in: [...new Set((claimed as QueuedNotification[]).map((n) => n.userId))] } },
+  const allPrefs = await notificationRepo.findPreferences({
+    userId: { in: [...new Set((claimed as QueuedNotification[]).map((n) => n.userId))] },
   })
   const prefsMap = new Map((allPrefs as NotifPrefs[]).map((p) => [p.userId, p]))
 
@@ -280,10 +255,7 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
           (notification.channel === 'PUSH' && !prefs.push) ||
           (notification.channel === 'WHATSAPP' && !prefs.whatsapp)
         ) {
-          await db.notification.update({
-            where: { id: notification.id },
-            data: { status: 'SENT', sentAt: now, errorMessage: null },
-          })
+          await notificationRepo.update(notification.id, { status: 'SENT', sentAt: now, errorMessage: null })
           sent++
           return
         }
@@ -298,21 +270,15 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
           sent++
         } else {
           // No contact details — mark sent to drain the queue
-          await db.notification.update({
-            where: { id: notification.id },
-            data: { status: 'SENT', sentAt: now, errorMessage: null },
-          })
+          await notificationRepo.update(notification.id, { status: 'SENT', sentAt: now, errorMessage: null })
           sent++
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
-        await db.notification.update({
-          where: { id: notification.id },
-          data: {
-            status: 'FAILED',
-            errorMessage: msg,
-            retryCount: { increment: 1 },
-          },
+        await notificationRepo.update(notification.id, {
+          status: 'FAILED',
+          errorMessage: msg,
+          retryCount: { increment: 1 },
         })
         failed++
       }
@@ -328,14 +294,14 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
 // ---------------------------------------------------------------------------
 
 export async function requeueFailedNotifications(): Promise<number> {
-  const result = await db.notification.updateMany({
-    where: {
+  const result = await notificationRepo.updateMany(
+    {
       status: 'FAILED',
       retryCount: { lt: MAX_RETRIES },
       errorMessage: { not: 'in-flight' }, // skip records currently being processed
     },
-    data: { status: 'QUEUED' },
-  })
+    { status: 'QUEUED' },
+  )
   return result.count
 }
 
@@ -352,11 +318,11 @@ export async function updateSMSDeliveryStatus(
 
   const status: NotifStatus = deliveryStatus === 'DELIVERED' ? 'SENT' : 'FAILED'
 
-  await db.notification.updateMany({
-    where: { id: notificationId, channel: 'SMS' },
-    data: {
+  await notificationRepo.updateMany(
+    { id: notificationId, channel: 'SMS' },
+    {
       status,
       sentAt: status === 'SENT' ? new Date() : undefined,
     },
-  })
+  )
 }
