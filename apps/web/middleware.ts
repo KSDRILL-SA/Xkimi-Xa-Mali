@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto'
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
@@ -45,7 +44,7 @@ function verifyCsrfOrigin(req: { headers: Headers; nextUrl: URL }): boolean {
 
 export default auth(async (req) => {
   const { pathname } = req.nextUrl
-  const traceId = req.headers.get('x-trace-id') ?? randomUUID()
+  const traceId = req.headers.get('x-trace-id') ?? crypto.randomUUID()
 
   // Always allow: health, webhooks (self-verifying), NextAuth internals, SW + offline
   if (
