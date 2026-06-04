@@ -46,6 +46,44 @@
           Never remove this constraint.
 ```
 
+## Entity Delete Cascade Map
+
+Shows what happens when a record is deleted. RESTRICT = deletion blocked if child records exist.
+
+```mermaid
+flowchart TD
+    USER(["User"])
+    ROLE(["Role"])
+    USERROLE(["UserRole"])
+    BA(["BankAccount"])
+    PM(["PaymentMandate"])
+    CONTRIB(["Contribution"])
+    TXN(["Transaction"])
+    NOTIF(["Notification"])
+    AUDIT(["AuditLog"])
+    GOAL(["Goal"])
+    GP(["GoalProgress"])
+    INVITE(["Invitation"])
+
+    USER -->|"CASCADE"| USERROLE
+    ROLE -->|"RESTRICT"| USERROLE
+    USER -->|"CASCADE"| BA
+    USER -->|"RESTRICT"| PM
+    BA -->|"RESTRICT"| PM
+    USER -->|"RESTRICT"| CONTRIB
+    CONTRIB -->|"RESTRICT"| TXN
+    PM -->|"RESTRICT"| TXN
+    USER -->|"CASCADE"| NOTIF
+    USER -->|"SET NULL"| AUDIT
+    GOAL -->|"RESTRICT"| GP
+    USER -->|"RESTRICT"| INVITE
+
+    style USER fill:#1B4332,color:#fff
+    style ROLE fill:#1B4332,color:#fff
+```
+
+---
+
 ## ON DELETE Contracts
 
 | Relationship | Contract | Reason |
