@@ -37,7 +37,10 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
     throw new Error('ACCOUNT_LOCKED')
   }
 
-  if (user.status === 'PENDING') throw new Error('EMAIL_NOT_VERIFIED')
+  if (user.status === 'PENDING') {
+    if (!user.emailVerified) throw new Error('EMAIL_NOT_VERIFIED')
+    throw new Error('PENDING_ACTIVATION')
+  }
   if (user.status === 'SUSPENDED') throw new Error('ACCOUNT_SUSPENDED')
 
   const valid = await bcrypt.compare(parsed.data.password, user.password)
