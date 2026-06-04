@@ -36,3 +36,45 @@ export const statementRatelimit = new Ratelimit({
   limiter: Ratelimit.slidingWindow(10, '1 h'),
   prefix: 'xxm:ratelimit:statement',
 })
+
+export const forgotPasswordRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '15 m'),
+  prefix: 'xxm:ratelimit:forgot-password',
+})
+
+export const verifyEmailRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '15 m'),
+  prefix: 'xxm:ratelimit:verify-email',
+})
+
+export const mandateCreateRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(10, '1 h'),
+  prefix: 'xxm:ratelimit:mandate-create',
+})
+
+export const mandateDelayRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  prefix: 'xxm:ratelimit:mandate-delay',
+})
+
+export const adminInviteRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, '1 h'),
+  prefix: 'xxm:ratelimit:admin-invite',
+})
+
+export const adminBroadcastRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '1 h'),
+  prefix: 'xxm:ratelimit:admin-broadcast',
+})
+
+export const adminBulkRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(3, '1 h'),
+  prefix: 'xxm:ratelimit:admin-bulk',
+})

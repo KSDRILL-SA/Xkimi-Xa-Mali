@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
+import { adminInviteRatelimit } from '@/lib/redis'
 import {
   generateInvite, listInvitations,
 } from '@/services/invite.service'
@@ -27,6 +28,9 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 export const POST = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
+
+  const { success } = await adminInviteRatelimit.limit(session.user.id)
+  if (!success) return apiError('SYS_005', 'Too many invitations. Please try again later.', 429)
 
   const roles = (session.user.roles as string[] | undefined) ?? []
 
