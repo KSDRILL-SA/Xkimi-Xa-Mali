@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'crypto'
 import { env } from './env'
 import { withRetry } from './retry'
 import { ExternalServiceError } from './errors'
@@ -124,7 +125,6 @@ export function verifyBulkSmsWebhook(
   secret: string,
 ): boolean {
   // BulkSMS delivery receipts carry a HMAC-SHA256 signature header.
-  const { createHmac, timingSafeEqual } = require('crypto') as typeof import('crypto')
   const expected = createHmac('sha256', secret).update(body).digest('hex')
   const exp = Buffer.from(expected, 'utf8')
   const got = Buffer.from(signature, 'utf8')
