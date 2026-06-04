@@ -171,7 +171,7 @@ function StatementDocument({ data }: { data: StatementData }) {
         <View style={s.header}>
           <View>
             <Text style={s.logoText}>Xkimm Xa Mali</Text>
-            <Text style={s.tagline}>"Blessed is the hand that giveth."</Text>
+            <Text style={s.tagline}>&ldquo;Blessed is the hand that giveth.&rdquo;</Text>
           </View>
           <View style={s.headerRight}>
             <Text style={s.statementTitle}>Statement</Text>
@@ -257,7 +257,7 @@ function StatementDocument({ data }: { data: StatementData }) {
         {/* Footer */}
         <View style={s.footer} fixed>
           <Text style={s.footerText}>Xkimm Xa Mali · Private Group Savings</Text>
-          <Text style={s.footerGold}>"Blessed is the hand that giveth."</Text>
+          <Text style={s.footerGold}>&ldquo;Blessed is the hand that giveth.&rdquo;</Text>
         </View>
       </Page>
     </Document>

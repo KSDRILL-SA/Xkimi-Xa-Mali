@@ -9,7 +9,7 @@ export default function NotFound() {
           <FileSearch size={24} className="text-xxm-gray-400" />
         </div>
         <h1 className="text-2xl font-bold text-xxm-green-900">Page not found</h1>
-        <p className="text-sm text-xxm-gray-500">That page doesn't exist in the admin portal.</p>
+        <p className="text-sm text-xxm-gray-500">That page doesn&apos;t exist in the admin portal.</p>
         <Link href="/" className="inline-flex items-center justify-center px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-canopy transition-colors">
           Back to Dashboard
         </Link>
