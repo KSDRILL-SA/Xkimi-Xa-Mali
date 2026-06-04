@@ -59,130 +59,160 @@ async function main() {
     console.log('Founder seeded:', founder.email)
   }
 
-  const templates = [
-    // ── SMS templates ──────────────────────────────────────────────────────
+  // Idempotent: create-only, never overwrite — admins can edit template bodies in the DB
+  const templates: Array<{
+    slug: string
+    channel: 'SMS' | 'EMAIL' | 'WHATSAPP' | 'PUSH' | 'BOTH'
+    subject: string | null
+    body: string
+  }> = [
+    // ── SMS templates (active — referenced by queueNotification calls) ──────
     {
       slug: 'debit-morning-warning',
-      channel: 'SMS' as const,
+      channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali: Tonight at 20:00 we will deduct R{{amount}} for your monthly contribution. Reply DELAY to postpone.',
+      body: 'Xkimm Xa Mali: Tonight at 20:00 we will deduct R{{amount}} for your monthly contribution.',
     },
     {
       slug: 'debit-tomorrow-warning',
-      channel: 'SMS' as const,
+      channel: 'SMS',
       subject: null,
       body: 'Xkimm Xa Mali: Reminder — your delayed debit of R{{amount}} will run tomorrow ({{newDate}}). Ensure funds are available.',
     },
     {
       slug: 'debit-success',
-      channel: 'SMS' as const,
+      channel: 'SMS',
       subject: null,
       body: 'Xkimm Xa Mali: R{{amount}} contribution received. Thank you, {{firstName}}!',
     },
     {
       slug: 'debit-pending',
-      channel: 'SMS' as const,
+      channel: 'SMS',
       subject: null,
       body: 'Xkimm Xa Mali: Your debit of R{{amount}} is being processed. We will confirm once settled.',
     },
     {
       slug: 'overdue-reminder',
-      channel: 'SMS' as const,
+      channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali: Your monthly contribution of R{{amount}} is still outstanding. Please pay before month-end to avoid penalties.',
+      body: 'Xkimm Xa Mali: Your monthly contribution of R{{amount}} is still outstanding. Please pay before month-end.',
     },
     {
-      slug: 'payment-failed-sms',
-      channel: 'SMS' as const,
-      subject: null,
-      body: 'Xkimm Xa Mali: Your R{{amount}} debit was declined. Please log in to resolve: {{url}}',
-    },
-    {
-      slug: 'mandate-approved-sms',
-      channel: 'SMS' as const,
+      slug: 'mandate-approved',
+      channel: 'SMS',
       subject: null,
       body: 'Xkimm Xa Mali: Your debit order has been approved. R{{amount}} will be collected on the {{debitDay}}th of each month.',
     },
     {
-      slug: 'mandate-rejected-sms',
-      channel: 'SMS' as const,
+      slug: 'mandate-rejected',
+      channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali: Your debit order request was not approved. Please contact support for assistance.',
+      body: 'Xkimm Xa Mali: Your debit order request was not approved. Please contact the group admin.',
     },
-    // ── Email templates ────────────────────────────────────────────────────
+    // ── SMS templates (reserved — for financial mandatory events) ────────────
     {
-      slug: 'welcome-email',
-      channel: 'EMAIL' as const,
+      slug: 'payment-failed-sms',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Your R{{amount}} debit was declined. Please log in to resolve: {{url}}',
+    },
+    {
+      slug: 'account-activated',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Your account is now active. Welcome, {{firstName}}! Log in at: {{url}}',
+    },
+    {
+      slug: 'invite-created',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: You have been invited to join. Your invite code is {{code}}. Register at: {{url}}',
+    },
+    {
+      slug: 'debit-declined',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Your contribution debit of R{{amount}} was declined. Log in to pay manually: {{url}}',
+    },
+    {
+      slug: 'mandate-cancelled',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Your debit order has been cancelled. Please set up a new one to continue contributions.',
+    },
+    {
+      slug: 'mandate-delayed',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Your debit has been delayed to {{newDate}}. Ensure sufficient funds are available.',
+    },
+    {
+      slug: 'goal-activated',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: New goal activated — {{title}}. Target: R{{targetAmount}} by {{endDate}}.',
+    },
+    {
+      slug: 'goal-achieved',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Goal achieved! {{title}} has been reached. Congratulations!',
+    },
+    // ── Email templates ──────────────────────────────────────────────────────
+    {
+      slug: 'welcome',
+      channel: 'EMAIL',
       subject: 'Welcome to Xkimm Xa Mali',
-      body: 'Welcome to Xkimm Xa Mali, {{firstName}}! Your account is active.',
+      body: 'Welcome to Xkimm Xa Mali, {{firstName}}! Your account is now active.',
     },
     {
       slug: 'email-verification',
-      channel: 'EMAIL' as const,
+      channel: 'EMAIL',
       subject: 'Verify your email — Xkimm Xa Mali',
-      body: 'Please verify your email: {{url}}',
+      body: 'Hi {{firstName}}, please verify your email address: {{url}} (expires in 24 hours)',
     },
     {
       slug: 'password-reset',
-      channel: 'EMAIL' as const,
+      channel: 'EMAIL',
       subject: 'Reset your password — Xkimm Xa Mali',
-      body: 'Reset your password: {{url}} (expires in 1 hour)',
+      body: 'Hi {{firstName}}, reset your password here: {{url}} (expires in 1 hour)',
     },
     {
-      slug: 'payment-success-email',
-      channel: 'EMAIL' as const,
-      subject: 'Payment received — Xkimm Xa Mali',
+      slug: 'invite-created-email',
+      channel: 'EMAIL',
+      subject: 'You have been invited to Xkimm Xa Mali',
+      body: 'Hi {{firstName}}, you have been invited to join Xkimm Xa Mali. Use code {{code}} to register: {{url}}',
+    },
+    {
+      slug: 'debit-success-email',
+      channel: 'EMAIL',
+      subject: 'Contribution received — Xkimm Xa Mali',
       body: 'Hi {{firstName}}, your R{{amount}} contribution for {{period}} has been processed successfully.',
     },
     {
-      slug: 'payment-failed-email',
-      channel: 'EMAIL' as const,
-      subject: 'Payment failed — Xkimm Xa Mali',
-      body: 'Hi {{firstName}}, your R{{amount}} debit for {{period}} was declined. Log in to resolve: {{url}}',
+      slug: 'debit-declined-email',
+      channel: 'EMAIL',
+      subject: 'Contribution payment failed — Xkimm Xa Mali',
+      body: 'Hi {{firstName}}, your R{{amount}} debit for {{period}} was declined. Please log in to resolve: {{url}}',
     },
     {
       slug: 'overdue-reminder-email',
-      channel: 'EMAIL' as const,
-      subject: 'Outstanding contribution — Xkimm Xa Mali',
+      channel: 'EMAIL',
+      subject: 'Your contribution is overdue — Xkimm Xa Mali',
       body: 'Hi {{firstName}}, your R{{amount}} contribution for {{period}} is still outstanding. Please pay: {{url}}',
     },
     {
-      slug: 'mandate-approved-email',
-      channel: 'EMAIL' as const,
-      subject: 'Debit order approved — Xkimm Xa Mali',
-      body: 'Hi {{firstName}}, your debit order of R{{amount}} on the {{debitDay}}th has been approved.',
-    },
-    {
-      slug: 'invitation-email',
-      channel: 'EMAIL' as const,
-      subject: 'You are invited to join Xkimm Xa Mali',
-      body: 'Hi {{firstName}}, you have been invited to join Xkimm Xa Mali. Use code {{code}} to register: {{url}}',
-    },
-    // ── WhatsApp templates ─────────────────────────────────────────────────
-    {
-      slug: 'debit-warning-whatsapp',
-      channel: 'WHATSAPP' as const,
-      subject: null,
-      body: 'Xkimm Xa Mali: Tonight at 20:00 we will deduct R{{amount}} for your monthly contribution.',
-    },
-    {
-      slug: 'payment-success-whatsapp',
-      channel: 'WHATSAPP' as const,
-      subject: null,
-      body: 'Xkimm Xa Mali: R{{amount}} contribution received. Thank you, {{firstName}}!',
-    },
-    {
-      slug: 'payment-failed-whatsapp',
-      channel: 'WHATSAPP' as const,
-      subject: null,
-      body: 'Xkimm Xa Mali: Your R{{amount}} debit was declined. Please resolve: {{url}}',
+      slug: 'payment-failed-email',
+      channel: 'EMAIL',
+      subject: 'Payment failed — Xkimm Xa Mali',
+      body: 'Hi {{firstName}}, your R{{amount}} debit for {{period}} was declined. Log in to resolve: {{url}}',
     },
   ]
 
   for (const template of templates) {
     await prisma.notificationTemplate.upsert({
       where: { slug: template.slug },
-      update: { subject: template.subject, body: template.body },
+      update: {},   // never overwrite — admin can edit template bodies in the DB
       create: template,
     })
   }
