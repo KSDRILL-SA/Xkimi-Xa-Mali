@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { ChangePasswordSchema } from '@/lib/validation/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { changePassword } from '@/services/auth.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function PATCH(req: NextRequest) {
+export const PATCH = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -20,10 +21,6 @@ export async function PATCH(req: NextRequest) {
 
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 
-  try {
-    await changePassword(session.user.id, parsed.data.currentPassword, parsed.data.newPassword, ip)
-    return apiSuccess({ message: 'Password changed successfully.' })
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  await changePassword(session.user.id, parsed.data.currentPassword, parsed.data.newPassword, ip)
+  return apiSuccess({ message: 'Password changed successfully.' })
+})

@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { bulkGenerateContributions } from '@/services/admin.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -21,10 +22,6 @@ export async function POST(req: NextRequest) {
 
   const ip = req.headers.get('x-forwarded-for') ?? undefined
 
-  try {
-    const result = await bulkGenerateContributions(session.user.id, roles, month, year, ip)
-    return apiSuccess(result, 201)
-  } catch (e) {
-    return handleServiceError(e)
-  }
-}
+  const result = await bulkGenerateContributions(session.user.id, roles, month, year, ip)
+  return apiSuccess(result, 201)
+})

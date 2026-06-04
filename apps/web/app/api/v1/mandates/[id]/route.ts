@@ -1,27 +1,22 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { mandateRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { getMandate, updateMandate, cancelMandate } from '@/services/mandate.service'
 import { UpdateMandateSchema } from '@/lib/validation/mandate'
+import { withApiHandler } from '@/lib/api-handler'
 
-type Params = { params: Promise<{ id: string }> }
-
-export async function GET(_req: NextRequest, { params }: Params) {
+export const GET = withApiHandler<{ id: string }>(async (_req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user) return apiError('SYS_001', 'Authentication required', 401)
 
   const { id } = await params
 
-  try {
-    const mandate = await getMandate(id, session.user.id, session.user.roles ?? [])
-    return apiSuccess(mandate)
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const mandate = await getMandate(id, session.user.id, session.user.roles ?? [])
+  return apiSuccess(mandate)
+})
 
-export async function PATCH(req: NextRequest, { params }: Params) {
+export const PATCH = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user) return apiError('SYS_001', 'Authentication required', 401)
 
@@ -40,15 +35,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
-  try {
-    const mandate = await updateMandate(id, parsed.data, session.user.id, session.user.roles ?? [], ip)
-    return apiSuccess(mandate)
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const mandate = await updateMandate(id, parsed.data, session.user.id, session.user.roles ?? [], ip)
+  return apiSuccess(mandate)
+})
 
-export async function DELETE(req: NextRequest, { params }: Params) {
+export const DELETE = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user) return apiError('SYS_001', 'Authentication required', 401)
 
@@ -58,10 +49,6 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const { id } = await params
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
-  try {
-    await cancelMandate(id, session.user.id, session.user.roles ?? [], ip)
-    return apiSuccess({ cancelled: true })
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  await cancelMandate(id, session.user.id, session.user.roles ?? [], ip)
+  return apiSuccess({ cancelled: true })
+})

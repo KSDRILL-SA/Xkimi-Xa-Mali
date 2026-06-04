@@ -1,29 +1,26 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { UpdateGoalSchema } from '@/lib/validation/goal'
 import { getGoal, updateGoal, deleteGoal } from '@/services/goal.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(
+export const GET = withApiHandler<{ id: string }>(async (
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+  { params },
+) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
   const { id } = await params
-  try {
-    const goal = await getGoal(id)
-    return apiSuccess(goal)
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  const goal = await getGoal(id)
+  return apiSuccess(goal)
+})
 
-export async function PATCH(
+export const PATCH = withApiHandler<{ id: string }>(async (
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+  { params },
+) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -42,18 +39,14 @@ export async function PATCH(
 
   const { id } = await params
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  try {
-    const goal = await updateGoal(id, parsed.data, session.user.id, ip)
-    return apiSuccess(goal)
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  const goal = await updateGoal(id, parsed.data, session.user.id, ip)
+  return apiSuccess(goal)
+})
 
-export async function DELETE(
+export const DELETE = withApiHandler<{ id: string }>(async (
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+  { params },
+) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -62,10 +55,6 @@ export async function DELETE(
 
   const { id } = await params
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  try {
-    await deleteGoal(id, session.user.id, ip)
-    return apiSuccess({ deleted: true })
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  await deleteGoal(id, session.user.id, ip)
+  return apiSuccess({ deleted: true })
+})
