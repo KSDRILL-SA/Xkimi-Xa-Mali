@@ -682,7 +682,14 @@ On merge to main:
 
 ## Phase 6 — Sequential Build Plan
 
-See `docs/build-order.md` for full detail.
+See `docs/build-order.md` for full detail (includes Phase 2 Production Hardening).
+
+---
+
+## Phase 7 — Requirements Reference
+
+See `docs/requirements.md` for the complete catalogue of Functional Requirements (FRs) and
+Non-Functional Requirements (NFRs) for the system.
 
 ### Module Dependency Order
 

@@ -459,3 +459,138 @@ Step 2 — Complete signup
 | M11a Invite & Access Control | 2 days | ✅ Done |
 | M12 PWA | 2 days | ✅ Done |
 | **Total** | **~30 developer-days** | **30 done** |
+
+---
+
+## Phase 2 — Production Hardening
+
+Completed after all 13 modules shipped. These steps hardened the system for production: centralised
+error handling, sealed rate limiting gaps, completed the invite frontend, wired the public stats
+endpoint, rewrote setup docs, and verified the full CI/CD gate.
+
+**Completed:** 2026-06-04 — all PRs merged to Dev.
+
+---
+
+### Step 2 — `withApiHandler` Error Wrapper
+**PR #61** · `feat/api-handler-wrapper` · 49 files changed (+649 / −798)
+
+**Problem:** Each of the 48 v1 route handlers had its own `try/catch` of varying quality. Some swallowed errors silently, some returned inconsistent shapes, none stamped a trace ID.
+
+**Solution:** Created `apps/web/lib/api-handler.ts` — a typed higher-order function wrapping every handler with a consistent error boundary.
+
+| Scenario | Behaviour |
+|----------|-----------|
+| Handler returns `NextResponse` | Stamps `x-trace-id` header and returns unchanged |
+| Handler throws an `AppError` | Maps to `{ error: { code, message, traceId } }` with correct HTTP status |
+| Handler throws anything else | Logs via structured logger → Sentry, returns `SYS_500` |
+
+Applied to all 48 v1 route handlers. Intentionally excluded: `/api/v1/webhooks/inngest` (uses Inngest `serve()`) and `/api/v1/health`.
+
+---
+
+### Step 3 — Notification Template Seed Fix
+**PR #62** · `feat/notification-templates-seed` · 2 files changed (+95 / −62)
+
+**Problem:** Two slugs were wrong (`mandate-approved-sms`, `mandate-rejected-sms`) — caused silent notification failures. Thirteen templates were missing entirely. The seed overwrote admin-edited bodies on every redeploy.
+
+**Solution:**
+- Fixed slug names to match the values referenced in `admin.service.ts`
+- Added 13 missing templates covering the complete notification lifecycle
+- Changed all upserts to `update: {}` — seed is now idempotent and never clobbers admin edits
+- Added `db:seed` step to `.github/workflows/ci.yml` after `migrate deploy`
+
+**Files:** `packages/database/prisma/seed.ts`, `.github/workflows/ci.yml`
+
+---
+
+### Step 4 — Rate Limiting Audit
+**PR #63** · `fix/rate-limiting-coverage` · 8 files changed (+64 / −6)
+
+**Problem:** Several mutation endpoints had no rate limiter or shared a limiter sized for a different threat model (e.g. `forgot-password` was using the login-rate limiter at 5/min).
+
+**Solution:** Added 7 dedicated `Ratelimit` instances to `apps/web/lib/redis.ts`:
+
+| Limiter | Window | Limit | Endpoint |
+|---------|--------|-------|----------|
+| `forgotPasswordRatelimit` | 15 min | 5 | `POST /auth/forgot-password` |
+| `verifyEmailRatelimit` | 15 min | 10 | `GET /auth/verify-email` |
+| `mandateCreateRatelimit` | 1 h | 10 | `POST /mandates` |
+| `mandateDelayRatelimit` | 1 h | 5 | `POST /mandates/[id]/delay` |
+| `adminInviteRatelimit` | 1 h | 20 | `POST /admin/invitations` |
+| `adminBroadcastRatelimit` | 1 h | 5 | `POST /admin/notifications/broadcast` |
+| `adminBulkRatelimit` | 1 h | 3 | `POST /admin/contributions/generate` |
+
+`verify-email` returns a redirect (not JSON) on 429 to match the route's existing redirect-based response pattern.
+
+---
+
+### Step 5 — Invite Flow End-to-End
+**PR #64** · `feat/invite-flow-e2e` · 7 files changed (+260 / −6)
+
+**Problem:** The backend invite system (M11a) was complete, but the frontend registration experience was missing the `/invite/[token]` entry page and the post-registration verify-email variant.
+
+**Solution:**
+
+| File | What was built |
+|------|----------------|
+| `apps/web/app/(auth)/invite/[token]/page.tsx` | Server component — validates invite via service (no HTTP round-trip), renders form or error view, inherits branded card layout via `(auth)` route group |
+| `apps/web/components/auth/InviteRegisterForm.tsx` | Client component — email and phone pre-filled and read-only, redirects to `/auth/verify-email?sent=true` on success |
+| `apps/web/components/auth/InviteErrorView.tsx` | Maps INV_001–INV_004 to distinct messages; INV_002 includes a sign-in link |
+| `apps/web/app/(auth)/verify-email/page.tsx` | Converted to async server component — shows "link sent" variant when `?sent=true` |
+| `apps/web/lib/auth.ts` | `authorizeCredentials` now distinguishes `EMAIL_NOT_VERIFIED` (PENDING, no email verification) from `PENDING_ACTIVATION` (verified, awaiting admin) |
+| `apps/web/components/auth/LoginForm.tsx` | Added `PENDING_ACTIVATION` error message |
+
+---
+
+### Steps 6 & 7 — Member and Admin Portal Pages
+**No new PRs required.**
+
+All 10 member portal pages (1,603 lines across `apps/web/app/(member)/dashboard/`) and all 10 admin portal pages (1,328 lines across `apps/admin/app/`) were already fully implemented from earlier development.
+
+---
+
+### Step 8 — Public Stats Endpoint
+**PR #65** · `feat/public-stats-endpoint` · 3 files changed (+158 / −56)
+
+**Problem:** `apps/website/components/sections/StatsSection.tsx` showed hardcoded numbers. The website had no connection to live data.
+
+**Solution:**
+
+- Created `apps/web/app/api/v1/stats/public/route.ts` — unauthenticated `GET`, returns active member count, total pooled capital, and months active (zero PII). Results cached in Upstash Redis with a 1-hour TTL.
+- Refactored `StatsSection` into a server/client pair:
+  - `StatsSection` (async server component) — ISR fetch with `revalidate: 3600`; falls back to static placeholder values if the API is unreachable
+  - `StatsDisplay` (client component) — retains the `useScrollReveal` animation hook
+
+---
+
+### Step 9 — README Rewrite
+**PR #66** · `docs/setup-instructions-readme` · 1 file changed (+197 / −40)
+
+**Problem:** The README assumed Docker. The project runs on Neon + Upstash + Vercel — no local Docker required.
+
+**Changes:**
+- Removed Docker dependency from setup steps
+- Added Prerequisites section (8 external services, all have free tiers)
+- Getting Started reduced to 4 steps: clone → env vars → database → `npm run dev`
+- Added Environment Variables Reference table (30+ vars with descriptions and sources)
+- Added step-by-step Vercel deployment section
+- Added Database Migrations and Running Tests reference sections
+
+---
+
+### Step 10 — Merge Gate Verification
+**PR #67** · `chore/merge-gate-verification` · 12 files changed (+71 / −13)
+
+**Gate result:** `typecheck ✅ · lint ✅ · test 116/116 ✅ · prisma validate ✅`
+
+**Fixes applied:**
+
+| Issue | File | Fix |
+|-------|------|-----|
+| `next lint` prompted interactively (no ESLint config) | All 3 apps | Created `eslint.config.mjs` extending `next/core-web-vitals + next/typescript` |
+| `@typescript-eslint/no-require-imports` | `lib/bulksms.ts` | Converted `require('crypto')` to ES module `import` |
+| Unused `eslint-disable` directive | `lib/db.ts` | Removed stale comment |
+| `react/no-unescaped-entities` | `lib/pdf/statement.tsx` | Escaped `"` with `&ldquo;`/`&rdquo;` (2 occurrences) |
+| `react/no-unescaped-entities` | `apps/admin/app/not-found.tsx` | Escaped `'` with `&apos;` |
+| Turbo test pipeline failure | 5 shared packages | Added `"test": "exit 0"` to `config`, `database`, `types`, `ui`, `utils` |
