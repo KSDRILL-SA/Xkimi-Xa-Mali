@@ -4,9 +4,9 @@ import { authRatelimit } from '@/lib/redis'
 import { getClientIP } from '@/lib/request'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { requestPasswordReset } from '@/services/auth.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const ip = getClientIP(req) ?? 'unknown'
 
   const { success } = await authRatelimit.limit(`reset:${ip}`)
@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
     const baseUrl = new URL(req.url).origin
     await requestPasswordReset(parsed.data.email, baseUrl, ip)
   } catch {
-    // Swallow all errors — never reveal if email exists
+    // Never reveal whether an email address is registered
   }
 
   return apiSuccess({ message: 'If that email is registered, a reset link has been sent.' })
-}
+})

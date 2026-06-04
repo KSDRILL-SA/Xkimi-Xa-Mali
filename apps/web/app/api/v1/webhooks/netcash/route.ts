@@ -4,6 +4,7 @@ import { paymentGateway } from '@/integrations/payment'
 import { processMandateWebhook } from '@/services/mandate.service'
 import { processTransactionWebhook } from '@/services/contribution.service'
 import { logger } from '@/lib/logger'
+import { withApiHandler } from '@/lib/api-handler'
 
 const MANDATE_STATUSES = [
   'PENDING', 'AUTHORIZED', 'ACTIVE', 'SUSPENDED', 'CANCELLED', 'REJECTED',
@@ -28,7 +29,7 @@ const WebhookPayloadSchema = z.object({
   { message: 'Either mandateId or transactionRef is required' },
 )
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const rawBody = await req.text()
 
   const signature = req.headers.get('x-netcash-signature') ?? ''
@@ -60,40 +61,34 @@ export async function POST(req: NextRequest) {
   }
 
   const payload = parsed.data
+  const jobs: Promise<void>[] = []
 
-  try {
-    const jobs: Promise<void>[] = []
-
-    if (payload.mandateId) {
-      jobs.push(
-        processMandateWebhook({
-          mandateId: payload.mandateId,
-          status: payload.status as Parameters<typeof processMandateWebhook>[0]['status'],
-          reason: payload.reason,
-          transactionRef: payload.transactionRef,
-          amount: payload.amount,
-          processedAt: payload.processedAt,
-        }),
-      )
-    }
-
-    if (payload.transactionRef) {
-      jobs.push(
-        processTransactionWebhook({
-          transactionRef: payload.transactionRef,
-          status: payload.status as Parameters<typeof processTransactionWebhook>[0]['status'],
-          mandateId: payload.mandateId,
-          amount: payload.amount,
-          reason: payload.reason,
-          processedAt: payload.processedAt,
-        }),
-      )
-    }
-
-    await Promise.all(jobs)
-    return NextResponse.json({ received: true }, { status: 200 })
-  } catch (err) {
-    logger.error('Netcash webhook processing failed', { err })
-    return NextResponse.json({ error: 'Processing failed' }, { status: 500 })
+  if (payload.mandateId) {
+    jobs.push(
+      processMandateWebhook({
+        mandateId: payload.mandateId,
+        status: payload.status as Parameters<typeof processMandateWebhook>[0]['status'],
+        reason: payload.reason,
+        transactionRef: payload.transactionRef,
+        amount: payload.amount,
+        processedAt: payload.processedAt,
+      }),
+    )
   }
-}
+
+  if (payload.transactionRef) {
+    jobs.push(
+      processTransactionWebhook({
+        transactionRef: payload.transactionRef,
+        status: payload.status as Parameters<typeof processTransactionWebhook>[0]['status'],
+        mandateId: payload.mandateId,
+        amount: payload.amount,
+        reason: payload.reason,
+        processedAt: payload.processedAt,
+      }),
+    )
+  }
+
+  await Promise.all(jobs)
+  return NextResponse.json({ received: true }, { status: 200 })
+})

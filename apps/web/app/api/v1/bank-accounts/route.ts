@@ -1,18 +1,19 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { CreateBankAccountSchema } from '@/lib/validation/profile'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { listBankAccounts, addBankAccount } from '@/services/member.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET() {
+export const GET = withApiHandler(async () => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
   const accounts = await listBankAccounts(session.user.id)
   return apiSuccess(accounts)
-}
+})
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -28,10 +29,6 @@ export async function POST(req: NextRequest) {
 
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 
-  try {
-    const account = await addBankAccount(session.user.id, parsed.data, ip)
-    return apiSuccess(account, 201)
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  const account = await addBankAccount(session.user.id, parsed.data, ip)
+  return apiSuccess(account, 201)
+})

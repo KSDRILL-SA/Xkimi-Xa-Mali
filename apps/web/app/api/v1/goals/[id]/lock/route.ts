@@ -1,12 +1,13 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { lockGoal } from '@/services/goal.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(
+export const POST = withApiHandler<{ id: string }>(async (
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+  { params },
+) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -15,10 +16,6 @@ export async function POST(
 
   const { id } = await params
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  try {
-    const goal = await lockGoal(id, session.user.id, ip)
-    return apiSuccess(goal)
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  const goal = await lockGoal(id, session.user.id, ip)
+  return apiSuccess(goal)
+})

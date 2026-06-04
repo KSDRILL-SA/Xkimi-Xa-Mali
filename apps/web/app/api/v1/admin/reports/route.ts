@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { AdminReportRequestSchema } from '@/lib/validation/report'
 import { getAdminReport } from '@/services/report.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(req: NextRequest) {
+export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -20,10 +21,6 @@ export async function GET(req: NextRequest) {
 
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
 
-  try {
-    const report = await getAdminReport(parsed.data.month, parsed.data.year)
-    return apiSuccess(report)
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const report = await getAdminReport(parsed.data.month, parsed.data.year)
+  return apiSuccess(report)
+})
