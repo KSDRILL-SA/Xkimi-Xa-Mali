@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { env } from '@/lib/env'
 import { apiSuccess, apiError } from '@/lib/api-response'
+import { adminBroadcastRatelimit } from '@/lib/redis'
 import { broadcastNotification } from '@/services/admin.service'
 import type { BroadcastChannel, BroadcastFilter } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
@@ -34,6 +35,9 @@ export const POST = withApiHandler(async (req: NextRequest) => {
 
   const adminId = isTrustedInternal ? (session?.user?.id ?? 'system') : session!.user.id
   const adminRoles = isTrustedInternal ? ['ADMIN'] : roles
+
+  const { success } = await adminBroadcastRatelimit.limit(adminId)
+  if (!success) return apiError('SYS_005', 'Broadcast rate limit exceeded. Please try again later.', 429)
 
   let body: unknown
   try { body = await req.json() } catch { return apiError('VAL_001', 'Invalid JSON', 400) }
