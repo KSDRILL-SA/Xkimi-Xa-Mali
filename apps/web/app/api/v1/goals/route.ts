@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { CreateGoalSchema } from '@/lib/validation/goal'
 import { getGoals, createGoal } from '@/services/goal.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(req: NextRequest) {
+export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -24,9 +25,9 @@ export async function GET(req: NextRequest) {
     total: result.total,
     totalPages: result.totalPages,
   })
-}
+})
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -44,10 +45,6 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
 
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
-  try {
-    const goal = await createGoal(parsed.data, session.user.id, ip)
-    return apiSuccess(goal, 201)
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const goal = await createGoal(parsed.data, session.user.id, ip)
+  return apiSuccess(goal, 201)
+})

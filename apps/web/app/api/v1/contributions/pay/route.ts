@@ -2,11 +2,12 @@ import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { paymentRatelimit } from '@/lib/redis'
 import { env } from '@/lib/env'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { submitManualPayment } from '@/services/contribution.service'
 import { ManualContributionSchema } from '@/lib/validation/contribution'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user) return apiError('SYS_001', 'Authentication required', 401)
 
@@ -25,16 +26,12 @@ export async function POST(req: NextRequest) {
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
-  try {
-    const result = await submitManualPayment(
-      session.user.id,
-      parsed.data,
-      session.user.id,
-      session.user.roles ?? [],
-      ip,
-    )
-    return apiSuccess(result, 201)
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const result = await submitManualPayment(
+    session.user.id,
+    parsed.data,
+    session.user.id,
+    session.user.roles ?? [],
+    ip,
+  )
+  return apiSuccess(result, 201)
+})

@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { authRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { validateInviteCode } from '@/services/invite.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 
   const { success } = await authRatelimit.limit(ip)
@@ -16,10 +17,6 @@ export async function POST(req: NextRequest) {
   if (typeof code !== 'string' || !code.trim())
     return apiError('VAL_002', '"code" is required', 400)
 
-  try {
-    const result = await validateInviteCode(code.trim().toUpperCase())
-    return apiSuccess(result)
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  const result = await validateInviteCode(code.trim().toUpperCase())
+  return apiSuccess(result)
+})

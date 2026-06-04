@@ -1,17 +1,17 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { TransactionFilterSchema } from '@/lib/validation/report'
 import { getTransactionHistory } from '@/services/report.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(req: NextRequest) {
+export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
   const { searchParams } = new URL(req.url)
   const roles = (session.user.roles as string[] | undefined) ?? []
 
-  // Admins may query any member; members can only query themselves
   const targetUserId = roles.includes('ADMIN') && searchParams.get('userId')
     ? (searchParams.get('userId') as string)
     : session.user.id
@@ -27,15 +27,11 @@ export async function GET(req: NextRequest) {
 
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
 
-  try {
-    const result = await getTransactionHistory(targetUserId, session.user.id, roles, parsed.data)
-    return apiSuccess(result.items, 200, {
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalPages: result.totalPages,
-    })
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const result = await getTransactionHistory(targetUserId, session.user.id, roles, parsed.data)
+  return apiSuccess(result.items, 200, {
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+    totalPages: result.totalPages,
+  })
+})
