@@ -4,7 +4,7 @@
 |---|---|
 | **Purpose** | Documents the invite-gated registration system — from admin creating an invite to member completing signup |
 | **Module** | M11a Invite and Access Control (patches M02 Auth System) |
-| **Status** | PENDING IMPLEMENTATION — this documents the design before build |
+| **Status** | ✅ IMPLEMENTED — M11a complete; frontend completed in Phase 2 Step 5 (PR #64) |
 | **Related Docs** | [01-auth-flow.md](./01-auth-flow.md) · [../database/01-erd.md](../database/01-erd.md) · [../security/01-security-architecture.md](../security/01-security-architecture.md) |
 
 ---

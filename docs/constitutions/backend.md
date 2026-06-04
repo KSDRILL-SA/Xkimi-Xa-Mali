@@ -58,6 +58,32 @@
                Never logged in plaintext.
 ```
 
+## Request Flow
+
+Every HTTP request follows this strict path. No layer skips another.
+
+```mermaid
+flowchart TD
+    REQ["HTTP Request"]
+    WH["withApiHandler\nStamps x-trace-id\nCatches all unhandled errors → Sentry"]
+    ZOD["Zod Validation\nlib/validation/*.ts\nRejects malformed input — 400"]
+    SVC["Service Layer\nservices/*.service.ts\nAll business logic lives here"]
+    REPO["Repository Layer\nrepositories/*.repo.ts\nAll Prisma calls here"]
+    DB[("PostgreSQL\nNeon")]
+    AUDIT["audit.service.ts\nEvery write → AuditLog row"]
+    EXT["External Clients\nlib/netcash.ts\nlib/bulksms.ts\nlib/resend.ts"]
+    ERR["AppError subclass\nStructured: code + message + status"]
+
+    REQ --> WH --> ZOD --> SVC
+    SVC --> REPO --> DB
+    SVC -->|"every state-changing call"| AUDIT --> DB
+    SVC --> EXT
+    SVC -->|"business rule violation"| ERR
+    ERR -->|"caught by"| WH
+```
+
+---
+
 ## Service Layer Structure
 
 ```

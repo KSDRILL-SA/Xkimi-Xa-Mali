@@ -1,5 +1,51 @@
 # Security Constitution — Xkimm Xa Mali
 
+## Security Defence Layers
+
+Every request passes through layers in order. A failure at any layer halts the request.
+
+```mermaid
+flowchart TD
+    REQUEST["Inbound Request"]
+
+    subgraph L1["Layer 1 — Transport"]
+        TLS["HTTPS / TLS 1.3\nHSTS header\nHTTP → HTTPS redirect"]
+    end
+
+    subgraph L2["Layer 2 — Session"]
+        COOKIE["HTTP-only cookie\nSameSite=Strict\nJWT verified by NextAuth"]
+    end
+
+    subgraph L3["Layer 3 — Rate Limiting"]
+        RL["Upstash sliding window\nPer IP or per userId\n429 on breach"]
+    end
+
+    subgraph L4["Layer 4 — Input Validation"]
+        ZOD["Zod schema\nEvery API boundary\n400 on invalid"]
+    end
+
+    subgraph L5["Layer 5 — Authorisation"]
+        RBAC["Role check\nL0/L1/L2/L3 tier enforcement\nService-layer resource ownership"]
+    end
+
+    subgraph L6["Layer 6 — Data Protection"]
+        ENC["AES-256-GCM at rest\nbcrypt passwords\nSHA-256 token hashes"]
+    end
+
+    subgraph L7["Layer 7 — Audit"]
+        AUDIT["append-only AuditLog\nEvery state-changing operation\nIP + userId + timestamp"]
+    end
+
+    subgraph WEBHOOK["Webhook Path (parallel)"]
+        HMAC["HMAC-SHA256 + timingSafeEqual\nNetcash / Inngest / BulkSMS\nSession cookies rejected"]
+    end
+
+    REQUEST --> L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7
+    REQUEST -->|"webhook endpoints"| WEBHOOK
+```
+
+---
+
 ## Rules
 
 ```
