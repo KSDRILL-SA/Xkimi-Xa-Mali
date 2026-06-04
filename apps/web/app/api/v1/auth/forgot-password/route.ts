@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { PasswordResetRequestSchema as Schema } from '@/lib/validation/auth'
-import { authRatelimit } from '@/lib/redis'
+import { forgotPasswordRatelimit } from '@/lib/redis'
 import { getClientIP } from '@/lib/request'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { requestPasswordReset } from '@/services/auth.service'
@@ -9,7 +9,7 @@ import { withApiHandler } from '@/lib/api-handler'
 export const POST = withApiHandler(async (req: NextRequest) => {
   const ip = getClientIP(req) ?? 'unknown'
 
-  const { success } = await authRatelimit.limit(`reset:${ip}`)
+  const { success } = await forgotPasswordRatelimit.limit(ip)
   if (!success) return apiError('SYS_005', 'Too many requests. Please try again later.', 429)
 
   let body: unknown
