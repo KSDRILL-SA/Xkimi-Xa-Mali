@@ -14,9 +14,9 @@
              Use environment variables to toggle behaviour.
              if (process.env.NODE_ENV === 'production') is a code smell.
 
-[INFRA-I04]  Docker Compose for local development.
-             Every developer runs the full stack locally without cloud services.
-             Local PostgreSQL + Redis mirrors production schema exactly.
+[INFRA-I04]  Local development uses Neon dev branch + Upstash free tier directly.
+             No Docker required. Clone → npm install → fill .env.local → npm run dev.
+             Local environment must mirror production schema via prisma migrate dev.
 
 [INFRA-I05]  Staging uses real external services in sandbox/test mode.
              No mocks in staging. Mocks only in unit tests.
@@ -31,7 +31,7 @@
              .env.example committed with all required keys (no values).
 
 [INFRA-I08]  Vercel preview deployments on every PR.
-             Preview environments use Neon branch databases.
+             Preview environments use Neon branch databases (isolated from production).
              Preview environments are ephemeral — cleaned up on PR close.
 
 [INFRA-I09]  Sentry configured for error tracking on all environments.
@@ -39,28 +39,101 @@
              Release tracking enabled.
 
 [INFRA-I10]  Better Stack uptime monitor on /api/health.
-             Alert channel: email to admin. SLA target: 99.9%.
+             Alert channel: email to admin. SLA target: 99.5%.
 ```
+
+---
+
+## CI/CD Pipeline
+
+```mermaid
+flowchart TD
+    PR["Pull Request opened\nor pushed to"]
+
+    subgraph CI["CI Gate — must all pass before merge"]
+        TC["typecheck\ntsc --noEmit"]
+        LT["lint\neslint"]
+        TS["test\nvitest — 116 tests"]
+        PV["prisma validate\nschema + migration diff"]
+    end
+
+    subgraph PREVIEW["Preview Deployment"]
+        VPD["Vercel preview deploy"]
+        NBD["Neon branch database\n(isolated from prod)"]
+        VPD --- NBD
+    end
+
+    subgraph MERGE["On merge to Dev / main"]
+        PMD["prisma migrate deploy\n(Neon production)"]
+        PSD["prisma db seed\n(idempotent — safe every time)"]
+        VPR["Vercel production deploy"]
+        SR["Sentry release"]
+    end
+
+    subgraph ROLLBACK["Emergency Rollback"]
+        VR["Vercel instant rollback\n(previous deployment — 1 click)"]
+        DR["DB rollback script\n/packages/database/prisma/rollbacks/"]
+    end
+
+    PR --> TC & LT & TS & PV
+    TC & LT & TS & PV --> VPD
+    VPD -->|"merge approved"| PMD
+    PMD --> PSD --> VPR --> SR
+    VPR -.->|"if broken"| ROLLBACK
+```
+
+---
+
+## Environment Tiers
+
+```mermaid
+flowchart LR
+    subgraph LOCAL["Local Development"]
+        LD["npm run dev\nlocalhost:3000 / 3001 / 3002"]
+        LDB["Neon dev branch\n(personal, not shared)"]
+        LR["Upstash free tier\n(shared or personal)"]
+        LD --- LDB & LR
+    end
+
+    subgraph PREVIEW["PR Preview"]
+        PD["Vercel preview URL\nauto-deployed on push"]
+        PDB["Neon PR branch\n(auto-created, auto-deleted)"]
+        PR["Upstash free tier"]
+        PD --- PDB & PR
+    end
+
+    subgraph PROD["Production"]
+        VPROD["Vercel production\n3 projects: web / admin / website"]
+        NEON["Neon production\npooled connection string"]
+        UPS["Upstash pro\nRate limiting + cache"]
+        VPROD --- NEON & UPS
+    end
+
+    LOCAL -->|"PR → preview"| PREVIEW
+    PREVIEW -->|"merge → prod"| PROD
+```
+
+---
 
 ## Environment Variables Reference
 
 ```bash
-# .env.example
+# .env.example — copy to .env.local and fill in values
 
-# Database
-DATABASE_URL=postgresql://...
+# Database (Neon pooled connection string)
+DATABASE_URL=postgresql://...?pgbouncer=true&connect_timeout=15
 
 # Auth
-NEXTAUTH_SECRET=
-NEXTAUTH_URL=
+NEXTAUTH_SECRET=           # random 32-char string
+NEXTAUTH_URL=              # http://localhost:3000 locally
 
-# Encryption
-ENCRYPTION_KEY=   # 32-byte hex string
+# Encryption (AES-256-GCM key)
+ENCRYPTION_KEY=            # 32-byte hex string — never commit
 
 # Netcash
 NETCASH_SERVICE_KEY=
 NETCASH_WEBHOOK_SECRET=
-NETCASH_API_URL=  # sandbox vs production
+NETCASH_API_URL=           # sandbox: https://sandbox.netcash.co.za
 
 # BulkSMS
 BULKSMS_USERNAME=
@@ -68,17 +141,17 @@ BULKSMS_PASSWORD=
 
 # Resend
 RESEND_API_KEY=
-RESEND_FROM_EMAIL=
+RESEND_FROM_EMAIL=         # noreply@yourdomain.com
 
 # Inngest
 INNGEST_EVENT_KEY=
 INNGEST_SIGNING_KEY=
 
-# Redis
+# Upstash Redis
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 
-# Storage
+# Vercel Blob (statement PDFs)
 BLOB_READ_WRITE_TOKEN=
 
 # Monitoring
@@ -89,25 +162,4 @@ SENTRY_AUTH_TOKEN=
 ENABLE_MANUAL_PAYMENTS=true
 ENABLE_GOAL_LOCKING=true
 WHATSAPP_GROUP_LINK=https://chat.whatsapp.com/...
-```
-
-## Deployment Pipeline
-
-```yaml
-# On Pull Request:
-- typecheck      (tsc --noEmit)
-- lint           (eslint)
-- test           (vitest)
-- prisma-check   (prisma validate)
-- preview-deploy (Vercel)
-
-# On merge to main:
-- All PR checks
-- prisma migrate deploy (Neon production)
-- Vercel production deploy
-- Sentry release
-
-# Rollback:
-- Vercel instant rollback via dashboard (previous deployment)
-- Database: rollback migration script in /packages/database/prisma/rollbacks/
 ```
