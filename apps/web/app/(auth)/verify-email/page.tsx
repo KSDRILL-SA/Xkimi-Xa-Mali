@@ -5,7 +5,13 @@ import { Button } from '@/components/ui/Button'
 
 export const metadata: Metadata = { title: 'Verify email' }
 
-export default function VerifyEmailPage() {
+export default async function VerifyEmailPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ sent?: string }>
+}) {
+  const { sent } = await searchParams
+
   return (
     <div className="text-center space-y-4">
       <div className="w-16 h-16 rounded-full bg-xxm-green-100 flex items-center justify-center mx-auto">
@@ -15,10 +21,16 @@ export default function VerifyEmailPage() {
         </svg>
       </div>
       <h1 className="text-2xl font-bold text-xxm-green-900">Check your email</h1>
-      <Alert variant="info">
-        A verification link has been sent to your email address. Click it to activate your account.
-        The link expires in 24 hours.
-      </Alert>
+      {sent ? (
+        <Alert variant="info">
+          A verification link has been sent to your email address. Click it to activate your account.
+          The link expires in 24 hours.
+        </Alert>
+      ) : (
+        <Alert variant="info">
+          Please check your inbox for a verification link. If you didn&apos;t receive it, contact the group admin.
+        </Alert>
+      )}
       <Button variant="ghost" size="sm" asChild>
         <Link href="/login">Back to login</Link>
       </Button>
