@@ -1,13 +1,12 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { mandateDelayRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { requestDelay } from '@/services/mandate.service'
 import { DelayMandateSchema } from '@/lib/validation/mandate'
+import { withApiHandler } from '@/lib/api-handler'
 
-type Params = { params: Promise<{ id: string }> }
-
-export async function POST(req: NextRequest, { params }: Params) {
+export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user) return apiError('SYS_001', 'Authentication required', 401)
 
@@ -23,10 +22,6 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
-  try {
-    const result = await requestDelay(id, parsed.data, session.user.id, session.user.roles ?? [], ip)
-    return apiSuccess(result)
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const result = await requestDelay(id, parsed.data, session.user.id, session.user.roles ?? [], ip)
+  return apiSuccess(result)
+})

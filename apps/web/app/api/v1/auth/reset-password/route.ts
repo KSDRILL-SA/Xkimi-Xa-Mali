@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
 import { PasswordResetSchema } from '@/lib/validation/auth'
 import { authRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { resetPassword } from '@/services/auth.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 
   const { success } = await authRatelimit.limit(`resetpw:${ip}`)
@@ -20,10 +21,6 @@ export async function POST(req: NextRequest) {
   const parsed = PasswordResetSchema.safeParse(body)
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
 
-  try {
-    await resetPassword(parsed.data.token, parsed.data.password, ip)
-    return apiSuccess({ message: 'Password reset successful. You can now log in.' })
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  await resetPassword(parsed.data.token, parsed.data.password, ip)
+  return apiSuccess({ message: 'Password reset successful. You can now log in.' })
+})

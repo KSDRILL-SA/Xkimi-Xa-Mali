@@ -3,8 +3,9 @@ import { verifyEmail } from '@/services/auth.service'
 import { apiError } from '@/lib/api-response'
 import { isAppError } from '@/lib/errors'
 import { verifyEmailRatelimit } from '@/lib/redis'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(req: NextRequest) {
+export const GET = withApiHandler(async (req: NextRequest) => {
   const token = req.nextUrl.searchParams.get('token')
   if (!token) return apiError('SYS_001', 'Verification token is required.', 400)
 
@@ -22,4 +23,4 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.redirect(new URL('/auth/login?error=server', req.url))
   }
-}
+})

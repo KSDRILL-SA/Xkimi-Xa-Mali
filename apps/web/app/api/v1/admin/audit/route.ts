@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { listAuditLogs } from '@/services/admin.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(req: NextRequest) {
+export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -16,15 +17,11 @@ export async function GET(req: NextRequest) {
   const page   = Math.max(1, parseInt(searchParams.get('page')  ?? '1',  10))
   const limit  = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '30', 10)))
 
-  try {
-    const result = await listAuditLogs(roles, { entity, action, userId, page, limit })
-    return apiSuccess(result.items, 200, {
-      page: result.page,
-      limit: result.limit,
-      total: result.total,
-      totalPages: result.totalPages,
-    })
-  } catch (e) {
-    return handleServiceError(e)
-  }
-}
+  const result = await listAuditLogs(roles, { entity, action, userId, page, limit })
+  return apiSuccess(result.items, 200, {
+    page: result.page,
+    limit: result.limit,
+    total: result.total,
+    totalPages: result.totalPages,
+  })
+})

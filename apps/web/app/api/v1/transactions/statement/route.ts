@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import { statementRatelimit } from '@/lib/redis'
-import { apiError, handleServiceError } from '@/lib/api-response'
+import { apiError } from '@/lib/api-response'
 import { StatementRequestSchema } from '@/lib/validation/report'
 import { generateMemberStatement } from '@/services/report.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function GET(req: NextRequest) {
+export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -26,16 +27,12 @@ export async function GET(req: NextRequest) {
 
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
 
-  try {
-    const { signedUrl } = await generateMemberStatement(
-      targetUserId,
-      session.user.id,
-      roles,
-      parsed.data.month,
-      parsed.data.year,
-    )
-    return NextResponse.redirect(signedUrl, { status: 302 })
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const { signedUrl } = await generateMemberStatement(
+    targetUserId,
+    session.user.id,
+    roles,
+    parsed.data.month,
+    parsed.data.year,
+  )
+  return NextResponse.redirect(signedUrl, { status: 302 })
+})

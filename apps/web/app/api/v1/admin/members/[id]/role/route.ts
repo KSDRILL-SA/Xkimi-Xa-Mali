@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { setMemberRole } from '@/services/invite.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -21,10 +22,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const ip = req.headers.get('x-forwarded-for') ?? undefined
 
-  try {
-    const result = await setMemberRole(session.user.id, roles, id, b.role, b.assign, ip)
-    return apiSuccess(result)
-  } catch (e) {
-    return handleServiceError(e)
-  }
-}
+  const result = await setMemberRole(session.user.id, roles, id, b.role, b.assign, ip)
+  return apiSuccess(result)
+})
