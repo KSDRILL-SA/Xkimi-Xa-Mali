@@ -65,6 +65,9 @@ jobs:
       - name: Run Prisma migrations
         run: cd packages/database && npx prisma migrate deploy
 
+      - name: Seed database
+        run: npm run db:seed
+
       - name: Type check
         run: npm run typecheck
 
