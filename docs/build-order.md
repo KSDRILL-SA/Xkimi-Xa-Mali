@@ -31,20 +31,47 @@ Each module has a definition of done. PR is not merged until DoD is met.
 
 ## Module Dependency Graph
 
-```
-M01 Project Foundation
- └── M02 Auth System  ←──────────────────── patched by M11a
-       └── M03 Member Profile
-             ├── M04 Payment Mandates
-             │     └── M05 Contribution Engine
-             │           └── M06 Job Engine (Inngest)
-             │                 └── M07 Notification System
-             │                       └── M09 Reporting & Statements
-             └── M08 Goals System
- └── M10 WhatsApp Integration Page (M01 only)
-       └── M11 Admin Dashboard (M02–M10)
-             └── M11a Invite & Access Control (M11 + M02 patch)
-                   └── M12 PWA + Optimisation
+```mermaid
+flowchart TD
+    M01["M01\nProject Foundation"]
+    M02["M02\nAuth System"]
+    M03["M03\nMember Profile"]
+    M04["M04\nPayment Mandates"]
+    M05["M05\nContribution Engine"]
+    M06["M06\nJob Engine / Inngest"]
+    M07["M07\nNotification System"]
+    M08["M08\nGoals System"]
+    M09["M09\nReporting & Statements"]
+    M10["M10\nWhatsApp Page"]
+    M11["M11\nAdmin Dashboard"]
+    M11A["M11a\nInvite & Access Control"]
+    M12["M12\nPWA + Optimisation"]
+
+    M01 --> M02
+    M01 --> M10
+    M02 --> M03
+    M03 --> M04
+    M03 --> M08
+    M04 --> M05
+    M05 --> M06
+    M06 --> M07
+    M05 --> M09
+    M07 --> M09
+    M10 --> M11
+    M02 --> M11
+    M03 --> M11
+    M04 --> M11
+    M05 --> M11
+    M06 --> M11
+    M07 --> M11
+    M08 --> M11
+    M09 --> M11
+    M11 --> M11A
+    M11A -->|"patches"| M02
+    M11A --> M12
+
+    style M11A fill:#1B4332,color:#fff
+    style M12 fill:#1B4332,color:#fff
 ```
 
 ---

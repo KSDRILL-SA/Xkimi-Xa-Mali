@@ -12,6 +12,95 @@
 
 ---
 
+## System Domain Map
+
+High-level view of the functional domains and their dependencies.
+
+```mermaid
+flowchart TD
+    subgraph IDENTITY["Identity"]
+        AUTH["Auth & Access\nFR-AUTH"]
+        INV["Invite & Onboarding\nFR-INV"]
+        PROF["Member Profile\nFR-PROF"]
+    end
+
+    subgraph FINANCE["Finance"]
+        MAN["Payment Mandates\nFR-MAN"]
+        CON["Contribution Engine\nFR-CON"]
+        PAY["Debit Pipeline\nFR-PAY"]
+    end
+
+    subgraph ENGAGEMENT["Engagement"]
+        GOAL["Goals System\nFR-GOAL"]
+        NOTIF["Notifications\nFR-NOTIF"]
+        WEB["Public Stats & Website\nFR-WEB"]
+    end
+
+    subgraph OPERATIONS["Operations"]
+        REP["Reporting & Statements\nFR-REP"]
+        ADMIN["Admin Dashboard\nFR-ADMIN"]
+    end
+
+    INV --> AUTH --> PROF
+    PROF --> MAN --> CON --> PAY
+    PAY --> NOTIF
+    CON --> REP
+    GOAL --> NOTIF
+    ADMIN --> IDENTITY & FINANCE & ENGAGEMENT & OPERATIONS
+```
+
+---
+
+## NFR Coverage Map
+
+```mermaid
+mindmap
+  root((XXM NFRs))
+    Performance
+      API p95 < 500ms
+      Lighthouse ≥ 90
+      PDF < 5s
+    Scalability
+      4-50 members v1
+      500 members v2
+      Stateless serverless
+    Availability
+      99.5% uptime
+      Idempotent pipeline
+      ISR fallback
+    Security
+      AES-256-GCM
+      bcrypt 12
+      HMAC webhooks
+      withApiHandler
+    POPIA
+      Consent timestamp
+      Data export
+      5yr retention
+    Maintainability
+      Zero lint errors
+      Service isolation
+      Idempotent seed
+    Observability
+      Sentry + traceId
+      Inngest dashboard
+      Better Stack
+    Usability
+      PWA installable
+      Offline fallback
+      Mobile-first
+    Data Integrity
+      ACID transactions
+      Decimal money
+      Append-only audit
+    Deployment
+      3 Vercel apps
+      Auto migrations
+      CI gate
+```
+
+---
+
 ## 1. Functional Requirements
 
 ### 1.1 Authentication & Access Control
