@@ -1,12 +1,13 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { setMemberStatus } from '@/services/admin.service'
+import { withApiHandler } from '@/lib/api-handler'
 
 const VALID_STATUSES = ['ACTIVE', 'SUSPENDED', 'PENDING'] as const
 type UserStatus = typeof VALID_STATUSES[number]
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -23,10 +24,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const ip = req.headers.get('x-forwarded-for') ?? undefined
 
-  try {
-    const updated = await setMemberStatus(session.user.id, roles, id, status as UserStatus, ip)
-    return apiSuccess(updated)
-  } catch (e) {
-    return handleServiceError(e)
-  }
-}
+  const updated = await setMemberStatus(session.user.id, roles, id, status as UserStatus, ip)
+  return apiSuccess(updated)
+})

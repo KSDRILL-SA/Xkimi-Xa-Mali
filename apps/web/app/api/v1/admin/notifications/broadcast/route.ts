@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { env } from '@/lib/env'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { broadcastNotification } from '@/services/admin.service'
 import type { BroadcastChannel, BroadcastFilter } from '@/services/admin.service'
+import { withApiHandler } from '@/lib/api-handler'
 
 const VALID_CHANNELS: BroadcastChannel[] = ['SMS', 'EMAIL', 'BOTH']
 const VALID_FILTERS: BroadcastFilter[]  = ['ALL', 'ACTIVE', 'PENDING', 'SUSPENDED']
@@ -20,7 +21,7 @@ function isValidInternalRequest(req: NextRequest): boolean {
   return drift <= MAX_TIMESTAMP_DRIFT_MS
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const isTrustedInternal = isValidInternalRequest(req)
 
   const session = await auth()
@@ -50,13 +51,9 @@ export async function POST(req: NextRequest) {
 
   const ip = req.headers.get('x-forwarded-for') ?? undefined
 
-  try {
-    const result = await broadcastNotification(
-      adminId, adminRoles,
-      message.trim(), channel as BroadcastChannel, resolvedFilter, ip,
-    )
-    return apiSuccess(result)
-  } catch (e) {
-    return handleServiceError(e)
-  }
-}
+  const result = await broadcastNotification(
+    adminId, adminRoles,
+    message.trim(), channel as BroadcastChannel, resolvedFilter, ip,
+  )
+  return apiSuccess(result)
+})

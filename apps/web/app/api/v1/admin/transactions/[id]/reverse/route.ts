@@ -1,9 +1,10 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { createReversal } from '@/services/contribution.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -11,10 +12,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
 
-  try {
-    const reversal = await createReversal(id, session.user.id, roles, ip)
-    return apiSuccess(reversal, 201)
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  const reversal = await createReversal(id, session.user.id, roles, ip)
+  return apiSuccess(reversal, 201)
+})

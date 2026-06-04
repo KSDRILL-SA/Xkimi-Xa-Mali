@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server'
 import { authRatelimit } from '@/lib/redis'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { acceptInviteRegistration } from '@/services/invite.service'
+import { withApiHandler } from '@/lib/api-handler'
 
 const SA_PHONE = /^(\+27|0)[6-8][0-9]{8}$/
 const SA_ID    = /^\d{13}$/
@@ -16,10 +17,9 @@ function validateSAId(id: string): boolean {
   return sum % 10 === 0
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 
-  // Rate-limit by IP — prevents enumeration of invite codes
   const { success } = await authRatelimit.limit(ip)
   if (!success) return apiError('SYS_005', 'Too many requests. Please try again later.', 429)
 
@@ -52,30 +52,26 @@ export async function POST(req: NextRequest) {
   if (b.consentToPopia !== true)
     return apiError('VAL_008', 'You must consent to the privacy policy', 400)
 
-  try {
-    const baseUrl = new URL(req.url).origin
-    const result = await acceptInviteRegistration(
-      {
-        inviteCode:     b.inviteCode.trim().toUpperCase(),
-        email:          (b.email as string).toLowerCase().trim(),
-        phone:          b.phone as string,
-        firstName:      (b.firstName as string).trim(),
-        lastName:       (b.lastName  as string).trim(),
-        idNumber:       b.idNumber as string | undefined,
-        password:       b.password as string,
-        consentToPopia: true,
-      },
-      baseUrl,
-      ip,
-    )
-    return apiSuccess(
-      {
-        message: 'Registration successful. Please check your email to verify your account.',
-        userId: result.userId,
-      },
-      201,
-    )
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  const baseUrl = new URL(req.url).origin
+  const result = await acceptInviteRegistration(
+    {
+      inviteCode:     b.inviteCode.trim().toUpperCase(),
+      email:          (b.email as string).toLowerCase().trim(),
+      phone:          b.phone as string,
+      firstName:      (b.firstName as string).trim(),
+      lastName:       (b.lastName  as string).trim(),
+      idNumber:       b.idNumber as string | undefined,
+      password:       b.password as string,
+      consentToPopia: true,
+    },
+    baseUrl,
+    ip,
+  )
+  return apiSuccess(
+    {
+      message: 'Registration successful. Please check your email to verify your account.',
+      userId: result.userId,
+    },
+    201,
+  )
+})

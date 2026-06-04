@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { updateSMSDeliveryStatus } from '@/services/notification.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-// BulkSMS documented IP ranges for delivery receipts (https://www.bulksms.com/developer/json/v1/#tag/Message/operation/listMessages)
+// BulkSMS documented IP ranges for delivery receipts
 const BULKSMS_IP_RANGES = [
   '196.38.122.',
   '196.38.123.',
@@ -21,7 +22,7 @@ type DeliveryReceiptEntry = {
   status?: { type?: string }
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
 
   if (process.env.NODE_ENV === 'production' && !isAllowedBulkSMSIp(clientIp)) {
@@ -48,11 +49,10 @@ export async function POST(req: NextRequest) {
         await updateSMSDeliveryStatus(notificationId, deliveryStatus)
       } catch {
         // Non-fatal — BulkSMS will not retry based on our response body, only HTTP status.
-        // Log in prod observability tooling via Sentry/Vercel.
       }
     }),
   )
 
   // BulkSMS requires a 200 response regardless of processing outcome.
   return new NextResponse(null, { status: 200 })
-}
+})

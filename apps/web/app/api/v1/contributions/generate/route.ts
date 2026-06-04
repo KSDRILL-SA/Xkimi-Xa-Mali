@@ -1,10 +1,11 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { generateMonthlyContributions } from '@/services/contribution.service'
 import { GenerateContributionsSchema } from '@/lib/validation/contribution'
+import { withApiHandler } from '@/lib/api-handler'
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user) return apiError('SYS_001', 'Authentication required', 401)
 
@@ -18,14 +19,10 @@ export async function POST(req: NextRequest) {
     return apiError('VAL_001', parsed.error.errors[0]?.message ?? 'Invalid request', 422)
   }
 
-  try {
-    const result = await generateMonthlyContributions(
-      parsed.data,
-      session.user.id,
-      session.user.roles ?? [],
-    )
-    return apiSuccess(result, 201)
-  } catch (err: unknown) {
-    return handleServiceError(err)
-  }
-}
+  const result = await generateMonthlyContributions(
+    parsed.data,
+    session.user.id,
+    session.user.roles ?? [],
+  )
+  return apiSuccess(result, 201)
+})

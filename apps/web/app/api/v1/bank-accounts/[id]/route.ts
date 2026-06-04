@@ -1,12 +1,11 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { UpdateBankAccountSchema } from '@/lib/validation/profile'
-import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { apiSuccess, apiError } from '@/lib/api-response'
 import { updateBankAccount, removeBankAccount } from '@/services/member.service'
+import { withApiHandler } from '@/lib/api-handler'
 
-type Params = { params: Promise<{ id: string }> }
-
-export async function PATCH(req: NextRequest, { params }: Params) {
+export const PATCH = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
@@ -24,25 +23,17 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 
-  try {
-    await updateBankAccount(id, session.user.id, parsed.data, ip)
-    return apiSuccess({ message: 'Bank account updated' })
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  await updateBankAccount(id, session.user.id, parsed.data, ip)
+  return apiSuccess({ message: 'Bank account updated' })
+})
 
-export async function DELETE(req: NextRequest, { params }: Params) {
+export const DELETE = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
   const { id } = await params
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 
-  try {
-    await removeBankAccount(id, session.user.id, ip)
-    return apiSuccess({ message: 'Bank account removed' })
-  } catch (err) {
-    return handleServiceError(err)
-  }
-}
+  await removeBankAccount(id, session.user.id, ip)
+  return apiSuccess({ message: 'Bank account removed' })
+})
