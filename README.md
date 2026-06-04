@@ -26,7 +26,7 @@ A full-featured web platform that handles:
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 15 App Router (TypeScript) |
-| Database | PostgreSQL via Prisma ORM |
+| Database | PostgreSQL via Prisma ORM (hosted on Neon) |
 | Auth | NextAuth.js v5 |
 | Payments | Netcash (DebiCheck debit orders) |
 | SMS | BulkSMS |
@@ -35,7 +35,7 @@ A full-featured web platform that handles:
 | Cache / Rate limiting | Upstash Redis |
 | File storage | Vercel Blob |
 | Deployment | Vercel + Neon + Upstash |
-| Monitoring | Sentry + Better Stack |
+| Monitoring | Sentry |
 
 ---
 
@@ -46,9 +46,9 @@ xkimm-xa-mali/
 ├── apps/
 │   ├── web/                    # Member portal + API backend (port 3000)
 │   │   ├── app/                # Next.js 15 App Router
-│   │   │   ├── (auth)/         # Login, register, password reset
+│   │   │   ├── (auth)/         # Login, register, password reset, invite
 │   │   │   ├── (member)/       # Member dashboard, contributions, goals
-│   │   │   └── api/v1/         # REST API endpoints (49 routes)
+│   │   │   └── api/v1/         # REST API endpoints (50+ routes)
 │   │   ├── components/         # UI components
 │   │   ├── lib/                # Clients, utilities, validation schemas
 │   │   ├── services/           # Business logic (service layer)
@@ -72,22 +72,37 @@ xkimm-xa-mali/
 │   ├── api-contract.yaml       # OpenAPI specification
 │   ├── security-model.md       # Auth + permissions
 │   ├── build-order.md          # Module build plan
-│   ├── architecture/           # C4 architecture diagrams
-│   ├── flows/                  # Auth, payment, contribution lifecycle flows
 │   └── constitutions/          # Coding standards per layer
 ├── .github/workflows/          # CI/CD
-├── docker-compose.yml          # Local dev (PostgreSQL + Redis)
 └── .env.example                # Environment variable reference
 ```
 
 ---
 
-## Getting Started (Local Development)
+## Prerequisites
 
-### Prerequisites
+- **Node.js 20+** — [nodejs.org](https://nodejs.org)
+- **npm** — bundled with Node.js
+- **Neon account** — free tier works for development: [neon.tech](https://neon.tech)
+- **Upstash Redis** — free tier works: [upstash.com](https://upstash.com)
+- **Vercel account** — for deployment: [vercel.com](https://vercel.com)
 
-- Node.js 20+
-- Docker + Docker Compose
+External services you need keys for (required for full functionality):
+
+| Service | Purpose | Sign-up |
+|---|---|---|
+| [Neon](https://neon.tech) | PostgreSQL database | Free tier |
+| [Upstash](https://upstash.com) | Redis cache + rate limiting | Free tier |
+| [Resend](https://resend.com) | Transactional email | Free tier (3k/month) |
+| [BulkSMS](https://bulksms.com) | SMS notifications | Pay-as-you-go |
+| [Inngest](https://inngest.com) | Durable jobs (debits, reminders) | Free tier |
+| [Netcash](https://netcash.co.za) | DebiCheck debit orders | Business account |
+| [Vercel Blob](https://vercel.com/docs/storage/vercel-blob) | Statement PDF storage | Included with Vercel |
+| [Sentry](https://sentry.io) | Error monitoring | Free tier |
+
+---
+
+## Local Development Setup
 
 ### 1. Clone and install
 
@@ -97,9 +112,9 @@ cd xkimi-xa-mali
 npm install
 ```
 
-### 2. Configure environment
+### 2. Configure environment variables
 
-Copy and fill in `.env.local` for each app (see `.env.example` for all variables):
+Copy the example env file to each app:
 
 ```bash
 cp .env.example apps/web/.env.local
@@ -107,53 +122,197 @@ cp .env.example apps/admin/.env.local
 cp .env.example apps/website/.env.local
 ```
 
-**Local dev URLs** (set these in the website and web/admin env files):
+Open each `.env.local` and fill in the values. See the **Environment Variables Reference** section below. The minimum set needed to run locally:
 
-| Variable | Value |
-|---|---|
-| `NEXTAUTH_URL` (web) | `http://localhost:3000` |
-| `NEXTAUTH_URL` (admin) | `http://localhost:3002` |
-| `NEXT_PUBLIC_SITE_URL` | `http://localhost:3001` |
-| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` |
-| `NEXT_PUBLIC_ADMIN_URL` | `http://localhost:3002` |
-| `WEB_INTERNAL_URL` | `http://localhost:3000` |
-| `DATABASE_URL` | `postgresql://xxm:xxm_local_password@localhost:5432/xxm_dev` |
+- `DATABASE_URL` — your Neon connection string
+- `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` — from Upstash console
+- `AUTH_SECRET` + `NEXTAUTH_SECRET` — generate with `openssl rand -base64 32`
+- `ENCRYPTION_KEY` — generate with `openssl rand -hex 32` (must be exactly 64 hex chars)
+- `NEXTAUTH_URL=http://localhost:3000` (in `apps/web/.env.local`)
+- `NEXTAUTH_URL=http://localhost:3002` (in `apps/admin/.env.local`)
 
-Generate secrets: `openssl rand -base64 32` (auth) and `openssl rand -hex 32` (encryption).
+Set `FOUNDER_EMAIL`, `FOUNDER_PHONE`, and `FOUNDER_PASSWORD` in `apps/web/.env.local` before seeding — this creates your admin login.
 
-Set `FOUNDER_EMAIL`, `FOUNDER_PHONE`, and `FOUNDER_PASSWORD` in `apps/web/.env.local` before seeding.
-
-### 3. Start local services
+### 3. Set up the database
 
 ```bash
-docker-compose up -d   # PostgreSQL + Redis
+npm run db:generate     # generate the Prisma client from the schema
+npm run db:migrate      # run all pending migrations against your Neon DB
+npm run db:seed         # seed roles, notification templates, and founder account
 ```
 
-### 4. Set up database
-
-```bash
-npm run db:generate
-npm run db:migrate
-npm run db:seed
-```
-
-### 5. Start development servers
+### 4. Start development servers
 
 ```bash
 npm run dev
 ```
 
-| App | URL |
-|---|---|
-| Website (marketing) | http://localhost:3001 |
-| Web (member portal + API) | http://localhost:3000 |
-| Admin dashboard | http://localhost:3002 |
+This starts all three apps in parallel:
+
+| App | URL | Purpose |
+|---|---|---|
+| Member portal + API | http://localhost:3000 | Member login, dashboard, API |
+| Admin dashboard | http://localhost:3002 | Admin login (use founder credentials) |
+| Marketing website | http://localhost:3001 | Public landing page |
 
 Start a single app: `npm run dev:web`, `npm run dev:admin`, or `npm run dev:website`.
 
-Prisma Studio: `npm run db:studio`
-
 **Optional — Inngest jobs (debits, reminders):** run the [Inngest dev server](https://www.inngest.com/docs/local-development) alongside the web app so scheduled functions execute locally.
+
+Prisma Studio (visual DB browser): `npm run db:studio`
+
+---
+
+## Environment Variables Reference
+
+All variables live in `apps/web/.env.local` unless noted otherwise.
+
+| Variable | Description | Where to get it | Required |
+|---|---|---|---|
+| `DATABASE_URL` | Neon PostgreSQL connection string | Neon console → Connection Details | ✅ |
+| `AUTH_SECRET` | NextAuth.js signing secret (min 32 chars) | `openssl rand -base64 32` | ✅ |
+| `NEXTAUTH_SECRET` | Alias for AUTH_SECRET used by some adapters | same as AUTH_SECRET | ✅ |
+| `NEXTAUTH_URL` | Full URL of this app | `http://localhost:3000` (dev) | ✅ |
+| `ENCRYPTION_KEY` | AES-256 key for encrypting bank account numbers (64 hex chars) | `openssl rand -hex 32` | ✅ |
+| `UPSTASH_REDIS_REST_URL` | Upstash Redis REST endpoint | Upstash console | ✅ |
+| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis REST token | Upstash console | ✅ |
+| `NETCASH_SERVICE_KEY` | Netcash API service key | Netcash merchant portal | ✅ |
+| `NETCASH_WEBHOOK_SECRET` | Shared secret for webhook signature verification | Set in Netcash portal | ✅ |
+| `NETCASH_API_URL` | Netcash SOAP endpoint | Sandbox: `https://ws.netcash.co.za/NSWSSX/NetcashTest.asmx` | ✅ |
+| `BULKSMS_USERNAME` | BulkSMS account username | BulkSMS account settings | ✅ |
+| `BULKSMS_PASSWORD` | BulkSMS account password | BulkSMS account settings | ✅ |
+| `RESEND_API_KEY` | Resend API key | Resend dashboard → API Keys | ✅ |
+| `RESEND_FROM_EMAIL` | Verified sender address | Must be verified in Resend | ✅ |
+| `INNGEST_EVENT_KEY` | Inngest event signing key | Inngest dashboard → Keys | ✅ |
+| `INNGEST_SIGNING_KEY` | Inngest webhook signing key | Inngest dashboard → Keys | ✅ |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob token for PDF storage | Vercel dashboard → Storage | ✅ |
+| `WHATSAPP_GROUP_LINK` | WhatsApp group invite link | WhatsApp group settings | ✅ |
+| `WHATSAPP_GROUP_NAME` | Display name for the WhatsApp group | — | — |
+| `ADMIN_WHATSAPP_NUMBER` | Admin WhatsApp in international format (no +) | — | — |
+| `ADMIN_API_SECRET` | Secret for trusted admin→web internal API calls | `openssl rand -base64 32` | ✅ |
+| `NEXT_PUBLIC_WEB_URL` | Public URL of the web app | `http://localhost:3000` (dev) | ✅ |
+| `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN for error tracking | Sentry project settings | — |
+| `SENTRY_AUTH_TOKEN` | Sentry auth token for source maps | Sentry account → Auth tokens | — |
+| `FOUNDER_EMAIL` | Email address for the seeded admin account | Your email | Seed only |
+| `FOUNDER_PHONE` | SA phone number for the seeded admin (e.g. 0821234567) | Your phone | Seed only |
+| `FOUNDER_PASSWORD` | Password for the seeded admin account | Choose a strong password | Seed only |
+| `MAX_LOGIN_ATTEMPTS` | Failed logins before lockout (default: 5) | — | — |
+| `LOCKOUT_DURATION_MINUTES` | Lockout duration in minutes (default: 30) | — | — |
+
+**Admin app additional variables** (`apps/admin/.env.local`):
+
+| Variable | Description |
+|---|---|
+| `AUTH_SECRET` | Same secret as web app |
+| `NEXTAUTH_URL` | `http://localhost:3002` (dev) |
+| `WEB_INTERNAL_URL` | Internal URL of web app for server-to-server calls — `http://localhost:3000` (dev) |
+| `ADMIN_API_SECRET` | Same secret as web app |
+
+**Website app additional variables** (`apps/website/.env.local`):
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | Public URL of member portal — `http://localhost:3000` (dev) |
+| `NEXT_PUBLIC_ADMIN_URL` | Public URL of admin dashboard — `http://localhost:3002` (dev) |
+| `NEXT_PUBLIC_SITE_URL` | Public URL of marketing website — `http://localhost:3001` (dev) |
+| `NEXT_PUBLIC_WHATSAPP_GROUP_LINK` | Same as `WHATSAPP_GROUP_LINK` |
+
+---
+
+## Deployment (Vercel)
+
+### 1. Create three Vercel projects
+
+Deploy each app as a separate Vercel project:
+
+```
+apps/web      → member portal      (e.g. app.xkimmxamali.co.za)
+apps/admin    → admin dashboard    (e.g. admin.xkimmxamali.co.za)
+apps/website  → marketing website  (e.g. xkimmxamali.co.za)
+```
+
+In each Vercel project settings, set **Root Directory** to the app path (`apps/web`, `apps/admin`, or `apps/website`).
+
+### 2. Set environment variables
+
+Add all required variables from the **Environment Variables Reference** section above via Vercel's dashboard (Settings → Environment Variables). In production:
+
+- `NEXTAUTH_URL` = your production URL (e.g. `https://app.xkimmxamali.co.za`)
+- `DATABASE_URL` = your Neon connection string (use the pooled connection URL)
+- `NETCASH_API_URL` = `https://ws.netcash.co.za/NSWSSX/Netcash.asmx` (production, not sandbox)
+
+### 3. Connect Neon database
+
+In your Neon project, use the **pooled connection string** for `DATABASE_URL` in production. Enable the Neon Vercel integration for automatic branch preview databases.
+
+### 4. Run migrations on deploy
+
+Vercel build command for `apps/web`:
+
+```bash
+cd ../.. && npm run db:generate && npm run db:migrate && npm run db:seed && cd apps/web && npm run build
+```
+
+This ensures every deployment runs migrations and seeds templates.
+
+### 5. Connect Inngest
+
+In the Inngest dashboard, create a production app and point it to `https://your-app.vercel.app/api/inngest`. Set `INNGEST_EVENT_KEY` and `INNGEST_SIGNING_KEY` in Vercel environment variables.
+
+---
+
+## Database Migrations
+
+```bash
+# Development — creates a new migration file in packages/database/prisma/migrations/
+npm run db:migrate:dev
+
+# Production — deploys pending migrations only (no migration file creation)
+npm run db:migrate
+
+# Seed reference data (idempotent — safe to run on every deploy)
+npm run db:seed
+
+# Open Prisma Studio (visual database browser)
+npm run db:studio
+```
+
+---
+
+## Running Tests
+
+```bash
+npm run test           # run all tests
+npm run test:watch     # watch mode for development
+npm run typecheck      # TypeScript type checking (zero errors required)
+npm run lint           # ESLint (zero errors required)
+```
+
+---
+
+## Architecture Overview
+
+The system follows a layered architecture:
+
+```
+Browser / Mobile PWA
+        ↓
+Next.js App Router (Server Components + Client Components)
+        ↓
+Service Layer (business logic, validation, RBAC)
+        ↓
+Repository Layer (Prisma queries, data access)
+        ↓
+Neon PostgreSQL (29 models, full audit trail)
+        ↑
+Inngest (durable jobs: debit collection, notifications, reminders)
+Upstash Redis (rate limiting, caching, idempotency keys)
+Netcash (SA DebiCheck debit order mandate + collection)
+BulkSMS + Resend (notifications)
+Vercel Blob (statement PDFs)
+```
+
+See [docs/system-overview.md](docs/system-overview.md) for the full design document.
 
 ---
 
@@ -175,8 +334,6 @@ Prisma Studio: `npm run db:studio`
 ---
 
 ## Build Phases
-
-See [build-order.md](docs/build-order.md) for the full dependency-ordered module plan.
 
 | Phase | Module | Status |
 |---|---|---|
