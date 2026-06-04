@@ -10,12 +10,15 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@xxm/config": "*",
-    "@xxm/utils":  "*",
+    "@xxm/utils": "*",
     "lucide-react": "^0.474.0"
   },
   "peerDependencies": {
     "next": ">=15.0.0",
     "react": ">=19.0.0",
     "react-dom": ">=19.0.0"
+  },
+  "scripts": {
+    "test": "exit 0"
   }
 }
