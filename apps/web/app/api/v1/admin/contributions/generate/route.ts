@@ -1,11 +1,15 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { apiSuccess, apiError, handleServiceError } from '@/lib/api-response'
+import { adminBulkRatelimit } from '@/lib/redis'
 import { bulkGenerateContributions } from '@/services/admin.service'
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
+
+  const { success } = await adminBulkRatelimit.limit(session.user.id)
+  if (!success) return apiError('SYS_005', 'Bulk generation rate limit exceeded. Please try again later.', 429)
 
   const roles = (session.user.roles as string[] | undefined) ?? []
 
