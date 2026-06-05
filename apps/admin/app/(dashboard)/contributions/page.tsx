@@ -54,7 +54,7 @@ export default async function ContributionsPage({
   const page   = Math.max(1, parseInt(params.page ?? '1', 10))
   const generated = params.generated === '1'
 
-  const { items, total, totalPages } = await listAllContributions(roles, { month, year, status, page, limit: 25 })
+  const { items, total } = await listAllContributions(roles, { month, year, status, page, limit: 25 })
 
   async function generate(fd: FormData) {
     'use server'
