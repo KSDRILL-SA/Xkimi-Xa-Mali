@@ -38,18 +38,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!user?.password) return null
         if (user.deletedAt) return null
 
-        const roleNames = user.roles.map((ur) => ur.role.name)
-        if (!roleNames.includes('ADMIN')) return null
-
         if (user.lockedUntil && user.lockedUntil > new Date()) {
           throw new Error('ACCOUNT_LOCKED')
         }
-
         if (user.status === 'SUSPENDED') throw new Error('ACCOUNT_SUSPENDED')
+        if (user.status === 'PENDING') throw new Error('ACCOUNT_PENDING')
 
+        // Always run bcrypt before checking role — prevents timing-based admin email enumeration
         const valid = await bcrypt.compare(parsed.data.password, user.password)
+        const roleNames = user.roles.map((ur) => ur.role.name)
 
-        if (!valid) {
+        if (!valid || !roleNames.includes('ADMIN')) {
+          if (!roleNames.includes('ADMIN')) {
+            // Don't increment attempts for non-admin accounts
+            await recordLoginHistory(user.id, false)
+            return null
+          }
           const newAttempts = user.loginAttempts + 1
           const lockout = newAttempts >= MAX_LOGIN_ATTEMPTS
           await db.user.update({
@@ -93,7 +97,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session({ session, token }) {
       session.user.id    = token.id as string
-      session.user.roles = token.roles as string[]
+      session.user.roles = (token.roles as string[] | undefined) ?? []
       session.user.roleVersion = token.roleVersion as number
       return session
     },
