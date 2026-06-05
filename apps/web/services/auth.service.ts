@@ -12,6 +12,7 @@ import {
   InvalidTokenError,
   InvalidCredentialsError,
 } from '@/lib/errors'
+import { bumpRoleVersion } from '@/lib/role-version'
 import type { RegisterInput } from '@/lib/validation/auth'
 
 const BCRYPT_ROUNDS = 12
@@ -160,13 +161,16 @@ export async function resetPassword(rawToken: string, newPassword: string, ipAdd
     })
   })
 
-  await writeAuditLog({
-    userId: record.userId,
-    action: 'PASSWORD_RESET',
-    entity: 'User',
-    entityId: record.userId,
-    ipAddress,
-  })
+  await Promise.all([
+    bumpRoleVersion(record.userId),
+    writeAuditLog({
+      userId: record.userId,
+      action: 'PASSWORD_RESET',
+      entity: 'User',
+      entityId: record.userId,
+      ipAddress,
+    }),
+  ])
 }
 
 export async function changePassword(
@@ -187,7 +191,10 @@ export async function changePassword(
 
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
-  await userRepo.update(userId, { password: passwordHash })
+  await Promise.all([
+    userRepo.update(userId, { password: passwordHash }),
+    bumpRoleVersion(userId),
+  ])
 
   await writeAuditLog({
     userId,
