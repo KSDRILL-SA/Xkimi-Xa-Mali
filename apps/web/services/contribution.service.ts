@@ -352,8 +352,8 @@ export async function processTransactionWebhook(event: TransactionEvent) {
   })
 
   await Promise.all([
-    cache.del(CACHE_KEYS.DASHBOARD_STATS),
-    invalidateContributionSummaryCache(transaction.contribution.userId),
+    cache.del(CACHE_KEYS.DASHBOARD_STATS).catch(() => {}),
+    invalidateContributionSummaryCache(transaction.contribution.userId).catch(() => {}),
   ])
 
   logger.info('Transaction webhook processed', {

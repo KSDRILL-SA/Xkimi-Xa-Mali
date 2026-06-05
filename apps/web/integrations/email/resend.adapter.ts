@@ -1,5 +1,3 @@
-import { Resend } from 'resend'
-import { env } from '@/lib/env'
 import {
   sendVerificationEmail,
   sendPasswordResetEmail,
@@ -8,10 +6,9 @@ import {
   sendPaymentFailedEmail,
   sendInviteEmail,
   sendOverdueReminderEmail,
+  sendGenericEmail,
 } from '@/lib/email'
 import type { IEmailProvider } from './types'
-
-const resend = new Resend(env.RESEND_API_KEY)
 
 export const resendProvider: IEmailProvider = {
   sendVerificationEmail,
@@ -21,12 +18,5 @@ export const resendProvider: IEmailProvider = {
   sendPaymentFailedEmail,
   sendInviteEmail,
   sendOverdueReminderEmail,
-  sendGenericEmail: async (to: string, subject: string, html: string) => {
-    await resend.emails.send({
-      from: env.RESEND_FROM_EMAIL,
-      to,
-      subject,
-      html,
-    })
-  },
+  sendGenericEmail,
 }

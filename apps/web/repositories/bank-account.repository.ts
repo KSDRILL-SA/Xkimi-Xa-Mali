@@ -25,8 +25,9 @@ export const bankAccountRepo = {
     })
   },
 
-  findFirst(where: Prisma.BankAccountWhereInput, orderBy?: Prisma.BankAccountOrderByWithRelationInput) {
-    return db.bankAccount.findFirst({
+  findFirst(where: Prisma.BankAccountWhereInput, orderBy?: Prisma.BankAccountOrderByWithRelationInput, tx?: TxClient) {
+    const client = tx ?? db
+    return client.bankAccount.findFirst({
       where,
       ...(orderBy && { orderBy }),
     })
@@ -53,8 +54,9 @@ export const bankAccountRepo = {
     return client.bankAccount.updateMany({ where: { userId }, data })
   },
 
-  delete(id: string) {
-    return db.bankAccount.delete({ where: { id } })
+  delete(id: string, tx?: TxClient) {
+    const client = tx ?? db
+    return client.bankAccount.delete({ where: { id } })
   },
 
   count(where: Prisma.BankAccountWhereInput) {

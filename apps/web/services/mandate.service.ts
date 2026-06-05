@@ -15,6 +15,7 @@ import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '
 import type { MandateStatus, AccountType, Prisma } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { redis } from '@/lib/redis'
+import { logger } from '@/lib/logger'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
 
@@ -160,23 +161,30 @@ export async function updateMandate(
     throw new MandateConflictError('Only active or pending mandates can be updated', 'MND_003')
   }
 
-  // Push amount and/or debit-day changes to Netcash, effective next debit cycle.
-  // A debit-day change must reach Netcash too, otherwise the bank keeps debiting
-  // on the old day while our records show the new one.
-  const hasChange = data.amount !== undefined || data.debitDay !== undefined
-  if (hasChange && mandate.netcashMandateId) {
-    const effectiveDate = paymentGateway.getNextDebitDate(data.debitDay ?? mandate.debitDay)
-    await paymentGateway.updateMandate(
-      mandate.netcashMandateId,
-      { amount: data.amount, debitDay: data.debitDay },
-      effectiveDate,
-    )
-  }
-
+  // Write to DB first (source of truth), then sync to Netcash.
+  // If Netcash call fails after DB write, we log for manual reconciliation
+  // rather than leaving DB in the new state while Netcash has the old values.
   const updated = await mandateRepo.update(mandateId, {
     ...(data.debitDay !== undefined && { debitDay: data.debitDay }),
     ...(data.amount !== undefined && { amount: data.amount }),
   })
+
+  const hasChange = data.amount !== undefined || data.debitDay !== undefined
+  if (hasChange && mandate.netcashMandateId) {
+    try {
+      const effectiveDate = paymentGateway.getNextDebitDate(data.debitDay ?? mandate.debitDay)
+      await paymentGateway.updateMandate(
+        mandate.netcashMandateId,
+        { amount: data.amount, debitDay: data.debitDay },
+        effectiveDate,
+      )
+    } catch (err) {
+      logger.error('DB mandate updated but Netcash sync failed — manual reconciliation required', {
+        mandateId, netcashMandateId: mandate.netcashMandateId, changes: data,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   await writeAuditLog({
     userId: mandate.userId,
@@ -210,11 +218,20 @@ export async function cancelMandate(
     throw new MandateConflictError('Mandate is already cancelled', 'MND_004')
   }
 
-  if (mandate.netcashMandateId) {
-    await paymentGateway.cancelMandate(mandate.netcashMandateId)
-  }
-
+  // Cancel in DB first so we never re-bill after a member requests cancellation.
+  // Then notify Netcash; failure is logged for manual reconciliation.
   const updated = await mandateRepo.update(mandateId, { status: 'CANCELLED' })
+
+  if (mandate.netcashMandateId) {
+    try {
+      await paymentGateway.cancelMandate(mandate.netcashMandateId)
+    } catch (err) {
+      logger.error('DB mandate cancelled but Netcash cancel failed — manual reconciliation required', {
+        mandateId, netcashMandateId: mandate.netcashMandateId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    }
+  }
 
   await writeAuditLog({
     userId: mandate.userId,
