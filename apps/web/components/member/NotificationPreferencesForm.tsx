@@ -14,7 +14,7 @@ interface Prefs {
 const CHANNELS: { key: keyof Prefs; label: string; description: string }[] = [
   { key: 'sms', label: 'SMS notifications', description: 'Payment warnings, confirmations, and overdue reminders' },
   { key: 'email', label: 'Email notifications', description: 'Receipts, statements, and account updates' },
-  { key: 'push', label: 'Push notifications', description: 'In-app alerts when you have the site open' },
+  { key: 'push', label: 'Push & WhatsApp notifications', description: 'In-app alerts and WhatsApp messages (managed via the WhatsApp page)' },
 ]
 
 export function NotificationPreferencesForm({ initial }: { initial: Prefs }) {
