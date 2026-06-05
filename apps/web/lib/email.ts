@@ -32,6 +32,7 @@ function layout(content: string): string {
 // ─── Retry-wrapped send ───────────────────────────────────────────────────────
 
 async function send(options: Parameters<typeof resend.emails.send>[0]): Promise<void> {
+  if (!env.RESEND_API_KEY) throw new ExternalServiceError('Resend', 'RESEND_API_KEY not configured')
   await withRetry(
     async () => {
       const result = await resend.emails.send(options)
@@ -48,7 +49,7 @@ async function send(options: Parameters<typeof resend.emails.send>[0]): Promise<
 export async function sendVerificationEmail(
   to: string, firstName: string, token: string, baseUrl: string,
 ): Promise<void> {
-  const url = `${baseUrl}/auth/verify-email?token=${token}`
+  const url = `${baseUrl}/api/v1/auth/verify-email?token=${token}`
   await send({
     from: FROM, to,
     subject: `Verify your ${APP_NAME} account`,
@@ -65,7 +66,7 @@ export async function sendVerificationEmail(
 export async function sendPasswordResetEmail(
   to: string, firstName: string, token: string, baseUrl: string,
 ): Promise<void> {
-  const url = `${baseUrl}/auth/reset-password?token=${token}`
+  const url = `${baseUrl}/reset-password?token=${token}`
   await send({
     from: FROM, to,
     subject: `Reset your ${APP_NAME} password`,
@@ -179,4 +180,8 @@ export async function sendOverdueReminderEmail(
       <p style="${S.small}">You can make a manual payment from your contributions page.</p>
     `),
   })
+}
+
+export async function sendGenericEmail(to: string, subject: string, html: string): Promise<void> {
+  await send({ from: FROM, to, subject, html })
 }

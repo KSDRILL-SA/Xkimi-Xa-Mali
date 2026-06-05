@@ -12,15 +12,15 @@ export const GET = withApiHandler(async (req: NextRequest) => {
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 
   const { success } = await verifyEmailRatelimit.limit(ip)
-  if (!success) return NextResponse.redirect(new URL('/auth/login?error=rate_limited', req.url))
+  if (!success) return NextResponse.redirect(new URL('/login?error=rate_limited', req.url))
 
   try {
     await verifyEmail(token, ip)
-    return NextResponse.redirect(new URL('/auth/login?verified=1', req.url))
+    return NextResponse.redirect(new URL('/login?verified=1', req.url))
   } catch (err) {
     if (isAppError(err) && err.code === 'AUTH_004') {
-      return NextResponse.redirect(new URL('/auth/login?error=invalid_token', req.url))
+      return NextResponse.redirect(new URL('/login?error=invalid_token', req.url))
     }
-    return NextResponse.redirect(new URL('/auth/login?error=server', req.url))
+    return NextResponse.redirect(new URL('/login?error=server', req.url))
   }
 })
