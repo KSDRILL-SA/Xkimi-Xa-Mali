@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/Label'
 import { Select } from '@/components/ui/Select'
 import { Alert } from '@/components/ui/Alert'
 import { api } from '@/lib/api'
+import { SkeletonForm } from '@/components/ui/Skeleton'
 import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
 
 type OpenPeriod = {
@@ -131,16 +132,7 @@ export default function ContributePage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="max-w-lg space-y-4">
-        <div className="h-8 skeleton w-48 rounded" />
-        <div className="xxm-card p-6 space-y-4">
-          {[1, 2, 3].map((i) => <div key={i} className="h-10 skeleton rounded" />)}
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <SkeletonForm fields={3} />
 
   return (
     <div className="max-w-lg space-y-6">

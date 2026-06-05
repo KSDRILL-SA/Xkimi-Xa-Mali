@@ -64,7 +64,7 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
       return
     }
 
-    router.push('/auth/verify-email?sent=true')
+    router.push('/verify-email?sent=true')
   }
 
   return (
