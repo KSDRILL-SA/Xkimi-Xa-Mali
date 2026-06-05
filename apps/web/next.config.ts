@@ -3,10 +3,8 @@ import { withSentryConfig } from '@sentry/nextjs'
 
 const nextConfig: NextConfig = {
   transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/types', '@xxm/config', 'geist'],
-  experimental: {
-    typedRoutes: true,
-    serverComponentsExternalPackages: ['@prisma/client'],
-  },
+  typedRoutes: true,
+  serverExternalPackages: ['@prisma/client'],
   images: {
     formats: ['image/avif', 'image/webp'],
   },

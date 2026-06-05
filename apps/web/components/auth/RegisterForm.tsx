@@ -98,8 +98,8 @@ export function RegisterForm() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         inviteCode:     inviteCode.trim().toUpperCase(),
-        email:          prefilled!.email,
-        phone:          prefilled!.phone,
+        email:          prefilled?.email ?? '',
+        phone:          prefilled?.phone ?? '',
         firstName:      data.firstName.trim(),
         lastName:       data.lastName.trim(),
         idNumber:       data.idNumber || undefined,

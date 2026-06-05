@@ -36,11 +36,12 @@ export default async function GoalDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await auth()
+  const session = await auth()
+  const roles = (session?.user?.roles as string[] | undefined) ?? []
   const { id } = await params
 
-  const goal = await db.goal.findUnique({
-    where: { id },
+  const goal = await db.goal.findFirst({
+    where: { id, ...(roles.includes('ADMIN') ? {} : { status: { not: 'DRAFT' } }) },
     include: {
       progress: {
         orderBy: { recordedAt: 'desc' },
