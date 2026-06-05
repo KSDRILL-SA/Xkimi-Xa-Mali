@@ -34,7 +34,7 @@ function verifyCsrfOrigin(req: { headers: Headers; nextUrl: URL }): boolean {
   const origin = req.headers.get('origin')
   if (!origin) return false
   const allowed = process.env.NEXTAUTH_URL
-  if (!allowed) return true
+  if (!allowed) return false
   try {
     return new URL(origin).origin === new URL(allowed).origin
   } catch {
@@ -96,7 +96,7 @@ export default auth(async (req) => {
       )
     }
     const loginUrl = new URL('/login', req.url)
-    loginUrl.searchParams.set('callbackUrl', pathname)
+    loginUrl.searchParams.set('callbackUrl', pathname + req.nextUrl.search)
     return NextResponse.redirect(loginUrl)
   }
 
@@ -110,7 +110,7 @@ export default auth(async (req) => {
       )
     }
     const loginUrl = new URL('/login', req.url)
-    loginUrl.searchParams.set('callbackUrl', pathname)
+    loginUrl.searchParams.set('callbackUrl', pathname + req.nextUrl.search)
     loginUrl.searchParams.set('reason', 'session_expired')
     return NextResponse.redirect(loginUrl)
   }

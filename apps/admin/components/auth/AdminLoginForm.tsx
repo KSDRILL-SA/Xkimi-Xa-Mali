@@ -31,7 +31,11 @@ export function AdminLoginForm() {
     if (result?.error) {
       setError(
         result.error === 'ACCOUNT_SUSPENDED'
-          ? 'This account has been suspended.'
+          ? 'This account has been suspended. Contact another administrator.'
+          : result.error === 'ACCOUNT_LOCKED'
+          ? 'This account is locked due to too many failed login attempts. Contact another administrator.'
+          : result.error === 'ACCOUNT_PENDING'
+          ? 'This account has not been fully activated. Contact another administrator.'
           : 'Invalid credentials or insufficient permissions.',
       )
       return
