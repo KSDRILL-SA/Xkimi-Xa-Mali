@@ -279,8 +279,11 @@ export async function addBankAccount(
   input: CreateBankAccountInput,
   ipAddress?: string,
 ) {
-  const existingCount = await bankAccountRepo.count({ userId })
-  const makePrimary = input.isPrimary || existingCount === 0
+  const existing = await bankAccountRepo.findByUser(userId)
+  if (existing.some((a) => decrypt(a.accountNumber) === input.accountNumber)) {
+    throw new BankAccountConflictError('This bank account number is already registered', 'BNK_005')
+  }
+  const makePrimary = input.isPrimary || existing.length === 0
 
   const account = await runTransaction(async (tx) => {
     if (makePrimary) {
