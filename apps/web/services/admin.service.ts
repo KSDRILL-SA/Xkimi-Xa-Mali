@@ -392,7 +392,11 @@ export async function broadcastNotification(
         }
       }
       if ((channel === 'EMAIL' || channel === 'BOTH') && m.email) {
-        await emailProvider.sendWelcomeEmail(m.email, m.firstName)
+        await emailProvider.sendGenericEmail(
+          m.email,
+          'Message from Xkimm Xa Mali',
+          `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;"><p style="color:#374151;margin-bottom:24px;">Hi ${m.firstName},</p><p style="color:#374151;margin-bottom:24px;white-space:pre-wrap;">${message}</p><p style="color:#9CA3AF;font-size:12px;">Xkimm Xa Mali · "Blessed is the hand that giveth."</p></div>`,
+        )
         emailSent++
       }
     } catch {

@@ -4,9 +4,10 @@ import { authRatelimit } from '@/lib/redis'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { resetPassword } from '@/services/auth.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  const ip = getClientIP(req) ?? 'unknown'
 
   const { success } = await authRatelimit.limit(`resetpw:${ip}`)
   if (!success) return apiError('SYS_005', 'Too many requests. Please try again later.', 429)

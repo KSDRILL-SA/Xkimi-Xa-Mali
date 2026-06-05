@@ -4,7 +4,7 @@ import { apiSuccess, apiError } from '@/lib/api-response'
 import { setMemberStatus } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
 
-const VALID_STATUSES = ['ACTIVE', 'SUSPENDED', 'PENDING'] as const
+const VALID_STATUSES = ['ACTIVE', 'SUSPENDED'] as const
 type UserStatus = typeof VALID_STATUSES[number]
 
 export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {

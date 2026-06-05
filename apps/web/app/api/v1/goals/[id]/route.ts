@@ -14,6 +14,10 @@ export const GET = withApiHandler<{ id: string }>(async (
 
   const { id } = await params
   const goal = await getGoal(id)
+  const roles = (session.user.roles as string[] | undefined) ?? []
+  if (goal.status === 'DRAFT' && !roles.includes('ADMIN')) {
+    return apiError('ADM_001', 'Goal not found', 404)
+  }
   return apiSuccess(goal)
 })
 

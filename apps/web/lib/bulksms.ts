@@ -58,6 +58,9 @@ class BulkSMSError extends Error {
 }
 
 function authHeader(): string {
+  if (!env.BULKSMS_USERNAME || !env.BULKSMS_PASSWORD) {
+    throw new Error('BulkSMS credentials not configured (BULKSMS_USERNAME / BULKSMS_PASSWORD)')
+  }
   return `Basic ${Buffer.from(`${env.BULKSMS_USERNAME}:${env.BULKSMS_PASSWORD}`).toString('base64')}`
 }
 
