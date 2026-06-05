@@ -41,8 +41,8 @@ export function AppHeader({
 
   return (
     <header
-      className={`sticky top-0 z-40 bg-xxm-green border-b border-white/10 shadow-xxm transition-opacity duration-500 ${
-        atTop ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      className={`sticky top-0 z-40 bg-xxm-green border-b transition-shadow duration-300 ${
+        atTop ? 'border-transparent shadow-none' : 'border-white/10 shadow-xxm'
       }`}
       style={fixedHeight ? { height: 'var(--header-h)' } : undefined}
     >
