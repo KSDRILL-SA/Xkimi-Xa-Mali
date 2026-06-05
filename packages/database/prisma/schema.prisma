@@ -385,7 +385,7 @@ model GoalProgress {
   recordedById String?
   recordedAt   DateTime @default(now())
 
-  goal       Goal  @relation(fields: [goalId], references: [id], onDelete: Restrict)
+  goal       Goal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
   recordedBy User? @relation("ProgressRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
 
   @@index([goalId])
@@ -476,8 +476,8 @@ model Invitation {
   codePrefix    String
   firstName     String
   lastName      String
-  email         String           @unique
-  phone         String           @unique
+  email         String
+  phone         String
   minimumAmount Decimal          @db.Decimal(12, 2)
   currency      String           @default("ZAR")
   status        InvitationStatus @default(PENDING)
