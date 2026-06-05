@@ -20,6 +20,6 @@ export default auth((req) => {
 
 export const config = {
   matcher: [
-    '/((?!login|forbidden|_next/static|_next/image|favicon.ico|api/auth).*)',
+    '/((?!login$|login/|forbidden$|forbidden/|_next/static|_next/image|favicon.ico|api/auth).*)',
   ],
 }

@@ -120,7 +120,7 @@ export async function setMemberStatus(
 
   const updated = await db.user.update({
     where: { id: memberId },
-    data: { status: newStatus as 'ACTIVE' | 'PENDING' | 'SUSPENDED' },
+    data: { status: newStatus as 'ACTIVE' | 'PENDING' | 'SUSPENDED', roleVersion: { increment: 1 } },
     select: { id: true, status: true, firstName: true, lastName: true },
   })
 
@@ -433,11 +433,14 @@ export async function setMemberRole(
     await db.userRole.deleteMany({ where: { userId: memberId, roleId: roleRecord.id } })
   }
 
-  await writeAuditLog({
-    userId: adminId, action: assign ? 'ADMIN_ROLE_ASSIGNED' : 'ADMIN_ROLE_REMOVED',
-    entity: 'User', entityId: memberId,
-    payload: { role, assign }, ipAddress: ip,
-  })
+  await Promise.all([
+    db.user.update({ where: { id: memberId }, data: { roleVersion: { increment: 1 } } }),
+    writeAuditLog({
+      userId: adminId, action: assign ? 'ADMIN_ROLE_ASSIGNED' : 'ADMIN_ROLE_REMOVED',
+      entity: 'User', entityId: memberId,
+      payload: { role, assign }, ipAddress: ip,
+    }),
+  ])
 
   return { memberId, role, assigned: assign }
 }
