@@ -54,8 +54,10 @@ export function Navbar() {
   return (
     <>
       <header
-        className={`fixed top-0 inset-x-0 z-50 bg-transparent transition-opacity duration-500 ${
-          atTop ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+          atTop
+            ? 'bg-transparent'
+            : 'bg-xxm-green-950/95 backdrop-blur-md shadow-lg border-b border-white/10'
         }`}
         style={{ height: 'var(--nav-height)' }}
       >
@@ -78,24 +80,21 @@ export function Navbar() {
           >
             {NAV_LINKS.map(({ label, href, sectionId }) => {
               const isActive = sectionId ? activeSection === sectionId : false
-              return (
+              const linkClass = `gold-underline relative px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold ${
+                isActive ? 'text-xxm-gold active' : 'text-white/70 hover:text-white'
+              }`
+              return sectionId ? (
                 <button
                   key={label}
-                  onClick={() => sectionId ? scrollToSection(sectionId) : undefined}
-                  className={`gold-underline relative px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold ${
-                    isActive
-                      ? 'text-xxm-gold active'
-                      : 'text-white/70 hover:text-white'
-                  }`}
+                  onClick={() => scrollToSection(sectionId)}
+                  className={linkClass}
                 >
-                  {sectionId ? (
-                    label
-                  ) : (
-                    <Link href={href} className="block">
-                      {label}
-                    </Link>
-                  )}
+                  {label}
                 </button>
+              ) : (
+                <Link key={label} href={href} className={linkClass}>
+                  {label}
+                </Link>
               )
             })}
           </nav>
@@ -131,18 +130,23 @@ export function Navbar() {
             >
               {NAV_LINKS.map(({ label, href, sectionId }) => {
                 const isActive = sectionId ? activeSection === sectionId : false
-                return (
+                const pillClass = `whitespace-nowrap shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold ${
+                  isActive
+                    ? 'bg-xxm-gold text-xxm-green-950 shadow-gold-sm'
+                    : 'text-white/65 hover:text-white hover:bg-white/10'
+                }`
+                return sectionId ? (
                   <button
                     key={label}
-                    onClick={() => sectionId ? scrollToSection(sectionId) : undefined}
-                    className={`whitespace-nowrap shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold ${
-                      isActive
-                        ? 'bg-xxm-gold text-xxm-green-950 shadow-gold-sm'
-                        : 'text-white/65 hover:text-white hover:bg-white/10'
-                    }`}
+                    onClick={() => scrollToSection(sectionId)}
+                    className={pillClass}
                   >
-                    {sectionId ? label : <Link href={href}>{label}</Link>}
+                    {label}
                   </button>
+                ) : (
+                  <Link key={label} href={href} className={pillClass}>
+                    {label}
+                  </Link>
                 )
               })}
 
@@ -178,16 +182,29 @@ export function Navbar() {
           }`}
         >
           <nav className="flex flex-col gap-2" aria-label="Mobile navigation">
-            {NAV_LINKS.map(({ label, href, sectionId }, i) => (
-              <button
-                key={label}
-                onClick={() => sectionId ? scrollToSection(sectionId) : setMenuOpen(false)}
-                className="text-left px-4 py-4 rounded-2xl text-xl font-bold text-white/80 hover:text-white hover:bg-white/8 transition-all duration-200 outline-none"
-                style={{ animationDelay: `${i * 60}ms` }}
-              >
-                {sectionId ? label : <Link href={href}>{label}</Link>}
-              </button>
-            ))}
+            {NAV_LINKS.map(({ label, href, sectionId }, i) => {
+              const itemClass = "text-left px-4 py-4 rounded-2xl text-xl font-bold text-white/80 hover:text-white hover:bg-white/8 transition-all duration-200 outline-none"
+              return sectionId ? (
+                <button
+                  key={label}
+                  onClick={() => scrollToSection(sectionId)}
+                  className={itemClass}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  {label}
+                </button>
+              ) : (
+                <Link
+                  key={label}
+                  href={href}
+                  onClick={() => setMenuOpen(false)}
+                  className={itemClass}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  {label}
+                </Link>
+              )
+            })}
           </nav>
 
           <div className="mt-auto pt-8 border-t border-white/10 flex flex-col gap-3">
