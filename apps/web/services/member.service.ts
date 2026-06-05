@@ -360,12 +360,13 @@ export async function removeBankAccount(accountId: string, userId: string, ipAdd
     throw new BankAccountConflictError('Cannot remove an account with an active mandate', 'BNK_004')
   }
 
-  await bankAccountRepo.delete(accountId)
-
-  if (account.isPrimary) {
-    const next = await bankAccountRepo.findFirst({ userId }, { createdAt: 'asc' })
-    if (next) await bankAccountRepo.update(next.id, { isPrimary: true })
-  }
+  await runTransaction(async (tx) => {
+    await bankAccountRepo.delete(accountId, tx)
+    if (account.isPrimary) {
+      const next = await bankAccountRepo.findFirst({ userId }, { createdAt: 'asc' }, tx)
+      if (next) await bankAccountRepo.update(next.id, { isPrimary: true }, tx)
+    }
+  })
 
   await writeAuditLog({
     userId,

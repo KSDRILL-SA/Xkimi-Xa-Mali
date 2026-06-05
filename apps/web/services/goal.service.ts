@@ -37,10 +37,9 @@ function serializeGoal(goal: GoalRow) {
     description: goal.description,
     targetAmount: Number(goal.targetAmount),
     currentAmount: Number(goal.currentAmount),
-    progressPct: Math.min(
-      100,
-      Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100),
-    ),
+    progressPct: Number(goal.targetAmount) > 0
+      ? Math.min(100, Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100))
+      : 0,
     deadline: goal.deadline.toISOString(),
     status: goal.status,
     isLocked: goal.lockedAt !== null,

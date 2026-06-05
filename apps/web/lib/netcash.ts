@@ -79,6 +79,7 @@ class NetcashError extends Error {
 const NETCASH_TIMEOUT_MS = 30_000
 
 async function netcashPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  if (!env.NETCASH_SERVICE_KEY) throw new ExternalServiceError('Netcash', 'NETCASH_SERVICE_KEY not configured')
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), NETCASH_TIMEOUT_MS)
 
@@ -212,13 +213,19 @@ export function mapNetcashStatus(raw: string): 'PENDING' | 'ACTIVE' | 'SUSPENDED
 // ─── Webhook security ─────────────────────────────────────────────────────────
 
 // Netcash signs the raw request body with HMAC-SHA256.
-// Compared in constant time to prevent timing side-channel attacks.
+// Compares raw HMAC bytes in constant time — accepts hex or base64-encoded signatures.
 export function verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean {
-  const expected = createHmac('sha256', env.NETCASH_WEBHOOK_SECRET).update(rawBody).digest('hex')
-  const expBuf = Buffer.from(expected, 'utf8')
-  const gotBuf = Buffer.from(signatureHeader, 'utf8')
-  if (expBuf.length !== gotBuf.length) return false
-  return timingSafeEqual(expBuf, gotBuf)
+  if (!env.NETCASH_WEBHOOK_SECRET) return false
+  const expectedBuf = createHmac('sha256', env.NETCASH_WEBHOOK_SECRET).update(rawBody).digest()
+  const clean = signatureHeader.trim()
+  let receivedBuf: Buffer | null = null
+  if (/^[0-9a-f]{64}$/i.test(clean)) {
+    receivedBuf = Buffer.from(clean, 'hex')
+  } else if (/^[A-Za-z0-9+/]{43,44}={0,2}$/.test(clean)) {
+    receivedBuf = Buffer.from(clean, 'base64')
+  }
+  if (!receivedBuf || receivedBuf.length !== expectedBuf.length) return false
+  return timingSafeEqual(expectedBuf, receivedBuf)
 }
 
 const DEFAULT_WEBHOOK_IPS = [
