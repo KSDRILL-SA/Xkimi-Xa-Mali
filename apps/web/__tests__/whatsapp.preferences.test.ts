@@ -17,8 +17,12 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('next/server', () => ({
   NextResponse: {
-    json: (body: unknown, init?: { status?: number }) =>
-      ({ body, status: init?.status ?? 200, json: async () => body }),
+    json: (body: unknown, init?: { status?: number }) => ({
+      body,
+      status: init?.status ?? 200,
+      json: async () => body,
+      headers: { set: vi.fn(), get: vi.fn() },
+    }),
   },
 }))
 
@@ -35,6 +39,16 @@ const mockDb = db as {
 }
 const mockAuth = auth as unknown as MockedFunction<typeof auth>
 
+function makeReq(body?: unknown) {
+  return {
+    json: async () => body,
+    url: 'http://localhost/api/v1/notifications/preferences/whatsapp',
+    method: body !== undefined ? 'PATCH' : 'GET',
+    headers: new Headers(),
+    nextUrl: { pathname: '/api/v1/notifications/preferences/whatsapp' },
+  } as never
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -45,7 +59,7 @@ describe('GET /api/v1/notifications/preferences/whatsapp', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as never)
     const { GET } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
-    const res = await GET()
+    const res = await GET(makeReq())
     expect((res as { status: number }).status).toBe(401)
   })
 
@@ -55,7 +69,7 @@ describe('GET /api/v1/notifications/preferences/whatsapp', () => {
     mockDb.notificationPreference.findUnique.mockResolvedValue({ whatsapp: true } as never)
 
     const { GET } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
-    const res = await GET()
+    const res = await GET(makeReq())
     const body = await (res as Response).json()
     expect(body.data).toMatchObject({ enabled: true, phone: '+27821234567' })
   })
@@ -66,7 +80,7 @@ describe('GET /api/v1/notifications/preferences/whatsapp', () => {
     mockDb.notificationPreference.findUnique.mockResolvedValue(null as never)
 
     const { GET } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
-    const res = await GET()
+    const res = await GET(makeReq())
     const body = await (res as Response).json()
     expect(body.data.enabled).toBe(true)
   })
@@ -75,14 +89,10 @@ describe('GET /api/v1/notifications/preferences/whatsapp', () => {
 // ─── PATCH ───────────────────────────────────────────────────────────────────
 
 describe('PATCH /api/v1/notifications/preferences/whatsapp', () => {
-  function makeRequest(body: unknown) {
-    return { json: async () => body, url: 'http://localhost/api/v1/notifications/preferences/whatsapp' } as never
-  }
-
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as never)
     const { PATCH } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
-    const res = await PATCH(makeRequest({ enabled: false }))
+    const res = await PATCH(makeReq({ enabled: false }))
     expect((res as { status: number }).status).toBe(401)
   })
 
@@ -92,7 +102,7 @@ describe('PATCH /api/v1/notifications/preferences/whatsapp', () => {
     mockDb.auditLog.create.mockResolvedValue({} as never)
 
     const { PATCH } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
-    const res = await PATCH(makeRequest({ enabled: false }))
+    const res = await PATCH(makeReq({ enabled: false }))
     const body = await (res as Response).json()
 
     expect(mockDb.notificationPreference.upsert).toHaveBeenCalledWith(
@@ -104,7 +114,7 @@ describe('PATCH /api/v1/notifications/preferences/whatsapp', () => {
   it('returns 400 for invalid body', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'u4' } } as never)
     const { PATCH } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
-    const res = await PATCH(makeRequest({ enabled: 'yes' }))
+    const res = await PATCH(makeReq({ enabled: 'yes' }))
     expect((res as { status: number }).status).toBe(400)
   })
 })
