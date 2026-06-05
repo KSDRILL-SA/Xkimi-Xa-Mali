@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getMonthlyReportSummary } from '@/lib/services'
 import { formatZAR, formatMonth, MONTHS } from '@xxm/utils'
@@ -13,7 +14,8 @@ export default async function ReportsPage({
   searchParams: Promise<{ month?: string; year?: string }>
 }) {
   const session = await auth()
-  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
   const now     = new Date()
   const params  = await searchParams
 
@@ -22,7 +24,7 @@ export default async function ReportsPage({
 
   const summary = await getMonthlyReportSummary(roles, month, year)
 
-  const yearOpts = [now.getFullYear() - 1, now.getFullYear()]
+  const yearOpts = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
 
   const statusGroups: Record<string, number> = {}
   for (const c of summary.contributions) {

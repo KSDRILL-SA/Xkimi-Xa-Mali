@@ -42,20 +42,30 @@ const columns: Column<GoalRow>[] = [
       <div className="flex items-center gap-2 justify-center flex-wrap">
         {r.status === 'Draft' && (
           <>
-            <form action={async () => {
+            <form action={async (fd: FormData) => {
               'use server'
+              const goalId = fd.get('goalId') as string
               const s = await auth()
-              await activateGoal(s!.user.id, s!.user.roles as string[], r.id)
+              if (!s?.user?.id) redirect('/login')
+              const sr = (s.user.roles as string[] | undefined) ?? []
+              if (!sr.includes('ADMIN')) redirect('/forbidden')
+              await activateGoal(s.user.id, sr, goalId)
               revalidatePath('/goals')
             }}>
+              <input type="hidden" name="goalId" value={r.id} />
               <button type="submit" className="text-xs text-xxm-green hover:underline font-medium">Activate</button>
             </form>
-            <form action={async () => {
+            <form action={async (fd: FormData) => {
               'use server'
+              const goalId = fd.get('goalId') as string
               const s = await auth()
-              await deleteGoal(s!.user.id, s!.user.roles as string[], r.id)
+              if (!s?.user?.id) redirect('/login')
+              const sr = (s.user.roles as string[] | undefined) ?? []
+              if (!sr.includes('ADMIN')) redirect('/forbidden')
+              await deleteGoal(s.user.id, sr, goalId)
               revalidatePath('/goals')
             }}>
+              <input type="hidden" name="goalId" value={r.id} />
               <button type="submit" className="text-xs text-red-500 hover:underline font-medium">Delete</button>
             </form>
           </>
@@ -63,23 +73,33 @@ const columns: Column<GoalRow>[] = [
         {r.status === 'Active' && (
           <>
             {!r.locked && (
-              <form action={async () => {
+              <form action={async (fd: FormData) => {
                 'use server'
+                const goalId = fd.get('goalId') as string
                 const s = await auth()
-                await lockGoal(s!.user.id, s!.user.roles as string[], r.id)
+                if (!s?.user?.id) redirect('/login')
+                const sr = (s.user.roles as string[] | undefined) ?? []
+                if (!sr.includes('ADMIN')) redirect('/forbidden')
+                await lockGoal(s.user.id, sr, goalId)
                 revalidatePath('/goals')
               }}>
+                <input type="hidden" name="goalId" value={r.id} />
                 <button type="submit" className="text-xs text-xxm-gray-500 hover:underline font-medium">Lock</button>
               </form>
             )}
             <form action={async (fd: FormData) => {
               'use server'
+              const goalId = fd.get('goalId') as string
               const s = await auth()
+              if (!s?.user?.id) redirect('/login')
+              const sr = (s.user.roles as string[] | undefined) ?? []
+              if (!sr.includes('ADMIN')) redirect('/forbidden')
               const amount = Number(fd.get('amount'))
               if (!amount || amount <= 0) return
-              await recordGoalProgress(s!.user.id, s!.user.roles as string[], r.id, amount)
+              await recordGoalProgress(s.user.id, sr, goalId, amount)
               revalidatePath('/goals')
             }} className="flex items-center gap-1">
+              <input type="hidden" name="goalId" value={r.id} />
               <input
                 type="number" name="amount" min={1} step={50} required
                 placeholder="R amount"
@@ -101,7 +121,8 @@ export default async function GoalsPage({
   searchParams: Promise<{ page?: string; created?: string }>
 }) {
   const session = await auth()
-  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
   const params  = await searchParams
   const page    = Math.max(1, parseInt(params.page ?? '1', 10))
   const created = params.created === '1'
@@ -132,7 +153,9 @@ export default async function GoalsPage({
   async function handleCreate(fd: FormData) {
     'use server'
     const s = await auth()
-    const r = (s!.user.roles as string[] | undefined) ?? []
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
     const title         = (fd.get('title') as string)?.trim()
     const description   = (fd.get('description') as string)?.trim() || undefined
     const type          = fd.get('type') as string
@@ -143,7 +166,7 @@ export default async function GoalsPage({
 
     if (!title || !type || !targetAmount || isNaN(targetAmount)) return
 
-    await createGoal(s!.user.id, r, { title, description, type, targetAmount, deadline })
+    await createGoal(s.user.id, r, { title, description, type, targetAmount, deadline })
     redirect('/goals?created=1')
   }
 

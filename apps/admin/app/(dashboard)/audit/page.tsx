@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAuditLogs } from '@/lib/services'
 import { formatRelativeTime } from '@xxm/utils'
@@ -22,7 +23,8 @@ export default async function AuditPage({
   searchParams: Promise<{ entity?: string; action?: string; userId?: string; page?: string }>
 }) {
   const session = await auth()
-  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
   const params  = await searchParams
   const entity  = params.entity  ?? undefined
   const action  = params.action  ?? undefined

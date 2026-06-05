@@ -44,7 +44,8 @@ export default async function ContributionsPage({
   searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string }>
 }) {
   const session = await auth()
-  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
   const now     = new Date()
   const params  = await searchParams
 
@@ -59,8 +60,9 @@ export default async function ContributionsPage({
   async function generate(fd: FormData) {
     'use server'
     const s = await auth()
-    const r = (s!.user.roles as string[] | undefined) ?? []
-    if (!r.includes('ADMIN')) return
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
     const m = parseInt(fd.get('month') as string, 10)
     const y = parseInt(fd.get('year')  as string, 10)
 
@@ -75,12 +77,12 @@ export default async function ContributionsPage({
         },
       },
     })
-    for (const member of activeMembers) {
+    await Promise.all(activeMembers.map((member) => {
       const mandate = member.mandates[0]
       const debitDay = mandate?.debitDay ?? 1
       const amountDue = mandate?.amount ?? 100
       const dueDate = new Date(y, m - 1, debitDay)
-      await db.contribution.upsert({
+      return db.contribution.upsert({
         where: { userId_periodMonth_periodYear: { userId: member.id, periodMonth: m, periodYear: y } },
         create: {
           userId: member.id,
@@ -93,7 +95,7 @@ export default async function ContributionsPage({
         },
         update: {},
       })
-    }
+    }))
     redirect(`/contributions?month=${m}&year=${y}&generated=1`)
   }
 
