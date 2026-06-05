@@ -19,10 +19,11 @@ type ContribRow = {
   status: string
 }
 
-type ContribStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'WAIVED'
+type ContribStatus = 'PENDING' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'WAIVED'
 
 const STATUS_CONFIG: Record<ContribStatus, { label: string; className: string }> = {
   PENDING: { label: 'Pending', className: 'xxm-status-warning' },
+  PARTIAL: { label: 'Partial', className: 'xxm-status-pending' },
   PAID:    { label: 'Paid',    className: 'xxm-status-success' },
   OVERDUE: { label: 'Overdue', className: 'xxm-status-danger'  },
   WAIVED:  { label: 'Waived',  className: 'xxm-status-info'    },

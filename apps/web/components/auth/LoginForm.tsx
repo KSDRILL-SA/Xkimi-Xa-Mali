@@ -14,11 +14,12 @@ import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
 
 const ERROR_MESSAGES: Record<string, string> = {
-  ACCOUNT_LOCKED: 'Your account has been temporarily locked due to too many failed attempts. Please try again later or contact the admin.',
-  EMAIL_NOT_VERIFIED: 'Please verify your email before logging in.',
-  PENDING_ACTIVATION: 'Your account is pending admin approval. You’ll receive an SMS when it’s activated.',
-  ACCOUNT_SUSPENDED: 'Your account has been suspended. Contact the admin.',
-  CredentialsSignin: 'Incorrect email or password.',
+  ACCOUNT_LOCKED: "Your account has been temporarily locked due to too many failed attempts. Please try again later or contact the admin.",
+  EMAIL_NOT_VERIFIED: "Please verify your email before logging in.",
+  PENDING_ACTIVATION: "Your account is pending admin approval. You’ll receive an SMS when it’s activated.",
+  ACCOUNT_SUSPENDED: "Your account has been suspended. Contact the admin.",
+  CredentialsSignin: "Incorrect email or password.",
+  rate_limited: "Too many attempts. Please wait a moment and try again.",
 }
 
 function safeCallbackUrl(raw: string | null): string {
@@ -37,6 +38,7 @@ export function LoginForm() {
   const params = useSearchParams()
   const callbackUrl = safeCallbackUrl(params.get('callbackUrl'))
   const verified = params.get('verified')
+  const reset = params.get('reset')
   const errorParam = params.get('error')
 
   const [serverError, setServerError] = useState('')
@@ -71,6 +73,9 @@ export function LoginForm() {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       {verified && (
         <Alert variant="success">Email verified! You can now log in.</Alert>
+      )}
+      {reset && (
+        <Alert variant="success">Password reset successful. You can now log in with your new password.</Alert>
       )}
       {(serverError || errorParam) && (
         <Alert variant="error">
