@@ -29,7 +29,7 @@ export default async function AuditPage({
   const userId  = params.userId  ?? undefined
   const page    = Math.max(1, parseInt(params.page ?? '1', 10))
 
-  const { items, total, totalPages } = await listAuditLogs(roles, { entity, action, userId, page, limit: 30 })
+  const { items, total } = await listAuditLogs(roles, { entity, action, userId, page, limit: 30 })
 
   const buildUrl = (overrides: Record<string, string | undefined>) => {
     const p = new URLSearchParams()
