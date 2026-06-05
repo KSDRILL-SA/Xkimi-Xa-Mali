@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listMembers } from '@/lib/services'
 import { formatDate } from '@xxm/utils'
@@ -49,7 +50,8 @@ export default async function MembersPage({
   searchParams: Promise<{ search?: string; status?: string; page?: string }>
 }) {
   const session = await auth()
-  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
   const params  = await searchParams
   const search  = params.search ?? undefined
   const status  = params.status as UserStatus | undefined
@@ -103,7 +105,11 @@ export default async function MembersPage({
       </div>
 
       <DataTable columns={columns} data={rows} keyExtractor={(r) => r.id} stickyHeader striped caption="Member list" />
-      <RouterPagination totalItems={total} itemsPerPage={25} currentPage={page} baseUrl="/members" className="justify-center" />
+      <RouterPagination
+        totalItems={total} itemsPerPage={25} currentPage={page}
+        baseUrl={(() => { const p = new URLSearchParams(); if (search) p.set('search', search); if (status) p.set('status', status); const q = p.toString(); return q ? `/members?${q}` : '/members' })()}
+        className="justify-center"
+      />
     </div>
   )
 }
