@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { AdminLoginForm } from '@/components/auth/AdminLoginForm'
 import { XmmLogo } from '@xxm/ui'
@@ -13,7 +14,9 @@ export default function AdminLoginPage() {
           <h1 className="text-xl font-bold text-white">Admin Portal</h1>
           <p className="text-sm text-white/60 mt-1">Restricted to authorised administrators only.</p>
         </div>
-        <AdminLoginForm />
+        <Suspense>
+          <AdminLoginForm />
+        </Suspense>
       </div>
     </div>
   )

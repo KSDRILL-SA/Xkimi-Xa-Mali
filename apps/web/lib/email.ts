@@ -3,8 +3,6 @@ import { env } from './env'
 import { withRetry } from './retry'
 import { ExternalServiceError } from './errors'
 
-const resend = new Resend(env.RESEND_API_KEY)
-
 const FROM = env.RESEND_FROM_EMAIL
 const APP_NAME = 'Xkimm Xa Mali'
 
@@ -31,8 +29,9 @@ function layout(content: string): string {
 
 // ─── Retry-wrapped send ───────────────────────────────────────────────────────
 
-async function send(options: Parameters<typeof resend.emails.send>[0]): Promise<void> {
+async function send(options: Parameters<Resend['emails']['send']>[0]): Promise<void> {
   if (!env.RESEND_API_KEY) throw new ExternalServiceError('Resend', 'RESEND_API_KEY not configured')
+  const resend = new Resend(env.RESEND_API_KEY)
   await withRetry(
     async () => {
       const result = await resend.emails.send(options)
