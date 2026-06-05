@@ -1,7 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { writeAuditLog } from './audit.service'
 import { queueNotification } from './notification.service'
-import { logger } from '@/lib/logger'
 import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { assertAdmin, assertNotSelf } from '@/lib/authorization'
 import { smsProvider } from '@/integrations/sms'

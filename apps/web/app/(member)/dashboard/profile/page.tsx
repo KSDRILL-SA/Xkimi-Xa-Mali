@@ -6,7 +6,7 @@ import {
   listBankAccounts,
   getNotificationPreferences,
 } from '@/services/member.service'
-import { Card, CardHeader, CardBody } from '@/components/ui/Card'
+import { Card, CardBody } from '@/components/ui/Card'
 import { Tabs } from '@/components/ui/Tabs'
 import { ProfileForm } from '@/components/member/ProfileForm'
 import { BankAccountsSection } from '@/components/member/BankAccountsSection'
