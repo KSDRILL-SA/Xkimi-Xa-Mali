@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllMandates, approveMandate, rejectMandate } from '@/lib/services'
 import { formatZAR, formatDate } from '@xxm/utils'
@@ -41,10 +42,30 @@ const columns: Column<MandateRow>[] = [
       <div className="flex items-center gap-2 justify-center">
         {r.status === 'Pending' && (
           <>
-            <form action={async () => { 'use server'; const s = await auth(); await approveMandate(s!.user.id, s!.user.roles as string[], r.mandateId); revalidatePath('/mandates') }}>
+            <form action={async (fd: FormData) => {
+              'use server'
+              const mandateId = fd.get('mandateId') as string
+              const s = await auth()
+              if (!s?.user?.id) redirect('/login')
+              const sr = (s.user.roles as string[] | undefined) ?? []
+              if (!sr.includes('ADMIN')) redirect('/forbidden')
+              await approveMandate(s.user.id, sr, mandateId)
+              revalidatePath('/mandates')
+            }}>
+              <input type="hidden" name="mandateId" value={r.mandateId} />
               <button type="submit" className="text-xs text-xxm-green hover:underline font-medium">Approve</button>
             </form>
-            <form action={async () => { 'use server'; const s = await auth(); await rejectMandate(s!.user.id, s!.user.roles as string[], r.mandateId); revalidatePath('/mandates') }}>
+            <form action={async (fd: FormData) => {
+              'use server'
+              const mandateId = fd.get('mandateId') as string
+              const s = await auth()
+              if (!s?.user?.id) redirect('/login')
+              const sr = (s.user.roles as string[] | undefined) ?? []
+              if (!sr.includes('ADMIN')) redirect('/forbidden')
+              await rejectMandate(s.user.id, sr, mandateId)
+              revalidatePath('/mandates')
+            }}>
+              <input type="hidden" name="mandateId" value={r.mandateId} />
               <button type="submit" className="text-xs text-red-600 hover:underline font-medium">Reject</button>
             </form>
           </>
@@ -61,7 +82,8 @@ export default async function MandatesPage({
   searchParams: Promise<{ status?: string; page?: string }>
 }) {
   const session = await auth()
-  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
   const params  = await searchParams
   const status  = params.status ?? undefined
   const page    = Math.max(1, parseInt(params.page ?? '1', 10))

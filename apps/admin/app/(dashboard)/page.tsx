@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getDashboardStats } from '@/lib/services'
 import { formatZAR } from '@xxm/utils'
@@ -11,7 +12,8 @@ export const metadata: Metadata = { title: 'Overview' }
 
 export default async function AdminOverviewPage() {
   const session = await auth()
-  const roles   = (session?.user as { roles?: string[] })?.roles ?? ['ADMIN']
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
 
   const { memberCount, totalDue, totalPaid, poolTotal, collectionRate, pendingMandates, month, year } =
     await getDashboardStats(roles)

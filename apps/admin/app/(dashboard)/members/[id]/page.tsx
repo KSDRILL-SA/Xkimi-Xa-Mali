@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory } from '@/lib/services'
 import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
@@ -10,7 +10,8 @@ export const metadata: Metadata = { title: 'Member Detail' }
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
-  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
   const { id }  = await params
 
   let member
@@ -33,32 +34,41 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   async function handleStatusChange(fd: FormData) {
     'use server'
     const s = await auth()
-    const r = (s!.user.roles as string[] | undefined) ?? []
-    await setMemberStatus(s!.user.id, r, id, fd.get('status') as string)
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
+    await setMemberStatus(s.user.id, r, id, fd.get('status') as string)
     revalidatePath(`/members/${id}`)
+    revalidatePath('/members')
   }
 
   async function handleUnlock() {
     'use server'
     const s = await auth()
-    const r = (s!.user.roles as string[] | undefined) ?? []
-    await unlockMember(s!.user.id, r, id)
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
+    await unlockMember(s.user.id, r, id)
     revalidatePath(`/members/${id}`)
   }
 
   async function handlePromoteAdmin() {
     'use server'
     const s = await auth()
-    const r = (s!.user.roles as string[] | undefined) ?? []
-    await setMemberRole(s!.user.id, r, id, 'ADMIN', true)
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
+    await setMemberRole(s.user.id, r, id, 'ADMIN', true)
     revalidatePath(`/members/${id}`)
   }
 
   async function handleRemoveAdmin() {
     'use server'
     const s = await auth()
-    const r = (s!.user.roles as string[] | undefined) ?? []
-    await setMemberRole(s!.user.id, r, id, 'ADMIN', false)
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
+    await setMemberRole(s.user.id, r, id, 'ADMIN', false)
     revalidatePath(`/members/${id}`)
   }
 

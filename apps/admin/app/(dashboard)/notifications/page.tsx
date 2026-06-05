@@ -13,6 +13,10 @@ export default async function NotificationsPage({
 }: {
   searchParams: Promise<{ sent?: string; failed?: string }>
 }) {
+  const session = await auth()
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
+
   const params = await searchParams
   const sent   = params.sent   === '1'
   const failed = params.failed === '1'
@@ -21,7 +25,7 @@ export default async function NotificationsPage({
     'use server'
     const s = await auth()
     if (!s?.user?.id) redirect('/login')
-    const roles = (s.user.roles as string[] | undefined) ?? []
+    const roles = (s?.user?.roles as string[] | undefined) ?? []
     if (!roles.includes('ADMIN')) redirect('/forbidden')
 
     const message = (fd.get('message') as string)?.trim()
@@ -32,17 +36,22 @@ export default async function NotificationsPage({
       redirect('/notifications?failed=1')
     }
 
+    const webUrl = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? ''
+    const adminSecret = process.env['ADMIN_API_SECRET'] ?? ''
+    if (!webUrl || !adminSecret) {
+      redirect('/notifications?failed=1')
+    }
     try {
-      const webUrl = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? ''
-      await fetch(`${webUrl}/api/v1/admin/notifications/broadcast`, {
+      const res = await fetch(`${webUrl}/api/v1/admin/notifications/broadcast`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-secret': process.env['ADMIN_API_SECRET'] ?? '',
+          'x-admin-secret': adminSecret,
           'x-admin-timestamp': String(Date.now()),
         },
         body: JSON.stringify({ message, channel, filter }),
       })
+      if (!res.ok) redirect('/notifications?failed=1')
       redirect('/notifications?sent=1')
     } catch {
       redirect('/notifications?failed=1')

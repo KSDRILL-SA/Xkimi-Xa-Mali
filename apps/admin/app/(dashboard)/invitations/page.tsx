@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listInvitations, revokeInvitation } from '@/lib/services'
 import { formatDate, formatZAR } from '@xxm/utils'
@@ -43,7 +44,8 @@ export default async function InvitationsPage({
   searchParams: Promise<{ page?: string; revoked?: string }>
 }) {
   const session = await auth()
-  const roles   = (session!.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
+  if (!roles.includes('ADMIN')) redirect('/forbidden')
   const params  = await searchParams
   const page    = Math.max(1, parseInt(params.page ?? '1', 10))
   const revoked = params.revoked === '1'
@@ -74,7 +76,10 @@ export default async function InvitationsPage({
           <form action={async () => {
             'use server'
             const s = await auth()
-            await revokeInvitation(s!.user.id, s!.user.roles as string[], r.id)
+            if (!s?.user?.id) redirect('/login')
+            const sr = (s.user.roles as string[] | undefined) ?? []
+            if (!sr.includes('ADMIN')) redirect('/forbidden')
+            await revokeInvitation(s.user.id, sr, r.id)
             revalidatePath('/invitations')
           }}>
             <button type="submit" className="text-xs text-red-500 hover:underline font-medium">
