@@ -4,9 +4,7 @@ const WEB_URL = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?
 
 const config: NextConfig = {
   transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/types', '@xxm/config', 'geist'],
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client'],
-  },
+  serverExternalPackages: ['@prisma/client'],
   // Proxy /api/* calls to the web app so client components work without CORS issues
   async rewrites() {
     return [
