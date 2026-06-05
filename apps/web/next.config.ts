@@ -74,6 +74,7 @@ if (process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN) {
 
 // Bundle analyser — run with ANALYZE=true next build
 if (process.env.ANALYZE === 'true') {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const withBundleAnalyzer = require('@next/bundle-analyzer')({ enabled: true })
   config = withBundleAnalyzer(config)
 }

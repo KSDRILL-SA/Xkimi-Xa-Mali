@@ -1,6 +1,5 @@
 import { decrypt } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
-import { logger } from '@/lib/logger'
 import {
   MandateNotFoundError,
   MandateConflictError,
