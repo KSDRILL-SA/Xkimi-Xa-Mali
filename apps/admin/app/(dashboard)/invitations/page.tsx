@@ -7,6 +7,50 @@ import { formatDate, formatZAR } from '@xxm/utils'
 import { Breadcrumb, DataTable, type Column, RouterPagination, PageHeader } from '@xxm/ui'
 import { CreateInviteModal } from '@/components/admin/CreateInviteModal'
 
+type CreatedInvite = { code: string; firstName: string; lastName: string; email: string }
+type InviteState   = { data?: CreatedInvite; error?: string }
+
+async function createInvite(_prev: InviteState, fd: FormData): Promise<InviteState> {
+  'use server'
+  const s = await auth()
+  if (!s?.user?.id) redirect('/login')
+  const sr = (s.user.roles as string[] | undefined) ?? []
+  if (!sr.includes('ADMIN')) redirect('/forbidden')
+
+  const webUrl      = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000'
+  const adminSecret = process.env['ADMIN_API_SECRET'] ?? ''
+
+  try {
+    const res = await fetch(`${webUrl}/api/v1/admin/invitations`, {
+      method:  'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-admin-secret':    adminSecret,
+        'x-admin-timestamp': String(Date.now()),
+      },
+      body: JSON.stringify({
+        firstName:     (fd.get('firstName') as string | null)?.trim(),
+        lastName:      (fd.get('lastName')  as string | null)?.trim(),
+        email:         (fd.get('email')     as string | null)?.trim().toLowerCase(),
+        phone:          fd.get('phone'),
+        minimumAmount:  Number(fd.get('minimumAmount')),
+      }),
+    })
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
+      return { error: err.error?.message ?? 'Failed to create invitation' }
+    }
+
+    const json = await res.json() as { data?: CreatedInvite }
+    if (!json.data) return { error: 'Unexpected response from server' }
+    revalidatePath('/invitations')
+    return { data: json.data }
+  } catch {
+    return { error: 'Network error. Please try again.' }
+  }
+}
+
 export const metadata: Metadata = { title: 'Invitations' }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
@@ -94,7 +138,7 @@ export default async function InvitationsPage({
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Invitations' }]} />
-      <PageHeader title="Invitations" subtitle={`${total} total`} action={<CreateInviteModal />} />
+      <PageHeader title="Invitations" subtitle={`${total} total`} action={<CreateInviteModal createAction={createInvite} />} />
 
       {revoked && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">

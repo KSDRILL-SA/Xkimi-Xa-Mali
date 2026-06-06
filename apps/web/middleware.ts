@@ -95,6 +95,16 @@ export default auth(async (req) => {
     return NextResponse.next()
   }
 
+  // Trusted internal calls from admin app — bypass session and CSRF checks
+  if (pathname.startsWith('/api/v1/admin')) {
+    const expectedSecret = process.env.ADMIN_API_SECRET
+    if (expectedSecret && req.headers.get('x-admin-secret') === expectedSecret) {
+      const response = NextResponse.next()
+      response.headers.set('x-trace-id', traceId)
+      return response
+    }
+  }
+
   // All other routes require a session
   if (!session) {
     if (pathname.startsWith('/api/')) {
