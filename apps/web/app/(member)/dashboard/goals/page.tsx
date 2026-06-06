@@ -4,8 +4,8 @@ import Link from 'next/link'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
-import { PageHeader } from '@/components/ui/PageHeader'
 import { ProgressBar } from '@/components/ui/ProgressBar'
+import { Target, Trophy, Clock, Lock, ChevronRight } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Goals' }
 
@@ -23,17 +23,25 @@ type GoalRow = {
   lockedAt: Date | null
 }
 
-const STATUS_CONFIG: Record<GoalStatus, { label: string; className: string; barVariant: 'default' | 'gold' | 'success' | 'danger' }> = {
-  DRAFT:    { label: 'Draft',    className: 'xxm-status-info',    barVariant: 'default' },
-  ACTIVE:   { label: 'Active',   className: 'xxm-status-pending', barVariant: 'gold'    },
-  ACHIEVED: { label: 'Achieved', className: 'xxm-status-success', barVariant: 'success' },
-  FAILED:   { label: 'Failed',   className: 'xxm-status-danger',  barVariant: 'danger'  },
+const STATUS_CONFIG: Record<GoalStatus, {
+  label: string
+  dot: string
+  badge: string
+  barVariant: 'default' | 'gold' | 'success' | 'danger'
+  cardBorder: string
+  iconBg: string
+  iconColor: string
+}> = {
+  DRAFT:    { label: 'Draft',    dot: 'bg-xxm-gray-400',  badge: 'bg-xxm-gray-100 text-xxm-gray-600', barVariant: 'default', cardBorder: 'border-xxm-gray-200',    iconBg: 'bg-xxm-gray-100',  iconColor: 'text-xxm-gray-500' },
+  ACTIVE:   { label: 'Active',   dot: 'bg-xxm-gold',      badge: 'bg-amber-100 text-amber-700',       barVariant: 'gold',    cardBorder: 'border-xxm-gold/30',     iconBg: 'bg-xxm-gold/12',  iconColor: 'text-xxm-gold-dark' },
+  ACHIEVED: { label: 'Achieved', dot: 'bg-xxm-green',     badge: 'bg-xxm-green-100 text-xxm-green-700', barVariant: 'success', cardBorder: 'border-xxm-green/20', iconBg: 'bg-xxm-green/10', iconColor: 'text-xxm-green' },
+  FAILED:   { label: 'Failed',   dot: 'bg-red-500',       badge: 'bg-red-100 text-red-700',           barVariant: 'danger',  cardBorder: 'border-red-200',         iconBg: 'bg-red-50',        iconColor: 'text-red-500' },
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  MONTHLY: 'Monthly',
-  YEARLY:  'Yearly',
-  CUSTOM:  'Custom',
+  MONTHLY: 'Monthly goal',
+  YEARLY:  'Yearly goal',
+  CUSTOM:  'Custom goal',
 }
 
 export default async function GoalsPage({
@@ -43,7 +51,7 @@ export default async function GoalsPage({
 }) {
   const session = await getSession()
   const isAdmin = (session!.user.roles as string[] | undefined)?.includes('ADMIN') ?? false
-  const params = await searchParams
+  const params  = await searchParams
 
   const validStatuses: GoalStatus[] = ['DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED']
   const statusFilter = params.status && validStatuses.includes(params.status as GoalStatus)
@@ -53,21 +61,30 @@ export default async function GoalsPage({
   const goals = await db.goal.findMany({
     where: statusFilter ? { status: statusFilter } : {},
     orderBy: [{ status: 'asc' }, { deadline: 'asc' }],
-  })
+  }) as unknown as GoalRow[]
 
-  const activeCount = (goals as unknown as GoalRow[]).filter((g) => g.status === 'ACTIVE').length
-  const achievedCount = (goals as unknown as GoalRow[]).filter((g) => g.status === 'ACHIEVED').length
+  const activeCount   = goals.filter((g) => g.status === 'ACTIVE').length
+  const achievedCount = goals.filter((g) => g.status === 'ACHIEVED').length
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <PageHeader
-        title="Financial Goals"
-        subtitle={`${activeCount} active · ${achievedCount} achieved`}
-      />
 
-      {/* Filter tabs */}
-      <div className="flex flex-wrap gap-2">
+      {/* ── Header ────────────────────────────────────────── */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-xxm-gold/12 flex items-center justify-center shrink-0">
+          <Target size={22} className="text-xxm-gold-dark" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Financial Goals</h1>
+          <p className="text-sm text-xxm-gray-500 mt-1">
+            <span className="font-semibold text-xxm-gold-dark">{activeCount}</span> active &middot;{' '}
+            <span className="font-semibold text-xxm-green">{achievedCount}</span> achieved
+          </p>
+        </div>
+      </div>
+
+      {/* ── Filter tabs ───────────────────────────────────── */}
+      <div className="flex flex-wrap gap-1.5">
         <FilterChip label="All" href="/dashboard/goals" active={!statusFilter} />
         {validStatuses.map((s) => (
           <FilterChip
@@ -79,47 +96,69 @@ export default async function GoalsPage({
         ))}
       </div>
 
-      {/* Goals grid */}
+      {/* ── Goals grid ────────────────────────────────────── */}
       {goals.length === 0 ? (
-        <div className="xxm-card p-10 text-center">
-          <p className="text-xxm-gray-400 text-sm">No goals found.</p>
+        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
+          <div className="w-14 h-14 rounded-2xl bg-xxm-gold/10 flex items-center justify-center mx-auto mb-4">
+            <Target size={24} className="text-xxm-gold-dark/50" aria-hidden />
+          </div>
+          <p className="text-xxm-gray-600 font-medium">No goals found</p>
           {isAdmin && (
-            <p className="text-xxm-gray-400 text-xs mt-1">
-              Create the first goal via the admin API to start tracking progress.
+            <p className="text-xxm-gray-400 text-xs mt-1.5 max-w-xs mx-auto">
+              Create the first goal from the admin portal to start tracking collective progress.
             </p>
           )}
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {(goals as unknown as GoalRow[]).map((goal) => {
-            const pct = Math.min(
-              100,
-              Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100),
-            )
-            const status = goal.status as GoalStatus
-            const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT
-            const isOverdue =
-              status === 'ACTIVE' && new Date(goal.deadline) < new Date()
+          {goals.map((goal) => {
+            const pct      = Math.min(100, Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100))
+            const status   = goal.status as GoalStatus
+            const cfg      = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT
+            const isOverdue = status === 'ACTIVE' && new Date(goal.deadline) < new Date()
 
             return (
               <Link
                 key={goal.id}
                 href={`/dashboard/goals/${goal.id}`}
-                className="xxm-card p-5 space-y-4 hover:shadow-md transition-shadow block"
+                className={`group block bg-white rounded-2xl border ${cfg.cardBorder} shadow-xxm-sm p-5 space-y-4 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-200`}
               >
                 {/* Title row */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-xxm-green-900 truncate">{goal.title}</p>
-                    <p className="text-xs text-xxm-gray-400 mt-0.5">
-                      {TYPE_LABELS[goal.type] ?? goal.type}
-                    </p>
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className={`w-9 h-9 rounded-xl ${cfg.iconBg} flex items-center justify-center shrink-0 mt-0.5`}>
+                      {status === 'ACHIEVED'
+                        ? <Trophy size={15} className={cfg.iconColor} aria-hidden />
+                        : <Target  size={15} className={cfg.iconColor} aria-hidden />
+                      }
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-xxm-green-900 leading-snug truncate">{goal.title}</p>
+                      <p className="text-[11px] text-xxm-gray-400 mt-0.5">{TYPE_LABELS[goal.type] ?? goal.type}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     {goal.lockedAt && (
-                      <span className="text-xs xxm-text-warning font-medium">Locked</span>
+                      <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center" title="Locked">
+                        <Lock size={10} className="text-amber-600" aria-hidden />
+                      </div>
                     )}
-                    <span className={cfg.className} role="status">{cfg.label}</span>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.badge}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} aria-hidden />
+                      {cfg.label}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Amounts */}
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-xl font-extrabold text-xxm-green-900 tabular-nums">{formatZAR(goal.currentAmount)}</p>
+                    <p className="text-[11px] text-xxm-gray-400">of {formatZAR(goal.targetAmount)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-xl font-extrabold tabular-nums ${pct >= 100 ? 'text-xxm-green' : 'text-xxm-gold-dark'}`}>{pct}%</p>
+                    <p className="text-[11px] text-xxm-gray-400">complete</p>
                   </div>
                 </div>
 
@@ -129,40 +168,32 @@ export default async function GoalsPage({
                   size="md"
                   variant={cfg.barVariant}
                   animated={status === 'ACTIVE' && pct < 100}
-                  label={`${formatZAR(goal.currentAmount)} raised`}
-                  showValue
                 />
 
                 {/* Deadline */}
-                <p className={`text-xs ${isOverdue ? 'xxm-text-danger font-medium' : 'text-xxm-gray-400'}`}>
+                <div className={`flex items-center gap-1.5 text-[11px] ${isOverdue ? 'text-red-500 font-semibold' : 'text-xxm-gray-400'}`}>
+                  <Clock size={11} aria-hidden />
                   {isOverdue ? 'Overdue · ' : 'Deadline · '}
                   {formatDate(goal.deadline)}
-                </p>
+                </div>
               </Link>
             )
           })}
         </div>
       )}
+
     </div>
   )
 }
 
-function FilterChip({
-  label,
-  href,
-  active,
-}: {
-  label: string
-  href: Route
-  active: boolean
-}) {
+function FilterChip({ label, href, active }: { label: string; href: Route; active: boolean }) {
   return (
     <Link
       href={href}
-      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
         active
-          ? 'bg-xxm-green-900 text-white'
-          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-gray-200'
+          ? 'bg-xxm-green text-white shadow-sm'
+          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gray-200'
       }`}
     >
       {label}
