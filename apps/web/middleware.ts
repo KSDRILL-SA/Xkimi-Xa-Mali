@@ -9,6 +9,12 @@ const AUTH_PREFIX = '/api/auth'
 const ROLE_VERSION_PREFIX = 'xxm:role-version:'
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
+// Only talk to Upstash when it is actually configured. Without this guard the
+// raw client is built with undefined url/token and every authenticated request
+// pays a failed network round-trip (caught, but slow) — the dominant source of
+// local navigation latency.
+const REDIS_CONFIGURED = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
+
 let _redis: Redis | null = null
 function getRedis(): Redis {
   if (!_redis) {
@@ -21,6 +27,7 @@ function getRedis(): Redis {
 }
 
 async function isRoleVersionStale(userId: string, tokenVersion: number): Promise<boolean> {
+  if (!REDIS_CONFIGURED) return false
   try {
     const cached = await getRedis().get<string>(`${ROLE_VERSION_PREFIX}${userId}`)
     if (cached === null) return false
@@ -74,6 +81,7 @@ export default auth(async (req) => {
     pathname.startsWith('/invite/')
 
   const isPublicApi =
+    pathname === '/api/v1/stats/public' ||
     pathname === '/api/v1/auth/register' ||
     pathname === '/api/v1/auth/forgot-password' ||
     pathname === '/api/v1/auth/reset-password' ||
