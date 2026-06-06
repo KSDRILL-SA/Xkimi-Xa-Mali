@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
-import { auth, signOut } from '@/lib/auth'
+import { signOut } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { MemberAppShell } from '@/components/layout/MemberAppShell'
 
 async function SignOutForm() {
@@ -21,7 +22,7 @@ async function SignOutForm() {
 }
 
 export default async function MemberLayout({ children }: { children: React.ReactNode }) {
-  const session = await auth()
+  const session = await getSession()
   if (!session?.user) redirect('/login')
 
   const isAdmin = session.user.roles?.includes('ADMIN')

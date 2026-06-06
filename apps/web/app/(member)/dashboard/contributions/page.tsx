@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
 import { env } from '@/lib/env'
@@ -20,7 +20,7 @@ export default async function ContributionsPage({
 }: {
   searchParams: Promise<{ page?: string }>
 }) {
-  const session = await auth()
+  const session = await getSession()
   const userId  = session!.user.id
   const roles   = session!.user.roles ?? []
   const params  = await searchParams

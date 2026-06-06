@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { CheckCircle2, ExternalLink, MessageCircle } from 'lucide-react'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 
@@ -31,7 +31,7 @@ export default async function WhatsAppPage({
 }: {
   searchParams: Promise<{ updated?: string }>
 }) {
-  const session = await auth()
+  const session = await getSession()
   if (!session?.user?.id) redirect('/login')
 
   const userId = session.user.id

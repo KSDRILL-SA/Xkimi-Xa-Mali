@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { FileText } from 'lucide-react'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
 
@@ -30,7 +30,7 @@ const STATUS_CONFIG: Record<ContribStatus, { label: string; className: string }>
 }
 
 export default async function StatementsPage() {
-  const session = await auth()
+  const session = await getSession()
   const userId = session!.user.id
 
   // Get all contribution periods for this member (distinct year-month combos)

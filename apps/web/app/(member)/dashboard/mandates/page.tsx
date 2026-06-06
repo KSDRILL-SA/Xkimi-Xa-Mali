@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
 import { MandateCard } from '@/components/mandate/MandateCard'
@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/Card'
 export const metadata: Metadata = { title: 'Payment Mandates' }
 
 export default async function MandatesPage() {
-  const session = await auth()
+  const session = await getSession()
   const userId = session!.user.id
 
   const [bankAccounts, mandates] = await Promise.all([
