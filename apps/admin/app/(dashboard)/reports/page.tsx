@@ -39,7 +39,7 @@ export default async function ReportsPage({
         subtitle="Monthly contribution summaries."
         action={
           <a
-            href={`/api/v1/admin/reports/csv?month=${month}&year=${year}`}
+            href={`/api/export?month=${month}&year=${year}`}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-canopy transition-colors"
             download={`xkimm-xa-mali-${month}-${year}.csv`}
           >
