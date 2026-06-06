@@ -8,6 +8,16 @@ import {
 import { withApiHandler } from '@/lib/api-handler'
 
 const SA_PHONE = /^(\+27|0)[6-8][0-9]{8}$/
+const MAX_TS_DRIFT_MS = 5 * 60 * 1000
+
+function isValidInternalRequest(req: NextRequest): boolean {
+  const expected = process.env.ADMIN_API_SECRET
+  if (!expected) return false
+  if (req.headers.get('x-admin-secret') !== expected) return false
+  const ts = req.headers.get('x-admin-timestamp')
+  if (!ts) return false
+  return Math.abs(Date.now() - Number(ts)) <= MAX_TS_DRIFT_MS
+}
 
 export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
@@ -26,13 +36,16 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 })
 
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const session = await auth()
-  if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
+  const isTrusted = isValidInternalRequest(req)
+  const session   = isTrusted ? null : await auth()
+  if (!isTrusted && !session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
-  const { success } = await adminInviteRatelimit.limit(session.user.id)
+  const adminId = isTrusted ? 'system' : session!.user.id
+  const roles   = isTrusted ? ['ADMIN'] : (session!.user.roles as string[] | undefined) ?? []
+
+  const rlKey = isTrusted ? 'internal-admin-invite' : adminId
+  const { success } = await adminInviteRatelimit.limit(rlKey)
   if (!success) return apiError('SYS_005', 'Too many invitations. Please try again later.', 429)
-
-  const roles = (session.user.roles as string[] | undefined) ?? []
 
   let body: unknown
   try { body = await req.json() } catch { return apiError('VAL_001', 'Invalid JSON', 400) }
@@ -55,7 +68,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   const ip      = req.headers.get('x-forwarded-for') ?? undefined
 
   const result = await generateInvite(
-    session.user.id,
+    adminId,
     roles,
     {
       firstName:     b.firstName.trim(),
