@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { auth, signOut } from '@/lib/auth'
 import { MemberAppShell } from '@/components/layout/MemberAppShell'
+import { env } from '@/lib/env'
 
 async function SignOutForm() {
   return (
@@ -40,6 +41,8 @@ export default async function MemberLayout({ children }: { children: React.React
       userInitials={initials}
       isAdmin={!!isAdmin}
       signOutSlot={<SignOutForm />}
+      whatsappGroupLink={env.WHATSAPP_GROUP_LINK}
+      whatsappGroupName={env.WHATSAPP_GROUP_NAME}
     >
       {children}
     </MemberAppShell>

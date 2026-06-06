@@ -36,6 +36,8 @@ interface MemberAppShellProps {
   userInitials: string
   isAdmin: boolean
   signOutSlot: React.ReactNode
+  whatsappGroupLink: string
+  whatsappGroupName: string
 }
 
 export function MemberAppShell({
@@ -44,6 +46,8 @@ export function MemberAppShell({
   userInitials,
   isAdmin,
   signOutSlot,
+  whatsappGroupLink,
+  whatsappGroupName,
 }: MemberAppShellProps) {
   const nav: NavItem[] = isAdmin
     ? [...memberNav, { href: env.NEXT_PUBLIC_ADMIN_URL as string, label: 'Admin', icon: ShieldCheck }]
@@ -63,7 +67,7 @@ export function MemberAppShell({
         <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
           {children}
         </main>
-        <AppFooter />
+        <AppFooter whatsappGroupLink={whatsappGroupLink} whatsappGroupName={whatsappGroupName} />
       </div>
     </ToastProvider>
   )
