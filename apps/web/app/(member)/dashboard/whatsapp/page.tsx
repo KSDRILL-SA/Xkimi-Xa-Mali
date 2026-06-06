@@ -11,8 +11,8 @@ async function setWhatsAppPreference(enabled: boolean, userId: string) {
   'use server'
   await db.notificationPreference.upsert({
     where: { userId },
-    create: { userId, sms: true, email: true, push: enabled },
-    update: { push: enabled },
+    create: { userId, sms: true, email: true, whatsapp: enabled },
+    update: { whatsapp: enabled },
   })
   await db.auditLog.create({
     data: {
@@ -44,11 +44,11 @@ export default async function WhatsAppPage({
     }),
     db.notificationPreference.findUnique({
       where: { userId },
-      select: { push: true },
+      select: { whatsapp: true },
     }),
   ])
 
-  const isEnabled = pref?.push ?? true
+  const isEnabled = pref?.whatsapp ?? true
   const phone = user?.phone ?? null
   const showBanner = params.updated === '1'
 
