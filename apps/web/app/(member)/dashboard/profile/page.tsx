@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import {
   getMemberProfile,
   listBankAccounts,
@@ -25,7 +25,7 @@ interface AddressShape {
 }
 
 export default async function ProfilePage() {
-  const session = await auth()
+  const session = await getSession()
   if (!session?.user?.id) redirect('/login')
 
   const userId = session.user.id

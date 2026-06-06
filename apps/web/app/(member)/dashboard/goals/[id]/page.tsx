@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 
@@ -36,7 +36,7 @@ export default async function GoalDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  const session = await auth()
+  const session = await getSession()
   const roles = (session?.user?.roles as string[] | undefined) ?? []
   const { id } = await params
 
