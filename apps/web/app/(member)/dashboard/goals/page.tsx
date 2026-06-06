@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -41,7 +41,7 @@ export default async function GoalsPage({
 }: {
   searchParams: Promise<{ status?: string }>
 }) {
-  const session = await auth()
+  const session = await getSession()
   const isAdmin = (session!.user.roles as string[] | undefined)?.includes('ADMIN') ?? false
   const params = await searchParams
 
