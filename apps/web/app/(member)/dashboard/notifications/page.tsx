@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { MessageSquare, Mail, Bell, type LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/ui/PageHeader'
@@ -65,7 +65,7 @@ export default async function NotificationsPage({
 }: {
   searchParams: Promise<{ cursor?: string; channel?: string; status?: string }>
 }) {
-  const session = await auth()
+  const session = await getSession()
   const userId = session!.user.id
   const params = await searchParams
   const cursor = params.cursor

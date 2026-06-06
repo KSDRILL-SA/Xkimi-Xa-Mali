@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { DataTable, type Column } from '@/components/ui/DataTable'
@@ -57,7 +57,7 @@ export default async function TransactionsPage({
 }: {
   searchParams: Promise<{ status?: string; type?: string; page?: string }>
 }) {
-  const session = await auth()
+  const session = await getSession()
   const userId  = session!.user.id
   const params  = await searchParams
 

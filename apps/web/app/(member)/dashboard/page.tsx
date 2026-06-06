@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { auth } from '@/lib/auth'
+import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { getMemberSummary } from '@/services/member.service'
 import { ProgressBar } from '@/components/ui/ProgressBar'
@@ -11,7 +11,7 @@ import { TrendingUp, Calendar, CheckCircle2 } from 'lucide-react'
 export const metadata: Metadata = { title: 'Dashboard' }
 
 export default async function DashboardPage() {
-  const session = await auth()
+  const session = await getSession()
   const userId  = session!.user.id
   const roles   = session!.user.roles ?? []
 
