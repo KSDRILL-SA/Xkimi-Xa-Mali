@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
+import NextTopLoader from 'nextjs-toploader'
 import { env } from '@/lib/env'
 import { PWARegister } from '@/components/PWARegister'
 import './globals.css'
@@ -36,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-dvh bg-xxm-champagne antialiased">
+        <NextTopLoader color="#D4AF37" height={3} showSpinner={false} />
         {children}
         <PWARegister />
       </body>
