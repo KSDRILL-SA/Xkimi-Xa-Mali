@@ -2,11 +2,15 @@
 
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
 import { ArrowRight, Menu, X } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { APP_URL, NAV_LINKS } from '@/lib/utils'
 
 export function Navbar() {
+  const pathname                       = usePathname()
+  const router                         = useRouter()
+  const isHome                         = pathname === '/'
   const [atTop, setAtTop]             = useState(true)
   const [menuOpen, setMenuOpen]       = useState(false)
   const [activeSection, setActive]    = useState<string>('hero')
@@ -47,6 +51,12 @@ export function Navbar() {
 
   const scrollToSection = (id: string | null) => {
     if (!id) return
+    if (!isHome) {
+      const link = NAV_LINKS.find((l) => l.sectionId === id)
+      router.push(link?.href ?? '/')
+      setMenuOpen(false)
+      return
+    }
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     setMenuOpen(false)
   }
