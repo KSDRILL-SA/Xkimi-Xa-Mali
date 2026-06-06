@@ -1,9 +1,13 @@
+'use client'
+
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { Button } from '@/components/ui/Button'
 import { Home, ArrowLeft } from 'lucide-react'
 
 export default function NotFound() {
+  const router = useRouter()
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center bg-xxm-champagne px-4 text-center">
       {/* Logo */}
@@ -36,11 +40,9 @@ export default function NotFound() {
             Go to Dashboard
           </Link>
         </Button>
-        <Button variant="outline" asChild>
-          <Link href="javascript:history.back()">
-            <ArrowLeft size={15} aria-hidden />
-            Go back
-          </Link>
+        <Button variant="outline" onClick={() => router.back()}>
+          <ArrowLeft size={15} aria-hidden />
+          Go back
         </Button>
       </div>
     </div>
