@@ -80,7 +80,7 @@ export function BankAccountsSection({ initial }: { initial: BankAccount[] }) {
                     <span className="status-pill bg-xxm-gold/20 text-xxm-gold-dark">Primary</span>
                   )}
                   {acc.verifiedAt && (
-                    <span className="xxm-status-success">Verified</span>
+                    <span className="status-pill bg-xxm-green-100 text-xxm-green-700">Verified</span>
                   )}
                 </div>
                 <p className="text-xs text-gray-400 amount">
