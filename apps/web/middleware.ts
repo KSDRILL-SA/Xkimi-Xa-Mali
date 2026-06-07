@@ -1,6 +1,12 @@
-import { auth } from '@/lib/auth'
+import NextAuth from 'next-auth'
+import { authConfig } from '@/lib/auth.config'
 import { NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
+
+// Built from the Edge-safe config slice only — importing the full @/lib/auth
+// here would drag PrismaClient (and its Node.js-only APIs) into the Edge
+// Runtime middleware bundle, where it doesn't run.
+const { auth } = NextAuth(authConfig)
 
 const WEBHOOK_PREFIX = '/api/v1/webhooks'
 const HEALTH_PATH = '/api/v1/health'
