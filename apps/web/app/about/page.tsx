@@ -294,7 +294,7 @@ export default function AboutPage() {
               {founders.map(({ initials, name, title, bio, color, ring }) => (
                 <div
                   key={name}
-                  className={`xxm-card p-6 flex flex-col sm:flex-row gap-5 ring-2 ${ring}`}
+                  className={`bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 flex flex-col sm:flex-row gap-5 ring-2 ${ring}`}
                 >
                   {/* Avatar */}
                   <div

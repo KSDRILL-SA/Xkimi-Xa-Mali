@@ -82,7 +82,7 @@ export default function SupportPage() {
               }
               target="_blank"
               rel="noopener noreferrer"
-              className="xxm-card p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
+              className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
             >
               <div className="w-10 h-10 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
                 <MessageCircle size={18} className="text-xxm-green" aria-hidden />
@@ -99,7 +99,7 @@ export default function SupportPage() {
 
             <a
               href="mailto:support@xkimmxamali.co.za"
-              className="xxm-card p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
+              className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
             >
               <div className="w-10 h-10 rounded-xl bg-xxm-champagne-200 flex items-center justify-center shrink-0">
                 <Mail size={18} className="text-xxm-green-700" aria-hidden />
@@ -123,7 +123,7 @@ export default function SupportPage() {
             </h2>
             <div className="space-y-4">
               {faqs.map(({ q, a }) => (
-                <div key={q} className="xxm-card p-5">
+                <div key={q} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5">
                   <p className="font-bold text-xxm-green-900 mb-2 text-sm">{q}</p>
                   <p className="text-sm text-xxm-gray-500 leading-relaxed">{a}</p>
                 </div>
@@ -133,15 +133,15 @@ export default function SupportPage() {
 
           {/* Quick links */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Link href="/about" className="xxm-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
+            <Link href="/about" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
               <Users size={16} className="text-xxm-gold shrink-0" aria-hidden />
               <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">About the platform</span>
             </Link>
-            <Link href="/privacy" className="xxm-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
+            <Link href="/privacy" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
               <Shield size={16} className="text-xxm-gold shrink-0" aria-hidden />
               <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">Privacy Policy</span>
             </Link>
-            <Link href="/terms" className="xxm-card p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
+            <Link href="/terms" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
               <FileText size={16} className="text-xxm-gold shrink-0" aria-hidden />
               <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">Terms of Use</span>
             </Link>
