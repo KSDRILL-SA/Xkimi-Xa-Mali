@@ -13,6 +13,7 @@ import { Alert } from '@/components/ui/Alert'
 import { api } from '@/lib/api'
 import { SkeletonForm } from '@/components/ui/Skeleton'
 import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
+import { Wallet, CreditCard, CheckCircle2, AlertTriangle } from 'lucide-react'
 
 type OpenPeriod = {
   id?: string
@@ -29,7 +30,6 @@ type MandateInfo = {
   amount: number
 }
 
-// Fetch data client-side — this page uses the API directly for simpler rendering
 export default function ContributePage() {
   const router = useRouter()
   const [openPeriods, setOpenPeriods] = useState<OpenPeriod[]>([])
@@ -58,7 +58,6 @@ export default function ContributePage() {
     ? selectedPeriod.amountDue - selectedPeriod.amountPaid
     : mandate?.amount ?? 100
 
-  // Pre-fill amount when period changes
   useEffect(() => {
     if (remaining > 0) setValue('amount', remaining)
   }, [selectedMonth, selectedYear, remaining, setValue])
@@ -82,7 +81,6 @@ export default function ContributePage() {
             amountPaid: Number(c.amountPaid),
           }))
 
-        // Add current month if not in list
         const now = new Date()
         const currentExists = open.some(
           (p) => p.periodMonth === now.getMonth() + 1 && p.periodYear === now.getFullYear(),
@@ -136,99 +134,122 @@ export default function ContributePage() {
 
   return (
     <div className="max-w-lg space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-xxm-green-900">Make a payment</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Pay a once-off contribution from your registered bank account.
-        </p>
+
+      {/* ── Header ─────────────────────────────────── */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
+          <Wallet size={22} className="text-xxm-green" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Make a Payment</h1>
+          <p className="text-sm text-xxm-gray-500 mt-1">
+            Pay a once-off contribution from your registered bank account.
+          </p>
+        </div>
       </div>
 
+      {/* ── No mandate error ───────────────────────── */}
       {!mandate && (
-        <div className="xxm-card p-5 xxm-banner-error">
-          <p className="text-sm font-semibold">No active mandate</p>
-          <p className="text-xs mt-1">
-            You need an active payment mandate before making a payment.
-            <a href="/dashboard/mandates" className="ml-1 underline font-semibold">Set up mandate</a>
-          </p>
+        <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
+          <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-red-800">No active mandate</p>
+            <p className="text-xs text-red-700 mt-0.5">
+              You need an active payment mandate before making a payment.{' '}
+              <a href="/dashboard/mandates" className="underline font-bold hover:text-red-900 transition-colors">
+                Set up mandate
+              </a>
+            </p>
+          </div>
         </div>
       )}
 
       {mandate && (
         <>
-          {/* Debit account banner */}
-          <div className="xxm-card p-4 flex items-center gap-4 border-l-4 border-xxm-green">
-            <div className="flex-1">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                Debit account
-              </p>
-              <p className="text-sm font-semibold text-xxm-green-900">{mandate.bankName}</p>
-              <p className="text-xs text-gray-400 font-mono tracking-wider">
-                {mandate.accountNumberMasked}
-              </p>
+          {/* ── Debit account card ─────────────────── */}
+          <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
+              <CreditCard size={18} className="text-xxm-green" aria-hidden />
             </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest mb-0.5">Debit account</p>
+              <p className="text-sm font-bold text-xxm-green-900">{mandate.bankName}</p>
+              <p className="text-xs text-xxm-gray-400 font-mono tracking-wider">{mandate.accountNumberMasked}</p>
+            </div>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-xxm-green-100 text-xxm-green-700 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-xxm-green" aria-hidden />
+              Active
+            </span>
           </div>
 
+          {/* ── Success state ──────────────────────── */}
           {success ? (
-            <div className="xxm-card p-6 text-center space-y-2">
-              <p className="text-lg font-bold xxm-text-success">Payment submitted</p>
-              <p className="text-sm text-gray-500">Redirecting to your contributions...</p>
+            <div className="bg-white rounded-2xl border border-xxm-green/20 shadow-xxm-sm p-8 text-center space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto">
+                <CheckCircle2 size={28} className="text-xxm-green" aria-hidden />
+              </div>
+              <p className="text-lg font-extrabold text-xxm-green-900">Payment submitted!</p>
+              <p className="text-sm text-xxm-gray-500">Redirecting to your contributions...</p>
             </div>
           ) : (
-            <div className="xxm-card p-6">
-              {serverError && <Alert variant="error" className="mb-4">{serverError}</Alert>}
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
-                <div>
-                  <Label htmlFor="period" required>Period</Label>
-                  {/* A single combined key encodes both month+year so changing period always updates both */}
-                  <Select
-                    id="period"
-                    value={`${watch('periodYear')}-${watch('periodMonth')}`}
-                    onChange={(e) => {
-                      const [y, m] = e.target.value.split('-').map(Number)
-                      setValue('periodMonth', m, { shouldValidate: true })
-                      setValue('periodYear', y, { shouldValidate: true })
-                    }}
-                    error={errors.periodMonth?.message ?? errors.periodYear?.message}
-                  >
-                    {openPeriods.map((p) => (
-                      <option key={`${p.periodYear}-${p.periodMonth}`} value={`${p.periodYear}-${p.periodMonth}`}>
-                        {formatMonth(p.periodMonth, p.periodYear)}
-                        {p.status !== 'PENDING' ? ` (${p.status})` : ''}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-
-                {selectedPeriod && selectedPeriod.amountPaid > 0 && (
-                  <div className="text-sm flex justify-between text-gray-500">
-                    <span>Already paid</span>
-                    <span className="xxm-text-success font-medium">
-                      {formatZAR(selectedPeriod.amountPaid)}
-                    </span>
+            /* ── Payment form ──────────────────────── */
+            <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-xxm-gray-100 bg-xxm-green-50/30">
+                <h2 className="text-base font-bold text-xxm-green-900">Payment details</h2>
+              </div>
+              <div className="p-5">
+                {serverError && <Alert variant="error" className="mb-4">{serverError}</Alert>}
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+                  <div>
+                    <Label htmlFor="period" required>Period</Label>
+                    <Select
+                      id="period"
+                      value={`${watch('periodYear')}-${watch('periodMonth')}`}
+                      onChange={(e) => {
+                        const [y, m] = e.target.value.split('-').map(Number)
+                        setValue('periodMonth', m, { shouldValidate: true })
+                        setValue('periodYear', y, { shouldValidate: true })
+                      }}
+                      error={errors.periodMonth?.message ?? errors.periodYear?.message}
+                    >
+                      {openPeriods.map((p) => (
+                        <option key={`${p.periodYear}-${p.periodMonth}`} value={`${p.periodYear}-${p.periodMonth}`}>
+                          {formatMonth(p.periodMonth, p.periodYear)}
+                          {p.status !== 'PENDING' ? ` (${p.status})` : ''}
+                        </option>
+                      ))}
+                    </Select>
                   </div>
-                )}
 
-                <div>
-                  <Label htmlFor="amount" required>Amount (ZAR)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    min={MIN_CONTRIBUTION_ZAR}
-                    step={CONTRIBUTION_STEP_ZAR}
-                    error={errors.amount?.message}
-                    {...register('amount', { valueAsNumber: true })}
-                  />
-                  {remaining > 0 && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Remaining: <span className="font-medium">{formatZAR(remaining)}</span>
-                    </p>
+                  {selectedPeriod && selectedPeriod.amountPaid > 0 && (
+                    <div className="flex items-center justify-between text-sm bg-xxm-green-50 rounded-xl px-4 py-2.5 border border-xxm-green/10">
+                      <span className="text-xxm-gray-600 font-medium">Already paid</span>
+                      <span className="font-bold text-xxm-green tabular-nums">{formatZAR(selectedPeriod.amountPaid)}</span>
+                    </div>
                   )}
-                </div>
 
-                <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>
-                  Pay now
-                </Button>
-              </form>
+                  <div>
+                    <Label htmlFor="amount" required>Amount (ZAR)</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      min={MIN_CONTRIBUTION_ZAR}
+                      step={CONTRIBUTION_STEP_ZAR}
+                      error={errors.amount?.message}
+                      {...register('amount', { valueAsNumber: true })}
+                    />
+                    {remaining > 0 && (
+                      <p className="text-xs text-xxm-gray-400 mt-1.5">
+                        Remaining: <span className="font-semibold text-xxm-green-700">{formatZAR(remaining)}</span>
+                      </p>
+                    )}
+                  </div>
+
+                  <Button type="submit" size="lg" className="w-full" loading={isSubmitting}>
+                    Pay now
+                  </Button>
+                </form>
+              </div>
             </div>
           )}
         </>

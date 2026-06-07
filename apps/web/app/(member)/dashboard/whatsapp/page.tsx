@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { CheckCircle2, ExternalLink, MessageCircle } from 'lucide-react'
+import { CheckCircle2, ExternalLink, MessageCircle, Phone, Bell } from 'lucide-react'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
@@ -57,95 +57,129 @@ export default async function WhatsAppPage({
 
   return (
     <div className="space-y-6 max-w-lg">
-      <div>
-        <h1 className="text-2xl font-bold text-xxm-green-900">WhatsApp Notifications</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Receive payment alerts and reminders via WhatsApp.
-        </p>
+
+      {/* ── Header ─────────────────────────────────── */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
+          <MessageCircle size={22} className="text-emerald-600" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">WhatsApp Notifications</h1>
+          <p className="text-sm text-xxm-gray-500 mt-1">
+            Receive payment alerts and reminders via WhatsApp.
+          </p>
+        </div>
       </div>
 
+      {/* ── Success banner ─────────────────────────── */}
       {showBanner && (
-        <div className="xxm-banner-success">
-          Preference saved successfully.
+        <div className="flex items-center gap-3 bg-xxm-green-50 border border-xxm-green/20 rounded-2xl px-5 py-3.5">
+          <CheckCircle2 size={16} className="text-xxm-green shrink-0" aria-hidden />
+          <p className="text-sm font-semibold text-xxm-green-800">Preference saved successfully.</p>
         </div>
       )}
 
-      {/* Status card */}
-      <div className="xxm-card p-6 space-y-5">
-        {/* Linked number */}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-700">Linked number</p>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {phone ? (
-                <span className="font-mono text-gray-800">{phone}</span>
-              ) : (
-                <span className="xxm-text-warning">No phone number on your profile</span>
-              )}
-            </p>
+      {/* ── Status card ────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+
+        {/* Linked number row */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-xxm-gray-50">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
+              <Phone size={15} className="text-xxm-green" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-xxm-gray-700">Linked number</p>
+              <p className="text-xs text-xxm-gray-500 mt-0.5">
+                {phone ? (
+                  <span className="font-mono text-xxm-green-900">{phone}</span>
+                ) : (
+                  <span className="text-amber-600 font-medium">No phone number on your profile</span>
+                )}
+              </p>
+            </div>
           </div>
-          <span className={phone ? 'xxm-status-success' : 'xxm-status-warning'}>
+          <span
+            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+              phone
+                ? 'bg-xxm-green-100 text-xxm-green-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${phone ? 'bg-xxm-green' : 'bg-amber-500'}`} aria-hidden />
             {phone ? 'Verified' : 'Missing'}
           </span>
         </div>
 
-        <div className="border-t border-gray-100" />
-
-        {/* Opt-in toggle */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-gray-700">WhatsApp opt-in</p>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {isEnabled
-                ? 'You will receive WhatsApp messages for payment confirmations, overdue reminders, and important updates.'
-                : 'You have opted out. No WhatsApp messages will be sent to your number.'}
-            </p>
+        {/* Opt-in toggle row */}
+        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-xxm-gray-50">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center shrink-0 mt-0.5">
+              <Bell size={15} className="text-sky-600" aria-hidden />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-xxm-gray-700">WhatsApp opt-in</p>
+              <p className="text-xs text-xxm-gray-500 mt-0.5 max-w-xs">
+                {isEnabled
+                  ? 'You will receive WhatsApp messages for payment confirmations, overdue reminders, and important updates.'
+                  : 'You have opted out. No WhatsApp messages will be sent to your number.'}
+              </p>
+            </div>
           </div>
-          <span className={`shrink-0 mt-0.5 ${isEnabled ? 'xxm-status-success' : 'xxm-status-pending'}`}>
+          <span
+            className={`shrink-0 mt-0.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
+              isEnabled
+                ? 'bg-xxm-green-100 text-xxm-green-700'
+                : 'bg-xxm-gray-100 text-xxm-gray-600'
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${isEnabled ? 'bg-xxm-green' : 'bg-xxm-gray-400'}`} aria-hidden />
             {isEnabled ? 'On' : 'Off'}
           </span>
         </div>
 
-        {/* Action */}
-        {phone ? (
-          isEnabled ? (
-            <form action={disableAction}>
-              <button
-                type="submit"
-                className="xxm-btn-danger"
-              >
-                Opt out of WhatsApp notifications
-              </button>
-            </form>
+        {/* Action button */}
+        <div className="px-5 py-4">
+          {phone ? (
+            isEnabled ? (
+              <form action={disableAction}>
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-red-50 border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors"
+                >
+                  Opt out of WhatsApp notifications
+                </button>
+              </form>
+            ) : (
+              <form action={enableAction}>
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-xxm-green px-4 py-2.5 text-sm font-semibold text-white hover:bg-xxm-canopy transition-colors"
+                >
+                  Opt in to WhatsApp notifications
+                </button>
+              </form>
+            )
           ) : (
-            <form action={enableAction}>
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-xxm-green px-4 py-2.5 text-sm font-semibold text-white hover:bg-xxm-green-700 transition-colors"
-              >
-                Opt in to WhatsApp notifications
-              </button>
-            </form>
-          )
-        ) : (
-          <a
-            href="/dashboard/profile"
-            className="block w-full text-center rounded-lg border border-xxm-green-200 bg-xxm-green-50 px-4 py-2.5 text-sm font-medium text-xxm-green-800 hover:bg-xxm-green-100 transition-colors"
-          >
-            Add phone number on profile →
-          </a>
-        )}
+            <a
+              href="/dashboard/profile"
+              className="block w-full text-center rounded-xl border border-xxm-green-200 bg-xxm-green-50 px-4 py-2.5 text-sm font-semibold text-xxm-green-800 hover:bg-xxm-green-100 transition-colors"
+            >
+              Add phone number on profile →
+            </a>
+          )}
+        </div>
       </div>
 
-      {/* Group link */}
-      <div className="xxm-card p-6 space-y-4">
+      {/* ── Group link card ────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 shrink-0 xxm-icon-bg-success">
-            <MessageCircle size={18} aria-hidden />
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+            <MessageCircle size={18} className="text-emerald-600" aria-hidden />
           </div>
           <div>
             <p className="font-bold text-xxm-green-900">Join the WhatsApp Group</p>
-            <p className="text-sm text-gray-500 mt-0.5">
+            <p className="text-sm text-xxm-gray-500 mt-0.5">
               Stay connected with the community — announcements, goal updates, and group discussions.
             </p>
           </div>
@@ -154,19 +188,19 @@ export default async function WhatsAppPage({
           href={env.WHATSAPP_GROUP_LINK}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-green-700 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
         >
           Open WhatsApp Group
           <ExternalLink size={13} aria-hidden />
         </a>
         {env.ADMIN_WHATSAPP_NUMBER && (
-          <div className="pt-1 border-t border-gray-100">
-            <p className="text-xs text-gray-400 mb-2">Want to join? Message the admin directly:</p>
+          <div className="pt-3 border-t border-xxm-gray-100">
+            <p className="text-xs text-xxm-gray-400 mb-2">Want to join? Message the admin directly:</p>
             <a
               href={`https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I would like to join the Xkimm Xa Mali WhatsApp group. Please add me.')}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-xxm-green-700 hover:text-xxm-green font-medium transition-colors"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-xxm-green hover:text-xxm-canopy transition-colors"
             >
               <MessageCircle size={14} aria-hidden />
               Message Admin to Join
@@ -175,25 +209,23 @@ export default async function WhatsAppPage({
         )}
       </div>
 
-      {/* Info box */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-4 space-y-2">
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-          What you will receive
-        </p>
-        <ul className="space-y-1.5 text-sm text-gray-600">
+      {/* ── What you'll receive ────────────────────── */}
+      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-3">
+        <p className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">What you will receive</p>
+        <ul className="space-y-2">
           {[
             'Payment confirmation when a debit is processed',
             'Overdue reminder if a contribution is unpaid',
             'Mandate status updates (active, cancelled)',
             'Goal milestone alerts',
           ].map((item) => (
-            <li key={item} className="flex items-start gap-2">
-              <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-xxm-green-600" aria-hidden />
-              {item}
+            <li key={item} className="flex items-start gap-2.5">
+              <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-xxm-green" aria-hidden />
+              <span className="text-sm text-xxm-gray-600">{item}</span>
             </li>
           ))}
         </ul>
-        <p className="text-xs text-gray-400 pt-1">
+        <p className="text-xs text-xxm-gray-400 pt-1 border-t border-xxm-gray-50">
           Full WhatsApp Business API integration is coming soon. Your preference is saved and will
           activate automatically when the channel goes live.
         </p>
