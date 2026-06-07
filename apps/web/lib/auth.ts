@@ -84,6 +84,8 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: env.NEXTAUTH_SECRET,
+  trustHost: true,
   adapter: PrismaAdapter(db),
   session: { strategy: 'jwt' },
   pages: {
