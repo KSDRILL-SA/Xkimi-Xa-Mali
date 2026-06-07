@@ -88,12 +88,12 @@ export default async function DashboardPage() {
 
       {/* ── Animated stat cards ─────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <AnimatedStatCard icon={TrendingUp}   label="Total contributed"      value={summary.totalContributed}  prefix="R " decimals={2}
-          gradient="from-xxm-green-50 to-white" iconBg="bg-xxm-green/10" iconColor="text-xxm-green" border="border-xxm-green/15" />
-        <AnimatedStatCard icon={Calendar}     label={`${currentYear} total`} value={summary.yearlyContributed} prefix="R " decimals={2}
-          gradient="from-amber-50 to-white" iconBg="bg-xxm-gold/15" iconColor="text-xxm-gold-dark" border="border-xxm-gold/20" />
-        <AnimatedStatCard icon={CheckCircle2} label="Paid contributions"     value={summary.paidCount}         suffix=" paid"
-          gradient="from-emerald-50 to-white" iconBg="bg-emerald-100" iconColor="text-emerald-600" border="border-emerald-200" />
+        <AnimatedStatCard icon={<TrendingUp size={18} className="text-xxm-green" aria-hidden />}   label="Total contributed"      value={summary.totalContributed}  prefix="R " decimals={2}
+          gradient="from-xxm-green-50 to-white" iconBg="bg-xxm-green/10" border="border-xxm-green/15" />
+        <AnimatedStatCard icon={<Calendar size={18} className="text-xxm-gold-dark" aria-hidden />}     label={`${currentYear} total`} value={summary.yearlyContributed} prefix="R " decimals={2}
+          gradient="from-amber-50 to-white" iconBg="bg-xxm-gold/15" border="border-xxm-gold/20" />
+        <AnimatedStatCard icon={<CheckCircle2 size={18} className="text-emerald-600" aria-hidden />} label="Paid contributions"     value={summary.paidCount}         suffix=" paid"
+          gradient="from-emerald-50 to-white" iconBg="bg-emerald-100" border="border-emerald-200" />
       </div>
 
       {/* ── Recent contributions ─────────────────────────────── */}
