@@ -85,7 +85,7 @@ export default function TermsPage() {
           {/* Sections */}
           <div className="space-y-8">
             {sections.map(({ title, body }, i) => (
-              <section key={title} className="xxm-card p-6">
+              <section key={title} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6">
                 <h2 className="font-bold text-xxm-green-900 mb-3 flex items-start gap-3">
                   <span className="inline-flex w-6 h-6 rounded-full bg-xxm-gold/15 text-xxm-gold-dark text-xs font-black items-center justify-center shrink-0 mt-0.5">
                     {i + 1}
