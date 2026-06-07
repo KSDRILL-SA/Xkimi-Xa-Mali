@@ -34,22 +34,22 @@ const founders = [
   {
     photo: '/founders/maluleke-ntwanano-glen.png',
     name: 'Maluleke Ntwanano Glen',
-    title: 'Co-Founder & Treasurer',
-    bio: 'The financial custodian of the collective. Ntwanano oversees financial integrity, ensures every contribution is accounted for, and guards the pool with discipline.',
+    title: 'Co-Founder & Secretary',
+    bio: 'The keeper of records and governance. Ntwanano ensures operational excellence, maintains the standards of the collective, and holds every member accountable.',
     ring: 'ring-xxm-gold/30',
   },
   {
     photo: '/founders/maluleke-risima-blessing.png',
     name: 'Malulele Risima Blessing',
-    title: 'Co-Founder & Secretary',
-    bio: 'The keeper of records and governance. Risima ensures operational excellence, maintains the standards of the collective, and holds every member accountable.',
+    title: 'Co-Founder & Treasurer',
+    bio: 'The financial custodian of the collective. Risima oversees financial integrity, ensures every contribution is accounted for, and guards the pool with discipline.',
     ring: 'ring-xxm-canopy/20',
   },
   {
     photo: '/founders/nkuna-rito-blessing.png',
     name: 'Nkuna Rito Blessing',
-    title: 'Co-Founder & Member Relations',
-    bio: 'The heart of the brotherhood. Rito nurtures relationships within the collective, champions member welfare, and ensures Xkimm Xa Mali remains rooted in trust.',
+    title: 'Co-Founder & Welfare Officer',
+    bio: 'The heart of the brotherhood. Rito champions member welfare, nurtures relationships within the collective, and ensures Xkimm Xa Mali remains rooted in trust.',
     ring: 'ring-xxm-green-900/20',
   },
 ]
