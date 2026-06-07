@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { AppFooter } from '@/components/layout/AppFooter'
@@ -24,35 +25,31 @@ export const metadata: Metadata = {
 
 const founders = [
   {
-    initials: 'KM',
+    photo: '/founders/maluleke-kurhula-success.jpg',
     name: 'Maluleke Kurhula Success',
     title: 'Founder & Chairman',
     bio: 'The visionary behind Xkimm Xa Mali. Kurhula identified the need for a disciplined, technology-powered approach to communal savings and brought the collective to life.',
-    color: 'bg-xxm-green text-white',
     ring: 'ring-xxm-green/20',
   },
   {
-    initials: 'NM',
+    photo: '/founders/maluleke-ntwanano-glen.png',
     name: 'Maluleke Ntwanano Glen',
     title: 'Co-Founder & Treasurer',
     bio: 'The financial custodian of the collective. Ntwanano oversees financial integrity, ensures every contribution is accounted for, and guards the pool with discipline.',
-    color: 'bg-xxm-gold text-xxm-green-900',
     ring: 'ring-xxm-gold/30',
   },
   {
-    initials: 'RM',
+    photo: '/founders/maluleke-risima-blessing.png',
     name: 'Malulele Risima Blessing',
     title: 'Co-Founder & Secretary',
     bio: 'The keeper of records and governance. Risima ensures operational excellence, maintains the standards of the collective, and holds every member accountable.',
-    color: 'bg-xxm-canopy text-white',
     ring: 'ring-xxm-canopy/20',
   },
   {
-    initials: 'RN',
+    photo: '/founders/nkuna-rito-blessing.png',
     name: 'Nkuna Rito Blessing',
     title: 'Co-Founder & Member Relations',
     bio: 'The heart of the brotherhood. Rito nurtures relationships within the collective, champions member welfare, and ensures Xkimm Xa Mali remains rooted in trust.',
-    color: 'bg-xxm-green-900 text-xxm-gold',
     ring: 'ring-xxm-green-900/20',
   },
 ]
@@ -291,17 +288,20 @@ export default function AboutPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {founders.map(({ initials, name, title, bio, color, ring }) => (
+              {founders.map(({ photo, name, title, bio, ring }) => (
                 <div
                   key={name}
                   className={`bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 flex flex-col sm:flex-row gap-5 ring-2 ${ring}`}
                 >
-                  {/* Avatar */}
-                  <div
-                    className={`w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 ${color}`}
-                    aria-hidden
-                  >
-                    {initials}
+                  {/* Portrait */}
+                  <div className="relative w-20 h-24 rounded-xl overflow-hidden shrink-0 ring-1 ring-xxm-green/10">
+                    <Image
+                      src={photo}
+                      alt={name}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
                   </div>
 
                   {/* Text */}
