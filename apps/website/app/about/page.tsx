@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -30,38 +31,34 @@ export const metadata: Metadata = {
 
 const founders = [
   {
-    initials: 'KM',
+    photo: '/founders/maluleke-kurhula-success.jpg',
     name: 'Maluleke Kurhula Success',
     title: 'Founder & Chairman',
     bio: 'The visionary behind Xkimm Xa Mali. Kurhula identified the need for a disciplined, technology-powered approach to communal savings and built the platform from the ground up.',
-    initBg: 'bg-xxm-green text-white',
     ring: 'ring-xxm-green/25',
     accent: 'from-xxm-green/5',
   },
   {
-    initials: 'NM',
+    photo: '/founders/maluleke-ntwanano-glen.png',
     name: 'Maluleke Ntwanano Glen',
-    title: 'Co-Founder & Treasurer',
-    bio: 'The financial custodian of the collective. Ntwanano oversees financial integrity, ensures every contribution is accounted for, and guards the pool with unwavering discipline.',
-    initBg: 'bg-xxm-gold text-xxm-green-900',
+    title: 'Co-Founder & Secretary',
+    bio: 'The keeper of records and governance. Ntwanano ensures operational excellence, maintains the standards of the collective, and holds every member accountable to the pact.',
     ring: 'ring-xxm-gold/30',
     accent: 'from-xxm-gold/5',
   },
   {
-    initials: 'RM',
+    photo: '/founders/maluleke-risima-blessing.png',
     name: 'Malulele Risima Blessing',
-    title: 'Co-Founder & Secretary',
-    bio: 'The keeper of records and governance. Risima ensures operational excellence, maintains the standards of the collective, and holds every member accountable to the pact.',
-    initBg: 'bg-xxm-canopy text-white',
+    title: 'Co-Founder & Treasurer',
+    bio: 'The financial custodian of the collective. Risima oversees financial integrity, ensures every contribution is accounted for, and guards the pool with unwavering discipline.',
     ring: 'ring-xxm-canopy/25',
     accent: 'from-xxm-canopy/5',
   },
   {
-    initials: 'RN',
+    photo: '/founders/nkuna-rito-blessing.png',
     name: 'Nkuna Rito Blessing',
-    title: 'Co-Founder & Member Relations',
-    bio: 'The heart of the brotherhood. Rito nurtures relationships within the collective, champions member welfare, and ensures Xkimm Xa Mali remains rooted in human trust.',
-    initBg: 'bg-xxm-green-900 text-xxm-gold',
+    title: 'Co-Founder & Welfare Officer',
+    bio: 'The heart of the brotherhood. Rito champions member welfare, nurtures relationships within the collective, and ensures Xkimm Xa Mali remains rooted in human trust.',
     ring: 'ring-xxm-green-900/20',
     accent: 'from-xxm-green-900/5',
   },
@@ -330,7 +327,7 @@ export default function AboutPage() {
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {founders.map(({ initials, name, title, bio, initBg, ring, accent }) => (
+              {founders.map(({ photo, name, title, bio, ring, accent }) => (
                 <div
                   key={name}
                   className={`relative overflow-hidden bg-white rounded-2xl border border-xxm-gold/10 p-6 flex flex-col sm:flex-row gap-5 ring-2 ${ring} hover:shadow-gold transition-all duration-300 group`}
@@ -339,8 +336,14 @@ export default function AboutPage() {
                     className={`absolute inset-0 bg-gradient-to-br ${accent} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}
                     aria-hidden
                   />
-                  <div className={`relative w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 shadow-sm ${initBg}`} aria-hidden>
-                    {initials}
+                  <div className="relative w-20 h-24 rounded-xl overflow-hidden shrink-0 shadow-sm ring-1 ring-xxm-green/10">
+                    <Image
+                      src={photo}
+                      alt={name}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
                   </div>
                   <div className="relative flex-1 min-w-0">
                     <p className="font-black text-xxm-green-900 text-base leading-snug">{name}</p>

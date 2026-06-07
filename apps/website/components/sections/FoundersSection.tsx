@@ -1,41 +1,38 @@
 'use client'
 
+import Image from 'next/image'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
 
 const founders = [
   {
-    initials: 'KM',
+    photo: '/founders/maluleke-kurhula-success.jpg',
     name: 'Maluleke Kurhula Success',
     title: 'Founder & Chairman',
     bio: 'The visionary behind Xkimm Xa Mali. Kurhula identified the need for a disciplined, technology-powered approach to communal savings and brought the collective to life.',
-    initBg: 'bg-xxm-green text-white',
     ringHover: 'hover:ring-xxm-green/30',
     delay: 'delay-100',
   },
   {
-    initials: 'NM',
+    photo: '/founders/maluleke-ntwanano-glen.png',
     name: 'Maluleke Ntwanano Glen',
-    title: 'Co-Founder & Treasurer',
-    bio: 'The financial custodian of the collective. Ntwanano oversees financial integrity, ensures every contribution is accounted for, and guards the pool with discipline.',
-    initBg: 'bg-xxm-gold text-xxm-green-950',
+    title: 'Co-Founder & Secretary',
+    bio: 'The keeper of records and governance. Ntwanano ensures operational excellence, maintains the standards of the collective, and holds every member accountable.',
     ringHover: 'hover:ring-xxm-gold/40',
     delay: 'delay-200',
   },
   {
-    initials: 'RM',
+    photo: '/founders/maluleke-risima-blessing.png',
     name: 'Malulele Risima Blessing',
-    title: 'Co-Founder & Secretary',
-    bio: 'The keeper of records and governance. Risima ensures operational excellence, maintains the standards of the collective, and holds every member accountable.',
-    initBg: 'bg-xxm-canopy text-white',
+    title: 'Co-Founder & Treasurer',
+    bio: 'The financial custodian of the collective. Risima oversees financial integrity, ensures every contribution is accounted for, and guards the pool with discipline.',
     ringHover: 'hover:ring-xxm-canopy/30',
     delay: 'delay-300',
   },
   {
-    initials: 'RN',
+    photo: '/founders/nkuna-rito-blessing.png',
     name: 'Nkuna Rito Blessing',
-    title: 'Co-Founder & Member Relations',
-    bio: 'The heart of the brotherhood. Rito nurtures relationships within the collective, champions member welfare, and ensures Xkimm Xa Mali remains rooted in trust.',
-    initBg: 'bg-xxm-green-900 text-xxm-gold',
+    title: 'Co-Founder & Welfare Officer',
+    bio: 'The heart of the brotherhood. Rito champions member welfare, nurtures relationships within the collective, and keeps Xkimm Xa Mali rooted in trust.',
     ringHover: 'hover:ring-xxm-green-900/30',
     delay: 'delay-400',
   },
@@ -73,7 +70,7 @@ export function FoundersSection() {
 
         {/* founder cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {founders.map(({ initials, name, title, bio, initBg, ringHover, delay }) => (
+          {founders.map(({ photo, name, title, bio, ringHover, delay }) => (
             <div
               key={name}
               className={`reveal reveal-scale ${delay} group relative rounded-2xl bg-white border border-xxm-gold/10 p-6 flex gap-5 ring-2 ring-transparent ${ringHover} hover:shadow-gold transition-all duration-400 overflow-hidden`}
@@ -85,12 +82,15 @@ export function FoundersSection() {
                 aria-hidden
               />
 
-              {/* avatar */}
-              <div
-                className={`w-16 h-16 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 shadow-xxm ${initBg}`}
-                aria-hidden
-              >
-                {initials}
+              {/* portrait */}
+              <div className="relative w-20 h-24 rounded-xl overflow-hidden shrink-0 shadow-xxm ring-1 ring-xxm-green/10">
+                <Image
+                  src={photo}
+                  alt={name}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
               </div>
 
               {/* text */}
