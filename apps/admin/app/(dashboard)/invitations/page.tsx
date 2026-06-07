@@ -4,8 +4,9 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listInvitations, revokeInvitation } from '@/lib/services'
 import { formatDate, formatZAR } from '@xxm/utils'
-import { Breadcrumb, DataTable, type Column, RouterPagination, PageHeader } from '@xxm/ui'
+import { Breadcrumb, RouterPagination, PageHeader } from '@xxm/ui'
 import { CreateInviteModal } from '@/components/admin/CreateInviteModal'
+import { InvitationsTable, type InviteRow } from './InvitationsTable'
 
 type CreatedInvite = { code: string; firstName: string; lastName: string; email: string }
 type InviteState   = { data?: CreatedInvite; error?: string }
@@ -60,27 +61,16 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   REVOKED:  { label: 'Revoked',  className: 'xxm-status-danger'  },
 }
 
-type InviteRow = {
-  id: string; name: string; email: string; phone: string; rawStatus: string
-  status: string; statusClass: string; minAmount: string; expires: string; accepted: string
+async function revokeInvitationAction(fd: FormData) {
+  'use server'
+  const id = fd.get('id') as string
+  const s = await auth()
+  if (!s?.user?.id) redirect('/login')
+  const sr = (s.user.roles as string[] | undefined) ?? []
+  if (!sr.includes('ADMIN')) redirect('/forbidden')
+  await revokeInvitation(s.user.id, sr, id)
+  revalidatePath('/invitations')
 }
-
-const columns: Column<InviteRow>[] = [
-  {
-    key: 'name', header: 'Invited Person', sortable: true,
-    render: (r) => (
-      <div>
-        <p className="font-medium text-xxm-green-900">{r.name}</p>
-        <p className="text-xs text-xxm-gray-400">{r.email}</p>
-      </div>
-    ),
-  },
-  { key: 'phone',     header: 'Phone',   render: (r) => <span className="font-mono text-xs">{r.phone}</span> },
-  { key: 'minAmount', header: 'Min/mo',  align: 'right' },
-  { key: 'status',    header: 'Status',  align: 'center', render: (r) => <span className={r.statusClass}>{r.status}</span> },
-  { key: 'expires',   header: 'Expires' },
-  { key: 'accepted',  header: 'Accepted' },
-]
 
 export default async function InvitationsPage({
   searchParams,
@@ -110,31 +100,6 @@ export default async function InvitationsPage({
     }
   })
 
-  const columnsWithActions: Column<InviteRow>[] = [
-    ...columns,
-    {
-      key: 'id', header: 'Actions', align: 'center',
-      render: (r) => {
-        if (r.rawStatus !== 'PENDING') return null
-        return (
-          <form action={async () => {
-            'use server'
-            const s = await auth()
-            if (!s?.user?.id) redirect('/login')
-            const sr = (s.user.roles as string[] | undefined) ?? []
-            if (!sr.includes('ADMIN')) redirect('/forbidden')
-            await revokeInvitation(s.user.id, sr, r.id)
-            revalidatePath('/invitations')
-          }}>
-            <button type="submit" className="text-xs text-red-500 hover:underline font-medium">
-              Revoke
-            </button>
-          </form>
-        )
-      },
-    },
-  ]
-
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Invitations' }]} />
@@ -146,7 +111,7 @@ export default async function InvitationsPage({
         </div>
       )}
 
-      <DataTable columns={columnsWithActions} data={rows} keyExtractor={(r) => r.id} stickyHeader striped caption="Invitations" />
+      <InvitationsTable rows={rows} revokeAction={revokeInvitationAction} />
       <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/invitations" className="justify-center" />
     </div>
   )
