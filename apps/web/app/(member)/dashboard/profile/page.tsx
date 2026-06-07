@@ -6,13 +6,13 @@ import {
   listBankAccounts,
   getNotificationPreferences,
 } from '@/services/member.service'
-import { Card, CardBody } from '@/components/ui/Card'
 import { Tabs } from '@/components/ui/Tabs'
 import { ProfileForm } from '@/components/member/ProfileForm'
 import { BankAccountsSection } from '@/components/member/BankAccountsSection'
 import { NotificationPreferencesForm } from '@/components/member/NotificationPreferencesForm'
 import { ChangePasswordForm } from '@/components/member/ChangePasswordForm'
 import { DataPrivacySection } from '@/components/member/DataPrivacySection'
+import { UserCircle } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Profile' }
 
@@ -41,21 +41,40 @@ export default async function ProfilePage() {
     verifiedAt: a.verifiedAt ? a.verifiedAt.toISOString() : null,
   }))
 
+  const name = session.user.name ?? ''
+  const initials =
+    name
+      .split(' ')
+      .map((w: string) => w[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || '?'
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-xxm-green-900">Profile &amp; Settings</h1>
-        <p className="text-gray-500 text-sm mt-1">Manage your personal details, banking, and preferences.</p>
+
+      {/* ── Header ─────────────────────────────────── */}
+      <div className="flex items-center gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-xxm-green to-xxm-canopy flex items-center justify-center shrink-0 shadow-sm">
+          <span className="text-xl font-black text-white" aria-hidden>{initials}</span>
+        </div>
+        <div>
+          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">
+            {name || 'Profile'}
+          </h1>
+          <p className="text-xxm-gray-500 text-sm mt-0.5">Manage your personal details, banking, and preferences.</p>
+        </div>
       </div>
 
-      <Card>
-        <CardBody>
-          <Tabs
-            tabs={[
-              {
-                id: 'profile',
-                label: 'Personal',
-                content: (
+      {/* ── Tabbed settings card ───────────────────── */}
+      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+        <Tabs
+          tabs={[
+            {
+              id: 'profile',
+              label: 'Personal',
+              content: (
+                <div className="p-5 md:p-6">
                   <ProfileForm
                     userId={userId}
                     initial={{
@@ -67,32 +86,48 @@ export default async function ProfilePage() {
                       address: (profile.address as AddressShape | null) ?? null,
                     }}
                   />
-                ),
-              },
-              {
-                id: 'banking',
-                label: 'Bank accounts',
-                content: <BankAccountsSection initial={serialisedAccounts} />,
-              },
-              {
-                id: 'notifications',
-                label: 'Notifications',
-                content: <NotificationPreferencesForm initial={prefs} />,
-              },
-              {
-                id: 'security',
-                label: 'Security',
-                content: <ChangePasswordForm />,
-              },
-              {
-                id: 'privacy',
-                label: 'Data & Privacy',
-                content: <DataPrivacySection userId={userId} />,
-              },
-            ]}
-          />
-        </CardBody>
-      </Card>
+                </div>
+              ),
+            },
+            {
+              id: 'banking',
+              label: 'Bank accounts',
+              content: (
+                <div className="p-5 md:p-6">
+                  <BankAccountsSection initial={serialisedAccounts} />
+                </div>
+              ),
+            },
+            {
+              id: 'notifications',
+              label: 'Notifications',
+              content: (
+                <div className="p-5 md:p-6">
+                  <NotificationPreferencesForm initial={prefs} />
+                </div>
+              ),
+            },
+            {
+              id: 'security',
+              label: 'Security',
+              content: (
+                <div className="p-5 md:p-6">
+                  <ChangePasswordForm />
+                </div>
+              ),
+            },
+            {
+              id: 'privacy',
+              label: 'Data & Privacy',
+              content: (
+                <div className="p-5 md:p-6">
+                  <DataPrivacySection userId={userId} />
+                </div>
+              ),
+            },
+          ]}
+        />
+      </div>
     </div>
   )
 }
