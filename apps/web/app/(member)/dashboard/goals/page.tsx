@@ -5,7 +5,7 @@ import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { ProgressBar } from '@/components/ui/ProgressBar'
-import { Target, Trophy, Clock, Lock, ChevronRight } from 'lucide-react'
+import { Target, Trophy, Clock, Lock } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Goals' }
 
