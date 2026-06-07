@@ -4,6 +4,7 @@ import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { db } from './db'
 import { env } from './env'
+import { authConfig } from './auth.config'
 import { LoginSchema } from './validation/auth'
 import { logger } from './logger'
 
@@ -84,33 +85,11 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: env.NEXTAUTH_SECRET,
-  trustHost: true,
+  ...authConfig,
   adapter: PrismaAdapter(db),
-  session: { strategy: 'jwt' },
-  pages: {
-    signIn: '/login',
-    error: '/login',
-  },
   providers: [
     Credentials({
       authorize: authorizeCredentials,
     }),
   ],
-  callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.roles = (user as { roles?: string[] }).roles ?? []
-        token.roleVersion = (user as { roleVersion?: number }).roleVersion ?? 0
-      }
-      return token
-    },
-    session({ session, token }) {
-      session.user.id = token.id as string
-      session.user.roles = token.roles as string[]
-      session.user.roleVersion = token.roleVersion as number
-      return session
-    },
-  },
 })
