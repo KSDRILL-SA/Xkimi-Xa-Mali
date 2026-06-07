@@ -12,7 +12,6 @@ import { BankAccountsSection } from '@/components/member/BankAccountsSection'
 import { NotificationPreferencesForm } from '@/components/member/NotificationPreferencesForm'
 import { ChangePasswordForm } from '@/components/member/ChangePasswordForm'
 import { DataPrivacySection } from '@/components/member/DataPrivacySection'
-import { UserCircle } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Profile' }
 
