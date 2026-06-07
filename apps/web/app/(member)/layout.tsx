@@ -44,6 +44,7 @@ export default async function MemberLayout({ children }: { children: React.React
       signOutSlot={<SignOutForm />}
       whatsappGroupLink={env.WHATSAPP_GROUP_LINK}
       whatsappGroupName={env.WHATSAPP_GROUP_NAME}
+      adminUrl={env.NEXT_PUBLIC_ADMIN_URL}
     >
       {children}
     </MemberAppShell>
