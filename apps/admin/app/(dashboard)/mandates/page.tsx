@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllMandates, approveMandate, rejectMandate } from '@/lib/services'
 import { formatZAR, formatDate } from '@xxm/utils'
-import { Breadcrumb, DataTable, type Column, RouterPagination, PageHeader } from '@xxm/ui'
+import { Breadcrumb, RouterPagination, PageHeader } from '@xxm/ui'
+import { MandatesTable, type MandateRow } from './MandatesTable'
 import Link from 'next/link'
 
 export const metadata: Metadata = { title: 'Mandates' }
@@ -16,65 +17,27 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   CANCELLED: { label: 'Cancelled', className: 'xxm-status-danger'  },
 }
 
-type MandateRow = {
-  id: string; mandateId: string; member: string; email: string; bank: string
-  amount: string; debitDay: number; status: string; statusClass: string; createdAt: string
+async function approveMandateAction(fd: FormData) {
+  'use server'
+  const mandateId = fd.get('mandateId') as string
+  const s = await auth()
+  if (!s?.user?.id) redirect('/login')
+  const sr = (s.user.roles as string[] | undefined) ?? []
+  if (!sr.includes('ADMIN')) redirect('/forbidden')
+  await approveMandate(s.user.id, sr, mandateId)
+  revalidatePath('/mandates')
 }
 
-const columns: Column<MandateRow>[] = [
-  {
-    key: 'member', header: 'Member', sortable: true,
-    render: (r) => (
-      <div>
-        <p className="font-medium text-xxm-green-900">{r.member}</p>
-        <p className="text-xs text-xxm-gray-400">{r.email}</p>
-      </div>
-    ),
-  },
-  { key: 'bank',     header: 'Bank' },
-  { key: 'amount',   header: 'Amount',   align: 'right' },
-  { key: 'debitDay', header: 'Debit Day',align: 'center' },
-  { key: 'status',   header: 'Status',   align: 'center', render: (r) => <span className={r.statusClass}>{r.status}</span> },
-  { key: 'createdAt',header: 'Created' },
-  {
-    key: 'mandateId', header: 'Actions', align: 'center',
-    render: (r) => (
-      <div className="flex items-center gap-2 justify-center">
-        {r.status === 'Pending' && (
-          <>
-            <form action={async (fd: FormData) => {
-              'use server'
-              const mandateId = fd.get('mandateId') as string
-              const s = await auth()
-              if (!s?.user?.id) redirect('/login')
-              const sr = (s.user.roles as string[] | undefined) ?? []
-              if (!sr.includes('ADMIN')) redirect('/forbidden')
-              await approveMandate(s.user.id, sr, mandateId)
-              revalidatePath('/mandates')
-            }}>
-              <input type="hidden" name="mandateId" value={r.mandateId} />
-              <button type="submit" className="text-xs text-xxm-green hover:underline font-medium">Approve</button>
-            </form>
-            <form action={async (fd: FormData) => {
-              'use server'
-              const mandateId = fd.get('mandateId') as string
-              const s = await auth()
-              if (!s?.user?.id) redirect('/login')
-              const sr = (s.user.roles as string[] | undefined) ?? []
-              if (!sr.includes('ADMIN')) redirect('/forbidden')
-              await rejectMandate(s.user.id, sr, mandateId)
-              revalidatePath('/mandates')
-            }}>
-              <input type="hidden" name="mandateId" value={r.mandateId} />
-              <button type="submit" className="text-xs text-red-600 hover:underline font-medium">Reject</button>
-            </form>
-          </>
-        )}
-        <Link href={`/members/${r.id}`} className="text-xs text-xxm-gray-400 hover:text-xxm-green">View</Link>
-      </div>
-    ),
-  },
-]
+async function rejectMandateAction(fd: FormData) {
+  'use server'
+  const mandateId = fd.get('mandateId') as string
+  const s = await auth()
+  if (!s?.user?.id) redirect('/login')
+  const sr = (s.user.roles as string[] | undefined) ?? []
+  if (!sr.includes('ADMIN')) redirect('/forbidden')
+  await rejectMandate(s.user.id, sr, mandateId)
+  revalidatePath('/mandates')
+}
 
 export default async function MandatesPage({
   searchParams,
@@ -117,7 +80,7 @@ export default async function MandatesPage({
         {status && <Link href="/mandates" className="px-4 py-2 rounded-xl border border-xxm-gray-200 text-sm text-xxm-gray-500 hover:bg-xxm-gray-50">Clear</Link>}
       </form>
 
-      <DataTable columns={columns} data={rows} keyExtractor={(r) => r.mandateId} stickyHeader striped caption="Mandates" />
+      <MandatesTable rows={rows} approveAction={approveMandateAction} rejectAction={rejectMandateAction} />
       <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl={`/mandates${status ? `?status=${status}` : ''}`} className="justify-center" />
     </div>
   )
