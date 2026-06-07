@@ -3,6 +3,7 @@ import { siteEnv } from '@/lib/env'
 
 export { cn }
 
+export const SITE_URL        = siteEnv.SITE_URL
 export const APP_URL         = siteEnv.APP_URL
 export const ADMIN_URL       = siteEnv.ADMIN_URL
 export const WA_LINK         = siteEnv.WA_LINK
