@@ -58,94 +58,135 @@ export default function SupportPage() {
         </div>
       </header>
 
-      <main className="flex-1 py-12 md:py-20 px-4">
-        <div className="max-w-screen-md mx-auto space-y-10">
-          {/* Header */}
-          <div>
+      <main className="flex-1">
+        {/* ── Hero ──────────────────────────────────────────────────── */}
+        <section className="relative overflow-hidden bg-xxm-green py-14 md:py-20 px-4">
+          <div
+            className="absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl opacity-20 pointer-events-none"
+            style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
+            aria-hidden
+          />
+          <div
+            className="absolute -bottom-12 -left-12 w-56 h-56 rounded-full blur-3xl opacity-15 pointer-events-none"
+            style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
+            aria-hidden
+          />
+          <div className="relative max-w-screen-md mx-auto text-center">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-xxm-gold/15 mb-5">
+              <HelpCircle size={24} className="text-xxm-gold" aria-hidden />
+            </div>
             <p className="text-xs font-bold text-xxm-gold tracking-widest uppercase mb-2">Help Centre</p>
-            <h1 className="text-3xl sm:text-4xl font-black text-xxm-green-900 leading-tight">
+            <h1 className="text-3xl sm:text-4xl font-black text-white leading-tight">
               Support
             </h1>
-            <p className="text-xxm-gray-600 text-[15px] leading-relaxed mt-3">
+            <p className="text-white/75 text-[15px] leading-relaxed mt-4 max-w-lg mx-auto">
               Need help? Start with the FAQs below. For anything else, reach out to the
               platform administrators directly via WhatsApp.
             </p>
           </div>
+        </section>
 
+        <div className="py-12 md:py-16 px-4">
+        <div className="max-w-screen-md mx-auto space-y-12">
           {/* Contact cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <a
-              href={
-                env.ADMIN_WHATSAPP_NUMBER
-                  ? `https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I need support with my Xkimm Xa Mali account. Please assist me.')}`
-                  : env.WHATSAPP_GROUP_LINK
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
-                <MessageCircle size={18} className="text-xxm-green" aria-hidden />
-              </div>
-              <div>
-                <p className="font-bold text-xxm-green-900 group-hover:text-xxm-green transition-colors">
-                  Message Admin on WhatsApp
-                </p>
-                <p className="text-xs text-xxm-gray-500 mt-0.5 leading-relaxed">
-                  Chat directly with an administrator on WhatsApp for immediate assistance.
-                </p>
-              </div>
-            </a>
+          <div>
+            <h2 className="flex items-center gap-2 text-xs font-bold text-xxm-gold-dark tracking-widest uppercase mb-4">
+              Get in touch
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <a
+                href={
+                  env.ADMIN_WHATSAPP_NUMBER
+                    ? `https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I need support with my Xkimm Xa Mali account. Please assist me.')}`
+                    : env.WHATSAPP_GROUP_LINK
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 flex items-start gap-4 hover:border-xxm-gold/30 hover:shadow-xxm transition-all group"
+              >
+                <div className="w-11 h-11 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0 group-hover:bg-xxm-green-100 transition-colors">
+                  <MessageCircle size={19} className="text-xxm-green" aria-hidden />
+                </div>
+                <div>
+                  <p className="font-bold text-xxm-green-900 group-hover:text-xxm-green transition-colors">
+                    Message Admin on WhatsApp
+                  </p>
+                  <p className="text-xs text-xxm-gray-500 mt-0.5 leading-relaxed">
+                    Chat directly with an administrator on WhatsApp for immediate assistance.
+                  </p>
+                </div>
+              </a>
 
-            <a
-              href="mailto:support@xkimmxamali.co.za"
-              className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow group"
-            >
-              <div className="w-10 h-10 rounded-xl bg-xxm-champagne-200 flex items-center justify-center shrink-0">
-                <Mail size={18} className="text-xxm-green-700" aria-hidden />
-              </div>
-              <div>
-                <p className="font-bold text-xxm-green-900 group-hover:text-xxm-green transition-colors">
-                  Email Support
-                </p>
-                <p className="text-xs text-xxm-gray-500 mt-0.5 leading-relaxed">
-                  For non-urgent queries, email us. We respond within 1–2 business days.
-                </p>
-              </div>
-            </a>
+              <a
+                href="mailto:support@xkimmxamali.co.za"
+                className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 flex items-start gap-4 hover:border-xxm-gold/30 hover:shadow-xxm transition-all group"
+              >
+                <div className="w-11 h-11 rounded-xl bg-xxm-champagne-200 flex items-center justify-center shrink-0 group-hover:bg-xxm-champagne-300 transition-colors">
+                  <Mail size={19} className="text-xxm-green-700" aria-hidden />
+                </div>
+                <div>
+                  <p className="font-bold text-xxm-green-900 group-hover:text-xxm-green transition-colors">
+                    Email Support
+                  </p>
+                  <p className="text-xs text-xxm-gray-500 mt-0.5 leading-relaxed">
+                    For non-urgent queries, email us. We respond within 1–2 business days.
+                  </p>
+                </div>
+              </a>
+            </div>
           </div>
 
           {/* FAQs */}
           <div>
             <h2 className="flex items-center gap-2 text-xl font-black text-xxm-green-900 mb-5">
-              <HelpCircle size={20} className="text-xxm-gold" aria-hidden />
+              <span className="inline-flex w-9 h-9 rounded-xl bg-xxm-gold/15 items-center justify-center shrink-0">
+                <HelpCircle size={17} className="text-xxm-gold-dark" aria-hidden />
+              </span>
               Frequently Asked Questions
             </h2>
-            <div className="space-y-4">
-              {faqs.map(({ q, a }) => (
-                <div key={q} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5">
-                  <p className="font-bold text-xxm-green-900 mb-2 text-sm">{q}</p>
-                  <p className="text-sm text-xxm-gray-500 leading-relaxed">{a}</p>
+            <div className="space-y-3">
+              {faqs.map(({ q, a }, i) => (
+                <div
+                  key={q}
+                  className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 hover:border-xxm-gold/20 hover:shadow-xxm transition-all"
+                >
+                  <p className="font-bold text-xxm-green-900 mb-2 text-sm flex items-baseline gap-2.5">
+                    <span className="text-xxm-gold-dark text-xs font-black tabular-nums shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                    {q}
+                  </p>
+                  <p className="text-sm text-xxm-gray-500 leading-relaxed pl-[26px]">{a}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Quick links */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Link href="/about" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
-              <Users size={16} className="text-xxm-gold shrink-0" aria-hidden />
-              <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">About the platform</span>
-            </Link>
-            <Link href="/privacy" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
-              <Shield size={16} className="text-xxm-gold shrink-0" aria-hidden />
-              <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">Privacy Policy</span>
-            </Link>
-            <Link href="/terms" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:shadow-md transition-shadow group">
-              <FileText size={16} className="text-xxm-gold shrink-0" aria-hidden />
-              <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green">Terms of Use</span>
-            </Link>
+          <div>
+            <h2 className="flex items-center gap-2 text-xs font-bold text-xxm-gold-dark tracking-widest uppercase mb-4">
+              More resources
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Link href="/about" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:border-xxm-gold/30 hover:shadow-xxm transition-all group">
+                <span className="inline-flex w-9 h-9 rounded-xl bg-xxm-green-50 items-center justify-center shrink-0">
+                  <Users size={15} className="text-xxm-green" aria-hidden />
+                </span>
+                <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green transition-colors">About the platform</span>
+              </Link>
+              <Link href="/privacy" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:border-xxm-gold/30 hover:shadow-xxm transition-all group">
+                <span className="inline-flex w-9 h-9 rounded-xl bg-xxm-green-50 items-center justify-center shrink-0">
+                  <Shield size={15} className="text-xxm-green" aria-hidden />
+                </span>
+                <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green transition-colors">Privacy Policy</span>
+              </Link>
+              <Link href="/terms" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 flex items-center gap-3 hover:border-xxm-gold/30 hover:shadow-xxm transition-all group">
+                <span className="inline-flex w-9 h-9 rounded-xl bg-xxm-green-50 items-center justify-center shrink-0">
+                  <FileText size={15} className="text-xxm-green" aria-hidden />
+                </span>
+                <span className="text-sm font-medium text-xxm-gray-700 group-hover:text-xxm-green transition-colors">Terms of Use</span>
+              </Link>
+            </div>
           </div>
+        </div>
         </div>
       </main>
 
