@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
+import { ProgressBar } from '@/components/ui/ProgressBar'
+import { ChevronLeft, Target, Trophy, Lock, Clock, TrendingUp } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
 
@@ -15,11 +17,18 @@ type ProgressEntry = {
   recordedAt: Date
 }
 
-const STATUS_CONFIG: Record<GoalStatus, { label: string; barClass: string; badgeClass: string }> = {
-  DRAFT:    { label: 'Draft',    barClass: 'bg-xxm-gray-300',  badgeClass: 'xxm-status-info'    },
-  ACTIVE:   { label: 'Active',   barClass: 'bg-xxm-gold',      badgeClass: 'xxm-status-pending' },
-  ACHIEVED: { label: 'Achieved', barClass: 'bg-xxm-green',     badgeClass: 'xxm-status-success' },
-  FAILED:   { label: 'Failed',   barClass: 'bg-red-500',       badgeClass: 'xxm-status-danger'  },
+const STATUS_CONFIG: Record<GoalStatus, {
+  label: string
+  dot: string
+  badge: string
+  barVariant: 'default' | 'gold' | 'success' | 'danger'
+  iconBg: string
+  iconColor: string
+}> = {
+  DRAFT:    { label: 'Draft',    dot: 'bg-xxm-gray-400',  badge: 'bg-xxm-gray-100 text-xxm-gray-600',    barVariant: 'default', iconBg: 'bg-xxm-gray-100',  iconColor: 'text-xxm-gray-500'  },
+  ACTIVE:   { label: 'Active',   dot: 'bg-xxm-gold',      badge: 'bg-amber-100 text-amber-700',           barVariant: 'gold',    iconBg: 'bg-xxm-gold/12',   iconColor: 'text-xxm-gold-dark' },
+  ACHIEVED: { label: 'Achieved', dot: 'bg-xxm-green',     badge: 'bg-xxm-green-100 text-xxm-green-700',   barVariant: 'success', iconBg: 'bg-xxm-green/10',  iconColor: 'text-xxm-green'     },
+  FAILED:   { label: 'Failed',   dot: 'bg-red-500',       badge: 'bg-red-100 text-red-700',               barVariant: 'danger',  iconBg: 'bg-red-50',         iconColor: 'text-red-500'       },
 }
 
 function formatRelative(date: Date): string {
@@ -71,105 +80,133 @@ export default async function GoalDetailPage({
   const isOverdue = status === 'ACTIVE' && daysLeft < 0
 
   return (
-    <div className="space-y-6">
-      {/* Back link */}
+    <div className="space-y-6 max-w-2xl">
+
+      {/* ── Back link ──────────────────────────────── */}
       <Link
         href="/dashboard/goals"
-        className="text-sm text-xxm-green-700 hover:text-xxm-green-900 underline underline-offset-2"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-xxm-green hover:text-xxm-canopy transition-colors"
       >
-        ← All goals
+        <ChevronLeft size={15} aria-hidden />
+        All goals
       </Link>
 
-      {/* Goal header */}
-      <div className="xxm-card p-6 space-y-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-xxm-green-900">{goal.title}</h1>
-            {goal.description && (
-              <p className="text-sm text-xxm-gray-500 mt-1">{goal.description}</p>
-            )}
+      {/* ── Goal header card ───────────────────────── */}
+      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+
+        {/* Title row */}
+        <div className="flex items-start justify-between gap-4 px-5 py-5 border-b border-xxm-gray-50">
+          <div className="flex items-start gap-4 min-w-0">
+            <div className={`w-11 h-11 rounded-2xl ${cfg.iconBg} flex items-center justify-center shrink-0`}>
+              {status === 'ACHIEVED'
+                ? <Trophy size={20} className={cfg.iconColor} aria-hidden />
+                : <Target  size={20} className={cfg.iconColor} aria-hidden />
+              }
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl font-extrabold text-xxm-green-900 leading-snug">{goal.title}</h1>
+              {goal.description && (
+                <p className="text-sm text-xxm-gray-500 mt-1 leading-relaxed">{goal.description}</p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {goal.lockedAt && (
-              <span className="xxm-status-warning">
-                Locked
-              </span>
+              <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center" title="Locked">
+                <Lock size={11} className="text-amber-600" aria-hidden />
+              </div>
             )}
-            <span className={`status-pill ${cfg.badgeClass}`}>{cfg.label}</span>
+            <span
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.badge}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} aria-hidden />
+              {cfg.label}
+            </span>
           </div>
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Stat label="Raised" value={formatZAR(goal.currentAmount)} />
-          <Stat label="Target" value={formatZAR(goal.targetAmount)} />
-          <Stat label="Remaining" value={formatZAR(remaining)} />
-          <Stat
-            label={isOverdue ? 'Overdue' : 'Days left'}
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-xxm-gray-50">
+          <StatCell label="Raised"   value={formatZAR(goal.currentAmount)} />
+          <StatCell label="Target"   value={formatZAR(goal.targetAmount)} />
+          <StatCell label="Remaining" value={formatZAR(remaining)} />
+          <StatCell
+            label={isOverdue ? 'Overdue by' : 'Days left'}
             value={isOverdue ? `${Math.abs(daysLeft)}d` : daysLeft > 0 ? `${daysLeft}d` : 'Today'}
             highlight={isOverdue}
           />
         </div>
 
-        {/* Progress bar */}
-        <div className="space-y-2">
-          <div className="h-3 rounded-full bg-xxm-green-100 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-700 ${cfg.barClass}`}
-              style={{ width: `${pct}%` }}
-            />
+        {/* Progress bar section */}
+        <div className="px-5 py-5 space-y-3 border-t border-xxm-gray-50">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-bold text-xxm-green-900 text-base tabular-nums">{pct}%</span>
+            <span className="text-xxm-gray-400">of {formatZAR(goal.targetAmount)}</span>
           </div>
-          <div className="flex items-center justify-between text-xs text-xxm-gray-500">
-            <span>{pct}% complete</span>
-            <span>Deadline: {formatDate(goal.deadline)}</span>
+          <ProgressBar value={pct} size="lg" variant={cfg.barVariant} animated={status === 'ACTIVE' && pct < 100} />
+          <div className="flex items-center justify-between text-xs text-xxm-gray-400">
+            <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : ''}`}>
+              <Clock size={11} aria-hidden />
+              {isOverdue ? 'Overdue · ' : 'Deadline · '}
+              {formatDate(goal.deadline)}
+            </span>
+            <span>{formatZAR(goal.currentAmount)} raised</span>
           </div>
         </div>
 
-        {/* Achieved banner */}
+        {/* Status banners */}
         {status === 'ACHIEVED' && (
-          <div className="rounded-lg bg-xxm-green-50 border border-xxm-green/20 px-4 py-3 text-sm text-xxm-green font-medium">
-            This goal has been achieved.
+          <div className="mx-5 mb-5 flex items-center gap-2.5 rounded-2xl bg-xxm-green-50 border border-xxm-green/15 px-4 py-3">
+            <Trophy size={15} className="text-xxm-green shrink-0" aria-hidden />
+            <p className="text-sm font-semibold text-xxm-green-800">Congratulations — this goal has been achieved!</p>
           </div>
         )}
-
-        {/* Failed banner */}
         {status === 'FAILED' && (
-          <div className="rounded-lg bg-xxm-champagne-200 border border-xxm-champagne-400 px-4 py-3 text-sm text-xxm-gray-700 font-medium">
-            This goal was not achieved by the deadline.
+          <div className="mx-5 mb-5 flex items-center gap-2.5 rounded-2xl bg-red-50 border border-red-100 px-4 py-3">
+            <Target size={15} className="text-red-400 shrink-0" aria-hidden />
+            <p className="text-sm font-medium text-red-700">This goal was not achieved by the deadline.</p>
           </div>
         )}
       </div>
 
-      {/* Progress history */}
+      {/* ── Progress history ───────────────────────── */}
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-xxm-gray-500 uppercase tracking-wide">
+        <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">
           Progress history ({goal.progress.length})
         </h2>
 
         {goal.progress.length === 0 ? (
-          <div className="xxm-card p-8 text-center">
-            <p className="text-xxm-gray-400 text-sm">No progress recorded yet.</p>
+          <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-10 text-center">
+            <div className="w-11 h-11 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-3">
+              <TrendingUp size={18} className="text-xxm-green-300" aria-hidden />
+            </div>
+            <p className="text-xxm-gray-400 text-sm font-medium">No progress recorded yet.</p>
           </div>
         ) : (
-          <div className="xxm-card divide-y divide-gray-100">
+          <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden divide-y divide-xxm-gray-50">
             {progressEntries.map((entry, idx) => {
               const runningTotal = progressEntries
                 .slice(idx)
                 .reduce((sum: number, p: ProgressEntry) => sum + Number(p.amount), 0)
 
               return (
-                <div key={entry.id} className="flex items-center justify-between px-5 py-4">
-                  <div>
-                    <p className="text-sm font-medium text-xxm-green-900">
-                      {formatZAR(entry.amount)}
-                    </p>
-                    <p className="text-xs text-xxm-gray-400 mt-0.5">
-                      {formatRelative(entry.recordedAt)}
-                    </p>
+                <div key={entry.id} className="flex items-center justify-between px-5 py-4 hover:bg-xxm-green-50/20 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-lg bg-xxm-green-50 flex items-center justify-center shrink-0">
+                      <TrendingUp size={13} className="text-xxm-green" aria-hidden />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-xxm-green-900 tabular-nums">
+                        {formatZAR(entry.amount)}
+                      </p>
+                      <p className="text-[11px] text-xxm-gray-400 mt-0.5">
+                        {formatRelative(entry.recordedAt)}
+                      </p>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-xxm-gray-400">Cumulative</p>
-                    <p className="text-sm font-semibold text-xxm-green-700">
+                    <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide font-semibold">Cumulative</p>
+                    <p className="text-sm font-bold text-xxm-green-700 tabular-nums">
                       {formatZAR(runningTotal)}
                     </p>
                   </div>
@@ -183,7 +220,7 @@ export default async function GoalDetailPage({
   )
 }
 
-function Stat({
+function StatCell({
   label,
   value,
   highlight = false,
@@ -193,9 +230,9 @@ function Stat({
   highlight?: boolean
 }) {
   return (
-    <div className="xxm-card p-3">
-      <p className="text-xs text-xxm-gray-400 font-medium uppercase tracking-wide">{label}</p>
-      <p className={`text-lg font-bold mt-0.5 ${highlight ? 'xxm-text-danger' : 'text-xxm-green-900'}`}>
+    <div className="px-5 py-4">
+      <p className="text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest mb-1">{label}</p>
+      <p className={`text-lg font-extrabold tabular-nums ${highlight ? 'text-red-600' : 'text-xxm-green-900'}`}>
         {value}
       </p>
     </div>

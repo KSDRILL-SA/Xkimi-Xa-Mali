@@ -4,7 +4,8 @@ import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
 import { MandateCard } from '@/components/mandate/MandateCard'
 import { MandateForm } from '@/components/mandate/MandateForm'
-import { Card } from '@/components/ui/Card'
+import { CreditCard, UserCircle } from 'lucide-react'
+import Link from 'next/link'
 
 export const metadata: Metadata = { title: 'Payment Mandates' }
 
@@ -29,7 +30,6 @@ export default async function MandatesPage() {
     }),
   ])
 
-  // Mask encrypted account numbers before passing to client
   const maskedBankAccounts = bankAccounts.map((a) => ({
     id: a.id,
     bankName: a.bankName,
@@ -55,48 +55,62 @@ export default async function MandatesPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-bold text-xxm-green-900">Payment mandates</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Your DebiCheck debit order mandate with Netcash. Only one active mandate at a time.
-        </p>
+
+      {/* ── Header ─────────────────────────────────── */}
+      <div className="flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-xxm-gold/12 flex items-center justify-center shrink-0">
+          <CreditCard size={22} className="text-xxm-gold-dark" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Payment Mandates</h1>
+          <p className="text-sm text-xxm-gray-500 mt-1">
+            Your DebiCheck debit order mandate with Netcash. Only one active mandate at a time.
+          </p>
+        </div>
       </div>
 
-      {/* Create form — only shown if no active/pending mandate */}
+      {/* ── Create form ────────────────────────────── */}
       {!hasActiveOrPending && (
-        <Card>
-          <div className="p-5">
-            <h2 className="text-base font-semibold text-xxm-green-900 mb-1">Set up a mandate</h2>
-            <p className="text-sm text-gray-400 mb-5">
+        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-xxm-gray-100 bg-xxm-green-50/30">
+            <h2 className="text-base font-bold text-xxm-green-900">Set up a mandate</h2>
+            <p className="text-sm text-xxm-gray-400 mt-0.5">
               Authorise a monthly debit from your bank account.
             </p>
-
+          </div>
+          <div className="p-5">
             {bankAccounts.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-sm text-gray-500 mb-3">
+              <div className="text-center py-8">
+                <div className="w-12 h-12 rounded-2xl bg-xxm-gray-100 flex items-center justify-center mx-auto mb-4">
+                  <UserCircle size={22} className="text-xxm-gray-400" aria-hidden />
+                </div>
+                <p className="text-sm font-semibold text-xxm-gray-600 mb-1">
+                  No bank accounts linked
+                </p>
+                <p className="text-xs text-xxm-gray-400 mb-4 max-w-xs mx-auto">
                   You need to add a bank account before setting up a mandate.
                 </p>
-                <a
+                <Link
                   href="/dashboard/profile"
-                  className="text-sm font-semibold text-xxm-green hover:underline"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-xxm-green text-white text-xs font-semibold hover:bg-xxm-canopy transition-colors"
                 >
                   Go to Profile → Bank accounts
-                </a>
+                </Link>
               </div>
             ) : (
               <MandateForm bankAccounts={maskedBankAccounts} />
             )}
           </div>
-        </Card>
+        </div>
       )}
 
-      {/* Mandate list */}
+      {/* ── Mandate list ───────────────────────────── */}
       {maskedMandates.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">
             {maskedMandates.length === 1 ? 'Your mandate' : 'Mandate history'}
           </h2>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {maskedMandates.map((m) => (
               <MandateCard key={m.id} mandate={m} />
             ))}
@@ -104,9 +118,9 @@ export default async function MandatesPage() {
         </section>
       )}
 
-      {/* Empty state */}
+      {/* ── Empty state ────────────────────────────── */}
       {maskedMandates.length === 0 && bankAccounts.length > 0 && (
-        <p className="text-sm text-gray-400 text-center py-4">
+        <p className="text-sm text-xxm-gray-400 text-center py-6">
           No mandates yet. Complete the form above to get started.
         </p>
       )}
