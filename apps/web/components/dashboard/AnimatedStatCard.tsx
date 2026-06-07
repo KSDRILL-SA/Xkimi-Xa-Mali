@@ -1,10 +1,10 @@
 'use client'
 
 import { useCountUp } from '@/lib/hooks/useCountUp'
-import type { LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 interface AnimatedStatCardProps {
-  icon: LucideIcon
+  icon: ReactNode
   label: string
   value: number
   prefix?: string
@@ -12,12 +12,11 @@ interface AnimatedStatCardProps {
   decimals?: number
   gradient?: string
   iconBg?: string
-  iconColor?: string
   border?: string
 }
 
 export function AnimatedStatCard({
-  icon: Icon,
+  icon,
   label,
   value,
   prefix = '',
@@ -25,7 +24,6 @@ export function AnimatedStatCard({
   decimals = 0,
   gradient = 'from-xxm-green-50 to-white',
   iconBg = 'bg-xxm-green/10',
-  iconColor = 'text-xxm-green',
   border = 'border-xxm-green/15',
 }: AnimatedStatCardProps) {
   const count   = useCountUp(Math.round(value * Math.pow(10, decimals)), 900)
@@ -38,7 +36,7 @@ export function AnimatedStatCard({
       className={`relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-200`}
     >
       <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4`}>
-        <Icon size={18} className={iconColor} aria-hidden />
+        {icon}
       </div>
       <p className="text-2xl font-extrabold text-xxm-green-900 tabular-nums leading-none">
         {prefix}{display}{suffix}
