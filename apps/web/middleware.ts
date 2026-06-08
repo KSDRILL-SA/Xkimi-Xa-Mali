@@ -1,5 +1,6 @@
 import NextAuth from 'next-auth'
 import { authConfig } from '@/lib/auth.config'
+import { verifyCsrfOrigin } from '@/lib/csrf-origin'
 import { NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
 
@@ -38,18 +39,6 @@ async function isRoleVersionStale(userId: string, tokenVersion: number): Promise
     const cached = await getRedis().get<string>(`${ROLE_VERSION_PREFIX}${userId}`)
     if (cached === null) return false
     return Number(cached) > tokenVersion
-  } catch {
-    return false
-  }
-}
-
-function verifyCsrfOrigin(req: { headers: Headers; nextUrl: URL }): boolean {
-  const origin = req.headers.get('origin')
-  if (!origin) return false
-  const allowed = process.env.NEXTAUTH_URL
-  if (!allowed) return false
-  try {
-    return new URL(origin).origin === new URL(allowed).origin
   } catch {
     return false
   }
