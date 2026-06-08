@@ -2,8 +2,7 @@
 
 import { AppHeader } from '@/components/layout/AppHeader'
 import { ScrollNav, type NavItem } from '@/components/layout/ScrollNav'
-import { AppFooter } from '@/components/layout/AppFooter'
-import { ToastProvider } from '@/components/ui'
+import { ToastProvider } from '@/components/ui/Toast'
 import {
   LayoutDashboard,
   Wallet,
@@ -35,8 +34,7 @@ interface MemberAppShellProps {
   userInitials: string
   isAdmin: boolean
   signOutSlot: React.ReactNode
-  whatsappGroupLink: string
-  whatsappGroupName: string
+  footerSlot: React.ReactNode
   adminUrl: string
 }
 
@@ -46,8 +44,7 @@ export function MemberAppShell({
   userInitials,
   isAdmin,
   signOutSlot,
-  whatsappGroupLink,
-  whatsappGroupName,
+  footerSlot,
   adminUrl,
 }: MemberAppShellProps) {
   const nav: NavItem[] = isAdmin
@@ -68,7 +65,7 @@ export function MemberAppShell({
         <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
           {children}
         </main>
-        <AppFooter whatsappGroupLink={whatsappGroupLink} whatsappGroupName={whatsappGroupName} />
+        {footerSlot}
       </div>
     </ToastProvider>
   )

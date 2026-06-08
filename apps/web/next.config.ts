@@ -65,8 +65,12 @@ const sentryOptions = {
 
 let config: NextConfig = nextConfig
 
-// Only wrap with Sentry when DSN is configured
-if (process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN) {
+// Only wrap with Sentry in production when DSN is configured — dev injection
+// loads Replay chunks that crash member-portal hydration in webpack dev mode.
+if (
+  process.env.NODE_ENV === 'production' &&
+  (process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN)
+) {
   config = withSentryConfig(nextConfig, sentryOptions)
 }
 
