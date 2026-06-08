@@ -2,8 +2,6 @@ import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { env } from '@/lib/env'
-import { TopLoader } from '@/components/TopLoader'
-import { PWARegister } from '@/components/PWARegister'
 import './globals.css'
 
 export const viewport: Viewport = {
@@ -37,9 +35,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-dvh bg-xxm-champagne antialiased">
-        <TopLoader />
         {children}
-        <PWARegister />
+        <script src="/nav-progress.js" defer />
+        <script src="/pwa-register.js" defer />
       </body>
     </html>
   )
