@@ -173,6 +173,28 @@ export class AdminConflictError extends ConflictError {
   constructor(message: string) { super(message, 'ADM_002') }
 }
 
+// ─── Community domain ─────────────────────────────────────────────────────────
+
+export class MessageNotFoundError extends NotFoundError {
+  constructor() { super('Message not found', 'MSG_001') }
+}
+
+export class MessageLimitError extends AppError {
+  constructor() { super('Daily message limit reached', 'MSG_002', 429) }
+}
+
+export class MessageEditWindowError extends AppError {
+  constructor() {
+    super('Messages can only be edited or deleted within 5 minutes of posting', 'MSG_003', 403)
+  }
+}
+
+export class MessageDepthError extends AppError {
+  constructor() {
+    super('Cannot reply to a reply — maximum thread depth reached', 'MSG_004', 422)
+  }
+}
+
 // ─── Type guard ───────────────────────────────────────────────────────────────
 
 export function isAppError(err: unknown): err is AppError {

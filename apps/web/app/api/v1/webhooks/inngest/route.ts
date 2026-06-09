@@ -13,6 +13,8 @@ import {
   goalDeadlineChecker,
   mandateStatusSync,
   inviteExpiry,
+  badgeRecalculation,
+  badgeGraceCheck,
 } from '@/inngest'
 
 export const { GET, POST, PUT } = serve({
@@ -30,5 +32,7 @@ export const { GET, POST, PUT } = serve({
     goalDeadlineChecker,
     mandateStatusSync,
     inviteExpiry,
+    badgeRecalculation,
+    badgeGraceCheck,
   ],
 })

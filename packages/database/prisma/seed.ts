@@ -158,6 +158,24 @@ async function main() {
       subject: null,
       body: 'Xkimm Xa Mali: Goal achieved! {{title}} has been reached. Congratulations!',
     },
+    {
+      slug: 'badge-level-up',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Congratulations! You have been promoted to {{tier}} status.',
+    },
+    {
+      slug: 'badge-level-down',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Your badge tier has changed to {{tier}}. Keep contributing on time to climb back up.',
+    },
+    {
+      slug: 'badge-progress-80',
+      channel: 'PUSH',
+      subject: null,
+      body: 'Xkimm Xa Mali: You are {{progress}}% of the way to your next badge tier. Keep it up!',
+    },
     // ── Email templates ──────────────────────────────────────────────────────
     {
       slug: 'welcome',
@@ -206,6 +224,12 @@ async function main() {
       channel: 'EMAIL',
       subject: 'Payment failed — Xkimm Xa Mali',
       body: 'Hi {{firstName}}, your R{{amount}} debit for {{period}} was declined. Log in to resolve: {{url}}',
+    },
+    {
+      slug: 'badge-level-up-email',
+      channel: 'EMAIL',
+      subject: 'You have been promoted — Xkimm Xa Mali',
+      body: 'Hi {{firstName}}, congratulations! Your consistent contributions have earned you {{tier}} status.',
     },
   ]
 
