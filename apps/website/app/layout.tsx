@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
-import NextTopLoader from 'nextjs-toploader'
 import './globals.css'
 
 export const viewport: Viewport = {
@@ -42,8 +41,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-ZA" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body className="min-h-dvh bg-xxm-champagne antialiased selection:bg-xxm-gold/30 selection:text-xxm-green-900">
-        <NextTopLoader color="#D4AF37" height={3} showSpinner={false} />
         {children}
+        <script src="/nav-progress.js" defer />
       </body>
     </html>
   )
