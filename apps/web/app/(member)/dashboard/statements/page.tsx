@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { FileText, Download } from 'lucide-react'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
@@ -31,7 +32,8 @@ const STATUS_CONFIG: Record<ContribStatus, { label: string; dot: string; badge: 
 
 export default async function StatementsPage() {
   const session = await getSession()
-  const userId = session!.user.id
+  if (!session?.user?.id) redirect('/login')
+  const userId = session.user.id
 
   const contributions = await db.contribution.findMany({
     where: { userId },
