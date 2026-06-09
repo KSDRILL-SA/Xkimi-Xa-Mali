@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
@@ -11,7 +12,8 @@ export const metadata: Metadata = { title: 'Payment Mandates' }
 
 export default async function MandatesPage() {
   const session = await getSession()
-  const userId = session!.user.id
+  if (!session?.user?.id) redirect('/login')
+  const userId = session.user.id
 
   const [bankAccounts, mandates] = await Promise.all([
     db.bankAccount.findMany({

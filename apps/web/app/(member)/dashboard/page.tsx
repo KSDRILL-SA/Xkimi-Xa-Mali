@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { getMemberSummary } from '@/services/member.service'
@@ -17,8 +18,9 @@ export const metadata: Metadata = { title: 'Dashboard' }
 
 export default async function DashboardPage() {
   const session = await getSession()
-  const userId  = session!.user.id
-  const roles   = session!.user.roles ?? []
+  if (!session?.user?.id) redirect('/login')
+  const userId  = session.user.id
+  const roles   = session.user.roles ?? []
 
   const currentYear = new Date().getFullYear()
 
@@ -39,7 +41,7 @@ export default async function DashboardPage() {
     }),
   ])
 
-  const firstName = session!.user.name?.split(' ')[0] ?? 'Member'
+  const firstName = session.user.name?.split(' ')[0] ?? 'Member'
   const hasOpenContrib = recentContributions.some((c: RecentContrib) =>
     ['PENDING', 'PARTIAL', 'OVERDUE'].includes(c.status),
   )
