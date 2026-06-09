@@ -5,7 +5,8 @@ export const env = createEnv({
   emptyStringAsUndefined: true,
   server: {
     DATABASE_URL: z.string().url(),
-    NEXTAUTH_SECRET: z.string().min(32),
+    // Resolved from AUTH_SECRET (v5 standard) or NEXTAUTH_SECRET (v4 compat) — one must be set.
+    AUTH_SECRET: z.string().min(32),
     NEXTAUTH_URL: z.string().url().optional(),
     FOUNDER_EMAIL: z.string().email().optional(),
     ENCRYPTION_KEY: z.string().length(64),
@@ -42,7 +43,7 @@ export const env = createEnv({
   },
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
-    NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    AUTH_SECRET: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     FOUNDER_EMAIL: process.env.FOUNDER_EMAIL,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
