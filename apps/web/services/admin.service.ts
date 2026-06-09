@@ -378,17 +378,14 @@ export async function broadcastNotification(
     select: { id: true, email: true, phone: true, firstName: true },
   })
 
-  let smsSent = 0
-  let emailSent = 0
-  let failed = 0
-
-  for (const m of members) {
+  const sends = members.map(async (m) => {
+    const counts = { sms: 0, email: 0, failed: false }
     try {
       if ((channel === 'SMS' || channel === 'BOTH') && m.phone) {
         const phone = smsProvider.normalisePhone(m.phone)
         if (phone) {
           await smsProvider.send({ to: phone, body: message })
-          smsSent++
+          counts.sms++
         }
       }
       if ((channel === 'EMAIL' || channel === 'BOTH') && m.email) {
@@ -397,12 +394,18 @@ export async function broadcastNotification(
           'Message from Xkimm Xa Mali',
           `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;"><p style="color:#374151;margin-bottom:24px;">Hi ${m.firstName},</p><p style="color:#374151;margin-bottom:24px;white-space:pre-wrap;">${message}</p><p style="color:#9CA3AF;font-size:12px;">Xkimm Xa Mali · "Blessed is the hand that giveth."</p></div>`,
         )
-        emailSent++
+        counts.email++
       }
     } catch {
-      failed++
+      counts.failed = true
     }
-  }
+    return counts
+  })
+
+  const results = await Promise.all(sends)
+  const smsSent   = results.reduce((n, r) => n + r.sms, 0)
+  const emailSent = results.reduce((n, r) => n + r.email, 0)
+  const failed    = results.filter((r) => r.failed).length
 
   await writeAuditLog({
     userId: adminId,
