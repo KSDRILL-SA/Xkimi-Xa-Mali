@@ -1,6 +1,8 @@
 export { auditRepo } from './audit.repository'
 export { authTokenRepo } from './auth-token.repository'
+export { badgeRepo } from './badge.repository'
 export { bankAccountRepo } from './bank-account.repository'
+export { communityRepo } from './community.repository'
 export { contributionRepo } from './contribution.repository'
 export { goalRepo } from './goal.repository'
 export { invitationRepo } from './invitation.repository'
