@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { RegisterStep2Schema, type RegisterStep2Input } from '@/lib/validation/auth'
+import { api, ApiClientError } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormGroup } from '@/components/ui/FormGroup'
@@ -42,21 +43,14 @@ export function RegisterForm() {
     const formatted = urlCode.trim().toUpperCase()
     setInviteCode(formatted)
     setLoading(true)
-    fetch('/api/v1/auth/invitations/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: formatted }),
-    })
-      .then((r) => r.json())
-      .then((json) => {
-        if (json.data) {
-          setPrefilled(json.data)
-          setStep(2)
-        } else {
-          setError(json.error?.message ?? 'This invite link is invalid or has expired.')
-        }
+    api.post<PrefilledData>('/api/v1/auth/invitations/validate', { code: formatted })
+      .then((data) => {
+        setPrefilled(data)
+        setStep(2)
       })
-      .catch(() => setError('Could not validate invite code. Please try again.'))
+      .catch((err: unknown) => {
+        setError(err instanceof ApiClientError ? err.message : 'This invite link is invalid or has expired.')
+      })
       .finally(() => setLoading(false))
   // Only run once on mount
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,22 +63,17 @@ export function RegisterForm() {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/v1/auth/invitations/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: inviteCode.trim().toUpperCase() }),
-    })
-
-    const json = await res.json()
-    setLoading(false)
-
-    if (!res.ok) {
-      setError(json.error?.message ?? 'Invalid invite code. Please check and try again.')
-      return
+    try {
+      const data = await api.post<PrefilledData>('/api/v1/auth/invitations/validate', {
+        code: inviteCode.trim().toUpperCase(),
+      })
+      setPrefilled(data)
+      setStep(2)
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Invalid invite code. Please check and try again.')
+    } finally {
+      setLoading(false)
     }
-
-    setPrefilled(json.data)
-    setStep(2)
   }
 
   // ─── Step 2 — complete registration ────────────────────────────────────────
@@ -93,10 +82,8 @@ export function RegisterForm() {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/v1/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await api.post('/api/v1/auth/register', {
         inviteCode:     inviteCode.trim().toUpperCase(),
         email:          prefilled?.email ?? '',
         phone:          prefilled?.phone ?? '',
@@ -105,18 +92,13 @@ export function RegisterForm() {
         idNumber:       data.idNumber || undefined,
         password:       data.password,
         consentToPopia: true,
-      }),
-    })
-
-    const json = await res.json()
-    setLoading(false)
-
-    if (!res.ok) {
-      setError(json.error?.message ?? 'Registration failed. Please try again.')
-      return
+      })
+      setSuccess(true)
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Registration failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
-
-    setSuccess(true)
   }
 
   // ─── Success screen ─────────────────────────────────────────────────────────
