@@ -1,9 +1,16 @@
 import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
-import { NavigationProgress } from '@/components/NavigationProgress'
+import dynamic from 'next/dynamic'
 import { env } from '@/lib/env'
 import './globals.css'
+
+// Client-only: loads after hydration so the module factory is never
+// executed during the synchronous SSR/hydration pass.
+const NavigationProgress = dynamic(
+  () => import('@/components/NavigationProgress').then(m => m.NavigationProgress),
+  { ssr: false },
+)
 
 export const viewport: Viewport = {
   themeColor: '#1B4332',
