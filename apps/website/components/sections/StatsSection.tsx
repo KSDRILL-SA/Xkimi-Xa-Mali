@@ -9,6 +9,7 @@ export async function StatsSection() {
   try {
     const res = await fetch(`${webUrl}/api/v1/stats/public`, {
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(2000),
     })
     if (res.ok) {
       const json = await res.json()
