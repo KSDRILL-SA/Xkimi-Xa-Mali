@@ -1,0 +1,1113 @@
+my prompt and raw/plain ideas💡 :
+
+so now here are the updates that I said I had earlier on so let's discuss them and plan them then put them and detail them to join the v2 scope coz now v1 is done so thes one are joining the existing v2 scope so now let's design then and Architect them in the highest level as the top notch senior engineering mode and aura level ,so here we go master chef:There should be a min or ammeture ,mid-level or semi pro,and pro,and world class level badges for each user ,where I must not be easy to reach or move from one level to another but it should take consistency in the amount of contribution and how well u respect to contribute in time and how u never pass the due dat and may more like u will add how all should be done and use all the best practices to make this interesting amd also that these badges should also show a loading percentages on it of how far are u from completing the current badge level and move to the next level on each user account ..then there must be a dashboard that has all the members in the system and show all the history how everything is going in the system and what level each users have but restricted only in showing the level only and badge without the percentages ,then this dashboard should be whee all can even type massages and discussions but it should be limited to 10 massages per day for each user and many more that u think this page should have
+
+and see where in the backend, frontend, database and etc we would need to integrate and change and improve for this to be fully connected and integrated overall and not break any existing structure, code,logic and overall
+
+
+Another thing is that there must be a feature of a user budget where the user should specify from the min which is r1o to any amount in the middle as the max until our r10000 max of the system, in order when they try to contribute much more that their budget the system should restrict It and say this is above ur monthly,yearly,custom budeget it can leave u financially stable ,if u insist to go beyond your monthly budget I wish u have valid reason ,click proceed or go back and change,reduce the amount u wanna contribute and etc ,so u should consider all the edge cases and improvements and recommendations and suggestions that I may have missed and all that and see where in the backend, frontend, database and etc we would need to integrate and change and improve for this to be fully connected and integrated overall and not break any existing structure, code,logic and overall
+
+Another thing is that every payment receipt any download able statement and any relevant document download able from the system should have an admin signature ,meaning in the admin account in the setting or update any details there should be a signature that an admin can sign there as mandatory and then it be ready and distributed all over and it can only be sign or updated in 3 months if the admin wish to change or update their signature ,so in terms of how hey sign it there should be like an input where they can use those word documents like pens or whitedashboard pen and a plain clean input where they sign their signature there they they submit it
+
+
+
+modified ideas and broken down fully:
+
+Three features. Full V2 design. No shortcuts.
+
+---
+
+## V2 Feature Design — Xkimm Xa Mali
+
+These three features are purely additive. No existing model is altered. No existing service logic is touched. Every integration point is a new call appended to an existing flow.
+
+---
+
+## Feature 1 — Progressive Badge System + Community Board
+
+### Domain Model
+
+The badge system is a multi-dimensional reputation engine. A single overall score is derived from four independent dimensions. Each dimension measures a different aspect of financial discipline.
+
+```
+Overall Score = (Consistency × 0.40) + (Timeliness × 0.35) + (Generosity × 0.15) + (Streak × 0.10)
+```
+
+**Consistency Score (40% weight)**
+Measures how reliably a member contributes every month since joining.
+
+```
+consistencyScore = (totalPaidMonths / monthsActive) × 100
+```
+
+If a member joined 12 months ago and paid 10 of those months: `10/12 × 100 = 83.33`
+
+**Timeliness Score (35% weight)**
+Measures how often they pay before or on the due date.
+
+```
+timelinessScore = (onTimeMonths / totalPaidMonths) × 100
+```
+
+`On time` = contribution paid before or on the deduction day of that month.
+`Late` = paid after deduction day but before month end.
+`Overdue` = not paid by month end.
+
+**Generosity Score (15% weight)**
+Measures how much above the R100 minimum a member contributes on average.
+
+```
+generosityScore = min(((avgContributionAmount − 100) / 100) × 50, 100)
+```
+
+Paying exactly R100 → 0. Paying R200 → 50. Paying R300+ → 100. The score is zero at the floor. This means you cannot reach certain tiers without contributing above minimum.
+
+**Streak Bonus (10% weight)**
+Rewards unbroken consecutive on-time months.
+
+```
+streakBonus = min((currentStreak / 12) × 100, 100)
+```
+
+A 12-month unbroken streak gives full streak bonus. Breaks reset to zero.
+
+---
+
+### Tier Qualification Requirements
+
+Each tier has two gates: a minimum score AND hard conditions that cannot be compensated by score alone.
+
+```
+AMATEUR (default)
+  Entry:    Automatic on account activation
+  Gates:    None
+  Exit:     After 3 months + meets SEMI_PRO requirements
+
+SEMI_PRO
+  Entry:    monthsActive >= 3
+            overallScore >= 45
+            consistencyScore >= 70
+  Gates:    None additional
+  Exit:     After 6 months + meets PRO requirements
+
+PRO
+  Entry:    monthsActive >= 6
+            overallScore >= 65
+            consistencyScore >= 85
+            timelinessScore >= 80
+            overdueInLast6Months == 0     ← no overdue in past 6 months
+  Gates:    Single overdue in last 6 months disqualifies regardless of score
+  Exit:     After 12 months + meets WORLD_CLASS requirements
+
+WORLD_CLASS
+  Entry:    monthsActive >= 12
+            overallScore >= 82
+            consistencyScore >= 95        ← near-perfect consistency
+            timelinessScore >= 90
+            totalOverdue == 0             ← never been overdue, not ever
+            currentStreak >= 6            ← active 6-month on-time streak
+  Gates:    A single lifetime overdue permanently disqualifies until score
+            recovers AND the overdue is > 12 months in the past
+```
+
+**Downgrade mechanics:**
+If a member's score drops below their current tier's entry threshold, they enter a 60-day grace period. If they haven't recovered by day 60, they are downgraded. This prevents a single bad month from causing an instant demotion.
+
+**Progress bar calculation:**
+The progress percentage toward the next tier is the average fulfillment of every requirement for that tier.
+
+```
+For SEMI_PRO progress, requirements are:
+  - monthsActive >= 3    →  min(monthsActive / 3, 1) × 100
+  - overallScore >= 45   →  min(overallScore / 45, 1) × 100
+  - consistencyScore >= 70 → min(consistencyScore / 70, 1) × 100
+
+progressToNext = average of all three fulfillment percentages
+```
+
+---
+
+### Database Schema — New Models
+
+```prisma
+// packages/database/prisma/schema.prisma — ADDITIVE ONLY
+
+model BadgeScore {
+  id                  String     @id @default(cuid())
+  userId              String     @unique
+  currentBadge        BadgeTier  @default(AMATEUR)
+  overallScore        Decimal    @db.Decimal(6, 3)
+  consistencyScore    Decimal    @db.Decimal(6, 3)
+  timelinessScore     Decimal    @db.Decimal(6, 3)
+  generosityScore     Decimal    @db.Decimal(6, 3)
+  streakBonus         Decimal    @db.Decimal(6, 3)
+  progressToNext      Decimal    @db.Decimal(6, 3)   // % toward next tier
+  currentStreak       Int        @default(0)
+  longestStreak       Int        @default(0)
+  totalPaidMonths     Int        @default(0)
+  totalOnTimeMonths   Int        @default(0)
+  totalOverdue        Int        @default(0)
+  overdueInLast6      Int        @default(0)          // recalculated monthly
+  monthsActive        Int        @default(0)
+  avgContribution     Decimal    @db.Decimal(10, 2)   @default(0)
+  graceUntil          DateTime?                       // downgrade grace deadline
+  lastCalculatedAt    DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  user                User       @relation(fields: [userId], references: [id], onDelete: CASCADE)
+
+  @@index([currentBadge])
+  @@index([overallScore])
+}
+
+model BadgeHistory {
+  id          String     @id @default(cuid())
+  userId      String
+  fromBadge   BadgeTier?
+  toBadge     BadgeTier
+  trigger     String     // "monthly_recalc" | "contribution_paid" | "grace_expired"
+  score       Decimal    @db.Decimal(6, 3)
+  createdAt   DateTime   @default(now())
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: CASCADE)
+
+  @@index([userId, createdAt])
+}
+
+enum BadgeTier {
+  AMATEUR
+  SEMI_PRO
+  PRO
+  WORLD_CLASS
+}
+
+model CommunityMessage {
+  id            String             @id @default(cuid())
+  userId        String
+  content       String             @db.VarChar(500)
+  replyToId     String?
+  isPinned      Boolean            @default(false)    // admin only
+  isDeleted     Boolean            @default(false)
+  deletedById   String?
+  deletedAt     DateTime?
+  editableUntil DateTime           // createdAt + 5 minutes
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  user          User               @relation("MessageAuthor", fields: [userId], references: [id], onDelete: RESTRICT)
+  deletedBy     User?              @relation("MessageDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
+  replyTo       CommunityMessage?  @relation("Replies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies       CommunityMessage[] @relation("Replies")
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([isPinned])
+}
+```
+
+---
+
+### New Migration
+
+```sql
+-- migration: 20260601000001_badge_system_and_community
+
+CREATE TABLE "badge_scores" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "user_id" TEXT NOT NULL UNIQUE,
+  "current_badge" TEXT NOT NULL DEFAULT 'AMATEUR',
+  "overall_score" DECIMAL(6,3) NOT NULL DEFAULT 0,
+  "consistency_score" DECIMAL(6,3) NOT NULL DEFAULT 0,
+  "timeliness_score" DECIMAL(6,3) NOT NULL DEFAULT 0,
+  "generosity_score" DECIMAL(6,3) NOT NULL DEFAULT 0,
+  "streak_bonus" DECIMAL(6,3) NOT NULL DEFAULT 0,
+  "progress_to_next" DECIMAL(6,3) NOT NULL DEFAULT 0,
+  "current_streak" INT NOT NULL DEFAULT 0,
+  "longest_streak" INT NOT NULL DEFAULT 0,
+  "total_paid_months" INT NOT NULL DEFAULT 0,
+  "total_on_time_months" INT NOT NULL DEFAULT 0,
+  "total_overdue" INT NOT NULL DEFAULT 0,
+  "overdue_in_last_6" INT NOT NULL DEFAULT 0,
+  "months_active" INT NOT NULL DEFAULT 0,
+  "avg_contribution" DECIMAL(10,2) NOT NULL DEFAULT 0,
+  "grace_until" TIMESTAMPTZ,
+  "last_calculated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "fk_badge_user" FOREIGN KEY ("user_id")
+    REFERENCES "users"("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_badge_tier" CHECK (
+    "current_badge" IN ('AMATEUR','SEMI_PRO','PRO','WORLD_CLASS')
+  ),
+  CONSTRAINT "chk_score_range" CHECK (
+    "overall_score" BETWEEN 0 AND 100
+  )
+);
+
+CREATE TABLE "badge_history" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "user_id" TEXT NOT NULL,
+  "from_badge" TEXT,
+  "to_badge" TEXT NOT NULL,
+  "trigger" TEXT NOT NULL,
+  "score" DECIMAL(6,3) NOT NULL,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "fk_badge_history_user" FOREIGN KEY ("user_id")
+    REFERENCES "users"("id") ON DELETE CASCADE
+);
+CREATE INDEX "idx_badge_history_user" ON "badge_history"("user_id","created_at");
+
+CREATE TABLE "community_messages" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "user_id" TEXT NOT NULL,
+  "content" VARCHAR(500) NOT NULL,
+  "reply_to_id" TEXT,
+  "is_pinned" BOOLEAN NOT NULL DEFAULT FALSE,
+  "is_deleted" BOOLEAN NOT NULL DEFAULT FALSE,
+  "deleted_by_id" TEXT,
+  "deleted_at" TIMESTAMPTZ,
+  "editable_until" TIMESTAMPTZ NOT NULL,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "fk_msg_user" FOREIGN KEY ("user_id")
+    REFERENCES "users"("id") ON DELETE RESTRICT,
+  CONSTRAINT "fk_msg_reply" FOREIGN KEY ("reply_to_id")
+    REFERENCES "community_messages"("id") ON DELETE SET NULL,
+  CONSTRAINT "fk_msg_deleter" FOREIGN KEY ("deleted_by_id")
+    REFERENCES "users"("id") ON DELETE SET NULL,
+  CONSTRAINT "chk_reply_depth" CHECK (
+    "reply_to_id" IS NULL OR
+    NOT EXISTS (
+      SELECT 1 FROM "community_messages" p
+      WHERE p."id" = "reply_to_id" AND p."reply_to_id" IS NOT NULL
+    )
+  )  -- max 2 levels deep enforced at DB level
+);
+CREATE INDEX "idx_community_msg_created" ON "community_messages"("created_at" DESC);
+CREATE INDEX "idx_community_msg_user" ON "community_messages"("user_id","created_at");
+CREATE INDEX "idx_community_msg_pinned" ON "community_messages"("is_pinned") WHERE "is_pinned" = TRUE;
+
+-- Seed initial BadgeScore for all existing active users
+INSERT INTO "badge_scores" ("id","user_id","last_calculated_at","updated_at")
+SELECT gen_random_uuid(), "id", NOW(), NOW()
+FROM "users" WHERE "status" = 'ACTIVE'
+ON CONFLICT ("user_id") DO NOTHING;
+```
+
+---
+
+### New Services
+
+**`apps/web/services/badge.service.ts`**
+
+```typescript
+// Responsibilities:
+//   - calculateBadgeScore(userId) → computes all dimensions from contribution history
+//   - determineTier(score, conditions) → applies tier qualification rules
+//   - recalculateAll() → called by Inngest monthly job
+//   - getMyBadge(userId) → returns full score + progress (own data only)
+//   - getCommunityBadges() → returns all members with tier only (no scores)
+//   - checkGraceExpiry() → called daily, demotes users past grace period
+
+// calculateBadgeScore pulls from contributionRepo.findAll(userId)
+// No business logic in the repository — all tier logic lives here
+```
+
+**`apps/web/services/community.service.ts`**
+
+```typescript
+// Responsibilities:
+//   - getMessages(page, limit) → paginated messages with author badge
+//   - postMessage(userId, content, replyToId?) → rate-checked post
+//   - deleteMessage(userId, messageId, roles) → soft delete with permission check
+//   - checkDailyLimit(userId) → Redis check before allowing post
+//   - pinMessage(messageId) → admin only
+
+// Daily limit check:
+//   Redis key: xxm:community:daily:{userId}:{YYYY-MM-DD}
+//   TTL: seconds until midnight SAST
+//   On post: INCR + check <= 10
+//   If > 10: throw RateLimitError('MSG_001', 'Daily message limit reached')
+```
+
+---
+
+### New Repositories
+
+```typescript
+// apps/web/repositories/badge.repository.ts
+export const badgeRepo = {
+  findByUser:     (userId) => db.badgeScore.findUnique({ where: { userId } }),
+  upsert:         (userId, data) => db.badgeScore.upsert({ where: { userId }, create: { userId, ...data }, update: data }),
+  findAllForCommunity: () => db.badgeScore.findMany({ select: { userId: true, currentBadge: true } }),
+  findAllWithScores:   () => db.badgeScore.findMany(),  // admin only
+  createHistoryEntry:  (data) => db.badgeHistory.create({ data }),
+  findUsersInGrace:    () => db.badgeScore.findMany({ where: { graceUntil: { lte: new Date() } } }),
+}
+
+// apps/web/repositories/community.repository.ts
+export const communityRepo = {
+  findMessages:   (page, limit) => db.communityMessage.findMany({
+    where: { isDeleted: false, replyToId: null },
+    include: { user: { select: { id, firstName, badgeScore: { select: { currentBadge } } } }, replies: {...} },
+    orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
+    skip: (page-1)*limit, take: limit,
+  }),
+  create:         (data) => db.communityMessage.create({ data }),
+  softDelete:     (id, deletedById) => db.communityMessage.update({
+    where: { id },
+    data: { isDeleted: true, deletedById, deletedAt: new Date() },
+  }),
+  countByUserToday: (userId, from, to) => db.communityMessage.count({
+    where: { userId, createdAt: { gte: from, lte: to }, isDeleted: false },
+  }),
+}
+```
+
+---
+
+### New Inngest Jobs
+
+**`badge-recalculation.job.ts`**
+Cron: `0 2 1 * *` (01:00 UTC = 03:00 SAST, 1st of each month, after rollover)
+Also triggered by event `xxm/contribution.status.changed` when status is PAID or OVERDUE.
+
+```typescript
+// Flow:
+// 1. Get all active members
+// 2. For each member, call badge.service.calculateBadgeScore(userId)
+// 3. Determine if tier changed
+// 4. If promoted: createHistoryEntry, send badge-level-up notification
+// 5. If score dropped below tier threshold: set graceUntil = now + 60 days
+// 6. If grace expired: demote, send badge-level-down notification
+```
+
+**`badge-grace-check.job.ts`**
+Cron: `0 3 * * *` (03:00 UTC = 05:00 SAST, daily)
+Finds all users with `graceUntil <= now()` and executes demotion.
+
+---
+
+### New API Routes
+
+```
+GET    /api/v1/badges/me                Member's own full badge + progress breakdown
+GET    /api/v1/community/members        All member names + badge tier (no scores, no percentages)
+GET    /api/v1/community/messages       Paginated community board messages
+POST   /api/v1/community/messages       Post new message (rate-limited)
+DELETE /api/v1/community/messages/[id]  Soft delete (own within 5min, admin any time)
+
+GET    /api/v1/admin/badges             All members with full scores + progress (admin only)
+PATCH  /api/v1/admin/community/messages/[id]/pin   Pin/unpin message (admin only)
+```
+
+---
+
+### New Pages
+
+```
+apps/web/app/(member)/dashboard/community/page.tsx
+  Server: getMessages(page) + getCommunityMembers()
+  Client:
+    - MemberBadgeList (name, badge icon, tier label — no scores)
+    - MessageBoard (post form, message list, reply threads)
+    - PostForm → POST /api/v1/community/messages
+    - DeleteButton → DELETE /api/v1/community/messages/[id]
+    - DailyLimitIndicator (X/10 messages today)
+
+apps/web/app/(member)/dashboard/badges/page.tsx
+  (or integrated into profile — your call)
+  Server: getMyBadge(userId)
+  Client:
+    - BadgeTierCard (current badge, animated icon)
+    - ProgressRing (% to next tier)
+    - DimensionBreakdown (consistency %, timeliness %, streak, generosity)
+    - BadgeHistory (tier change timeline)
+    - NextTierRequirements (what you still need to reach next tier)
+
+apps/admin/app/(dashboard)/badges/page.tsx
+  Server: getAllBadgesWithScores()
+  Client:
+    - AdminBadgeTable (all members, full scores, tier, progress)
+    - Filter by tier
+    - Sort by score
+```
+
+### Integration Points — Existing Code
+
+No existing code changes. Only additive hooks:
+
+```typescript
+// contribution.service.ts — after marking contribution PAID or OVERDUE
+// Add at the end of the webhook handler:
+await inngest.send({ name: 'xxm/contribution.status.changed', data: { userId, status } })
+
+// notification.service.ts seed additions:
+'badge-level-up'        channel: SMS + EMAIL
+'badge-level-down'      channel: SMS
+'badge-progress-80'     channel: IN_APP only
+```
+
+---
+
+## Feature 2 — Budget Guard System
+
+### Domain Model
+
+A budget is a personal ceiling. The system never blocks the mandatory minimum (R100/month) from being processed. It only guards against voluntary over-contribution beyond what the member themselves declared as their limit. The guard is soft — the member can override it with acknowledgement.
+
+**Budget types:**
+
+```
+MONTHLY:  Total contribution cap per calendar month
+YEARLY:   Total contribution cap per rolling 12-month window
+CUSTOM:   Cap over a user-defined date range
+```
+
+**Constraint rules:**
+- Budget amount must be ≥ R100 (the system minimum). Setting a budget below R100 would mathematically block all contributions, which is invalid.
+- Budget amount ceiling: R10,000 per the system limit.
+- A MONTHLY budget applies per calendar month regardless of when it was set.
+- Changing a budget takes effect from the next period start. The current period keeps the old budget.
+- One active budget per type per user. Setting a new MONTHLY budget replaces the previous one (deactivates it, not deletes).
+
+---
+
+### Database Schema — New Models
+
+```prisma
+model UserBudget {
+  id          String     @id @default(cuid())
+  userId      String
+  type        BudgetType
+  amount      Decimal    @db.Decimal(10, 2)
+  startDate   DateTime
+  endDate     DateTime?                     // null = rolling (no end)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: CASCADE)
+  overrides   BudgetOverride[]
+
+  @@unique([userId, type, isActive])        // one active budget per type per user
+  @@index([userId, type, isActive])
+}
+
+model BudgetOverride {
+  id              String    @id @default(cuid())
+  budgetId        String
+  userId          String
+  contributionId  String?                   // linked to the contribution that triggered it
+  attemptedAmount Decimal   @db.Decimal(10, 2)
+  budgetAmount    Decimal   @db.Decimal(10, 2)
+  overageAmount   Decimal   @db.Decimal(10, 2)
+  reason          String?                   // user-typed reason (optional)
+  createdAt       DateTime  @default(now())
+
+  budget          UserBudget @relation(fields: [budgetId], references: [id], onDelete: RESTRICT)
+  user            User      @relation(fields: [userId], references: [id], onDelete: CASCADE)
+
+  @@index([userId, createdAt])
+}
+
+enum BudgetType {
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+```
+
+---
+
+### New Migration
+
+```sql
+-- migration: 20260601000002_budget_guard
+
+CREATE TABLE "user_budgets" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "user_id" TEXT NOT NULL,
+  "type" TEXT NOT NULL,
+  "amount" DECIMAL(10,2) NOT NULL,
+  "start_date" TIMESTAMPTZ NOT NULL,
+  "end_date" TIMESTAMPTZ,
+  "is_active" BOOLEAN NOT NULL DEFAULT TRUE,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "fk_budget_user" FOREIGN KEY ("user_id")
+    REFERENCES "users"("id") ON DELETE CASCADE,
+  CONSTRAINT "chk_budget_type" CHECK ("type" IN ('MONTHLY','YEARLY','CUSTOM')),
+  CONSTRAINT "chk_budget_amount" CHECK (
+    "amount" >= 100 AND "amount" <= 10000
+  ),
+  CONSTRAINT "chk_budget_dates" CHECK (
+    "end_date" IS NULL OR "end_date" > "start_date"
+  )
+);
+CREATE UNIQUE INDEX "uq_active_budget_per_type"
+  ON "user_budgets"("user_id","type")
+  WHERE "is_active" = TRUE;
+
+CREATE TABLE "budget_overrides" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "budget_id" TEXT NOT NULL,
+  "user_id" TEXT NOT NULL,
+  "contribution_id" TEXT,
+  "attempted_amount" DECIMAL(10,2) NOT NULL,
+  "budget_amount" DECIMAL(10,2) NOT NULL,
+  "overage_amount" DECIMAL(10,2) NOT NULL,
+  "reason" TEXT,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "fk_override_budget" FOREIGN KEY ("budget_id")
+    REFERENCES "user_budgets"("id") ON DELETE RESTRICT,
+  CONSTRAINT "fk_override_user" FOREIGN KEY ("user_id")
+    REFERENCES "users"("id") ON DELETE CASCADE
+);
+CREATE INDEX "idx_budget_overrides_user" ON "budget_overrides"("user_id","created_at");
+```
+
+---
+
+### New Service
+
+**`apps/web/services/budget.service.ts`**
+
+```typescript
+// Core check function — called before every manual payment
+async function checkBudget(userId, amount, type = 'MONTHLY'): Promise<BudgetCheckResult> {
+  const budget = await budgetRepo.findActiveByType(userId, type)
+  if (!budget) return { status: 'NO_BUDGET' }        // no budget set, allow freely
+
+  const alreadyContributed = await contributionRepo.sumPaidInPeriod(userId, budget)
+  const remaining = budget.amount - alreadyContributed
+  const wouldTotal = alreadyContributed + amount
+
+  if (wouldTotal <= budget.amount) {
+    return { status: 'WITHIN_BUDGET', remaining, wouldTotal }
+  }
+
+  return {
+    status: 'OVER_BUDGET',
+    budget: budget.amount,
+    alreadyContributed,
+    remaining,
+    wouldTotal,
+    overage: wouldTotal - budget.amount,
+  }
+}
+
+// Override — called when user clicks "Proceed Anyway"
+async function recordBudgetOverride(userId, budgetId, contributionId, amounts, reason?)
+  // Creates BudgetOverride record
+  // Writes AuditLog entry
+  // Does NOT block the payment
+
+// Mandate creation guard — warn if mandate amount > budget
+async function checkMandateAgainstBudget(userId, mandateAmount)
+  // Returns a warning (not a block) if monthly mandate > monthly budget
+  // e.g. mandate R200, monthly budget R150 → warn the user at mandate setup time
+```
+
+---
+
+### New Repository
+
+```typescript
+// apps/web/repositories/budget.repository.ts
+export const budgetRepo = {
+  findActiveByType:    (userId, type) => db.userBudget.findFirst({ where: { userId, type, isActive: true } }),
+  findAllByUser:       (userId) => db.userBudget.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+  create:              (data) => db.userBudget.create({ data }),
+  deactivate:          (id) => db.userBudget.update({ where: { id }, data: { isActive: false } }),
+  createOverride:      (data) => db.budgetOverride.create({ data }),
+  findOverridesByUser: (userId) => db.budgetOverride.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+}
+```
+
+---
+
+### Integration — Existing Contribution Service
+
+Only one integration point. Add the budget check inside `contribution.service.ts` at the `initiateManualPayment` function entry, before any payment logic:
+
+```typescript
+// contribution.service.ts — initiateManualPayment()
+// Add BEFORE the existing Netcash call:
+
+const budgetCheck = await budgetService.checkBudget(userId, data.amount)
+
+if (budgetCheck.status === 'OVER_BUDGET' && !data.budgetOverrideConfirmed) {
+  throw new BudgetExceededError({
+    budget: budgetCheck.budget,
+    alreadyContributed: budgetCheck.alreadyContributed,
+    remaining: budgetCheck.remaining,
+    overage: budgetCheck.overage,
+  })
+}
+
+if (budgetCheck.status === 'OVER_BUDGET' && data.budgetOverrideConfirmed) {
+  await budgetService.recordBudgetOverride(userId, data.reason)
+}
+
+// ... rest of existing payment logic unchanged
+```
+
+The `BudgetExceededError` is caught by `withApiHandler` and returns HTTP 422 with structured data. The frontend reads this specific error code and shows the `BudgetGuardModal` instead of a generic error.
+
+For the **automatic debit run** (Inngest job): no block. The debit runs as normal. After a successful debit that exceeds the budget, queue a notification:
+
+```typescript
+// debit-run.ts — after contribution marked PAID
+// Add:
+const budgetCheck = await budgetService.checkBudget(userId, amount)
+if (budgetCheck.status === 'OVER_BUDGET') {
+  await notificationService.queue(userId, 'budget-auto-exceeded', { amount, budget: budgetCheck.budget })
+}
+```
+
+The commitment (debit order) was made by the member. The system honours it. But it informs them.
+
+---
+
+### New API Routes
+
+```
+GET    /api/v1/budgets/me                Own budgets (all types)
+POST   /api/v1/budgets/me               Create new budget for a type
+PATCH  /api/v1/budgets/me/[type]        Update budget amount (takes effect next period)
+DELETE /api/v1/budgets/me/[type]        Deactivate budget (removes guard)
+GET    /api/v1/budgets/me/overrides     Own override history
+GET    /api/v1/admin/budgets            All member budgets + override counts (admin)
+```
+
+The `POST /api/v1/contributions/pay` route body gains two optional fields:
+
+```typescript
+{
+  contributionId: string,
+  amount: number,
+  budgetOverrideConfirmed?: boolean,   // present only after user clicks "Proceed Anyway"
+  budgetOverrideReason?: string        // user-typed reason
+}
+```
+
+---
+
+### New Pages + Components
+
+**Budget settings in `/dashboard/profile`** (new section, same page):
+
+```
+BudgetSettingsSection:
+  - Monthly budget input (R100–R10,000 slider + number input)
+  - Yearly budget input
+  - "When does this take effect" explanation
+  - Budget override history table
+  - "Remove budget" deactivation button per type
+```
+
+**`BudgetGuardModal` (client component):**
+
+```
+Triggered: when API returns BudgetExceededError (code: BUDGET_001)
+Shows:
+  "You're about to exceed your monthly budget"
+  
+  Budget:            R[X]
+  Already paid:      R[Y] this month
+  This contribution: R[Z]
+  Over by:           R[overage]
+  
+  "Contributing beyond your budget may impact your financial stability."
+  
+  [Text input: "Optional reason for override"]
+  
+  [← Change amount]    [Proceed anyway →]
+
+On "Proceed anyway":
+  - Re-submits request with budgetOverrideConfirmed: true
+  - Logs the override
+
+On "Change amount":
+  - Closes modal
+  - Returns to payment form
+  - Pre-fills amount input with budget.remaining
+```
+
+**Zod validation addition** in `packages/utils/src/schemas.ts`:
+
+```typescript
+export const CreateBudgetSchema = z.object({
+  type: z.enum(['MONTHLY', 'YEARLY', 'CUSTOM']),
+  amount: z.number()
+    .min(100, 'Budget must be at least R100 (the contribution minimum)')
+    .max(10000, 'Budget cannot exceed R10,000'),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional(),
+})
+```
+
+---
+
+### Notification Templates to Add
+
+```
+budget-auto-exceeded     SMS    "Your R[X] debit was processed. This exceeded your [type] budget of R[Y]."
+budget-near-limit        EMAIL  "You've used [X]% of your monthly budget."
+```
+
+---
+
+## Feature 3 — Admin Signature System
+
+### Domain Model
+
+The admin signature is a biometric-style identifier that authenticates all documents issued by the system. It is drawn via canvas, stored as a PNG, and embedded into every generated PDF. The 3-month lock prevents casual changes and signals institutional continuity — the same signature on documents over time builds trust.
+
+**Constraints:**
+- One active signature per admin at any time.
+- Signature cannot be updated until `nextChangeAllowedAt` (createdAt + 90 days).
+- Admin cannot generate any document until a signature exists.
+- Signature history is immutable — previous signatures are archived, never deleted.
+- The canvas input records the drawing strokes, not just a photo upload. Both canvas drawing and image upload are supported.
+
+---
+
+### Database Schema — New Models
+
+```prisma
+model AdminSignature {
+  id                    String    @id @default(cuid())
+  adminId               String    @unique
+  signatureUrl          String                      // Vercel Blob URL (PNG)
+  signatureHash         String                      // SHA-256 of the PNG bytes — integrity check
+  displayName           String                      // "Signed by: Maluleke Kurhula Success"
+  isActive              Boolean   @default(true)
+  nextChangeAllowedAt   DateTime                    // createdAt + 90 days
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  admin                 User      @relation(fields: [adminId], references: [id], onDelete: RESTRICT)
+  history               AdminSignatureHistory[]
+}
+
+model AdminSignatureHistory {
+  id              String    @id @default(cuid())
+  adminId         String
+  signatureUrl    String
+  signatureHash   String
+  replacedAt      DateTime  @default(now())
+  replacedById    String                          // who changed it (always the admin themselves)
+
+  admin           User      @relation(fields: [adminId], references: [id], onDelete: RESTRICT)
+}
+```
+
+---
+
+### New Migration
+
+```sql
+-- migration: 20260601000003_admin_signature
+
+CREATE TABLE "admin_signatures" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "admin_id" TEXT NOT NULL UNIQUE,
+  "signature_url" TEXT NOT NULL,
+  "signature_hash" TEXT NOT NULL,
+  "display_name" TEXT NOT NULL,
+  "is_active" BOOLEAN NOT NULL DEFAULT TRUE,
+  "next_change_allowed_at" TIMESTAMPTZ NOT NULL,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updated_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT "fk_signature_admin" FOREIGN KEY ("admin_id")
+    REFERENCES "users"("id") ON DELETE RESTRICT
+);
+
+CREATE TABLE "admin_signature_history" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "admin_id" TEXT NOT NULL,
+  "signature_url" TEXT NOT NULL,
+  "signature_hash" TEXT NOT NULL,
+  "replaced_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "replaced_by_id" TEXT NOT NULL,
+  CONSTRAINT "fk_sig_history_admin" FOREIGN KEY ("admin_id")
+    REFERENCES "users"("id") ON DELETE RESTRICT
+);
+CREATE INDEX "idx_sig_history_admin" ON "admin_signature_history"("admin_id","replaced_at");
+```
+
+---
+
+### New Service
+
+**`apps/web/services/signature.service.ts`**
+
+```typescript
+// getActiveSignature(adminId) → AdminSignature | null
+// createSignature(adminId, pngBuffer, displayName) → AdminSignature
+//   - Hash the buffer: SHA-256
+//   - Upload to Vercel Blob: signatures/{adminId}/{timestamp}.png
+//   - Create DB record with nextChangeAllowedAt = now + 90 days
+//   - Write AuditLog
+
+// updateSignature(adminId, pngBuffer) → AdminSignature
+//   - Check nextChangeAllowedAt > now() → throw SignatureLockError if too early
+//   - Archive current to AdminSignatureHistory
+//   - Upload new PNG to Vercel Blob
+//   - Update DB record, reset nextChangeAllowedAt
+
+// verifySignatureExists(adminId) → boolean
+//   - Called by report.service before any PDF generation
+//   - Throws NoSignatureError if not found
+
+// embedSignatureInPdf(signatureUrl) → base64 PNG
+//   - Fetches the blob URL, returns base64 for PDF embedding
+```
+
+---
+
+### New Repository
+
+```typescript
+// apps/web/repositories/signature.repository.ts
+export const signatureRepo = {
+  findByAdmin:     (adminId) => db.adminSignature.findUnique({ where: { adminId } }),
+  create:          (data) => db.adminSignature.create({ data }),
+  update:          (adminId, data) => db.adminSignature.update({ where: { adminId }, data }),
+  createHistory:   (data) => db.adminSignatureHistory.create({ data }),
+  findHistory:     (adminId) => db.adminSignatureHistory.findMany({
+    where: { adminId }, orderBy: { replacedAt: 'desc' }
+  }),
+}
+```
+
+---
+
+### Integration — Existing Report Service
+
+One insertion in `report.service.ts`. Add at the beginning of every document generation function:
+
+```typescript
+// report.service.ts — generateStatement(), generateReceipt(), any PDF generation
+
+// Add as FIRST step before any PDF logic:
+const signature = await signatureService.getActiveSignature(adminUserId)
+if (!signature) {
+  throw new NoSignatureError(
+    'SIG_001',
+    'Admin signature is required before generating documents. Please upload your signature in Settings.'
+  )
+}
+
+// Then pass signatureUrl into the PDF template:
+const pdf = await renderStatementPdf({ ...statementData, signature })
+```
+
+**`lib/pdf/statement.tsx`** — add a signature block at the bottom of the PDF:
+
+```tsx
+// Signature block component inside the PDF template
+<View style={styles.signatureBlock}>
+  <Text style={styles.signatureLabel}>Authorised by</Text>
+  <Image src={signatureUrl} style={styles.signatureImage} />
+  <Text style={styles.signatureName}>{signature.displayName}</Text>
+  <Text style={styles.signatureDate}>
+    Generated: {format(new Date(), 'dd MMMM yyyy', { timeZone: 'Africa/Johannesburg' })}
+  </Text>
+  <Text style={styles.verificationText}>
+    Xkimm Xa Mali — Official Document
+  </Text>
+</View>
+```
+
+---
+
+### New API Routes
+
+```
+GET    /api/v1/admin/signature              Current signature metadata (no blob URL exposed directly)
+POST   /api/v1/admin/signature              Upload first signature (multipart/form-data: PNG file + displayName)
+PATCH  /api/v1/admin/signature              Update signature (3-month gate enforced)
+GET    /api/v1/admin/signature/history      Signature change history
+GET    /api/v1/admin/signature/lock-status  { canChange: boolean, nextChangeAllowedAt: DateTime }
+```
+
+The blob URL is never returned raw in API responses. The PDF embedding happens server-side only. The frontend shows a preview using a separate signed URL that expires in 60 seconds.
+
+---
+
+### New Admin Page + Components
+
+**`apps/admin/app/(dashboard)/settings/page.tsx`** (new page):
+
+```
+SignaturePad component:
+  Canvas:
+    - White background, 400×180px canvas
+    - Stroke: #1a1a1a (near-black), 2px, smooth curves
+    - Toolbar: "Clear" button only
+    - "Use image instead" toggle → file input (PNG/JPG, max 2MB)
+  
+  Below canvas:
+    - "Display name" input (pre-filled with admin full name)
+    - "Preview" shows how it will appear on documents
+    - Lock status banner (if within 3 months):
+        "Signature can next be updated on [date]"
+    - "Save signature" button (disabled if locked or canvas empty)
+
+  Signature history section:
+    - Chronological list of previous signatures (thumbnail, date, replaced on)
+    - No restore option — history is read-only
+```
+
+**Canvas implementation** uses the `signature_pad` npm package:
+
+```typescript
+// apps/web/package.json — add dependency
+"signature_pad": "^4.2.0"
+
+// SignaturePad.tsx client component
+import SignaturePad from 'signature_pad'
+// Captures PNG via: signaturePad.toDataURL('image/png')
+// Convert to Blob: fetch(dataUrl).then(r => r.blob())
+// Submit as FormData to POST /api/v1/admin/signature
+```
+
+---
+
+## Full V2 Integration Map
+
+Every file that changes, every new file, every new dependency.
+
+### New Database Models (3 migrations)
+
+```
+migration_01: BadgeScore, BadgeHistory, BadgeTier enum, CommunityMessage
+migration_02: UserBudget, BudgetOverride, BudgetType enum
+migration_03: AdminSignature, AdminSignatureHistory
+```
+
+### New Services (4 files)
+
+```
+apps/web/services/badge.service.ts
+apps/web/services/community.service.ts
+apps/web/services/budget.service.ts
+apps/web/services/signature.service.ts
+```
+
+### New Repositories (4 files)
+
+```
+apps/web/repositories/badge.repository.ts
+apps/web/repositories/community.repository.ts
+apps/web/repositories/budget.repository.ts
+apps/web/repositories/signature.repository.ts
+```
+
+### New Inngest Jobs (2 files)
+
+```
+apps/web/inngest/functions/badge-recalculation.ts    cron: 0 2 1 * *
+apps/web/inngest/functions/badge-grace-check.ts      cron: 0 3 * * *
+```
+
+### Existing Files — Additive Changes Only
+
+```
+apps/web/services/contribution.service.ts
+  → Add budget check at entry of initiateManualPayment()
+  → Add inngest.send() after PAID/OVERDUE status change
+
+apps/web/inngest/functions/debit-run.ts
+  → Add post-debit budget check notification (non-blocking)
+
+apps/web/services/report.service.ts
+  → Add signature guard at start of all PDF generation
+
+apps/web/lib/pdf/statement.tsx
+  → Add signature block to PDF template
+
+apps/web/lib/errors.ts
+  → Add BudgetExceededError, SignatureLockError, NoSignatureError, MessageLimitError
+
+packages/database/prisma/seed.ts
+  → Add notification templates: badge-level-up, badge-level-down, budget-auto-exceeded, budget-near-limit
+
+packages/utils/src/schemas.ts
+  → Add CreateBudgetSchema, UpdateBudgetSchema
+```
+
+### New API Routes (17 new routes)
+
+```
+Badge:         /badges/me
+Community:     /community/members, /community/messages, /community/messages/[id]
+Budget:        /budgets/me, /budgets/me/[type], /budgets/me/overrides
+Signature:     /admin/signature, /admin/signature/history, /admin/signature/lock-status
+Admin badge:   /admin/badges
+Admin pin:     /admin/community/messages/[id]/pin
+```
+
+### New Member Pages (3)
+
+```
+apps/web/app/(member)/dashboard/community/page.tsx
+apps/web/app/(member)/dashboard/badges/page.tsx
+Profile page — new BudgetSettingsSection
+```
+
+### New Admin Pages (1 + existing update)
+
+```
+apps/admin/app/(dashboard)/settings/page.tsx   ← new
+Badges section on admin dashboard              ← additive
+```
+
+### New Packages
+
+```
+signature_pad: ^4.2.0    (canvas signature capture)
+```
+
+### New Notification Templates to Seed
+
+```
+badge-level-up            SMS + EMAIL
+badge-level-down          SMS
+budget-auto-exceeded      SMS
+budget-near-limit         EMAIL
+```
+
+---
+
+## Build Order — V2 Features
+
+```
+V2-01   Migration 01 (badge + community schema)
+V2-02   Migration 02 (budget schema)
+V2-03   Migration 03 (signature schema)
+V2-04   badge.repository.ts + community.repository.ts
+V2-05   budget.repository.ts + signature.repository.ts
+V2-06   badge.service.ts (scoring algorithm + tier logic)
+V2-07   community.service.ts (messages + rate limiting)
+V2-08   budget.service.ts (check + override)
+V2-09   signature.service.ts (upload + lock + embed)
+V2-10   Inngest jobs (badge-recalculation + badge-grace-check)
+V2-11   Integration into contribution.service.ts (budget check)
+V2-12   Integration into debit-run.ts (post-debit budget notify)
+V2-13   Integration into report.service.ts (signature guard)
+V2-14   Integration into lib/pdf/statement.tsx (signature block)
+V2-15   All new API routes
+V2-16   BudgetGuardModal component
+V2-17   SignaturePad component + admin settings page
+V2-18   Community page (member portal)
+V2-19   Badges page (member portal)
+V2-20   Budget settings section (profile page)
+V2-21   Admin badges view
+V2-22   Seed new notification templates
+V2-23   Tests for badge.service, budget.service, signature.service
+```
+
+No V2 module touches anything built in V1. Every integration is a new call appended to an existing flow, not a replacement of existing logic.
