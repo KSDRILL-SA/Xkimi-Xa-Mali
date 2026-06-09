@@ -39,6 +39,7 @@ export function LoginForm() {
   const callbackUrl = safeCallbackUrl(params.get('callbackUrl'))
   const verified = params.get('verified')
   const reset = params.get('reset')
+  const reason = params.get('reason')
   const errorParam = params.get('error')
 
   const [serverError, setServerError] = useState('')
@@ -76,6 +77,9 @@ export function LoginForm() {
       )}
       {reset && (
         <Alert variant="success">Password reset successful. You can now log in with your new password.</Alert>
+      )}
+      {reason === 'session_expired' && !serverError && !errorParam && (
+        <Alert variant="warning">Your session has expired. Please sign in again to continue.</Alert>
       )}
       {(serverError || errorParam) && (
         <Alert variant="error">
