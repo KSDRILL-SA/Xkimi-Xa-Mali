@@ -311,58 +311,83 @@ export default function AboutPage() {
         </section>
 
         {/* ── Founders ──────────────────────────────────────────────── */}
-        <section className="py-20 md:py-28 px-4 bg-white">
-          <div className="max-w-screen-lg mx-auto">
-            <div className="flex flex-col items-center text-center mb-14 gap-3">
+        <section className="py-20 md:py-32 px-4 bg-xxm-champagne">
+          <div className="max-w-screen-xl mx-auto">
+            <div className="flex flex-col items-center text-center mb-16 gap-3">
               <span className="inline-flex items-center gap-2 bg-xxm-gold/10 border border-xxm-gold/20 rounded-full px-4 py-1.5 text-xxm-gold-dark text-xs font-bold tracking-widest uppercase">
-                <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold" aria-hidden />
-                The brotherhood
+                <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold animate-pulse" aria-hidden />
+                The Brotherhood
               </span>
-              <h2 className="text-3xl sm:text-4xl font-black text-xxm-green-900 tracking-tight leading-tight">
+              <h2 className="text-4xl sm:text-5xl font-black text-xxm-green-900 tracking-tight leading-tight">
                 Meet the founders
               </h2>
-              <p className="text-gray-500 text-base max-w-md leading-relaxed">
+              <p className="text-gray-500 text-base max-w-lg leading-relaxed">
                 Four men. One pact. A platform built from scratch with nothing but discipline,
                 vision, and each other&rsquo;s word.
               </p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {founders.map(({ photo, name, title, bio, ring, accent }) => (
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 lg:gap-10">
+              {founders.map(({ photo, name, title, bio, ring, accent }, idx) => (
                 <div
                   key={name}
-                  className={`relative overflow-hidden bg-white rounded-2xl border border-xxm-gold/10 p-6 flex flex-col sm:flex-row gap-5 ring-2 ${ring} hover:shadow-gold transition-all duration-300 group`}
+                  className={`group relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 ring-2 ${ring} hover:ring-xxm-gold/50`}
                 >
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-br ${accent} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}
-                    aria-hidden
-                  />
-                  <div className="relative w-20 h-24 rounded-xl overflow-hidden shrink-0 shadow-sm ring-1 ring-xxm-green/10">
+                  {/* Large portrait */}
+                  <div className="relative w-full aspect-[3/4] overflow-hidden bg-xxm-green-900">
                     <Image
                       src={photo}
-                      alt={name}
+                      alt={`${name} — ${title}`}
                       fill
-                      sizes="80px"
-                      className="object-cover"
+                      priority={idx < 2}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 560px"
+                      className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
                     />
+                    {/* Dark-to-transparent gradient so name is legible */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-xxm-green-950/95 via-xxm-green-950/40 to-transparent" />
+                    {/* Colour accent on hover */}
+                    <div
+                      className={`absolute inset-0 bg-gradient-to-br ${accent} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
+                      aria-hidden
+                    />
+                    {/* Name / title overlay */}
+                    <div className="absolute bottom-0 left-0 right-0 px-7 py-7">
+                      <div className="flex items-end justify-between gap-4">
+                        <div>
+                          <p className="font-black text-white text-xl sm:text-2xl leading-snug drop-shadow">
+                            {name}
+                          </p>
+                          <p className="text-xxm-gold text-xs font-bold uppercase tracking-widest mt-2">
+                            {title}
+                          </p>
+                        </div>
+                        <div className="w-11 h-11 rounded-full bg-xxm-gold/15 border border-xxm-gold/40 backdrop-blur-sm flex items-center justify-center shrink-0">
+                          <span className="text-xxm-gold text-xs font-black tabular-nums">
+                            {String(idx + 1).padStart(2, '0')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div className="relative flex-1 min-w-0">
-                    <p className="font-black text-xxm-green-900 text-base leading-snug">{name}</p>
-                    <p className="text-xxm-gold-dark text-xs font-bold uppercase tracking-widest mt-0.5 mb-3">
-                      {title}
-                    </p>
-                    <p className="text-sm text-gray-500 leading-relaxed">{bio}</p>
+
+                  {/* Bio panel */}
+                  <div className={`bg-white px-7 py-6 bg-gradient-to-b ${accent} to-white`}>
+                    <p className="text-sm text-gray-600 leading-relaxed">{bio}</p>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Ubuntu callout */}
-            <div className="mt-12 text-center">
-              <div className="inline-block rounded-2xl bg-xxm-champagne border border-xxm-gold/15 px-8 py-6 max-w-lg">
-                <p className="text-xxm-green-900 text-base italic font-semibold leading-relaxed">
+            <div className="mt-16 text-center">
+              <div className="inline-block rounded-3xl bg-white border border-xxm-gold/20 shadow-md px-10 py-8 max-w-xl">
+                <div className="w-10 h-10 rounded-full bg-xxm-gold/10 border border-xxm-gold/20 flex items-center justify-center mx-auto mb-5">
+                  <Quote size={16} className="text-xxm-gold" aria-hidden />
+                </div>
+                <p className="text-xxm-green-900 text-lg font-bold italic leading-relaxed">
                   &ldquo;I am because we are — together we build what none of us could build alone.&rdquo;
                 </p>
-                <p className="text-xxm-gold-dark text-xs mt-3 font-bold tracking-widest uppercase not-italic">
+                <p className="text-xxm-gold-dark text-xs mt-4 font-bold tracking-widest uppercase not-italic">
                   Ubuntu — The founding principle
                 </p>
               </div>

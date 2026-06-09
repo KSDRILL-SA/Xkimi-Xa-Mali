@@ -6,7 +6,6 @@ import { StatsSection } from '@/components/sections/StatsSection'
 import { FeaturesSection } from '@/components/sections/FeaturesSection'
 import { HowItWorksSection } from '@/components/sections/HowItWorksSection'
 import { MissionSection } from '@/components/sections/MissionSection'
-import { FoundersSection } from '@/components/sections/FoundersSection'
 import { CTASection } from '@/components/sections/CTASection'
 import { Footer } from '@/components/Footer'
 
@@ -45,7 +44,6 @@ export default function HomePage() {
         <FeaturesSection />
         <HowItWorksSection />
         <MissionSection />
-        <FoundersSection />
         <CTASection />
       </main>
 
