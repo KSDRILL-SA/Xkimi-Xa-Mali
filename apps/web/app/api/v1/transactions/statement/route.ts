@@ -3,8 +3,13 @@ import { auth } from '@/lib/auth'
 import { statementRatelimit } from '@/lib/redis'
 import { apiError } from '@/lib/api-response'
 import { StatementRequestSchema } from '@/lib/validation/report'
-import { generateMemberStatement } from '@/services/report.service'
+import {
+  generateMemberStatement,
+  generateMemberStatementPdf,
+} from '@/services/report.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { env } from '@/lib/env'
+import { MONTHS } from '@/lib/date'
 
 export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
@@ -27,12 +32,35 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
 
+  const { month, year } = parsed.data
+  const monthName = MONTHS?.[month - 1] ?? `Month-${month}`
+  const filename  = `xkimm-xa-mali-statement-${monthName.toLowerCase()}-${year}.pdf`
+
+  if (!env.BLOB_READ_WRITE_TOKEN) {
+    const buffer = await generateMemberStatementPdf(
+      targetUserId,
+      session.user.id,
+      roles,
+      month,
+      year,
+    )
+    return new NextResponse(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type':        'application/pdf',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length':      String(buffer.byteLength),
+        'Cache-Control':       'no-store',
+      },
+    })
+  }
+
   const { signedUrl } = await generateMemberStatement(
     targetUserId,
     session.user.id,
     roles,
-    parsed.data.month,
-    parsed.data.year,
+    month,
+    year,
   )
   return NextResponse.redirect(signedUrl, { status: 302 })
 })

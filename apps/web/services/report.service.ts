@@ -8,6 +8,7 @@ import { assertCanAccess } from '@/lib/authorization'
 import { transactionRepo } from '@/repositories/transaction.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
+import { env } from '@/lib/env'
 
 export { ReportNotFoundError }
 
@@ -107,20 +108,35 @@ type ContribWithTx = {
   transactions: TxRow[]
 }
 
-export async function generateMemberStatement(
+type UserRow = {
+  id: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+  createdAt: Date
+}
+
+function buildDocRef(userId: string, month: number, year: number): string {
+  const short = userId.replace(/-/g, '').slice(0, 8).toUpperCase()
+  const ts = Date.now().toString(36).toUpperCase().slice(-4)
+  return `XMM-${year}${String(month).padStart(2, '0')}-${short}-${ts}`
+}
+
+function formatMemberId(userId: string): string {
+  return `XMM-${userId.replace(/-/g, '').slice(0, 6).toUpperCase()}`
+}
+
+async function buildStatementData(
   userId: string,
-  requesterId: string,
-  roles: string[],
   month: number,
   year: number,
-): Promise<{ url: string; signedUrl: string }> {
-  assertCanAccess(userId, requesterId, roles)
-
+): Promise<StatementData> {
   const userResults = await userRepo.findMany({ id: userId }, {
     take: 1,
-    select: { firstName: true, lastName: true, email: true, phone: true },
+    select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true },
   })
-  const user = userResults[0] ?? null
+  const user = (userResults[0] ?? null) as UserRow | null
   if (!user) throw new ReportNotFoundError('Member not found')
 
   const contributions = await contributionRepo.findMany(
@@ -141,12 +157,16 @@ export async function generateMemberStatement(
 
   const allTransactions = periodContributions.flatMap((c) => c.transactions)
 
-  const data: StatementData = {
+  return {
     member: {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
       phone: user.phone,
+      memberId: formatMemberId(user.id),
+      memberSince: user.createdAt.toLocaleDateString('en-ZA', {
+        day: 'numeric', month: 'long', year: 'numeric',
+      }),
     },
     period: { month, year, label: periodLabel(month, year) },
     contributions: periodContributions.map((c) => ({
@@ -180,8 +200,32 @@ export async function generateMemberStatement(
       hour: '2-digit',
       minute: '2-digit',
     }),
+    docRef: buildDocRef(userId, month, year),
   }
+}
 
+export async function generateMemberStatementPdf(
+  userId: string,
+  requesterId: string,
+  roles: string[],
+  month: number,
+  year: number,
+): Promise<Buffer> {
+  assertCanAccess(userId, requesterId, roles)
+  const data = await buildStatementData(userId, month, year)
+  return renderStatementPDF(data)
+}
+
+export async function generateMemberStatement(
+  userId: string,
+  requesterId: string,
+  roles: string[],
+  month: number,
+  year: number,
+): Promise<{ url: string; signedUrl: string }> {
+  assertCanAccess(userId, requesterId, roles)
+
+  const data = await buildStatementData(userId, month, year)
   const pdfBuffer = await renderStatementPDF(data)
 
   const blobPath = `statements/${userId}/${year}-${String(month).padStart(2, '0')}.pdf`
@@ -298,31 +342,62 @@ export async function getAdminReport(month: number, year: number) {
 
 // ─── CSV export ───────────────────────────────────────────────────────────────
 
+function csvCell(value: string | number | null | undefined): string {
+  const str = value == null ? '' : String(value)
+  if (/[",\n\r]/.test(str)) return `"${str.replace(/"/g, '""')}"`
+  return str
+}
+
+function rands(n: number): string {
+  return `R ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
+}
+
 export async function exportAdminReportCSV(month: number, year: number): Promise<string> {
   const report = await getAdminReport(month, year)
 
-  const headers = ['Name', 'Email', 'Phone', 'Amount Due', 'Amount Paid', 'Outstanding', 'Status']
+  const generatedAt = new Date().toLocaleString('en-ZA', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+  })
+
+  const headerTitle = [
+    'XKIMM XA MALI — CONTRIBUTION REPORT',
+    `Period: ${report.period.label}`,
+    `Generated: ${generatedAt}`,
+    '',
+  ]
+
+  const columnHeaders = [
+    'Member Name', 'Email Address', 'Phone Number',
+    'Amount Due (R)', 'Amount Paid (R)', 'Outstanding (R)', 'Status',
+  ].map(csvCell).join(',')
+
   const rows = report.members.map((m) =>
     [
-      `"${m.name}"`,
-      `"${m.email}"`,
-      `"${m.phone}"`,
+      csvCell(m.name),
+      csvCell(m.email),
+      csvCell(m.phone),
       m.amountDue.toFixed(2),
       m.amountPaid.toFixed(2),
       m.outstanding.toFixed(2),
-      m.status,
+      csvCell(m.status),
     ].join(','),
   )
 
-  const summary = [
+  const summarySection = [
     '',
-    `"Total Due",${report.summary.totalDue.toFixed(2)}`,
-    `"Total Paid",${report.summary.totalPaid.toFixed(2)}`,
-    `"Outstanding",${report.summary.outstanding.toFixed(2)}`,
-    `"Collection Rate",${report.summary.collectionRate}%`,
-    `"Pool Total (all time)",${report.summary.poolTotal.toFixed(2)}`,
-    `"Generated",${new Date().toISOString()}`,
+    '--- SUMMARY ---',
+    `Period,${csvCell(report.period.label)}`,
+    `Total Members,${report.summary.memberCount}`,
+    `Members Paid,${report.summary.paidCount}`,
+    `Members Overdue,${report.summary.overdueCount}`,
+    `Collection Rate,${report.summary.collectionRate}%`,
+    `Total Due,${rands(report.summary.totalDue)}`,
+    `Total Paid,${rands(report.summary.totalPaid)}`,
+    `Outstanding,${rands(report.summary.outstanding)}`,
+    `Pool Total (all-time),${rands(report.summary.poolTotal)}`,
+    `Generated,${csvCell(generatedAt)}`,
   ]
 
-  return [headers.join(','), ...rows, ...summary].join('\n')
+  return [...headerTitle, columnHeaders, ...rows, ...summarySection].join('\r\n')
 }
