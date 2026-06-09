@@ -7,7 +7,7 @@ import { env } from './env'
 // into the Edge Runtime middleware bundle, which doesn't support those Node.js
 // APIs and made middleware execution unstable.
 export const authConfig = {
-  secret: env.NEXTAUTH_SECRET,
+  secret: env.AUTH_SECRET,
   trustHost: true,
   session: { strategy: 'jwt' },
   pages: {
