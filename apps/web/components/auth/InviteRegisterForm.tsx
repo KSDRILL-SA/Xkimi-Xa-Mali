@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { RegisterStep2Schema, type RegisterStep2Input } from '@/lib/validation/auth'
+import { api, ApiClientError } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormGroup } from '@/components/ui/FormGroup'
@@ -41,10 +42,8 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
     setLoading(true)
     setError('')
 
-    const res = await fetch('/api/v1/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    try {
+      await api.post('/api/v1/auth/register', {
         inviteCode:     inviteCode.trim().toUpperCase(),
         email:          invite.email,
         phone:          invite.phone,
@@ -53,18 +52,13 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
         idNumber:       data.idNumber || undefined,
         password:       data.password,
         consentToPopia: true,
-      }),
-    })
-
-    const json = await res.json()
-    setLoading(false)
-
-    if (!res.ok) {
-      setError(json.error?.message ?? 'Registration failed. Please try again.')
-      return
+      })
+      router.push('/verify-email?sent=true')
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : 'Registration failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
-
-    router.push('/verify-email?sent=true')
   }
 
   return (
