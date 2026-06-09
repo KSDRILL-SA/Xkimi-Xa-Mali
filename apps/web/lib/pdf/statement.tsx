@@ -16,6 +16,8 @@ export type StatementData = {
     lastName: string
     email: string
     phone: string
+    memberId: string
+    memberSince: string
   }
   period: {
     month: number
@@ -45,226 +47,511 @@ export type StatementData = {
     outstanding: number
   }
   generatedAt: string
+  docRef: string
+}
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+
+const C = {
+  headerBg:    '#0D2818',
+  green:       '#1B4332',
+  greenMid:    '#2D6A4F',
+  greenLight:  '#D1FAE5',
+  greenBg:     '#F0F7F3',
+  gold:        '#C9A227',
+  goldLight:   '#FEF3C7',
+  white:       '#FFFFFF',
+  gray50:      '#F9FAFB',
+  gray100:     '#F3F4F6',
+  gray200:     '#E5E7EB',
+  gray400:     '#9CA3AF',
+  gray500:     '#6B7280',
+  gray700:     '#374151',
+  gray900:     '#111827',
+  red:         '#DC2626',
+  redLight:    '#FEE2E2',
+  amber:       '#D97706',
+  amberLight:  '#FEF3C7',
+  sky:         '#0284C7',
+  skyLight:    '#E0F2FE',
+  settled:     '#059669',
+  settledBg:   '#D1FAE5',
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
-const GREEN = '#1B4332'
-const GOLD  = '#D4A017'
-const GRAY  = '#6B7280'
-const LIGHT = '#F9FAFB'
-const RED   = '#DC2626'
 
 const s = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
     fontSize: 9,
-    color: '#111827',
-    padding: 40,
-    backgroundColor: '#FFFFFF',
+    color: C.gray900,
+    backgroundColor: C.white,
+    paddingTop: 0,
+    paddingBottom: 52,
+    paddingHorizontal: 0,
   },
-  // Header
+
+  // ── Header band ──────────────────────────────────────────────────────
   header: {
+    backgroundColor: C.headerBg,
+    paddingHorizontal: 36,
+    paddingTop: 22,
+    paddingBottom: 22,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 24,
-    paddingBottom: 16,
-    borderBottom: `2px solid ${GREEN}`,
   },
-  logoText: { fontSize: 18, fontFamily: 'Helvetica-Bold', color: GREEN },
-  tagline: { fontSize: 8, color: GRAY, marginTop: 2 },
+  headerLeft: { flexDirection: 'column' },
+  orgName: {
+    fontSize: 22,
+    fontFamily: 'Helvetica-Bold',
+    color: C.white,
+    letterSpacing: 0.5,
+  },
+  orgTagline: {
+    fontSize: 7.5,
+    color: C.gold,
+    fontFamily: 'Helvetica-Oblique',
+    marginTop: 3,
+    letterSpacing: 0.3,
+  },
   headerRight: { alignItems: 'flex-end' },
-  statementTitle: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: GREEN },
-  periodLabel: { fontSize: 10, color: GRAY, marginTop: 2 },
-  generatedAt: { fontSize: 7, color: GRAY, marginTop: 4 },
-  // Member info
-  memberSection: {
-    backgroundColor: LIGHT,
+  docType: {
+    fontSize: 13,
+    fontFamily: 'Helvetica-Bold',
+    color: C.white,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  docPeriod: { fontSize: 9, color: C.gold, marginTop: 3, fontFamily: 'Helvetica-Bold' },
+  docRef: { fontSize: 7, color: C.gray400, marginTop: 3, letterSpacing: 0.3 },
+
+  // ── Gold accent line under header ─────────────────────────────────────
+  accentBar: {
+    height: 3,
+    backgroundColor: C.gold,
+  },
+
+  // ── Content wrapper ───────────────────────────────────────────────────
+  content: { paddingHorizontal: 36, paddingTop: 20 },
+
+  // ── Two-column info section ───────────────────────────────────────────
+  infoRow: { flexDirection: 'row', gap: 12, marginBottom: 18 },
+  infoBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: C.gray200,
     borderRadius: 4,
-    padding: 12,
-    marginBottom: 20,
+    overflow: 'hidden',
   },
-  memberLabel: { fontSize: 7, color: GRAY, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 },
-  memberName: { fontSize: 12, fontFamily: 'Helvetica-Bold', color: GREEN },
-  memberDetail: { fontSize: 8, color: GRAY, marginTop: 2 },
-  // Section heading
-  sectionHeading: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: GREEN, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 16 },
-  // Table
-  tableHeader: { flexDirection: 'row', backgroundColor: GREEN, borderRadius: 2, padding: '6 8', marginBottom: 1 },
-  tableHeaderCell: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#FFFFFF' },
-  tableRow: { flexDirection: 'row', padding: '5 8', borderBottom: `1px solid #E5E7EB` },
-  tableRowAlt: { backgroundColor: LIGHT },
-  tableCell: { fontSize: 8, color: '#374151' },
-  // Summary
-  summaryBox: { marginTop: 20, borderTop: `2px solid ${GREEN}`, paddingTop: 12 },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  summaryLabel: { fontSize: 9, color: GRAY },
-  summaryValue: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: GREEN },
-  summaryOutstanding: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: RED },
-  summaryTotal: {
+  infoBoxHeader: {
+    backgroundColor: C.green,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  infoBoxTitle: {
+    fontSize: 7,
+    fontFamily: 'Helvetica-Bold',
+    color: C.white,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  infoBoxBody: { padding: 10 },
+  infoName: {
+    fontSize: 12,
+    fontFamily: 'Helvetica-Bold',
+    color: C.green,
+    marginBottom: 4,
+  },
+  infoRow2: { flexDirection: 'row', marginBottom: 3 },
+  infoLabel: { fontSize: 7.5, color: C.gray400, width: 70 },
+  infoValue: { fontSize: 7.5, color: C.gray700, flex: 1 },
+
+  // ── Four-column financial summary ─────────────────────────────────────
+  summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+  summaryCard: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderRadius: 4,
+    padding: 10,
+    alignItems: 'center',
+  },
+  summaryCardGreen: { backgroundColor: C.greenBg, borderColor: C.greenMid },
+  summaryCardAmber: { backgroundColor: C.amberLight, borderColor: C.amber },
+  summaryCardRed:   { backgroundColor: C.redLight,  borderColor: C.red   },
+  summaryCardGold:  { backgroundColor: C.goldLight,  borderColor: C.gold  },
+  summaryCardLabel: {
+    fontSize: 6.5,
+    color: C.gray400,
+    fontFamily: 'Helvetica-Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  summaryCardValue: {
+    fontSize: 13,
+    fontFamily: 'Helvetica-Bold',
+    color: C.green,
+    textAlign: 'center',
+  },
+  summaryCardValueAmber: { color: C.amber },
+  summaryCardValueRed:   { color: C.red   },
+  summaryCardValueGold:  { color: C.gold  },
+  summaryCardSub: { fontSize: 6.5, color: C.gray400, marginTop: 3, textAlign: 'center' },
+
+  // ── Section heading ───────────────────────────────────────────────────
+  sectionHeading: {
+    fontSize: 7.5,
+    fontFamily: 'Helvetica-Bold',
+    color: C.green,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 6,
+    marginTop: 4,
+    paddingBottom: 4,
+    borderBottomWidth: 2,
+    borderBottomColor: C.green,
+  },
+
+  // ── Table ─────────────────────────────────────────────────────────────
+  table: { marginBottom: 16 },
+  tableHead: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTop: `1px solid #E5E7EB`,
+    backgroundColor: C.green,
+    borderRadius: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
-  // Status badges
-  statusPaid: { color: '#059669', fontFamily: 'Helvetica-Bold' },
-  statusPending: { color: '#D97706' },
-  statusFailed: { color: RED },
-  statusDefault: { color: GRAY },
-  // Footer
+  tableHeadCell: {
+    fontSize: 7.5,
+    fontFamily: 'Helvetica-Bold',
+    color: C.white,
+    letterSpacing: 0.3,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: C.gray100,
+  },
+  tableRowAlt: { backgroundColor: C.gray50 },
+  tableCell: { fontSize: 8, color: C.gray700 },
+  tableCellMuted: { fontSize: 7.5, color: C.gray400 },
+  tableEmpty: {
+    paddingHorizontal: 8,
+    paddingVertical: 14,
+    backgroundColor: C.gray50,
+    borderRadius: 3,
+    alignItems: 'center',
+  },
+  tableEmptyText: { fontSize: 8, color: C.gray400 },
+
+  // ── Column widths ─────────────────────────────────────────────────────
+  // Contributions
+  cPeriod:  { width: '22%' },
+  cDue:     { width: '18%', textAlign: 'right' },
+  cPaid:    { width: '18%', textAlign: 'right' },
+  cBalance: { width: '18%', textAlign: 'right' },
+  cStatus:  { width: '14%', textAlign: 'center' },
+  cDate:    { width: '10%', textAlign: 'right' },
+  // Transactions
+  tDate:    { width: '14%' },
+  tDesc:    { width: '28%' },
+  tRef:     { width: '22%' },
+  tAmount:  { width: '14%', textAlign: 'right' },
+  tStatus:  { width: '12%', textAlign: 'center' },
+  tProc:    { width: '10%', textAlign: 'right' },
+
+  // ── Status text colours ───────────────────────────────────────────────
+  sPaid:     { color: C.settled,  fontFamily: 'Helvetica-Bold' },
+  sPending:  { color: C.amber },
+  sOverdue:  { color: C.red,     fontFamily: 'Helvetica-Bold' },
+  sFailed:   { color: C.red,     fontFamily: 'Helvetica-Bold' },
+  sPartial:  { color: C.sky },
+  sWaived:   { color: C.gray400 },
+  sDefault:  { color: C.gray500 },
+
+  // ── Fixed footer (every page) ─────────────────────────────────────────
   footer: {
     position: 'absolute',
-    bottom: 30,
-    left: 40,
-    right: 40,
-    borderTop: `1px solid #E5E7EB`,
-    paddingTop: 8,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopWidth: 2,
+    borderTopColor: C.headerBg,
+    backgroundColor: C.gray50,
+    paddingHorizontal: 36,
+    paddingVertical: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  footerText: { fontSize: 7, color: GRAY },
-  footerGold: { fontSize: 7, color: GOLD, fontFamily: 'Helvetica-BoldOblique' },
-  // Column widths
-  colPeriod: { width: '25%' },
-  colDue: { width: '20%', textAlign: 'right' },
-  colPaid: { width: '20%', textAlign: 'right' },
-  colStatus: { width: '15%', textAlign: 'center' },
-  colDate: { width: '20%', textAlign: 'right' },
-  colAmount: { width: '20%', textAlign: 'right' },
-  colType: { width: '20%' },
-  colRef: { width: '30%' },
-  colTxStatus: { width: '15%', textAlign: 'center' },
-  colProcessed: { width: '15%', textAlign: 'right' },
+  footerLeft:   { flex: 1 },
+  footerCenter: { flex: 1, alignItems: 'center' },
+  footerRight:  { flex: 1, alignItems: 'flex-end' },
+  footerText:   { fontSize: 6.5, color: C.gray400 },
+  footerBold:   { fontSize: 6.5, color: C.gray500, fontFamily: 'Helvetica-Bold' },
+  footerGold:   { fontSize: 6.5, color: C.gold,   fontFamily: 'Helvetica-BoldOblique' },
+
+  // ── Disclaimer strip ──────────────────────────────────────────────────
+  disclaimer: {
+    marginHorizontal: 36,
+    marginBottom: 8,
+    padding: 8,
+    backgroundColor: C.greenBg,
+    borderRadius: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: C.green,
+  },
+  disclaimerText: { fontSize: 6.5, color: C.gray500, lineHeight: 1.5 },
 })
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatZAR(amount: number): string {
-  return `R ${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
+function rands(amount: number): string {
+  return `R ${amount
+    .toFixed(2)
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 }
 
 function statusStyle(status: string) {
-  switch (status) {
-    case 'PAID':    case 'SUCCESS':   return s.statusPaid
-    case 'PENDING': case 'PROCESSING': return s.statusPending
-    case 'FAILED':  case 'REVERSED':  return s.statusFailed
-    default: return s.statusDefault
+  switch (status.toUpperCase()) {
+    case 'PAID':       case 'SUCCESS':    return s.sPaid
+    case 'PENDING':    case 'PROCESSING': return s.sPending
+    case 'OVERDUE':                       return s.sOverdue
+    case 'FAILED':     case 'REVERSED':   return s.sFailed
+    case 'PARTIAL':                       return s.sPartial
+    case 'WAIVED':                        return s.sWaived
+    default:                              return s.sDefault
   }
+}
+
+function txDescription(type: string): string {
+  return type
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
 // ─── Document ─────────────────────────────────────────────────────────────────
 
 function StatementDocument({ data }: { data: StatementData }) {
-  const { member, period, contributions, transactions, summary, generatedAt } = data
+  const { member, period, contributions, transactions, summary, generatedAt, docRef } = data
+  const fullyPaid = summary.outstanding <= 0
 
   return (
     <Document
-      title={`Xkimm Xa Mali Statement — ${member.firstName} ${member.lastName} — ${period.label}`}
+      title={`Xkimm Xa Mali — Statement — ${member.firstName} ${member.lastName} — ${period.label}`}
       author="Xkimm Xa Mali"
-      subject="Member Contribution Statement"
+      subject="Contribution Statement of Account"
+      creator="Xkimm Xa Mali Platform"
+      keywords="statement contribution savings xkimm"
     >
       <Page size="A4" style={s.page}>
-        {/* Header */}
+
+        {/* ── Header band ────────────────────────────── */}
         <View style={s.header}>
-          <View>
-            <Text style={s.logoText}>Xkimm Xa Mali</Text>
-            <Text style={s.tagline}>&ldquo;Blessed is the hand that giveth.&rdquo;</Text>
+          <View style={s.headerLeft}>
+            <Text style={s.orgName}>Xkimm Xa Mali</Text>
+            <Text style={s.orgTagline}>&ldquo;Blessed is the hand that giveth.&rdquo; — Acts 20:35</Text>
           </View>
           <View style={s.headerRight}>
-            <Text style={s.statementTitle}>Statement</Text>
-            <Text style={s.periodLabel}>{period.label}</Text>
-            <Text style={s.generatedAt}>Generated: {generatedAt}</Text>
+            <Text style={s.docType}>Statement of Account</Text>
+            <Text style={s.docPeriod}>{period.label}</Text>
+            <Text style={s.docRef}>REF: {docRef}</Text>
           </View>
         </View>
+        <View style={s.accentBar} />
 
-        {/* Member details */}
-        <View style={s.memberSection}>
-          <Text style={s.memberLabel}>Member</Text>
-          <Text style={s.memberName}>{member.firstName} {member.lastName}</Text>
-          <Text style={s.memberDetail}>{member.email}</Text>
-          <Text style={s.memberDetail}>{member.phone}</Text>
-        </View>
+        <View style={s.content}>
 
-        {/* Contributions table */}
-        <Text style={s.sectionHeading}>Contributions</Text>
-        <View style={s.tableHeader}>
-          <Text style={[s.tableHeaderCell, s.colPeriod]}>Period</Text>
-          <Text style={[s.tableHeaderCell, s.colDue]}>Due</Text>
-          <Text style={[s.tableHeaderCell, s.colPaid]}>Paid</Text>
-          <Text style={[s.tableHeaderCell, s.colStatus]}>Status</Text>
-          <Text style={[s.tableHeaderCell, s.colDate]}>Due Date</Text>
-        </View>
-        {contributions.map((c, i) => (
-          <View key={c.id} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
-            <Text style={[s.tableCell, s.colPeriod]}>{c.periodLabel}</Text>
-            <Text style={[s.tableCell, s.colDue]}>{formatZAR(c.amountDue)}</Text>
-            <Text style={[s.tableCell, s.colPaid]}>{formatZAR(c.amountPaid)}</Text>
-            <Text style={[s.tableCell, s.colStatus, statusStyle(c.status)]}>{c.status}</Text>
-            <Text style={[s.tableCell, s.colDate]}>{c.dueDate}</Text>
-          </View>
-        ))}
-        {contributions.length === 0 && (
-          <View style={s.tableRow}>
-            <Text style={[s.tableCell, { color: GRAY }]}>No contributions for this period.</Text>
-          </View>
-        )}
-
-        {/* Transactions table */}
-        <Text style={s.sectionHeading}>Transactions</Text>
-        <View style={s.tableHeader}>
-          <Text style={[s.tableHeaderCell, s.colAmount]}>Amount</Text>
-          <Text style={[s.tableHeaderCell, s.colType]}>Type</Text>
-          <Text style={[s.tableHeaderCell, s.colTxStatus]}>Status</Text>
-          <Text style={[s.tableHeaderCell, s.colRef]}>Reference</Text>
-          <Text style={[s.tableHeaderCell, s.colProcessed]}>Processed</Text>
-        </View>
-        {transactions.map((t, i) => (
-          <View key={t.id} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
-            <Text style={[s.tableCell, s.colAmount]}>{formatZAR(t.amount)}</Text>
-            <Text style={[s.tableCell, s.colType]}>{t.type.replace(/_/g, ' ')}</Text>
-            <Text style={[s.tableCell, s.colTxStatus, statusStyle(t.status)]}>{t.status}</Text>
-            <Text style={[s.tableCell, s.colRef]}>{t.gatewayRef ?? '—'}</Text>
-            <Text style={[s.tableCell, s.colProcessed]}>{t.processedAt ?? '—'}</Text>
-          </View>
-        ))}
-        {transactions.length === 0 && (
-          <View style={s.tableRow}>
-            <Text style={[s.tableCell, { color: GRAY }]}>No transactions for this period.</Text>
-          </View>
-        )}
-
-        {/* Summary */}
-        <View style={s.summaryBox}>
-          <View style={s.summaryRow}>
-            <Text style={s.summaryLabel}>Total Due</Text>
-            <Text style={s.summaryValue}>{formatZAR(summary.totalDue)}</Text>
-          </View>
-          <View style={s.summaryRow}>
-            <Text style={s.summaryLabel}>Total Paid</Text>
-            <Text style={s.summaryValue}>{formatZAR(summary.totalPaid)}</Text>
-          </View>
-          {summary.outstanding > 0 && (
-            <View style={s.summaryTotal}>
-              <Text style={[s.summaryLabel, { fontFamily: 'Helvetica-Bold', fontSize: 10 }]}>Outstanding</Text>
-              <Text style={s.summaryOutstanding}>{formatZAR(summary.outstanding)}</Text>
+          {/* ── Account holder + Statement details ───── */}
+          <View style={s.infoRow}>
+            {/* Account holder */}
+            <View style={s.infoBox}>
+              <View style={s.infoBoxHeader}>
+                <Text style={s.infoBoxTitle}>Account Holder</Text>
+              </View>
+              <View style={s.infoBoxBody}>
+                <Text style={s.infoName}>{member.firstName} {member.lastName}</Text>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Member ID</Text>
+                  <Text style={s.infoValue}>{member.memberId}</Text>
+                </View>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Email</Text>
+                  <Text style={s.infoValue}>{member.email}</Text>
+                </View>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Mobile</Text>
+                  <Text style={s.infoValue}>{member.phone}</Text>
+                </View>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Member Since</Text>
+                  <Text style={s.infoValue}>{member.memberSince}</Text>
+                </View>
+              </View>
             </View>
-          )}
+
+            {/* Statement details */}
+            <View style={s.infoBox}>
+              <View style={s.infoBoxHeader}>
+                <Text style={s.infoBoxTitle}>Statement Details</Text>
+              </View>
+              <View style={s.infoBoxBody}>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Period</Text>
+                  <Text style={s.infoValue}>{period.label}</Text>
+                </View>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Issued On</Text>
+                  <Text style={s.infoValue}>{generatedAt}</Text>
+                </View>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Document Ref</Text>
+                  <Text style={s.infoValue}>{docRef}</Text>
+                </View>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Account Status</Text>
+                  <Text style={[s.infoValue, fullyPaid ? s.sPaid : s.sOverdue]}>
+                    {fullyPaid ? 'SETTLED ✓' : 'OUTSTANDING'}
+                  </Text>
+                </View>
+                <View style={s.infoRow2}>
+                  <Text style={s.infoLabel}>Product</Text>
+                  <Text style={s.infoValue}>Group Savings — Monthly Contributions</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* ── Financial summary cards ───────────────── */}
+          <View style={s.summaryRow}>
+            <View style={[s.summaryCard, s.summaryCardGreen]}>
+              <Text style={s.summaryCardLabel}>Total Due</Text>
+              <Text style={s.summaryCardValue}>{rands(summary.totalDue)}</Text>
+              <Text style={s.summaryCardSub}>this period</Text>
+            </View>
+            <View style={[s.summaryCard, s.summaryCardGreen]}>
+              <Text style={s.summaryCardLabel}>Total Paid</Text>
+              <Text style={s.summaryCardValue}>{rands(summary.totalPaid)}</Text>
+              <Text style={s.summaryCardSub}>received</Text>
+            </View>
+            <View style={[s.summaryCard, fullyPaid ? s.summaryCardGreen : s.summaryCardRed]}>
+              <Text style={s.summaryCardLabel}>Outstanding</Text>
+              <Text style={[s.summaryCardValue, fullyPaid ? {} : s.summaryCardValueRed]}>
+                {rands(summary.outstanding)}
+              </Text>
+              <Text style={s.summaryCardSub}>{fullyPaid ? 'fully settled' : 'balance due'}</Text>
+            </View>
+            <View style={[s.summaryCard, fullyPaid ? s.summaryCardGold : s.summaryCardAmber]}>
+              <Text style={s.summaryCardLabel}>Period Status</Text>
+              <Text style={[s.summaryCardValue, fullyPaid ? s.summaryCardValueGold : s.summaryCardValueAmber]}>
+                {fullyPaid ? 'PAID' : 'OPEN'}
+              </Text>
+              <Text style={s.summaryCardSub}>{period.label}</Text>
+            </View>
+          </View>
+
+          {/* ── Contributions table ───────────────────── */}
+          <Text style={s.sectionHeading}>Contributions</Text>
+          <View style={s.table}>
+            <View style={s.tableHead}>
+              <Text style={[s.tableHeadCell, s.cPeriod]}>Period</Text>
+              <Text style={[s.tableHeadCell, s.cDue]}>Due</Text>
+              <Text style={[s.tableHeadCell, s.cPaid]}>Paid</Text>
+              <Text style={[s.tableHeadCell, s.cBalance]}>Outstanding</Text>
+              <Text style={[s.tableHeadCell, s.cStatus]}>Status</Text>
+              <Text style={[s.tableHeadCell, s.cDate]}>Due Date</Text>
+            </View>
+            {contributions.length === 0 ? (
+              <View style={s.tableEmpty}>
+                <Text style={s.tableEmptyText}>No contributions recorded for this period.</Text>
+              </View>
+            ) : contributions.map((c, i) => {
+              const bal = Math.max(0, c.amountDue - c.amountPaid)
+              return (
+                <View key={c.id} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
+                  <Text style={[s.tableCell, s.cPeriod]}>{c.periodLabel}</Text>
+                  <Text style={[s.tableCell, s.cDue]}>{rands(c.amountDue)}</Text>
+                  <Text style={[s.tableCell, s.cPaid]}>{rands(c.amountPaid)}</Text>
+                  <Text style={[s.tableCell, s.cBalance, bal > 0 ? s.sOverdue : s.sPaid]}>
+                    {rands(bal)}
+                  </Text>
+                  <Text style={[s.tableCell, s.cStatus, statusStyle(c.status)]}>
+                    {c.status}
+                  </Text>
+                  <Text style={[s.tableCell, s.cDate]}>{c.dueDate}</Text>
+                </View>
+              )
+            })}
+          </View>
+
+          {/* ── Transactions table ────────────────────── */}
+          <Text style={s.sectionHeading}>Transaction History</Text>
+          <View style={s.table}>
+            <View style={s.tableHead}>
+              <Text style={[s.tableHeadCell, s.tDate]}>Date</Text>
+              <Text style={[s.tableHeadCell, s.tDesc]}>Description</Text>
+              <Text style={[s.tableHeadCell, s.tRef]}>Reference</Text>
+              <Text style={[s.tableHeadCell, s.tAmount]}>Amount</Text>
+              <Text style={[s.tableHeadCell, s.tStatus]}>Status</Text>
+              <Text style={[s.tableHeadCell, s.tProc]}>Processed</Text>
+            </View>
+            {transactions.length === 0 ? (
+              <View style={s.tableEmpty}>
+                <Text style={s.tableEmptyText}>No transactions recorded for this period.</Text>
+              </View>
+            ) : transactions.map((t, i) => (
+              <View key={t.id} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
+                <Text style={[s.tableCell, s.tDate]}>{t.createdAt}</Text>
+                <Text style={[s.tableCell, s.tDesc]}>{txDescription(t.type)}</Text>
+                <Text style={[s.tableCellMuted, s.tRef]}>{t.gatewayRef ?? '—'}</Text>
+                <Text style={[s.tableCell, s.tAmount, statusStyle(t.status)]}>{rands(t.amount)}</Text>
+                <Text style={[s.tableCell, s.tStatus, statusStyle(t.status)]}>{t.status}</Text>
+                <Text style={[s.tableCellMuted, s.tProc]}>{t.processedAt ?? '—'}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* ── Disclaimer ────────────────────────────── */}
+          <View style={s.disclaimer}>
+            <Text style={s.disclaimerText}>
+              This statement is a record of your contributions and transactions for the specified period on the Xkimm Xa Mali private group savings platform.
+              It is intended solely for the named account holder. If you believe this statement is incorrect, please contact your group administrator immediately.
+              Amounts are in South African Rand (ZAR). This document was generated electronically and is valid without a signature.
+            </Text>
+          </View>
+
         </View>
 
-        {/* Footer */}
+        {/* ── Fixed footer (every page) ─────────────── */}
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>Xkimm Xa Mali · Private Group Savings</Text>
-          <Text style={s.footerGold}>&ldquo;Blessed is the hand that giveth.&rdquo;</Text>
+          <View style={s.footerLeft}>
+            <Text style={s.footerBold}>Xkimm Xa Mali</Text>
+            <Text style={s.footerText}>Private Group Savings Platform · South Africa</Text>
+          </View>
+          <View style={s.footerCenter}>
+            <Text style={s.footerText} render={({ pageNumber, totalPages }) =>
+              `Page ${pageNumber} of ${totalPages}`
+            } />
+            <Text style={s.footerGold}>&ldquo;Blessed is the hand that giveth.&rdquo;</Text>
+          </View>
+          <View style={s.footerRight}>
+            <Text style={s.footerText}>Generated: {generatedAt}</Text>
+            <Text style={s.footerText}>Ref: {docRef}</Text>
+          </View>
         </View>
+
       </Page>
     </Document>
   )
 }
 
-// ─── Export ───────────────────────────────────────────────────────────────────
+// ─── Exports ──────────────────────────────────────────────────────────────────
 
 export async function renderStatementPDF(data: StatementData): Promise<Buffer> {
   return renderToBuffer(<StatementDocument data={data} />)
