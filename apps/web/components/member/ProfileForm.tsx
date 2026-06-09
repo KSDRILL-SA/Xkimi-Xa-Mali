@@ -35,7 +35,7 @@ export function ProfileForm({ userId, initial }: Props) {
   const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const { register, handleSubmit, formState: { errors, isDirty } } = useForm<UpdateProfileInput>({
+  const { register, handleSubmit, formState: { errors } } = useForm<UpdateProfileInput>({
     resolver: zodResolver(UpdateProfileSchema),
     defaultValues: {
       firstName: initial.firstName,
@@ -124,7 +124,7 @@ export function ProfileForm({ userId, initial }: Props) {
       </div>
 
       <div className="flex justify-end">
-        <Button type="submit" loading={loading} disabled={!isDirty}>Save changes</Button>
+        <Button type="submit" loading={loading} disabled={loading}>Save changes</Button>
       </div>
     </form>
   )
