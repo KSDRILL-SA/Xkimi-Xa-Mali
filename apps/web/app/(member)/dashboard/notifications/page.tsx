@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { MessageSquare, Mail, Bell, type LucideIcon } from 'lucide-react'
@@ -65,7 +66,8 @@ export default async function NotificationsPage({
   searchParams: Promise<{ cursor?: string; channel?: string; status?: string }>
 }) {
   const session = await getSession()
-  const userId = session!.user.id
+  if (!session?.user?.id) redirect('/login')
+  const userId = session.user.id
   const params = await searchParams
   const cursor = params.cursor
   const channelFilter = params.channel as NotifChannel | undefined

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
@@ -37,7 +38,8 @@ export default async function TransactionsPage({
   searchParams: Promise<{ status?: string; type?: string; page?: string }>
 }) {
   const session = await getSession()
-  const userId  = session!.user.id
+  if (!session?.user?.id) redirect('/login')
+  const userId  = session.user.id
   const params  = await searchParams
 
   const page = Math.max(1, Number(params.page ?? '1'))

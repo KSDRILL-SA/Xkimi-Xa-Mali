@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
@@ -21,8 +22,9 @@ export default async function ContributionsPage({
   searchParams: Promise<{ page?: string }>
 }) {
   const session = await getSession()
-  const userId  = session!.user.id
-  const roles   = session!.user.roles ?? []
+  if (!session?.user?.id) redirect('/login')
+  const userId  = session.user.id
+  const roles   = session.user.roles ?? []
   const params  = await searchParams
   const page    = Math.max(1, Number(params.page ?? '1'))
 
