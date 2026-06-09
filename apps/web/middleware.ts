@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth'
 import { authConfig } from '@/lib/auth.config'
 import { verifyCsrfOrigin } from '@/lib/csrf-origin'
+import { getCachedRoleVersion, setCachedRoleVersion } from '@/lib/role-version-cache'
 import { NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
 
@@ -16,10 +17,6 @@ const AUTH_PREFIX = '/api/auth'
 const ROLE_VERSION_PREFIX = 'xxm:role-version:'
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
-// Only talk to Upstash when it is actually configured. Without this guard the
-// raw client is built with undefined url/token and every authenticated request
-// pays a failed network round-trip (caught, but slow) — the dominant source of
-// local navigation latency.
 const REDIS_CONFIGURED = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
 
 let _redis: Redis | null = null
@@ -35,10 +32,20 @@ function getRedis(): Redis {
 
 async function isRoleVersionStale(userId: string, tokenVersion: number): Promise<boolean> {
   if (!REDIS_CONFIGURED) return false
+
+  // Check the in-process cache first — avoids a Redis round-trip on every
+  // request for the common case where the role hasn't changed.
+  const inProcess = getCachedRoleVersion(userId)
+  if (inProcess !== null) {
+    return inProcess > tokenVersion
+  }
+
+  // Cache miss: fetch from Redis, populate cache, then evaluate.
   try {
-    const cached = await getRedis().get<string>(`${ROLE_VERSION_PREFIX}${userId}`)
-    if (cached === null) return false
-    return Number(cached) > tokenVersion
+    const stored = await getRedis().get<string>(`${ROLE_VERSION_PREFIX}${userId}`)
+    const version = stored === null ? 0 : Number(stored)
+    setCachedRoleVersion(userId, version)
+    return version > tokenVersion
   } catch {
     return false
   }
