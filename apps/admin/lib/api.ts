@@ -7,7 +7,9 @@ export class ApiClientError extends Error {
 type ApiEnvelope<T> = { data: T; meta: unknown }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const base = typeof window !== 'undefined' ? '' : (process.env['NEXT_PUBLIC_WEB_URL'] ?? '')
+  const base = typeof window !== 'undefined'
+    ? ''
+    : (process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000')
   const res = await fetch(`${base}${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
