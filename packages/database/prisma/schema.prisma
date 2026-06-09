@@ -89,6 +89,13 @@ enum InvitationStatus {
   EXPIRED
 }
 
+enum BadgeTier {
+  AMATEUR
+  SEMI_PRO
+  PRO
+  WORLD_CLASS
+}
+
 // ─── Identity ─────────────────────────────────────────────────────────────────
 
 model User {
@@ -130,6 +137,10 @@ model User {
   inviteAccepted         Invitation?             @relation("InviteAccepted")
   approvedMandates       PaymentMandate[]        @relation("MandateApprover")
   revokedInvitations     Invitation[]            @relation("InviteRevoker")
+  badgeScore             BadgeScore?
+  badgeHistory           BadgeHistory[]
+  communityMessages      CommunityMessage[]      @relation("MessageAuthor")
+  deletedCommunityMsgs   CommunityMessage[]      @relation("MessageDeleter")
 
   @@index([status])
   @@index([email, status])
@@ -526,4 +537,74 @@ model SystemConfig {
   updatedBy String?
 
   @@map("system_config")
+}
+
+// ─── Badges & Community ────────────────────────────────────────────────────────
+
+model BadgeScore {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  currentBadge      BadgeTier  @default(AMATEUR)
+  overallScore      Decimal    @default(0) @db.Decimal(6, 3)
+  consistencyScore  Decimal    @default(0) @db.Decimal(6, 3)
+  timelinessScore   Decimal    @default(0) @db.Decimal(6, 3)
+  generosityScore   Decimal    @default(0) @db.Decimal(6, 3)
+  streakBonus       Decimal    @default(0) @db.Decimal(6, 3)
+  progressToNext    Decimal    @default(0) @db.Decimal(6, 3)
+  currentStreak     Int        @default(0)
+  longestStreak     Int        @default(0)
+  totalPaidMonths   Int        @default(0)
+  totalOnTimeMonths Int        @default(0)
+  totalOverdue      Int        @default(0)
+  overdueInLast6    Int        @default(0)
+  monthsActive      Int        @default(0)
+  avgContribution   Decimal    @default(0) @db.Decimal(10, 2)
+  graceUntil        DateTime?
+  lastCalculatedAt  DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([currentBadge])
+  @@index([overallScore])
+  @@map("badge_scores")
+}
+
+model BadgeHistory {
+  id        String     @id @default(cuid())
+  userId    String
+  fromBadge BadgeTier?
+  toBadge   BadgeTier
+  trigger   String
+  score     Decimal    @db.Decimal(6, 3)
+  createdAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("badge_history")
+}
+
+model CommunityMessage {
+  id            String    @id @default(cuid())
+  userId        String
+  content       String    @db.VarChar(500)
+  replyToId     String?
+  isPinned      Boolean   @default(false)
+  isDeleted     Boolean   @default(false)
+  deletedById   String?
+  deletedAt     DateTime?
+  editableUntil DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user      User               @relation("MessageAuthor", fields: [userId], references: [id], onDelete: Restrict)
+  deletedBy User?              @relation("MessageDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
+  replyTo   CommunityMessage?  @relation("Replies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   CommunityMessage[] @relation("Replies")
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([isPinned])
+  @@map("community_messages")
 }
