@@ -8,6 +8,7 @@ import { mandateRepo } from '@/repositories/mandate.repository'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@/lib/logger'
 import { cache, CACHE_KEYS } from '@/lib/cache'
+import { inngest, InngestEvents } from '@/lib/inngest'
 import {
   ContributionNotFoundError,
   ContributionConflictError,
@@ -290,7 +291,20 @@ export async function recalculateContributionStatus(
       tx,
     )
 
-    if (updated.count > 0) return
+    if (updated.count > 0) {
+      if (status === 'PAID' || status === 'OVERDUE') {
+        await inngest.send({
+          name: InngestEvents.CONTRIBUTION_STATUS_CHANGED,
+          data: { userId: contribution.userId, contributionId, status },
+        }).catch((err) => {
+          logger.error('Failed to send contribution.status.changed event', {
+            contributionId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
+      }
+      return
+    }
 
     if (attempt < MAX_OPTIMISTIC_RETRIES) {
       logger.warn('Optimistic lock conflict on contribution, retrying', {

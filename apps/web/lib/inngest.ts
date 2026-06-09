@@ -20,6 +20,9 @@ type XXMEvents = {
   'xxm/notifications.flush': { data: Record<string, never> }
   'xxm/mandate.status-sync': { data: Record<string, never> }
   'xxm/invite.expiry': { data: Record<string, never> }
+  'xxm/contribution.status.changed': {
+    data: { userId: string; contributionId: string; status: string }
+  }
 }
 
 export const inngest = new Inngest({
@@ -40,4 +43,5 @@ export const InngestEvents = {
   NOTIFICATIONS_FLUSH: 'xxm/notifications.flush',
   MANDATE_STATUS_SYNC: 'xxm/mandate.status-sync',
   INVITE_EXPIRY: 'xxm/invite.expiry',
+  CONTRIBUTION_STATUS_CHANGED: 'xxm/contribution.status.changed',
 } as const
