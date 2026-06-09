@@ -1,7 +1,6 @@
 'use client'
 
-import { Button } from '@/components/ui/Button'
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { ErrorCard } from '@/components/ui/ErrorCard'
 
 export default function DashboardError({
   error,
@@ -10,19 +9,5 @@ export default function DashboardError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-      <div className="rounded-2xl bg-xxm-champagne-200 border border-red-200 p-4">
-        <AlertTriangle size={36} className="text-red-500" aria-hidden />
-      </div>
-      <div className="max-w-sm space-y-1">
-        <p className="font-semibold text-xxm-gray-800">Something went wrong</p>
-        <p className="text-sm text-xxm-gray-400">{error.message || 'Failed to load dashboard.'}</p>
-      </div>
-      <Button onClick={reset} variant="outline" size="sm">
-        <RefreshCw size={14} aria-hidden />
-        Try again
-      </Button>
-    </div>
-  )
+  return <ErrorCard error={error} reset={reset} message="Failed to load this page. Please try again." />
 }
