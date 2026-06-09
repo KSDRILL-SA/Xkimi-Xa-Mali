@@ -8,6 +8,7 @@
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "sideEffects": false,
   "peerDependencies": {
     "@prisma/client": ">=6.0.0"
   },
