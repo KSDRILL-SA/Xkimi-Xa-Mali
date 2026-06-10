@@ -14,6 +14,7 @@ import { NotificationPreferencesForm } from '@/components/member/NotificationPre
 import { ChangePasswordForm } from '@/components/member/ChangePasswordForm'
 import { DataPrivacySection } from '@/components/member/DataPrivacySection'
 import { BudgetSettingsSection } from '@/components/member/BudgetSettingsSection'
+import { Reveal } from '@xxm/ui'
 
 export const metadata: Metadata = { title: 'Profile' }
 
@@ -57,17 +58,17 @@ export default async function ProfilePage() {
     <div className="space-y-6">
 
       {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-xxm-green to-xxm-canopy flex items-center justify-center shrink-0 shadow-sm">
+      <Reveal variant="up" className="flex items-center gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-xxm-green to-xxm-canopy flex items-center justify-center shrink-0 shadow-sm transition-transform duration-slow ease-bounce hover:scale-105 hover:shadow-gold-sm">
           <span className="text-xl font-black text-white" aria-hidden>{initials}</span>
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">
             {name || 'Profile'}
           </h1>
           <p className="text-xxm-gray-500 text-sm mt-0.5">Manage your personal details, banking, and preferences.</p>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Tabbed settings card ───────────────────── */}
       <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
