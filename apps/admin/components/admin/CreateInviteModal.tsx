@@ -1,6 +1,7 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Button, Input, Label, Alert } from '@xxm/ui'
 import { Check, Copy, X, UserPlus } from 'lucide-react'
 import { MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR, DEFAULT_INVITE_AMOUNT } from '@xxm/utils'
@@ -37,7 +38,11 @@ function ModalContent({
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [state, formAction, isPending] = useActionState(createAction, {})
+
+  // Portal target only exists on the client — wait for mount before rendering.
+  useEffect(() => setMounted(true), [])
 
   function handleCopy() {
     if (!state.data) return
@@ -47,7 +52,9 @@ function ModalContent({
     })
   }
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 animate-fade-in">
       <div className="bg-white rounded-2xl shadow-xxm-lg w-full max-w-md p-6 space-y-5 animate-scale-in">
         <div className="flex items-center justify-between">
@@ -126,6 +133,7 @@ function ModalContent({
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
