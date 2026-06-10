@@ -13,24 +13,26 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean
   iconOnly?: boolean
   fullWidth?: boolean
+  /** Adds a soft pulsing gold ring — use sparingly for a single primary CTA. */
+  glow?: boolean
 }
 
 const base =
-  'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-150 ' +
+  'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-fast ease-smooth ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold focus-visible:ring-offset-2 ' +
   'disabled:opacity-50 disabled:pointer-events-none select-none'
 
 const variants: Record<Variant, string> = {
   primary:
-    'bg-xxm-green text-white hover:bg-xxm-canopy active:scale-[0.97] shadow-xxm-sm hover:shadow-xxm',
+    'bg-xxm-green text-white hover:bg-xxm-canopy active:scale-[0.97] shadow-xxm-sm hover:shadow-xxm hover:-translate-y-0.5',
   secondary:
-    'bg-xxm-champagne-200 text-xxm-green-900 border border-xxm-green/15 hover:bg-xxm-champagne-300 active:scale-[0.97]',
+    'bg-xxm-champagne-200 text-xxm-green-900 border border-xxm-green/15 hover:bg-xxm-champagne-300 active:scale-[0.97] hover:-translate-y-0.5',
   gold:
-    'bg-xxm-gold text-xxm-green-900 hover:bg-xxm-gold-dark active:scale-[0.97] shadow-gold-sm hover:shadow-gold font-bold',
+    'bg-xxm-gold text-xxm-green-900 hover:bg-xxm-gold-dark active:scale-[0.97] shadow-gold-sm hover:shadow-gold font-bold hover:-translate-y-0.5',
   ghost:
     'text-xxm-green hover:bg-xxm-green-100 active:scale-[0.97]',
   danger:
-    'bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] shadow-sm',
+    'bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] shadow-sm hover:-translate-y-0.5',
   outline:
     'border border-xxm-gray-200 bg-white text-xxm-gray-700 hover:bg-xxm-green-50 hover:border-xxm-green/20 hover:text-xxm-green active:scale-[0.97]',
   tertiary:
@@ -46,13 +48,14 @@ const sizes: Record<Size, string> = {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', loading, asChild, iconOnly, fullWidth, children, disabled, ...props }, ref) => {
+  ({ className, variant = 'primary', size = 'md', loading, asChild, iconOnly, fullWidth, glow, children, disabled, ...props }, ref) => {
     const classes = cn(
       base,
       variants[variant],
       sizes[size],
       iconOnly && 'px-0 aspect-square',
       fullWidth && 'w-full',
+      glow && 'animate-pulse-ring',
       className,
     )
 

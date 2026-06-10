@@ -25,6 +25,8 @@ export { PageHeader } from './components/PageHeader'
 export { Pagination } from './components/Pagination'
 export { RouterPagination } from './components/RouterPagination'
 export { ProgressBar } from './components/ProgressBar'
+export { Reveal } from './components/Reveal'
+export { StatCard } from './components/StatCard'
 export { Select } from './components/Select'
 export {
   Skeleton,
@@ -43,3 +45,4 @@ export type { Toast, ToastVariant } from './components/Toast'
 export { Tooltip } from './components/Tooltip'
 export { XmmLogo } from './components/XmmLogo'
 export { useCountUp } from './hooks/useCountUp'
+export { useScrollReveal } from './hooks/useScrollReveal'
