@@ -50,6 +50,15 @@ export const communityRepo = {
     })
   },
 
+  /** Edit a message's content (own, within the edit window). */
+  updateContent(id: string, content: string) {
+    return db.communityMessage.update({
+      where: { id },
+      data: { content, editedAt: new Date() },
+      include: { user: authorSelect },
+    })
+  },
+
   /** Soft-delete a message (own within edit window, or admin at any time). */
   softDelete(id: string, deletedById: string) {
     return db.communityMessage.update({
