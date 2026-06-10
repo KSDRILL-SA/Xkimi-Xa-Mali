@@ -10,6 +10,7 @@ import { ContributionSummaryCards } from '@/components/contribution/SummaryCards
 import { ContributionRow } from '@/components/contribution/ContributionRow'
 import { RouterPagination } from '@/components/ui/RouterPagination'
 import { Button } from '@/components/ui/Button'
+import { Reveal } from '@xxm/ui'
 import { Wallet, AlertTriangle } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Contributions' }
@@ -77,13 +78,13 @@ export default async function ContributionsPage({
     <div className="space-y-6">
 
       {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      <Reveal variant="up" className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
             <Wallet size={22} className="text-xxm-green" aria-hidden />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Contributions</h1>
+            <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Contributions</h1>
             <p className="text-sm text-xxm-gray-500 mt-1">Your monthly payment history and ledger.</p>
           </div>
         </div>
@@ -92,10 +93,12 @@ export default async function ContributionsPage({
             <Link href="/dashboard/contribute">Make a payment</Link>
           </Button>
         )}
-      </div>
+      </Reveal>
 
       {/* Summary */}
-      <ContributionSummaryCards summary={summary} />
+      <Reveal variant="up" delay={100}>
+        <ContributionSummaryCards summary={summary} />
+      </Reveal>
 
       {/* No active mandate warning */}
       {!mandateInfo && (
