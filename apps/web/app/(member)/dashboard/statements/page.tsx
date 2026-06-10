@@ -2,9 +2,9 @@ import type { Metadata } from 'next'
 import { FileText, Download } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
+import { getStatementPeriods } from '@/services/contribution.service'
 
 export const metadata: Metadata = { title: 'Statements' }
 
@@ -16,8 +16,8 @@ const MONTHS = [
 type ContribRow = {
   periodMonth: number
   periodYear: number
-  amountDue: number | string
-  amountPaid: number | string
+  amountDue: number
+  amountPaid: number
   status: string
 }
 
@@ -35,14 +35,11 @@ export default async function StatementsPage() {
   const session = await getSession()
   if (!session?.user?.id) redirect('/login')
   const userId = session.user.id
+  const roles  = (session.user.roles as string[] | undefined) ?? []
 
-  const contributions = await db.contribution.findMany({
-    where: { userId },
-    orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
-    select: { periodMonth: true, periodYear: true, amountDue: true, amountPaid: true, status: true },
-  })
+  const contributions = await getStatementPeriods(userId, userId, roles)
 
-  const byYear = (contributions as unknown as ContribRow[]).reduce<Record<number, ContribRow[]>>((acc, c) => {
+  const byYear = (contributions as ContribRow[]).reduce<Record<number, ContribRow[]>>((acc, c) => {
     if (!acc[c.periodYear]) acc[c.periodYear] = []
     acc[c.periodYear].push(c)
     return acc
@@ -92,7 +89,7 @@ export default async function StatementsPage() {
               <div className="divide-y divide-xxm-gray-50">
                 {byYear[year].map((c) => {
                   const sc = STATUS_CONFIG[c.status as ContribStatus] ?? { label: c.status, dot: 'bg-xxm-gray-400', badge: 'bg-xxm-gray-100 text-xxm-gray-600' }
-                  const outstanding = Math.max(0, Number(c.amountDue) - Number(c.amountPaid))
+                  const outstanding = Math.max(0, c.amountDue - c.amountPaid)
 
                   return (
                     <div key={`${c.periodYear}-${c.periodMonth}`} className="flex items-center gap-4 px-5 py-4 hover:bg-xxm-green-50/20 transition-colors">
@@ -101,9 +98,9 @@ export default async function StatementsPage() {
                           {MONTHS[c.periodMonth - 1]} {c.periodYear}
                         </p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-[11px] text-xxm-gray-500 tabular-nums">Due {formatZAR(Number(c.amountDue))}</span>
+                          <span className="text-[11px] text-xxm-gray-500 tabular-nums">Due {formatZAR(c.amountDue)}</span>
                           <span className="text-xxm-gray-300">·</span>
-                          <span className="text-[11px] text-xxm-gray-500 tabular-nums">Paid {formatZAR(Number(c.amountPaid))}</span>
+                          <span className="text-[11px] text-xxm-gray-500 tabular-nums">Paid {formatZAR(c.amountPaid)}</span>
                           {outstanding > 0 && (
                             <>
                               <span className="text-xxm-gray-300">·</span>

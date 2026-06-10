@@ -3,11 +3,11 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { RouterPagination } from '@/components/ui/RouterPagination'
 import { Reveal } from '@xxm/ui'
 import { FileText, ArrowUpCircle } from 'lucide-react'
+import { getTransactionHistory } from '@/services/report.service'
 
 export const metadata: Metadata = { title: 'Transactions' }
 
@@ -31,8 +31,6 @@ const TYPE_LABELS: Record<TxType, string> = {
   SCHEDULED:   'Scheduled',
 }
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-
 export default async function TransactionsPage({
   searchParams,
 }: {
@@ -41,6 +39,7 @@ export default async function TransactionsPage({
   const session = await getSession()
   if (!session?.user?.id) redirect('/login')
   const userId  = session.user.id
+  const roles   = (session.user.roles as string[] | undefined) ?? []
   const params  = await searchParams
 
   const page = Math.max(1, Number(params.page ?? '1'))
@@ -52,22 +51,12 @@ export default async function TransactionsPage({
   const statusFilter = params.status && validStatuses.includes(params.status as TxStatus) ? (params.status as TxStatus) : undefined
   const typeFilter   = params.type   && validTypes.includes(params.type as TxType)         ? (params.type   as TxType)   : undefined
 
-  const where = {
-    contribution: { userId },
-    ...(statusFilter && { status: statusFilter }),
-    ...(typeFilter   && { type:   typeFilter }),
-  }
-
-  const [txs, total] = await Promise.all([
-    db.transaction.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: PAGE_SIZE,
-      include: { contribution: { select: { periodMonth: true, periodYear: true } } },
-    }),
-    db.transaction.count({ where }),
-  ])
+  const { items: txs, total } = await getTransactionHistory(userId, userId, roles, {
+    status: statusFilter,
+    type: typeFilter,
+    page,
+    limit: PAGE_SIZE,
+  })
 
   const buildUrl = (overrides: Record<string, string | undefined>) => {
     const p = new URLSearchParams()
@@ -135,7 +124,7 @@ export default async function TransactionsPage({
           <div className="divide-y divide-xxm-gray-50">
             {txs.map((tx) => {
               const sc = STATUS_CONFIG[tx.status as TxStatus] ?? { label: tx.status, dot: 'bg-xxm-gray-400', badge: 'bg-xxm-gray-100 text-xxm-gray-600' }
-              const period = `${MONTHS[(tx.contribution.periodMonth ?? 1) - 1]} ${tx.contribution.periodYear}`
+              const period = tx.period
               return (
                 <div key={tx.id} className="group flex sm:grid sm:grid-cols-[1fr_100px_100px_140px_1fr_90px] gap-3 items-center px-5 py-4 hover:bg-xxm-green-50/20 transition-colors flex-wrap">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -148,7 +137,7 @@ export default async function TransactionsPage({
                     {TYPE_LABELS[tx.type as TxType] ?? tx.type}
                   </span>
                   <span className="stat-number text-sm font-bold text-xxm-green-900 text-right hidden sm:block">
-                    {formatZAR(Number(tx.amount))}
+                    {formatZAR(tx.amount)}
                   </span>
                   <span
                     className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0 ${sc.badge}`}
