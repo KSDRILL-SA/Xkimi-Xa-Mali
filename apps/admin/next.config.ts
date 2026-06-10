@@ -5,6 +5,11 @@ const WEB_URL = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?
 const config: NextConfig = {
   transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/types', '@xxm/config', 'geist'],
   serverExternalPackages: ['@prisma/client'],
+  // Signature uploads (drawn PNGs / images) are sent through a server action;
+  // raise the default 1 MB body cap so larger signatures aren't rejected.
+  experimental: {
+    serverActions: { bodySizeLimit: '6mb' },
+  },
   // Proxy /api/* calls to the web app so client components work without CORS issues
   async rewrites() {
     return [

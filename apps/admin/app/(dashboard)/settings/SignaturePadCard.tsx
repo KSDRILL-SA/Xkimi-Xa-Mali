@@ -72,6 +72,10 @@ export function SignaturePadCard({ signature, lockStatus, history, saveAction }:
           setError('Please choose a PNG image to upload.')
           return
         }
+        if (uploadFile.size > 2 * 1024 * 1024) {
+          setError('Image is too large. Please upload a PNG under 2MB.')
+          return
+        }
         file = uploadFile
       } else {
         if (!padRef.current || padRef.current.isEmpty()) {
@@ -158,7 +162,7 @@ export function SignaturePadCard({ signature, lockStatus, history, saveAction }:
                 onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-xxm-gray-600 file:mr-4 file:rounded-xl file:border-0 file:bg-xxm-green-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-xxm-green hover:file:bg-xxm-green-100"
               />
-              <p className="text-xs text-xxm-gray-500">PNG only, up to 1MB.</p>
+              <p className="text-xs text-xxm-gray-500">PNG only, up to 2MB.</p>
             </div>
           )}
 
