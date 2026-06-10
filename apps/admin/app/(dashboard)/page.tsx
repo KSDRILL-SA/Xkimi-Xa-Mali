@@ -10,7 +10,7 @@ import {
   TrendingUp, CalendarCheck, UserPlus, ShieldCheck, Megaphone,
   ArrowRight, CheckCircle2,
 } from 'lucide-react'
-import { ProgressBar } from '@xxm/ui'
+import { ProgressBar, Reveal } from '@xxm/ui'
 
 export const metadata: Metadata = { title: 'Overview' }
 
@@ -84,10 +84,11 @@ export default async function AdminOverviewPage() {
     <div className="space-y-7">
 
       {/* ── Hero greeting ─────────────────────────────────────────── */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-xxm-green via-xxm-canopy to-xxm-green-900 rounded-2xl p-6 md:p-8 text-white shadow-xxm-lg">
+      <Reveal variant="up" className="relative overflow-hidden bg-gradient-to-br from-xxm-green via-xxm-canopy to-xxm-green-900 rounded-2xl p-6 md:p-8 text-white shadow-xxm-lg">
+        <div className="noise-overlay" aria-hidden />
         <div className="relative z-10">
           <p className="text-xxm-gold text-xs font-bold tracking-widest uppercase mb-2">Xkimm Xa Mali — Admin</p>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
+          <h1 className="font-display text-2xl md:text-3xl font-extrabold tracking-tight">
             Welcome back, {firstName}
           </h1>
           <p className="text-green-200/90 mt-2 text-sm max-w-md leading-relaxed">
@@ -112,34 +113,34 @@ export default async function AdminOverviewPage() {
             </Link>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/4 pointer-events-none" aria-hidden />
-        <div className="absolute bottom-0 right-1/4 w-40 h-40 bg-xxm-gold/10 rounded-full translate-y-1/2 pointer-events-none" aria-hidden />
-      </div>
+        <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/4 pointer-events-none animate-orb-drift-1" aria-hidden />
+        <div className="absolute bottom-0 right-1/4 w-40 h-40 bg-xxm-gold/10 rounded-full translate-y-1/2 pointer-events-none animate-orb-drift-2" aria-hidden />
+      </Reveal>
 
       {/* ── Stat cards ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <Reveal variant="up" delay={100} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map(({ icon: Icon, label, value, subtext, gradient, iconBg, iconColor, border }) => (
           <div
             key={label}
-            className={`relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-200`}
+            className={`group relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
           >
-            <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4`}>
+            <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-transform duration-slow group-hover:scale-110`}>
               <Icon size={18} className={iconColor} aria-hidden />
             </div>
-            <p className="text-2xl md:text-3xl font-extrabold text-xxm-green-900 tabular-nums leading-none">
+            <p className="stat-number text-2xl md:text-3xl font-extrabold text-xxm-green-900 leading-none">
               {value}
             </p>
             <p className="text-xs font-semibold text-xxm-gray-700 mt-1.5">{label}</p>
             <p className="text-[11px] text-xxm-gray-400 mt-0.5">{subtext}</p>
           </div>
         ))}
-      </div>
+      </Reveal>
 
       {/* ── Collection rate ─────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
+      <Reveal variant="up" delay={200} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-base font-bold text-xxm-green-900">{monthName} Collection Rate</h2>
+            <h2 className="font-display text-base font-bold text-xxm-green-900">{monthName} Collection Rate</h2>
             <p className="text-sm text-xxm-gray-500 mt-0.5">
               {formatZAR(totalPaid)} collected of {formatZAR(totalDue)} due this month
             </p>
@@ -151,7 +152,7 @@ export default async function AdminOverviewPage() {
               aria-hidden
             />
             <span
-              className={`text-3xl font-extrabold tabular-nums ${
+              className={`stat-number text-3xl font-extrabold ${
                 collectionRate >= 80 ? 'text-xxm-green' : collectionRate >= 50 ? 'text-amber-500' : 'text-red-500'
               }`}
             >
@@ -165,19 +166,19 @@ export default async function AdminOverviewPage() {
           <span className="text-xxm-gray-500 font-medium">Target: {formatZAR(totalDue)}</span>
           <span>100%</span>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Quick navigation ────────────────────────────────────────── */}
-      <div>
+      <Reveal variant="up" delay={300}>
         <p className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest mb-4">Quick Navigation</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {quickLinks.map(({ href, icon: Icon, label, description, iconColor, iconBg }) => (
             <Link
               key={href}
               href={href}
-              className="group flex flex-col gap-3 p-4 bg-white rounded-2xl border border-xxm-green/7 shadow-xxm-sm hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-200"
+              className="group flex flex-col gap-3 p-4 bg-white rounded-2xl border border-xxm-green/7 shadow-xxm-sm hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth"
             >
-              <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center group-hover:scale-105 transition-transform duration-200`}>
+              <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center transition-transform duration-slow group-hover:scale-110`}>
                 <Icon size={18} className={iconColor} aria-hidden />
               </div>
               <div className="flex-1">
@@ -188,7 +189,7 @@ export default async function AdminOverviewPage() {
             </Link>
           ))}
         </div>
-      </div>
+      </Reveal>
 
     </div>
   )
