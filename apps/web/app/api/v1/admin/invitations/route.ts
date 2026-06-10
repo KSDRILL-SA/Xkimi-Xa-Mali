@@ -40,7 +40,10 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   const session   = isTrusted ? null : await auth()
   if (!isTrusted && !session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
-  const adminId = isTrusted ? 'system' : session!.user.id
+  // On the trusted server-to-server path the admin app forwards the acting
+  // admin's real user id; it's required because invitedById is a FK to User.
+  const adminId = isTrusted ? (req.headers.get('x-admin-user-id') ?? '') : session!.user.id
+  if (!adminId) return apiError('SYS_002', 'Missing admin identity', 401)
   const roles   = isTrusted ? ['ADMIN'] : (session!.user.roles as string[] | undefined) ?? []
 
   const rlKey = isTrusted ? 'internal-admin-invite' : adminId
