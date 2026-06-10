@@ -1,10 +1,12 @@
 import { storageProvider } from '@/integrations/storage'
 import { renderStatementPDF } from '@/lib/pdf/statement'
 import type { StatementData } from '@/lib/pdf/statement'
+import { renderContributionReportPDF } from '@/lib/pdf/contribution-report'
+import type { ContributionReportData } from '@/lib/pdf/contribution-report'
 import type { TransactionFilter } from '@/lib/validation/report'
 import { MONTHS } from '@/lib/date'
 import { ReportNotFoundError } from '@/lib/errors'
-import { assertCanAccess } from '@/lib/authorization'
+import { assertCanAccess, assertAdmin } from '@/lib/authorization'
 import { transactionRepo } from '@/repositories/transaction.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
@@ -433,4 +435,41 @@ export async function exportAdminReportCSV(month: number, year: number): Promise
   ]
 
   return [...headerTitle, columnHeaders, ...rows, ...summarySection].join('\r\n')
+}
+
+// ─── Admin report PDF ───────────────────────────────────────────────────────────
+
+export async function generateContributionReportPdf(
+  roles: string[],
+  month: number,
+  year: number,
+): Promise<Buffer> {
+  assertAdmin(roles)
+
+  const report = await getAdminReport(month, year)
+
+  // Signature is embedded when configured; the report still generates otherwise.
+  const signature = await verifySignatureExists().catch((): null => null)
+  const signatureImage = signature
+    ? await embedSignatureInPdf(signature.signatureUrl).catch((): null => null)
+    : null
+
+  const ts = Date.now().toString(36).toUpperCase().slice(-4)
+  const docRef = `XMM-RPT-${year}${String(month).padStart(2, '0')}-${ts}`
+  const generatedAt = new Date().toLocaleDateString('en-ZA', {
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+
+  const data: ContributionReportData = {
+    period:    report.period,
+    summary:   report.summary,
+    members:   report.members,
+    generatedAt,
+    docRef,
+    signature: signature && signatureImage
+      ? { imageDataUri: signatureImage, displayName: signature.displayName }
+      : null,
+  }
+
+  return renderContributionReportPDF(data)
 }
