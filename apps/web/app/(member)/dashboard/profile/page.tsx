@@ -6,12 +6,14 @@ import {
   listBankAccounts,
   getNotificationPreferences,
 } from '@/services/member.service'
+import { getMyBudgets, getOverrideHistory } from '@/services/budget.service'
 import { Tabs } from '@/components/ui/Tabs'
 import { ProfileForm } from '@/components/member/ProfileForm'
 import { BankAccountsSection } from '@/components/member/BankAccountsSection'
 import { NotificationPreferencesForm } from '@/components/member/NotificationPreferencesForm'
 import { ChangePasswordForm } from '@/components/member/ChangePasswordForm'
 import { DataPrivacySection } from '@/components/member/DataPrivacySection'
+import { BudgetSettingsSection } from '@/components/member/BudgetSettingsSection'
 
 export const metadata: Metadata = { title: 'Profile' }
 
@@ -29,10 +31,12 @@ export default async function ProfilePage() {
 
   const userId = session.user.id
 
-  const [profile, bankAccounts, prefs] = await Promise.all([
+  const [profile, bankAccounts, prefs, budgets, budgetOverrides] = await Promise.all([
     getMemberProfile(userId, userId, session.user.roles),
     listBankAccounts(userId),
     getNotificationPreferences(userId),
+    getMyBudgets(userId, userId, session.user.roles ?? []),
+    getOverrideHistory(userId, userId, session.user.roles ?? []),
   ])
 
   const serialisedAccounts = bankAccounts.map((a) => ({
@@ -103,6 +107,15 @@ export default async function ProfilePage() {
               content: (
                 <div className="p-5 md:p-6">
                   <NotificationPreferencesForm initial={prefs} />
+                </div>
+              ),
+            },
+            {
+              id: 'budget',
+              label: 'Budget',
+              content: (
+                <div className="p-5 md:p-6">
+                  <BudgetSettingsSection initial={budgets} initialOverrides={budgetOverrides} />
                 </div>
               ),
             },
