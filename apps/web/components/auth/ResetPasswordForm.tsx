@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
+import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormGroup } from '@/components/ui/FormGroup'
@@ -42,10 +43,10 @@ export function ResetPasswordForm({ token }: Props) {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       {serverError && <Alert variant="error">{serverError}</Alert>}
       <FormGroup label="New password" htmlFor="password" required error={errors.password?.message} hint="Min. 8 characters, 1 uppercase, 1 number">
-        <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" {...register('password')} />
+        <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" icon={Lock} {...register('password')} />
       </FormGroup>
       <FormGroup label="Confirm password" htmlFor="confirmPassword" required error={errors.confirmPassword?.message}>
-        <Input id="confirmPassword" type="password" autoComplete="new-password" placeholder="Repeat your password" {...register('confirmPassword')} />
+        <Input id="confirmPassword" type="password" autoComplete="new-password" placeholder="Repeat your password" icon={Lock} {...register('confirmPassword')} />
       </FormGroup>
       <Button type="submit" className="w-full" size="lg" loading={loading}>
         Set new password
