@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllContributions } from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
-import { Alert, RouterPagination } from '@xxm/ui'
+import { Alert, Reveal, RouterPagination } from '@xxm/ui'
 import { db } from '@/lib/db'
 import { Wallet, ChevronDown, Zap } from 'lucide-react'
 
@@ -93,11 +93,11 @@ export default async function ContributionsPage({
     <div className="space-y-6">
 
       {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <Reveal variant="up" className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Contributions</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Contributions</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">
-            <span className="font-semibold text-xxm-green">{total}</span> records for {MONTHS[month - 1]} {year}
+            <span className="stat-number font-semibold text-xxm-green">{total}</span> records for {MONTHS[month - 1]} {year}
           </p>
         </div>
         <form action={generate} className="flex items-center gap-2">
@@ -111,7 +111,7 @@ export default async function ContributionsPage({
             Generate {MONTHS[month - 1]}
           </button>
         </form>
-      </div>
+      </Reveal>
 
       {generated && (
         <Alert variant="success" title="Generated">
@@ -120,7 +120,7 @@ export default async function ContributionsPage({
       )}
 
       {/* ── Filters ─────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4">
+      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4">
         <form method="GET" action="/contributions" className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <select
@@ -162,9 +162,10 @@ export default async function ContributionsPage({
             Filter
           </button>
         </form>
-      </div>
+      </Reveal>
 
       {/* ── Contributions list ──────────────────────────────── */}
+      <Reveal variant="up" delay={200}>
       {contributions.length === 0 ? (
         <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
@@ -194,10 +195,10 @@ export default async function ContributionsPage({
               return (
                 <div
                   key={c.id}
-                  className="grid grid-cols-[2fr_1fr_1fr_1fr_90px] gap-3 px-4 py-3 items-center hover:bg-xxm-green-50/40 transition-colors"
+                  className="group grid grid-cols-[2fr_1fr_1fr_1fr_90px] gap-3 px-4 py-3 items-center hover:bg-xxm-green-50/40 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-8 h-8 rounded-xl ${avatarColor} flex items-center justify-center text-[11px] font-bold shrink-0`}>
+                    <div className={`w-8 h-8 rounded-xl ${avatarColor} flex items-center justify-center text-[11px] font-bold shrink-0 transition-transform duration-slow group-hover:scale-110`}>
                       {initials}
                     </div>
                     <div className="min-w-0">
@@ -206,8 +207,8 @@ export default async function ContributionsPage({
                     </div>
                   </div>
                   <span className="text-xs text-xxm-gray-600 hidden sm:block">{MONTHS[c.periodMonth - 1]} {c.periodYear}</span>
-                  <span className="text-sm font-semibold text-xxm-gray-700 text-right tabular-nums">{formatZAR(c.amountDue as number)}</span>
-                  <span className="text-sm font-semibold text-xxm-green-700 text-right tabular-nums">{formatZAR(c.amountPaid as number)}</span>
+                  <span className="stat-number text-sm font-semibold text-xxm-gray-700 text-right">{formatZAR(c.amountDue as number)}</span>
+                  <span className="stat-number text-sm font-semibold text-xxm-green-700 text-right">{formatZAR(c.amountPaid as number)}</span>
                   <div className="flex justify-center">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${sc.badge}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} aria-hidden />
@@ -220,6 +221,7 @@ export default async function ContributionsPage({
           </div>
         </div>
       )}
+      </Reveal>
 
       {/* ── Pagination ──────────────────────────────────────── */}
       {total > 25 && (

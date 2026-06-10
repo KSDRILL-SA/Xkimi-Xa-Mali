@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getMonthlyReportSummary } from '@/lib/services'
 import { formatZAR, formatMonth, MONTHS } from '@xxm/utils'
-import { ProgressBar } from '@xxm/ui'
+import { ProgressBar, Reveal } from '@xxm/ui'
 import { Download, TrendingUp, Users, Wallet, BarChart3, ChevronDown, CheckCircle2 } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Reports' }
@@ -54,23 +54,23 @@ export default async function ReportsPage({
     <div className="space-y-7">
 
       {/* ── Page header ──────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <Reveal variant="up" className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Reports</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Reports</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">Monthly contribution summaries and financial reporting.</p>
         </div>
         <a
           href={`/api/export?month=${month}&year=${year}`}
           download={`xkimm-xa-mali-${month}-${year}.csv`}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-canopy transition-colors shadow-xxm-sm"
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm"
         >
           <Download size={14} aria-hidden />
           Export CSV
         </a>
-      </div>
+      </Reveal>
 
       {/* ── Period selector ──────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4">
+      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4">
         <form method="GET" action="/reports" className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold text-xxm-gray-600 mr-1">Viewing period:</p>
           <div className="relative">
@@ -100,11 +100,12 @@ export default async function ReportsPage({
             View
           </button>
         </form>
-      </div>
+      </Reveal>
 
       {/* ── Period heading ──────────────────────────────────────── */}
+      <Reveal variant="up" delay={200} className="space-y-7">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-xxm-green-900">{formatMonth(month, year)}</h2>
+        <h2 className="font-display text-lg font-bold text-xxm-green-900">{formatMonth(month, year)}</h2>
         <span className="text-xs text-xxm-gray-400">{summary.paidCount} of {summary.memberCount} members paid</span>
       </div>
 
@@ -113,30 +114,31 @@ export default async function ReportsPage({
         {summaryCards.map(({ icon: Icon, label, value, sub, gradient, iconBg, iconColor, border }) => (
           <div
             key={label}
-            className={`bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-200`}
+            className={`group bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
           >
-            <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4`}>
+            <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-transform duration-slow group-hover:scale-110`}>
               <Icon size={18} className={iconColor} aria-hidden />
             </div>
-            <p className="text-2xl font-extrabold text-xxm-green-900 tabular-nums leading-none">{value}</p>
+            <p className="stat-number text-2xl font-extrabold text-xxm-green-900 leading-none">{value}</p>
             <p className="text-xs font-semibold text-xxm-gray-700 mt-1.5">{label}</p>
             <p className="text-[11px] text-xxm-gray-400 mt-0.5">{sub}</p>
           </div>
         ))}
       </div>
+      </Reveal>
 
       {/* ── Collection progress ──────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
+      <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h3 className="text-base font-bold text-xxm-green-900">Collection Progress</h3>
+            <h3 className="font-display text-base font-bold text-xxm-green-900">Collection Progress</h3>
             <p className="text-sm text-xxm-gray-500 mt-0.5">
               {formatZAR(summary.totalPaid)} of {formatZAR(summary.totalDue)} · {summary.paidCount} members paid
             </p>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 size={16} className={summary.collectionRate >= 80 ? 'text-xxm-green' : 'text-xxm-gray-300'} aria-hidden />
-            <span className={`text-2xl font-extrabold tabular-nums ${collColor}`}>
+            <span className={`stat-number text-2xl font-extrabold ${collColor}`}>
               {summary.collectionRate}%
             </span>
           </div>
@@ -147,25 +149,25 @@ export default async function ReportsPage({
           <span className="font-medium text-xxm-gray-500">Target: {formatZAR(summary.totalDue)}</span>
           <span>100%</span>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Status breakdown ─────────────────────────────────────── */}
       {Object.keys(statusGroups).length > 0 && (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6">
-          <h3 className="text-base font-bold text-xxm-green-900 mb-5">Contribution Status Breakdown</h3>
+        <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6">
+          <h3 className="font-display text-base font-bold text-xxm-green-900 mb-5">Contribution Status Breakdown</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {Object.entries(statusGroups).sort(([a], [b]) => a.localeCompare(b)).map(([status, count]) => {
               const styles = STATUS_STYLES[status] ?? { badge: 'bg-xxm-gray-100 text-xxm-gray-600', dot: 'bg-xxm-gray-400' }
               return (
                 <div key={status} className={`flex flex-col items-center gap-1.5 p-4 rounded-2xl ${styles.badge}`}>
                   <span className={`w-2.5 h-2.5 rounded-full ${styles.dot}`} aria-hidden />
-                  <p className="text-2xl font-extrabold tabular-nums">{count}</p>
+                  <p className="stat-number text-2xl font-extrabold">{count}</p>
                   <p className="text-[11px] font-semibold uppercase tracking-wide">{status}</p>
                 </div>
               )
             })}
           </div>
-        </div>
+        </Reveal>
       )}
 
     </div>
