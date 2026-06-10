@@ -1,23 +1,7 @@
 import { StatsDisplay } from './StatsDisplay'
-
-const FALLBACK = { members: 4, totalPooled: 0, monthsActive: 0 }
+import { getPublicStats } from '@/lib/stats'
 
 export async function StatsSection() {
-  const webUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-
-  let data = FALLBACK
-  try {
-    const res = await fetch(`${webUrl}/api/v1/stats/public`, {
-      next: { revalidate: 3600 },
-      signal: AbortSignal.timeout(2000),
-    })
-    if (res.ok) {
-      const json = await res.json()
-      data = json.data ?? FALLBACK
-    }
-  } catch {
-    // Fallback to static values if web app is unavailable
-  }
-
+  const data = await getPublicStats()
   return <StatsDisplay data={data} />
 }

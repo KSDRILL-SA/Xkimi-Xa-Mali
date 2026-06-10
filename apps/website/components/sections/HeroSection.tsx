@@ -1,8 +1,11 @@
 import Image from 'next/image'
 import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
 import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
+import { getPublicStats } from '@/lib/stats'
 
-export function HeroSection() {
+export async function HeroSection() {
+  const { members } = await getPublicStats()
+
   return (
     <section
       id="hero"
@@ -135,7 +138,7 @@ export function HeroSection() {
             style={{ animationDelay: '1s' }}
           >
             {[
-              { icon: Users,      label: '4 Members',         sub: 'Brotherhood' },
+              { icon: Users,      label: `${members} Member${members === 1 ? '' : 's'}`, sub: 'Brotherhood' },
               { icon: TrendingUp, label: 'R100+ / Month',     sub: 'Per member' },
               { icon: Shield,     label: 'DebiCheck Verified', sub: 'Netcash' },
             ].map(({ icon: Icon, label, sub }) => (
