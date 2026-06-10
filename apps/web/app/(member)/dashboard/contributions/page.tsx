@@ -7,6 +7,7 @@ import { decrypt } from '@/lib/encryption'
 import { env } from '@/lib/env'
 import { getContributions, getContributionSummary } from '@/services/contribution.service'
 import { ContributionSummaryCards } from '@/components/contribution/SummaryCards'
+import { GroupCollectionAccount } from '@/components/contribution/GroupCollectionAccount'
 import { ContributionRow } from '@/components/contribution/ContributionRow'
 import { RouterPagination } from '@/components/ui/RouterPagination'
 import { Button } from '@/components/ui/Button'
@@ -98,6 +99,11 @@ export default async function ContributionsPage({
       {/* Summary */}
       <Reveal variant="up" delay={100}>
         <ContributionSummaryCards summary={summary} />
+      </Reveal>
+
+      {/* Group collection account + Netcash fee transparency */}
+      <Reveal variant="up" delay={150}>
+        <GroupCollectionAccount />
       </Reveal>
 
       {/* No active mandate warning */}
