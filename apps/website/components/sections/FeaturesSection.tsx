@@ -109,7 +109,7 @@ export function FeaturesSection() {
           </span>
           <h2
             id="features-heading"
-            className="mt-1 text-4xl md:text-5xl font-black text-xxm-green-900 leading-tight"
+            className="font-display mt-1 text-4xl md:text-5xl font-black text-xxm-green-900 leading-tight"
           >
             Everything a financial collective needs —{' '}
             <span className="text-xxm-green">built in.</span>
@@ -151,7 +151,7 @@ export function FeaturesSection() {
               </div>
 
               <div>
-                <h3 className="font-black text-xxm-green-900 text-base mb-2 leading-snug">
+                <h3 className="font-display font-black text-xxm-green-900 text-base mb-2 leading-snug">
                   {title}
                 </h3>
                 <p className="text-sm text-gray-500 leading-relaxed">{description}</p>

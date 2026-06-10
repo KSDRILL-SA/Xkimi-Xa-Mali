@@ -54,7 +54,7 @@ export function MissionSection() {
             </span>
             <h2
               id="mission-heading"
-              className="text-4xl md:text-5xl font-black text-white leading-tight"
+              className="font-display text-4xl md:text-5xl font-black text-white leading-tight"
             >
               Wealth moves faster when it{' '}
               <span className="text-shimmer">moves together.</span>
@@ -104,7 +104,7 @@ export function MissionSection() {
                   {num}
                 </span>
                 <div>
-                  <h3 className="font-black text-white text-lg mb-1.5">{title}</h3>
+                  <h3 className="font-display font-black text-white text-lg mb-1.5">{title}</h3>
                   <p className="text-white/55 text-sm leading-relaxed">{body}</p>
                 </div>
               </div>
