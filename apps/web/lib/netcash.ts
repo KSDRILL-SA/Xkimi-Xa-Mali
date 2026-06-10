@@ -78,8 +78,38 @@ class NetcashError extends Error {
 
 const NETCASH_TIMEOUT_MS = 30_000
 
+// Dev-only simulator: when no Netcash service key is configured outside of
+// production, return plausible success responses so the mandate/debit flow can
+// be exercised end-to-end locally. This is NEVER reached in production — there,
+// a missing key throws (real DebiCheck registration requires real credentials).
+function simulateNetcash<T>(path: string, body: Record<string, unknown>): T {
+  const ref = `SIM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
+  const existingId = typeof body.mandateId === 'string' ? body.mandateId : ref
+
+  if (path.includes('/mandate/create')) {
+    // New mandates start PENDING — the group admin still approves them to ACTIVE.
+    return { mandateId: ref, status: 'PENDING' as const } as unknown as T
+  }
+  if (path.includes('/mandate/cancel')) {
+    return { mandateId: existingId, status: 'CANCELLED' as const } as unknown as T
+  }
+  if (path.includes('/mandate/update') || path.includes('/mandate/delay')) {
+    return { mandateId: existingId, status: 'ACTIVE' as const } as unknown as T
+  }
+  if (path.includes('/mandate/status')) {
+    return { mandateId: existingId, status: 'ACTIVE' as const } as unknown as T
+  }
+  if (path.includes('/debit/')) {
+    return { transactionRef: ref, status: 'SUCCESS' as const } as unknown as T
+  }
+  return { status: 'SUCCESS' as const } as unknown as T
+}
+
 async function netcashPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  if (!env.NETCASH_SERVICE_KEY) throw new ExternalServiceError('Netcash', 'NETCASH_SERVICE_KEY not configured')
+  if (!env.NETCASH_SERVICE_KEY) {
+    if (process.env.NODE_ENV !== 'production') return simulateNetcash<T>(path, body)
+    throw new ExternalServiceError('Netcash', 'NETCASH_SERVICE_KEY not configured')
+  }
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), NETCASH_TIMEOUT_MS)
 
