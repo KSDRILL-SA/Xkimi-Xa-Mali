@@ -1,29 +1,19 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { CheckCircle2, ExternalLink, MessageCircle, Phone, Bell } from 'lucide-react'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { Reveal } from '@xxm/ui'
+import { userRepo } from '@/repositories/user.repository'
+import { getNotificationPreferences, updateNotificationPreferences } from '@/services/member.service'
 
 export const metadata: Metadata = { title: 'WhatsApp Notifications' }
 
 async function setWhatsAppPreference(enabled: boolean, userId: string) {
   'use server'
-  await db.notificationPreference.upsert({
-    where: { userId },
-    create: { userId, sms: true, email: true, whatsapp: enabled },
-    update: { whatsapp: enabled },
-  })
-  await db.auditLog.create({
-    data: {
-      userId,
-      action: 'WHATSAPP_PREFERENCE_UPDATED',
-      entity: 'NotificationPreference',
-      entityId: userId,
-      payload: { enabled },
-    },
-  })
+  const ip = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
+  await updateNotificationPreferences(userId, { whatsapp: enabled }, ip)
   redirect(`/dashboard/whatsapp?updated=1`)
 }
 
@@ -39,14 +29,8 @@ export default async function WhatsAppPage({
   const params = await searchParams
 
   const [user, pref] = await Promise.all([
-    db.user.findUnique({
-      where: { id: userId },
-      select: { phone: true, firstName: true },
-    }),
-    db.notificationPreference.findUnique({
-      where: { userId },
-      select: { whatsapp: true },
-    }),
+    userRepo.findById(userId, { select: { phone: true, firstName: true } }),
+    getNotificationPreferences(userId),
   ])
 
   const isEnabled = pref?.whatsapp ?? true

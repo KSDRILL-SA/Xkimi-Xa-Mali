@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
+import { getRecentContributions } from '@/services/contribution.service'
 import { ContributionStatusBadge } from '@/components/contribution/StatusBadge'
 import { formatZAR } from '@/lib/formatters'
 import { Wallet, ArrowRight, ChevronRight } from 'lucide-react'
@@ -10,11 +10,7 @@ export async function DashboardRecentContributions() {
   const session = await getSession()
   const userId = session!.user.id
 
-  const recentContributions = await db.contribution.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    take: 5,
-  })
+  const recentContributions = await getRecentContributions(userId, 5)
 
   return (
     <section>

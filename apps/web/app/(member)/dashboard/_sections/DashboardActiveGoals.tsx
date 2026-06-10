@@ -1,16 +1,11 @@
 import Link from 'next/link'
-import { db } from '@/lib/db'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { formatZAR } from '@/lib/formatters'
 import { Target, ChevronRight } from 'lucide-react'
-import type { Goal } from '@xxm/types'
+import { getGoals } from '@/services/goal.service'
 
 export async function DashboardActiveGoals() {
-  const goals = await db.goal.findMany({
-    where: { status: 'ACTIVE' },
-    orderBy: { deadline: 'asc' },
-    take: 3,
-  })
+  const { items: goals } = await getGoals('ACTIVE', 1, 3)
 
   if (goals.length === 0) return null
 
@@ -26,8 +21,8 @@ export async function DashboardActiveGoals() {
         </Link>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {goals.map((g: Goal) => {
-          const pct = Math.min(100, Math.round((Number(g.currentAmount) / Number(g.targetAmount)) * 100))
+        {goals.map((g) => {
+          const pct = g.progressPct
           return (
             <Link
               key={g.id}
