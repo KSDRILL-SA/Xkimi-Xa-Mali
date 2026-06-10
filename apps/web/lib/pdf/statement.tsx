@@ -4,6 +4,7 @@ import {
   Page,
   View,
   Text,
+  Image,
   StyleSheet,
   renderToBuffer,
 } from '@react-pdf/renderer'
@@ -48,6 +49,10 @@ export type StatementData = {
   }
   generatedAt: string
   docRef: string
+  signature: {
+    imageDataUri: string
+    displayName: string
+  }
 }
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -307,6 +312,45 @@ const s = StyleSheet.create({
     borderLeftColor: C.green,
   },
   disclaimerText: { fontSize: 6.5, color: C.gray500, lineHeight: 1.5 },
+
+  // ── Authorisation / signature block ───────────────────────────────────
+  signatureBlock: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: C.gray200,
+    alignItems: 'flex-end',
+  },
+  signatureLabel: {
+    fontSize: 7,
+    color: C.gray400,
+    fontFamily: 'Helvetica-Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  signatureImage: {
+    width: 110,
+    height: 40,
+    objectFit: 'contain',
+  },
+  signatureName: {
+    fontSize: 8.5,
+    fontFamily: 'Helvetica-Bold',
+    color: C.green,
+    marginTop: 4,
+  },
+  signatureDate: {
+    fontSize: 7,
+    color: C.gray500,
+    marginTop: 2,
+  },
+  verificationText: {
+    fontSize: 6.5,
+    color: C.gold,
+    fontFamily: 'Helvetica-Oblique',
+    marginTop: 2,
+  },
 })
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -339,7 +383,7 @@ function txDescription(type: string): string {
 // ─── Document ─────────────────────────────────────────────────────────────────
 
 function StatementDocument({ data }: { data: StatementData }) {
-  const { member, period, contributions, transactions, summary, generatedAt, docRef } = data
+  const { member, period, contributions, transactions, summary, generatedAt, docRef, signature } = data
   const fullyPaid = summary.outstanding <= 0
 
   return (
@@ -522,8 +566,18 @@ function StatementDocument({ data }: { data: StatementData }) {
             <Text style={s.disclaimerText}>
               This statement is a record of your contributions and transactions for the specified period on the Xkimm Xa Mali private group savings platform.
               It is intended solely for the named account holder. If you believe this statement is incorrect, please contact your group administrator immediately.
-              Amounts are in South African Rand (ZAR). This document was generated electronically and is valid without a signature.
+              Amounts are in South African Rand (ZAR). This document was generated electronically and authorised with the administrator&rsquo;s signature below.
             </Text>
+          </View>
+
+          {/* ── Authorisation / signature ─────────────── */}
+          <View style={s.signatureBlock}>
+            <Text style={s.signatureLabel}>Authorised by</Text>
+            {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image, not an HTML img */}
+            <Image src={signature.imageDataUri} style={s.signatureImage} />
+            <Text style={s.signatureName}>{signature.displayName}</Text>
+            <Text style={s.signatureDate}>Generated: {generatedAt}</Text>
+            <Text style={s.verificationText}>Xkimm Xa Mali — Official Document</Text>
           </View>
 
         </View>
