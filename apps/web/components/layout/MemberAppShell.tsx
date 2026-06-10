@@ -14,6 +14,8 @@ import {
   UserCircle,
   Bell,
   ShieldCheck,
+  Trophy,
+  Users,
 } from 'lucide-react'
 
 const memberNav: NavItem[] = [
@@ -23,6 +25,8 @@ const memberNav: NavItem[] = [
   { href: '/dashboard/goals', label: 'Goals', icon: Target },
   { href: '/dashboard/transactions', label: 'Transactions', icon: ArrowLeftRight },
   { href: '/dashboard/statements', label: 'Statements', icon: FileText },
+  { href: '/dashboard/badges', label: 'Badges', icon: Trophy },
+  { href: '/dashboard/community', label: 'Community', icon: Users },
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { href: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { href: '/dashboard/profile', label: 'Profile', icon: UserCircle },
