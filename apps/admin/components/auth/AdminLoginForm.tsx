@@ -47,7 +47,8 @@ export function AdminLoginForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xxm-lg p-6 space-y-4">
+    <form onSubmit={handleSubmit} className="relative bg-white rounded-2xl shadow-xxm-lg ring-1 ring-black/5 p-6 space-y-4">
+      <div className="absolute -top-px left-6 right-6 h-px bg-gold-shimmer opacity-70" aria-hidden />
       {error && <Alert variant="error">{error}</Alert>}
 
       <div className="space-y-1.5">
