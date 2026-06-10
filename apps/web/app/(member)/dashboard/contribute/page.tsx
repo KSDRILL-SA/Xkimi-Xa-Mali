@@ -13,6 +13,7 @@ import { Alert } from '@/components/ui/Alert'
 import { api } from '@/lib/api'
 import { SkeletonForm } from '@/components/ui/Skeleton'
 import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
+import { Reveal } from '@xxm/ui'
 import { Wallet, CreditCard, CheckCircle2, AlertTriangle } from 'lucide-react'
 
 type OpenPeriod = {
@@ -136,17 +137,17 @@ export default function ContributePage() {
     <div className="max-w-lg space-y-6">
 
       {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-start gap-4">
+      <Reveal variant="up" className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
           <Wallet size={22} className="text-xxm-green" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Make a Payment</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Make a Payment</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">
             Pay a once-off contribution from your registered bank account.
           </p>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── No mandate error ───────────────────────── */}
       {!mandate && (
@@ -184,11 +185,11 @@ export default function ContributePage() {
 
           {/* ── Success state ──────────────────────── */}
           {success ? (
-            <div className="bg-white rounded-2xl border border-xxm-green/20 shadow-xxm-sm p-8 text-center space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto">
+            <div className="bg-white rounded-2xl border border-xxm-green/20 shadow-xxm-sm p-8 text-center space-y-3 animate-scale-in">
+              <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto animate-scale-in">
                 <CheckCircle2 size={28} className="text-xxm-green" aria-hidden />
               </div>
-              <p className="text-lg font-extrabold text-xxm-green-900">Payment submitted!</p>
+              <p className="font-display text-lg font-extrabold text-xxm-green-900">Payment submitted!</p>
               <p className="text-sm text-xxm-gray-500">Redirecting to your contributions...</p>
             </div>
           ) : (

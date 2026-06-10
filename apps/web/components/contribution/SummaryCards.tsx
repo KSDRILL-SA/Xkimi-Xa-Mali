@@ -72,12 +72,12 @@ export function ContributionSummaryCards({ summary }: { summary: Summary }) {
       {cards.map(({ icon: Icon, label, value, sub, gradient, iconBg, iconColor, border, valueColor }) => (
         <div
           key={label}
-          className={`relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5`}
+          className={`group relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
         >
-          <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4`}>
+          <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-transform duration-slow group-hover:scale-110`}>
             <Icon size={18} className={iconColor} aria-hidden />
           </div>
-          <p className={`text-2xl font-extrabold tabular-nums leading-none ${valueColor ?? 'text-xxm-green-900'}`}>
+          <p className={`stat-number text-2xl font-extrabold leading-none ${valueColor ?? 'text-xxm-green-900'}`}>
             {value}
           </p>
           <p className="text-xs font-semibold text-xxm-gray-600 mt-1.5">{label}</p>
