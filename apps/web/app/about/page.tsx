@@ -294,13 +294,13 @@ export default function AboutPage() {
                   className={`bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 flex flex-col sm:flex-row gap-5 ring-2 ${ring}`}
                 >
                   {/* Portrait */}
-                  <div className="relative w-20 h-24 rounded-xl overflow-hidden shrink-0 ring-1 ring-xxm-green/10">
+                  <div className="relative w-28 h-36 sm:w-32 sm:h-40 rounded-xl overflow-hidden shrink-0 ring-1 ring-xxm-green/10">
                     <Image
                       src={photo}
                       alt={name}
                       fill
-                      sizes="80px"
-                      className="object-cover"
+                      sizes="(max-width: 640px) 112px, 128px"
+                      className="object-cover object-top"
                     />
                   </div>
 
