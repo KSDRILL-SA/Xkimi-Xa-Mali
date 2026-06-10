@@ -1,6 +1,6 @@
 import { cn } from '@xxm/utils'
 
-type CardVariant = 'default' | 'outlined' | 'glass' | 'elevated' | 'champagne'
+type CardVariant = 'default' | 'outlined' | 'glass' | 'elevated' | 'champagne' | 'premium'
 
 interface CardProps {
   className?: string
@@ -16,6 +16,7 @@ const variantClasses: Record<CardVariant, string> = {
   glass:      'bg-white/70 backdrop-blur border border-white/60 shadow-glass',
   elevated:   'bg-white border border-xxm-green/7 shadow-xxm-lg',
   champagne:  'bg-xxm-champagne-50 border border-xxm-gold/15 shadow-xxm-sm',
+  premium:    'glass-dark text-white shadow-glass border border-xxm-gold/20',
 }
 
 export function Card({ className, children, variant = 'default', interactive, noPadding }: CardProps) {
@@ -25,6 +26,7 @@ export function Card({ className, children, variant = 'default', interactive, no
         'rounded-card',
         variantClasses[variant],
         interactive && 'card-hover cursor-pointer',
+        interactive && variant === 'premium' && 'hover:animate-border-glow',
         className,
       )}
     >
