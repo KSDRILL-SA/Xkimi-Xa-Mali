@@ -48,7 +48,7 @@ export function CTASection() {
             <div>
               <h2
                 id="cta-heading"
-                className="text-4xl md:text-5xl font-black text-white leading-tight"
+                className="font-display text-4xl md:text-5xl font-black text-white leading-tight"
               >
                 Ready to build{' '}
                 <span className="text-shimmer">wealth together?</span>

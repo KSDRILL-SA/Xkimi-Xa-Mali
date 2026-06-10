@@ -9,7 +9,7 @@ export default function GlobalError({ reset }: { reset: () => void }) {
       <XmmLogo size={56} />
       <div>
         <p className="text-xxm-gold text-xs font-bold tracking-widest uppercase mb-3">Error</p>
-        <h1 className="text-3xl sm:text-4xl font-black text-white mb-3">Something went wrong</h1>
+        <h1 className="font-display text-3xl sm:text-4xl font-black text-white mb-3">Something went wrong</h1>
         <p className="text-white/50 text-base max-w-xs mx-auto">
           An unexpected error occurred. Please try again or return to the homepage.
         </p>

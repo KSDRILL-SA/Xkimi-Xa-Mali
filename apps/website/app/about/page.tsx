@@ -173,7 +173,7 @@ export default function AboutPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold animate-pulse" aria-hidden />
                 <span className="text-xxm-gold text-xs font-bold tracking-widest uppercase">Private · Invite-Only · Brotherhood</span>
               </div>
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.05]">
+              <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.05]">
                 Xkimm Xa Mali
               </h1>
               <p className="text-xxm-gold text-sm font-bold tracking-widest uppercase mt-2">
@@ -224,7 +224,7 @@ export default function AboutPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold" aria-hidden />
                 Our story
               </span>
-              <h2 className="text-3xl sm:text-4xl font-black text-xxm-green-900 tracking-tight leading-tight">
+              <h2 className="font-display text-3xl sm:text-4xl font-black text-xxm-green-900 tracking-tight leading-tight">
                 How it all began
               </h2>
             </div>
@@ -284,7 +284,7 @@ export default function AboutPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold" aria-hidden />
                 What we stand for
               </span>
-              <h2 className="text-3xl sm:text-4xl font-black text-xxm-green-900 tracking-tight leading-tight">
+              <h2 className="font-display text-3xl sm:text-4xl font-black text-xxm-green-900 tracking-tight leading-tight">
                 Three pillars, one purpose
               </h2>
               <p className="text-gray-500 text-base max-w-sm leading-relaxed">
@@ -301,7 +301,7 @@ export default function AboutPage() {
                     <Icon size={22} aria-hidden />
                   </div>
                   <div>
-                    <h3 className="text-xl font-black text-xxm-green-900 mb-2 leading-snug">{title}</h3>
+                    <h3 className="font-display text-xl font-black text-xxm-green-900 mb-2 leading-snug">{title}</h3>
                     <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
                   </div>
                 </div>
@@ -318,7 +318,7 @@ export default function AboutPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold animate-pulse" aria-hidden />
                 The Brotherhood
               </span>
-              <h2 className="text-4xl sm:text-5xl font-black text-xxm-green-900 tracking-tight leading-tight">
+              <h2 className="font-display text-4xl sm:text-5xl font-black text-xxm-green-900 tracking-tight leading-tight">
                 Meet the founders
               </h2>
               <p className="text-gray-500 text-base max-w-lg leading-relaxed">
@@ -354,7 +354,7 @@ export default function AboutPage() {
                     <div className="absolute bottom-0 left-0 right-0 px-7 py-7">
                       <div className="flex items-end justify-between gap-4">
                         <div>
-                          <p className="font-black text-white text-xl sm:text-2xl leading-snug drop-shadow">
+                          <p className="font-display font-black text-white text-xl sm:text-2xl leading-snug drop-shadow">
                             {name}
                           </p>
                           <p className="text-xxm-gold text-xs font-bold uppercase tracking-widest mt-2">
@@ -408,7 +408,7 @@ export default function AboutPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold" aria-hidden />
                 Core values
               </span>
-              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+              <h2 className="font-display text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
                 The principles we build on
               </h2>
             </div>
@@ -422,7 +422,7 @@ export default function AboutPage() {
                     <Icon size={18} className="text-xxm-gold" aria-hidden />
                   </div>
                   <div>
-                    <p className="font-black text-white text-base mb-2">{title}</p>
+                    <p className="font-display font-black text-white text-base mb-2">{title}</p>
                     <p className="text-sm text-white/55 leading-relaxed">{body}</p>
                   </div>
                 </div>
@@ -439,7 +439,7 @@ export default function AboutPage() {
                 <span className="w-1.5 h-1.5 rounded-full bg-xxm-gold" aria-hidden />
                 The platform
               </span>
-              <h2 className="text-3xl sm:text-4xl font-black text-xxm-green-900 tracking-tight leading-tight">
+              <h2 className="font-display text-3xl sm:text-4xl font-black text-xxm-green-900 tracking-tight leading-tight">
                 Built for serious savers
               </h2>
               <p className="text-gray-500 text-base leading-relaxed max-w-xl mx-auto">
@@ -463,7 +463,7 @@ export default function AboutPage() {
                     <Icon size={18} className="text-xxm-green" aria-hidden />
                   </div>
                   <div>
-                    <p className="font-black text-xxm-green-900 text-sm mb-1.5">{heading}</p>
+                    <p className="font-display font-black text-xxm-green-900 text-sm mb-1.5">{heading}</p>
                     <p className="text-xs text-gray-500 leading-relaxed">{body}</p>
                   </div>
                 </div>
@@ -501,7 +501,7 @@ export default function AboutPage() {
               <XmmLogo size={56} />
             </div>
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight">Already a member?</h2>
+              <h2 className="font-display text-2xl sm:text-3xl font-black text-white leading-tight">Already a member?</h2>
               <p className="text-white/50 text-sm mt-2 leading-relaxed">
                 This is a private platform. Access is by invitation only.
               </p>

@@ -67,7 +67,7 @@ export function HowItWorksSection() {
           </span>
           <h2
             id="hiw-heading"
-            className="mt-1 text-4xl md:text-5xl font-black text-xxm-green-900 leading-tight"
+            className="font-display mt-1 text-4xl md:text-5xl font-black text-xxm-green-900 leading-tight"
           >
             From invitation to{' '}
             <span className="text-xxm-green">financial brotherhood</span>
@@ -108,7 +108,7 @@ export function HowItWorksSection() {
                 </div>
 
                 <div>
-                  <h3 className="font-black text-xxm-green-900 text-lg mb-2 leading-snug">
+                  <h3 className="font-display font-black text-xxm-green-900 text-lg mb-2 leading-snug">
                     {title}
                   </h3>
                   <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
