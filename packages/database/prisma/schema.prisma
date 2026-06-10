@@ -149,6 +149,8 @@ model User {
   deletedCommunityMsgs   CommunityMessage[]      @relation("MessageDeleter")
   budgets                UserBudget[]
   budgetOverrides        BudgetOverride[]
+  signature              AdminSignature?
+  signatureHistory       AdminSignatureHistory[]
 
   @@index([status])
   @@index([email, status])
@@ -653,4 +655,36 @@ model BudgetOverride {
 
   @@index([userId, createdAt])
   @@map("budget_overrides")
+}
+
+// ─── Admin Signature ────────────────────────────────────────────────────────────
+
+model AdminSignature {
+  id                  String   @id @default(cuid())
+  adminId             String   @unique
+  signatureUrl        String
+  signatureHash       String
+  displayName         String
+  isActive            Boolean  @default(true)
+  nextChangeAllowedAt DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@map("admin_signatures")
+}
+
+model AdminSignatureHistory {
+  id            String   @id @default(cuid())
+  adminId       String
+  signatureUrl  String
+  signatureHash String
+  replacedAt    DateTime @default(now())
+  replacedById  String
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([adminId, replacedAt])
+  @@map("admin_signature_history")
 }
