@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { decrypt } from '@/lib/encryption'
 import { MandateCard } from '@/components/mandate/MandateCard'
 import { MandateForm } from '@/components/mandate/MandateForm'
+import { Reveal } from '@xxm/ui'
 import { CreditCard, UserCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -59,21 +60,21 @@ export default async function MandatesPage() {
     <div className="space-y-6 max-w-2xl">
 
       {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-start gap-4">
+      <Reveal variant="up" className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-xxm-gold/12 flex items-center justify-center shrink-0">
           <CreditCard size={22} className="text-xxm-gold-dark" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Payment Mandates</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Payment Mandates</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">
             Your DebiCheck debit order mandate with Netcash. Only one active mandate at a time.
           </p>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Create form ────────────────────────────── */}
       {!hasActiveOrPending && (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+        <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-xxm-gray-100 bg-xxm-green-50/30">
             <h2 className="text-base font-bold text-xxm-green-900">Set up a mandate</h2>
             <p className="text-sm text-xxm-gray-400 mt-0.5">
@@ -103,11 +104,12 @@ export default async function MandatesPage() {
               <MandateForm bankAccounts={maskedBankAccounts} />
             )}
           </div>
-        </div>
+        </Reveal>
       )}
 
       {/* ── Mandate list ───────────────────────────── */}
       {maskedMandates.length > 0 && (
+        <Reveal variant="up" delay={200}>
         <section className="space-y-3">
           <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">
             {maskedMandates.length === 1 ? 'Your mandate' : 'Mandate history'}
@@ -118,6 +120,7 @@ export default async function MandatesPage() {
             ))}
           </div>
         </section>
+        </Reveal>
       )}
 
       {/* ── Empty state ────────────────────────────── */}

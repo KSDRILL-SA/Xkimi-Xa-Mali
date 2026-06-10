@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR } from '@/lib/formatters'
+import { Reveal } from '@xxm/ui'
 
 export const metadata: Metadata = { title: 'Statements' }
 
@@ -53,16 +54,17 @@ export default async function StatementsPage() {
     <div className="space-y-6">
 
       {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-start gap-4">
+      <Reveal variant="up" className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0">
           <FileText size={22} className="text-indigo-600" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Statements</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Statements</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">Download PDF statements for any contribution period</p>
         </div>
-      </div>
+      </Reveal>
 
+      <Reveal variant="up" delay={100}>
       {contributions.length === 0 ? (
         <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
@@ -78,8 +80,8 @@ export default async function StatementsPage() {
           {years.map((year) => (
             <div key={year} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
               {/* Year header */}
-              <div className="flex items-center gap-3 px-5 py-3.5 bg-xxm-green-50/40 border-b border-xxm-gray-100">
-                <div className="w-7 h-7 rounded-lg bg-xxm-green-100 flex items-center justify-center">
+              <div className="group flex items-center gap-3 px-5 py-3.5 bg-xxm-green-50/40 border-b border-xxm-gray-100">
+                <div className="w-7 h-7 rounded-lg bg-xxm-green-100 flex items-center justify-center transition-transform duration-slow group-hover:scale-110">
                   <FileText size={12} className="text-xxm-green" aria-hidden />
                 </div>
                 <h2 className="font-bold text-xxm-green-900">{year}</h2>
@@ -135,15 +137,16 @@ export default async function StatementsPage() {
           ))}
         </div>
       )}
+      </Reveal>
 
       {/* ── Info note ──────────────────────────────── */}
-      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 space-y-1.5">
+      <Reveal variant="up" delay={200} className="block bg-indigo-50 border border-indigo-100 rounded-2xl p-5 space-y-1.5">
         <p className="text-sm font-bold text-indigo-700">About statements</p>
         <p className="text-xs text-indigo-600 leading-relaxed">
           Each PDF statement includes your contribution details, transactions, and a summary for that period.
           Links expire after 15 minutes — simply click again to generate a fresh download.
         </p>
-      </div>
+      </Reveal>
     </div>
   )
 }
