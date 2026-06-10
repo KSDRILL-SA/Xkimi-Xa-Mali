@@ -105,11 +105,12 @@ function serializeMessage(message: MessagePayload): SerializedMessage {
 
 // ─── Queries ───────────────────────────────────────────────────────────────
 
-/** Paginated top-level messages (pinned first), with replies and author badges. */
-export async function getMessages(page = 1, limit = 20) {
-  const [items, total] = await Promise.all([
+/** Paginated top-level messages (pinned first), with replies, author badges, and the viewer's daily limit. */
+export async function getMessages(page = 1, limit = 20, userId?: string) {
+  const [items, total, dailyLimit] = await Promise.all([
     communityRepo.findMessages(page, limit),
     communityRepo.countTopLevel(),
+    userId ? getDailyLimitStatus(userId) : Promise.resolve(null),
   ])
 
   return {
@@ -118,6 +119,7 @@ export async function getMessages(page = 1, limit = 20) {
     page,
     limit,
     totalPages: Math.ceil(total / limit),
+    dailyLimit,
   }
 }
 

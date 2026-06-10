@@ -1,4 +1,4 @@
-import { ContributionStatus, MandateStatus, UserStatus } from '@prisma/client'
+import { ContributionStatus, MandateStatus, UserStatus, BadgeTier } from '@prisma/client'
 import { db, Prisma } from '@/lib/db'
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
@@ -510,4 +510,43 @@ export async function getMonthlyReportSummary(adminRoles: string[], month: numbe
   const collectionRate = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0
 
   return { month, year, memberCount, totalDue, totalPaid, paidCount, collectionRate, contributions }
+}
+
+// ─── Badges ───────────────────────────────────────────────────────────────────
+
+export async function listAllBadges(
+  adminRoles: string[],
+  params: { page?: number; limit?: number; tier?: BadgeTier } = {},
+) {
+  assertAdmin(adminRoles)
+  const { page = 1, limit = 20, tier } = params
+  const skip = (page - 1) * limit
+  const where: Prisma.BadgeScoreWhereInput = tier ? { currentBadge: tier } : {}
+
+  const [items, total] = await Promise.all([
+    db.badgeScore.findMany({
+      where, skip, take: limit,
+      orderBy: { overallScore: 'desc' },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+    }),
+    db.badgeScore.count({ where }),
+  ])
+
+  return {
+    items: items.map((s) => ({
+      userId: s.userId,
+      user: { id: s.user.id, firstName: s.user.firstName, lastName: s.user.lastName, email: s.user.email },
+      currentBadge: s.currentBadge,
+      overallScore: Number(s.overallScore),
+      consistencyScore: Number(s.consistencyScore),
+      timelinessScore: Number(s.timelinessScore),
+      generosityScore: Number(s.generosityScore),
+      streakBonus: Number(s.streakBonus),
+      progressToNext: Number(s.progressToNext),
+      currentStreak: s.currentStreak,
+      monthsActive: s.monthsActive,
+      totalOverdue: s.totalOverdue,
+    })),
+    total, page, limit, totalPages: Math.ceil(total / limit),
+  }
 }
