@@ -12,7 +12,7 @@ import {
   AdminConflictError,
   AdminNotFoundError,
 } from '@/lib/services'
-import { Breadcrumb, PageHeader, Alert } from '@xxm/ui'
+import { Breadcrumb, PageHeader, Reveal, Alert } from '@xxm/ui'
 import { SignaturePadCard } from './SignaturePadCard'
 
 export const metadata: Metadata = { title: 'Settings' }
@@ -88,17 +88,21 @@ export default async function SettingsPage({
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Settings' }]} />
-      <PageHeader title="Settings" subtitle="Manage your authorisation signature" />
+      <Reveal variant="up">
+        <PageHeader title="Settings" subtitle="Manage your authorisation signature" />
+      </Reveal>
 
       {saved && <Alert variant="success">Signature saved successfully.</Alert>}
       {errorMessage && <Alert variant="error">{errorMessage}</Alert>}
 
-      <SignaturePadCard
-        signature={signature}
-        lockStatus={lockStatus}
-        history={history}
-        saveAction={saveSignatureAction}
-      />
+      <Reveal variant="up" delay={100}>
+        <SignaturePadCard
+          signature={signature}
+          lockStatus={lockStatus}
+          history={history}
+          saveAction={saveSignatureAction}
+        />
+      </Reveal>
     </div>
   )
 }

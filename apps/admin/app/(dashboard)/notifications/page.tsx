@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { Alert } from '@xxm/ui'
+import { Alert, Reveal } from '@xxm/ui'
 import { Megaphone, MessageSquare, Mail, Layers, Users, UserCheck, Clock, Ban, Send } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Broadcast' }
@@ -73,15 +73,15 @@ export default async function NotificationsPage({
     <div className="space-y-7">
 
       {/* ── Page header ─────────────────────────────────────── */}
-      <div className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center shrink-0">
+      <Reveal variant="up" className="group flex items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110">
           <Megaphone size={22} className="text-purple-600" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Broadcast</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Broadcast</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">Send notifications to all or filtered members via SMS and email.</p>
         </div>
-      </div>
+      </Reveal>
 
       {sent   && <Alert variant="success" title="Broadcast sent">Your message has been dispatched to the selected members.</Alert>}
       {failed && <Alert variant="error"   title="Broadcast failed">Something went wrong. Please check your message and try again.</Alert>}
@@ -90,7 +90,7 @@ export default async function NotificationsPage({
         <form action={broadcast} className="space-y-6">
 
           {/* ── Message ──────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+          <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
             <div className="flex items-center gap-2 mb-1">
               <MessageSquare size={16} className="text-xxm-gray-500" aria-hidden />
               <label htmlFor="bc-message" className="text-sm font-bold text-xxm-green-900">
@@ -108,10 +108,10 @@ export default async function NotificationsPage({
               className="w-full rounded-xl border border-xxm-gray-200 px-4 py-3 text-sm text-xxm-green-900 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white resize-none placeholder:text-xxm-gray-400 leading-relaxed"
             />
             <p className="text-[11px] text-xxm-gray-400">Keep messages concise. SMS costs apply per message per recipient.</p>
-          </div>
+          </Reveal>
 
           {/* ── Channel ──────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+          <Reveal variant="up" delay={200} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
             <p className="text-sm font-bold text-xxm-green-900 mb-3">Delivery Channel</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {channels.map(({ value, label, icon: Icon, description }) => (
@@ -123,10 +123,10 @@ export default async function NotificationsPage({
                 </label>
               ))}
             </div>
-          </div>
+          </Reveal>
 
           {/* ── Audience filter ───────────────────────────────── */}
-          <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+          <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
             <p className="text-sm font-bold text-xxm-green-900 mb-3">Send To</p>
             <div className="grid grid-cols-2 gap-2">
               {filters.map(({ value, label, icon: Icon, description }) => (
@@ -142,12 +142,12 @@ export default async function NotificationsPage({
                 </label>
               ))}
             </div>
-          </div>
+          </Reveal>
 
           {/* ── Submit ───────────────────────────────────────── */}
           <button
             type="submit"
-            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-xxm-green text-white text-sm font-bold hover:bg-xxm-canopy transition-colors shadow-xxm-sm"
+            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-xxm-green text-white text-sm font-bold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm"
           >
             <Send size={16} aria-hidden />
             Send Broadcast

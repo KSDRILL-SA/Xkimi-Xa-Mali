@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAuditLogs } from '@/lib/services'
 import { formatRelativeTime } from '@xxm/utils'
-import { Breadcrumb, RouterPagination } from '@xxm/ui'
+import { Breadcrumb, Reveal, RouterPagination } from '@xxm/ui'
 
 export const metadata: Metadata = { title: 'Audit Log' }
 
@@ -46,30 +46,33 @@ export default async function AuditPage({
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Audit' }]} />
-      <div>
-        <h1 className="text-2xl font-bold text-xxm-green">Audit Log</h1>
+      <Reveal variant="up">
+        <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Audit Log</h1>
         <p className="text-sm text-xxm-gray-500 mt-1">{total} events · read-only</p>
-      </div>
+      </Reveal>
 
-      <form method="GET" action="/audit" className="flex flex-wrap gap-2">
-        <input type="text" name="action" defaultValue={action} placeholder="Filter by action…"
-          className="rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm text-xxm-green-900 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white" />
-        <input type="text" name="entity" defaultValue={entity} placeholder="Entity (User, PaymentMandate…)"
-          className="rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm text-xxm-green-900 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white" />
-        <button type="submit" className="px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors">Filter</button>
-        {(action || entity || userId) && (
-          <Link href="/audit" className="px-4 py-2 rounded-xl border border-xxm-gray-200 text-sm text-xxm-gray-500 hover:bg-xxm-gray-50">Clear</Link>
-        )}
-      </form>
+      <Reveal variant="up" delay={100}>
+        <form method="GET" action="/audit" className="flex flex-wrap gap-2">
+          <input type="text" name="action" defaultValue={action} placeholder="Filter by action…"
+            className="rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm text-xxm-green-900 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white" />
+          <input type="text" name="entity" defaultValue={entity} placeholder="Entity (User, PaymentMandate…)"
+            className="rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm text-xxm-green-900 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white" />
+          <button type="submit" className="px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors">Filter</button>
+          {(action || entity || userId) && (
+            <Link href="/audit" className="px-4 py-2 rounded-xl border border-xxm-gray-200 text-sm text-xxm-gray-500 hover:bg-xxm-gray-50">Clear</Link>
+          )}
+        </form>
+      </Reveal>
 
-      <div className="bg-white rounded-card border border-xxm-gray-100 divide-y divide-gray-50">
+      <Reveal variant="up" delay={200} className="space-y-4">
+      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm divide-y divide-xxm-gray-50 overflow-hidden">
         {items.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-xxm-gray-400">No audit events found.</div>
         ) : (
           (items as unknown as AuditRow[]).map((log) => {
             const color = ACTION_COLOR[log.action] ?? 'xxm-status-pending'
             return (
-              <div key={log.id} className="px-5 py-4 flex items-start gap-4">
+              <div key={log.id} className="px-5 py-4 flex items-start gap-4 hover:bg-xxm-green-50/30 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={`${color} font-mono !text-[0.6rem] !tracking-tight`}>{log.action}</span>
@@ -97,6 +100,7 @@ export default async function AuditPage({
       </div>
 
       <RouterPagination totalItems={total} itemsPerPage={30} currentPage={page} baseUrl={buildUrl({ page: undefined })} className="justify-center" />
+      </Reveal>
     </div>
   )
 }

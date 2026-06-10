@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllGoals, createGoal, activateGoal, lockGoal, deleteGoal, recordGoalProgress } from '@/lib/services'
 import { formatZAR, formatDate, MONTHS } from '@xxm/utils'
-import { Breadcrumb, RouterPagination, PageHeader } from '@xxm/ui'
+import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { GoalsTable, type GoalRow } from './GoalsTable'
 
 export const metadata: Metadata = { title: 'Goals' }
@@ -120,7 +120,9 @@ export default async function GoalsPage({
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Goals' }]} />
-      <PageHeader title="Goals" subtitle={`${total} total`} />
+      <Reveal variant="up">
+        <PageHeader title="Goals" subtitle={`${total} total`} />
+      </Reveal>
 
       {created && (
         <div className="rounded-xl bg-xxm-green-50 border border-xxm-green/20 px-4 py-3 text-sm text-xxm-green font-medium">
@@ -129,6 +131,7 @@ export default async function GoalsPage({
       )}
 
       {/* Create goal form */}
+      <Reveal variant="up" delay={100}>
       <details className="bg-white rounded-card border border-xxm-green/7 shadow-xxm-sm overflow-hidden group">
         <summary className="px-5 py-4 text-sm font-semibold text-xxm-green cursor-pointer select-none flex items-center justify-between">
           <span>+ New Goal</span>
@@ -177,15 +180,18 @@ export default async function GoalsPage({
           </form>
         </div>
       </details>
+      </Reveal>
 
-      <GoalsTable
-        rows={rows}
-        activateAction={activateGoalAction}
-        deleteAction={deleteGoalAction}
-        lockAction={lockGoalAction}
-        progressAction={recordGoalProgressAction}
-      />
-      <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/goals" className="justify-center" />
+      <Reveal variant="up" delay={200} className="space-y-4">
+        <GoalsTable
+          rows={rows}
+          activateAction={activateGoalAction}
+          deleteAction={deleteGoalAction}
+          lockAction={lockGoalAction}
+          progressAction={recordGoalProgressAction}
+        />
+        <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/goals" className="justify-center" />
+      </Reveal>
     </div>
   )
 }

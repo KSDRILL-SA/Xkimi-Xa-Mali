@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listInvitations, revokeInvitation } from '@/lib/services'
 import { formatDate, formatZAR } from '@xxm/utils'
-import { Breadcrumb, RouterPagination, PageHeader } from '@xxm/ui'
+import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { CreateInviteModal } from '@/components/admin/CreateInviteModal'
 import { InvitationsTable, type InviteRow } from './InvitationsTable'
 
@@ -103,7 +103,9 @@ export default async function InvitationsPage({
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Invitations' }]} />
-      <PageHeader title="Invitations" subtitle={`${total} total`} action={<CreateInviteModal createAction={createInvite} />} />
+      <Reveal variant="up">
+        <PageHeader title="Invitations" subtitle={`${total} total`} action={<CreateInviteModal createAction={createInvite} />} />
+      </Reveal>
 
       {revoked && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 font-medium">
@@ -111,8 +113,10 @@ export default async function InvitationsPage({
         </div>
       )}
 
-      <InvitationsTable rows={rows} revokeAction={revokeInvitationAction} />
-      <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/invitations" className="justify-center" />
+      <Reveal variant="up" delay={100} className="space-y-4">
+        <InvitationsTable rows={rows} revokeAction={revokeInvitationAction} />
+        <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/invitations" className="justify-center" />
+      </Reveal>
     </div>
   )
 }
