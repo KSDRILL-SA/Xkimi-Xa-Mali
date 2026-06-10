@@ -5,6 +5,7 @@ import { useForm } from 'react-hook-form'
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
+import { Mail } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormGroup } from '@/components/ui/FormGroup'
@@ -48,7 +49,7 @@ export function ForgotPasswordForm() {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       {error && <Alert variant="error">{error}</Alert>}
       <FormGroup label="Email address" htmlFor="email" required error={errors.email?.message}>
-        <Input id="email" type="email" placeholder="you@example.com" {...register('email')} />
+        <Input id="email" type="email" placeholder="you@example.com" icon={Mail} {...register('email')} />
       </FormGroup>
       <Button type="submit" className="w-full" size="lg" loading={loading}>
         Send reset link
