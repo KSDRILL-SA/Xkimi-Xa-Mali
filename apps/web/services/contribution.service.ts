@@ -61,6 +61,43 @@ export async function getContributions(
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+/** Most recent contributions for a user, for dashboard summaries. */
+export async function getRecentContributions(userId: string, limit = 5) {
+  return contributionRepo.findMany(
+    { userId },
+    { orderBy: [{ createdAt: 'desc' }], take: limit },
+  )
+}
+
+type StatementPeriodRow = {
+  periodMonth: number
+  periodYear: number
+  amountDue: unknown
+  amountPaid: unknown
+  status: string
+}
+
+/** All contribution periods for a user, for the statements list. */
+export async function getStatementPeriods(userId: string, requesterId: string, roles: string[]) {
+  assertCanAccess(userId, requesterId, roles)
+
+  const items = await contributionRepo.findMany(
+    { userId },
+    {
+      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+      select: { periodMonth: true, periodYear: true, amountDue: true, amountPaid: true, status: true },
+    },
+  )
+
+  return (items as unknown as StatementPeriodRow[]).map((c) => ({
+    periodMonth: c.periodMonth,
+    periodYear: c.periodYear,
+    amountDue: Number(c.amountDue),
+    amountPaid: Number(c.amountPaid),
+    status: c.status,
+  }))
+}
+
 export async function getContribution(id: string, requesterId: string, roles: string[]) {
   const contribution = await contributionRepo.findById(id, {
     transactions: { orderBy: { createdAt: 'desc' } },

@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { SkeletonCard, SkeletonRow } from '@/components/ui/Skeleton'
 import { Reveal } from '@xxm/ui'

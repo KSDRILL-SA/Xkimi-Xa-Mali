@@ -2,27 +2,16 @@ import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Reveal } from '@xxm/ui'
 import { Target, Trophy, Clock, Lock } from 'lucide-react'
+import { getGoals, getGoalStatusCounts } from '@/services/goal.service'
+import { isAdmin } from '@/lib/authorization'
 
 export const metadata: Metadata = { title: 'Goals' }
 
 type GoalStatus = 'DRAFT' | 'ACTIVE' | 'ACHIEVED' | 'FAILED'
-
-type GoalRow = {
-  id: string
-  title: string
-  description: string | null
-  type: string
-  targetAmount: number | string
-  currentAmount: number | string
-  deadline: Date
-  status: string
-  lockedAt: Date | null
-}
 
 const STATUS_CONFIG: Record<GoalStatus, {
   label: string
@@ -51,21 +40,22 @@ export default async function GoalsPage({
   searchParams: Promise<{ status?: string }>
 }) {
   const session = await getSession()
-  const isAdmin = (session!.user.roles as string[] | undefined)?.includes('ADMIN') ?? false
+  const roles = (session!.user.roles as string[] | undefined) ?? []
+  const admin = isAdmin(roles)
   const params  = await searchParams
 
-  const validStatuses: GoalStatus[] = ['DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED']
+  const validStatuses: GoalStatus[] = admin
+    ? ['DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED']
+    : ['ACTIVE', 'ACHIEVED', 'FAILED']
+
   const statusFilter = params.status && validStatuses.includes(params.status as GoalStatus)
     ? (params.status as GoalStatus)
     : undefined
 
-  const goals = await db.goal.findMany({
-    where: statusFilter ? { status: statusFilter } : {},
-    orderBy: [{ status: 'asc' }, { deadline: 'asc' }],
-  }) as unknown as GoalRow[]
-
-  const activeCount   = goals.filter((g) => g.status === 'ACTIVE').length
-  const achievedCount = goals.filter((g) => g.status === 'ACHIEVED').length
+  const [{ items: goals }, { active: activeCount, achieved: achievedCount }] = await Promise.all([
+    getGoals(statusFilter, 1, 100, roles),
+    getGoalStatusCounts(),
+  ])
 
   return (
     <div className="space-y-6">
@@ -105,7 +95,7 @@ export default async function GoalsPage({
             <Target size={24} className="text-xxm-gold-dark/50" aria-hidden />
           </div>
           <p className="text-xxm-gray-600 font-medium">No goals found</p>
-          {isAdmin && (
+          {admin && (
             <p className="text-xxm-gray-400 text-xs mt-1.5 max-w-xs mx-auto">
               Create the first goal from the admin portal to start tracking collective progress.
             </p>
@@ -114,7 +104,7 @@ export default async function GoalsPage({
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {goals.map((goal) => {
-            const pct      = Math.min(100, Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100))
+            const pct      = goal.progressPct
             const status   = goal.status as GoalStatus
             const cfg      = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT
             const isOverdue = status === 'ACTIVE' && new Date(goal.deadline) < new Date()
