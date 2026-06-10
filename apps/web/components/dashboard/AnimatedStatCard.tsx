@@ -33,12 +33,12 @@ export function AnimatedStatCard({
 
   return (
     <div
-      className={`relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-200`}
+      className={`group relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
     >
-      <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4`}>
+      <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-transform duration-slow group-hover:scale-110`}>
         {icon}
       </div>
-      <p className="text-2xl font-extrabold text-xxm-green-900 tabular-nums leading-none">
+      <p className="stat-number text-2xl font-extrabold text-xxm-green-900 leading-none">
         {prefix}{display}{suffix}
       </p>
       <p className="text-xs font-semibold text-xxm-gray-600 mt-1.5">{label}</p>

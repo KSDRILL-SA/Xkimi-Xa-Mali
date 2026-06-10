@@ -59,7 +59,7 @@ export function ContributionRow({ contribution, mandate }: Props) {
 
   return (
     <>
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden hover:shadow-xxm transition-shadow duration-200">
+      <div className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden hover:shadow-xxm transition-all duration-fast ease-smooth">
 
         {/* ── Main row ────────────────────────────────────── */}
         <div
@@ -71,7 +71,7 @@ export function ContributionRow({ contribution, mandate }: Props) {
           onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}
         >
           {/* Period icon */}
-          <div className="w-9 h-9 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110">
             <Wallet size={15} className="text-xxm-green" aria-hidden />
           </div>
 
