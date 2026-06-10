@@ -176,6 +176,12 @@ async function main() {
       subject: null,
       body: 'Xkimm Xa Mali: You are {{progress}}% of the way to your next badge tier. Keep it up!',
     },
+    {
+      slug: 'budget-auto-exceeded',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali: Your R{{amount}} debit was processed. This exceeded your {{type}} budget of R{{budget}}.',
+    },
     // ── Email templates ──────────────────────────────────────────────────────
     {
       slug: 'welcome',
@@ -230,6 +236,12 @@ async function main() {
       channel: 'EMAIL',
       subject: 'You have been promoted — Xkimm Xa Mali',
       body: 'Hi {{firstName}}, congratulations! Your consistent contributions have earned you {{tier}} status.',
+    },
+    {
+      slug: 'budget-near-limit',
+      channel: 'EMAIL',
+      subject: 'Approaching your budget limit — Xkimm Xa Mali',
+      body: "Hi {{firstName}}, you've used {{percentage}}% of your monthly budget of R{{budget}}.",
     },
   ]
 
