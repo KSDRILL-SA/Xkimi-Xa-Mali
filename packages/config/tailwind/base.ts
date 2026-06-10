@@ -83,6 +83,9 @@ export const xxmAnimations = {
     'draw-line':      'draw-line 1.2s ease-out forwards',
     'nav-reveal':     'nav-reveal 0.5s ease-out both',
     'word-reveal':    'word-reveal 0.8s ease-out both',
+    'orb-drift-1':    'orb-drift-1 18s ease-in-out infinite',
+    'orb-drift-2':    'orb-drift-2 22s ease-in-out infinite',
+    'orb-drift-3':    'orb-drift-3 14s ease-in-out infinite',
   },
   keyframes: {
     'fade-in': {
@@ -157,6 +160,20 @@ export const xxmAnimations = {
     'word-reveal': {
       from: { opacity: '0', transform: 'translateY(100%)' },
       to:   { opacity: '1', transform: 'translateY(0)' },
+    },
+    'orb-drift-1': {
+      '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+      '33%':      { transform: 'translate(40px, -60px) scale(1.1)' },
+      '66%':      { transform: 'translate(-30px, 30px) scale(0.9)' },
+    },
+    'orb-drift-2': {
+      '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+      '33%':      { transform: 'translate(-50px, 40px) scale(1.15)' },
+      '66%':      { transform: 'translate(60px, -20px) scale(0.85)' },
+    },
+    'orb-drift-3': {
+      '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+      '50%':      { transform: 'translate(20px, -40px) scale(1.2)' },
     },
   },
 }
