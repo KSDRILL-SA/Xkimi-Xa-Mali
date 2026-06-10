@@ -605,6 +605,7 @@ model CommunityMessage {
   deletedById   String?
   deletedAt     DateTime?
   editableUntil DateTime
+  editedAt      DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

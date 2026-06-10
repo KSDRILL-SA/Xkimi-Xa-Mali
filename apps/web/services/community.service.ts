@@ -66,6 +66,7 @@ type MessagePayload = {
   content: string
   isPinned: boolean
   editableUntil: Date
+  editedAt: Date | null
   createdAt: Date
   user: AuthorPayload
   replies?: MessagePayload[]
@@ -76,6 +77,7 @@ type SerializedMessage = {
   content: string
   isPinned: boolean
   editableUntil: string
+  editedAt: string | null
   createdAt: string
   author: {
     id: string
@@ -92,6 +94,7 @@ function serializeMessage(message: MessagePayload): SerializedMessage {
     content: message.content,
     isPinned: message.isPinned,
     editableUntil: message.editableUntil.toISOString(),
+    editedAt: message.editedAt ? message.editedAt.toISOString() : null,
     createdAt: message.createdAt.toISOString(),
     author: {
       id: message.user.id,
@@ -151,7 +154,43 @@ export async function postMessage(userId: string, content: string, replyToId?: s
   return serializeMessage(message as unknown as MessagePayload)
 }
 
-/** Soft-delete a message — own message within the edit window, or admin at any time. */
+/** Edit a message's content — own message, within the 5-minute edit window. */
+export async function editMessage(
+  userId: string,
+  messageId: string,
+  content: string,
+  roles: string[],
+) {
+  const trimmed = content.trim()
+  if (trimmed.length === 0 || trimmed.length > MAX_CONTENT_LENGTH) {
+    throw new ValidationError(`Message must be between 1 and ${MAX_CONTENT_LENGTH} characters`)
+  }
+
+  const message = await communityRepo.findById(messageId)
+  if (!message || message.isDeleted) throw new MessageNotFoundError()
+
+  const isOwner = message.userId === userId
+
+  // Only the author may edit, and only within the edit window. Admins can pin /
+  // delete but must not silently rewrite another member's words.
+  if (!isOwner) throw new ForbiddenError('You can only edit your own messages')
+  if (new Date() > message.editableUntil) throw new MessageEditWindowError()
+
+  const updated = await communityRepo.updateContent(messageId, trimmed)
+
+  await writeAuditLog({
+    userId,
+    action: 'COMMUNITY_MESSAGE_EDITED',
+    entity: 'CommunityMessage',
+    entityId: messageId,
+    payload: {},
+  })
+
+  return serializeMessage(updated as unknown as MessagePayload)
+}
+
+/** Soft-delete a message — the author can delete their own message at any time,
+ *  and an admin can delete any message. */
 export async function deleteMessage(userId: string, messageId: string, roles: string[]) {
   const message = await communityRepo.findById(messageId)
   if (!message || message.isDeleted) throw new MessageNotFoundError()
@@ -159,10 +198,7 @@ export async function deleteMessage(userId: string, messageId: string, roles: st
   const isOwner = message.userId === userId
   const admin = isAdmin(roles)
 
-  if (!admin) {
-    if (!isOwner) throw new ForbiddenError('You can only delete your own messages')
-    if (new Date() > message.editableUntil) throw new MessageEditWindowError()
-  }
+  if (!admin && !isOwner) throw new ForbiddenError('You can only delete your own messages')
 
   await communityRepo.softDelete(messageId, userId)
 
