@@ -12,6 +12,7 @@ import { Alert } from '@/components/ui/Alert'
 import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
 import { api, ApiClientError } from '@/lib/api'
 import { BudgetGuardModal, type BudgetGuardDetails } from './BudgetGuardModal'
+import { GroupCollectionAccount } from './GroupCollectionAccount'
 
 type OpenContribution = {
   id: string
@@ -178,6 +179,8 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
             <p className="text-sm font-semibold text-xxm-green-900">{mandateBankName}</p>
             <p className="text-xs text-gray-400 font-mono tracking-wider">{mandateAccountMasked}</p>
           </div>
+
+          <GroupCollectionAccount compact />
 
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Amount due</span>
