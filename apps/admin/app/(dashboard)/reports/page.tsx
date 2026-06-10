@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { getMonthlyReportSummary } from '@/lib/services'
 import { formatZAR, formatMonth, MONTHS } from '@xxm/utils'
 import { ProgressBar, Reveal } from '@xxm/ui'
-import { Download, TrendingUp, Users, Wallet, BarChart3, ChevronDown, CheckCircle2 } from 'lucide-react'
+import { Download, FileText, TrendingUp, Users, Wallet, BarChart3, ChevronDown, CheckCircle2 } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Reports' }
 
@@ -59,14 +59,25 @@ export default async function ReportsPage({
           <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Reports</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">Monthly contribution summaries and financial reporting.</p>
         </div>
-        <a
-          href={`/api/export?month=${month}&year=${year}`}
-          download={`xkimm-xa-mali-${month}-${year}.csv`}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm"
-        >
-          <Download size={14} aria-hidden />
-          Export CSV
-        </a>
+        <div className="flex items-center gap-2.5">
+          <a
+            href={`/api/v1/admin/reports/pdf?month=${month}&year=${year}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm"
+          >
+            <FileText size={14} aria-hidden />
+            Download PDF
+          </a>
+          <a
+            href={`/api/export?month=${month}&year=${year}`}
+            download={`xkimm-xa-mali-${month}-${year}.csv`}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-xxm-green/20 text-xxm-green-900 text-sm font-semibold hover:bg-xxm-green-50 hover:-translate-y-0.5 transition-all duration-fast ease-smooth"
+          >
+            <Download size={14} aria-hidden />
+            Export CSV
+          </a>
+        </div>
       </Reveal>
 
       {/* ── Period selector ──────────────────────────────────────── */}

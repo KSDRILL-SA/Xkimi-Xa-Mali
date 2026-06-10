@@ -1,4 +1,3 @@
-import React from 'react'
 import {
   Document,
   Page,
@@ -6,12 +5,12 @@ import {
   Text,
   Image,
   StyleSheet,
-  Svg,
-  Path,
-  Circle,
-  Line,
   renderToBuffer,
 } from '@react-pdf/renderer'
+import {
+  C, rands, StatusPill, Masthead, PageFooter,
+  IconUser, IconFile, IconBank, IconScale, IconCoins, IconWallet, IconShield,
+} from './kit'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -65,77 +64,6 @@ export type StatementData = {
     displayName: string
   } | null
 }
-
-// ─── Design tokens ────────────────────────────────────────────────────────────
-
-const C = {
-  ink:        '#0A1F17',
-  headerBg:   '#0C2A1E',
-  green:      '#16412F',
-  greenMid:   '#2D6A4F',
-  greenSoft:  '#5B8A74',
-  mist:       '#F4F8F6',
-  mistLine:   '#E3EEE8',
-  gold:       '#B98A1F',
-  goldSoft:   '#FBF4E2',
-  paper:      '#FFFFFF',
-  line:       '#E7EBE9',
-  lineSoft:   '#F1F4F3',
-  ink70:      '#3B4A44',
-  ink50:      '#6A7872',
-  ink35:      '#9AA6A1',
-  red:        '#C2410C',
-  redSoft:    '#FBEAE1',
-  amber:      '#B45309',
-  amberSoft:  '#FBF1E0',
-  sky:        '#0E7490',
-  skySoft:    '#E3F1F4',
-  ok:         '#15795B',
-  okSoft:     '#E2F1EB',
-}
-
-// ─── Icons (lucide-style, stroked SVG) ──────────────────────────────────────────
-
-type IconProps = { size?: number; color?: string }
-
-function Stroke({ children, size = 10, color = C.gold }: IconProps & { children: React.ReactNode }) {
-  // Apply presentation attributes to every shape so rendering doesn't depend on
-  // SVG attribute inheritance (which @react-pdf handles inconsistently).
-  const shapeProps = {
-    stroke: color, strokeWidth: 2, fill: 'none',
-    strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
-  }
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      {React.Children.map(children, (child) =>
-        React.isValidElement(child)
-          ? React.cloneElement(child as React.ReactElement<Record<string, unknown>>, shapeProps)
-          : child,
-      )}
-    </Svg>
-  )
-}
-const IconUser = (p: IconProps) => (
-  <Stroke {...p}><Path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><Circle cx="12" cy="7" r="4" /></Stroke>
-)
-const IconFile = (p: IconProps) => (
-  <Stroke {...p}><Path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" /><Path d="M14 2v4a2 2 0 0 0 2 2h4" /><Line x1="8" y1="13" x2="16" y2="13" /><Line x1="8" y1="17" x2="16" y2="17" /></Stroke>
-)
-const IconBank = (p: IconProps) => (
-  <Stroke {...p}><Line x1="3" y1="22" x2="21" y2="22" /><Line x1="6" y1="18" x2="6" y2="11" /><Line x1="10" y1="18" x2="10" y2="11" /><Line x1="14" y1="18" x2="14" y2="11" /><Line x1="18" y1="18" x2="18" y2="11" /><Path d="M12 2 21 7 3 7 Z" /></Stroke>
-)
-const IconWallet = (p: IconProps) => (
-  <Stroke {...p}><Path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5" /><Path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /><Circle cx="17" cy="14" r="1" /></Stroke>
-)
-const IconCoins = (p: IconProps) => (
-  <Stroke {...p}><Circle cx="8" cy="8" r="6" /><Path d="M18.09 10.37A6 6 0 1 1 10.34 18" /><Path d="M7 6h1v4" /><Path d="m16.71 13.88.7.71-2.82 2.82" /></Stroke>
-)
-const IconScale = (p: IconProps) => (
-  <Stroke {...p}><Path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><Path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z" /><Path d="M7 21h10" /><Path d="M12 3v18" /><Path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2" /></Stroke>
-)
-const IconShield = (p: IconProps) => (
-  <Stroke {...p}><Path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z" /><Path d="m9 12 2 2 4-4" /></Stroke>
-)
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
@@ -303,32 +231,6 @@ const s = StyleSheet.create({
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function rands(amount: number): string {
-  return `R ${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
-}
-
-type Tone = { bg: string; fg: string; dot: string }
-function statusTone(status: string): Tone {
-  switch (status.toUpperCase()) {
-    case 'PAID': case 'SUCCESS':           return { bg: C.okSoft,    fg: C.ok,    dot: C.ok }
-    case 'PENDING': case 'PROCESSING':     return { bg: C.amberSoft, fg: C.amber, dot: C.amber }
-    case 'OVERDUE': case 'FAILED': case 'REVERSED': return { bg: C.redSoft, fg: C.red, dot: C.red }
-    case 'PARTIAL':                        return { bg: C.skySoft,   fg: C.sky,   dot: C.sky }
-    case 'WAIVED':                         return { bg: C.lineSoft,  fg: C.ink50, dot: C.ink35 }
-    default:                               return { bg: C.lineSoft,  fg: C.ink50, dot: C.ink35 }
-  }
-}
-
-function StatusPill({ status }: { status: string }) {
-  const t = statusTone(status)
-  return (
-    <View style={[s.pill, { backgroundColor: t.bg }]}>
-      <View style={[s.pillDot, { backgroundColor: t.dot }]} />
-      <Text style={[s.pillText, { color: t.fg }]}>{status.toUpperCase()}</Text>
-    </View>
-  )
-}
-
 function txDescription(type: string): string {
   return type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -349,23 +251,7 @@ function StatementDocument({ data }: { data: StatementData }) {
     >
       <Page size="A4" style={s.page}>
 
-        {/* ── Masthead ───────────────────────────────── */}
-        <View style={s.masthead} fixed>
-          <View style={s.brandRow}>
-            <View style={s.monogram}><Text style={s.monogramText}>X</Text></View>
-            <View>
-              <Text style={s.orgName}>XKIMM XA MALI</Text>
-              <Text style={s.orgTagline}>Contributing · Growing · Securing</Text>
-            </View>
-          </View>
-          <View style={s.mastRight}>
-            <Text style={s.docType}>Statement of Account</Text>
-            <Text style={s.docPeriod}>{period.label}</Text>
-            <Text style={s.docRef}>REF {docRef}</Text>
-          </View>
-        </View>
-        <View style={s.accentBar} fixed />
-        <View style={s.accentBarShade} fixed />
+        <Masthead docType="Statement of Account" period={period.label} docRef={docRef} />
 
         <View style={s.content}>
 
@@ -551,14 +437,7 @@ function StatementDocument({ data }: { data: StatementData }) {
 
         </View>
 
-        {/* ── Footer (every page) ────────────────────── */}
-        <View style={s.footer} fixed>
-          <Text style={s.fLeft}>XKIMM XA MALI</Text>
-          <Text style={s.fCenter} render={({ pageNumber, totalPages }) => (
-            `Confidential · ${docRef} · Page ${pageNumber} of ${totalPages}`
-          )} />
-          <Text style={s.fRight}>xkimimamali.co.za</Text>
-        </View>
+        <PageFooter docRef={docRef} />
 
       </Page>
     </Document>
