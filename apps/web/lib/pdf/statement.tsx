@@ -20,6 +20,13 @@ export type StatementData = {
     memberId: string
     memberSince: string
   }
+  banking: {
+    bankName: string
+    accountNumberMasked: string
+    accountType: string
+    branchCode: string
+    verified: boolean
+  } | null
   period: {
     month: number
     year: number
@@ -52,7 +59,7 @@ export type StatementData = {
   signature: {
     imageDataUri: string
     displayName: string
-  }
+  } | null
 }
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -171,6 +178,29 @@ const s = StyleSheet.create({
   infoRow2: { flexDirection: 'row', marginBottom: 3 },
   infoLabel: { fontSize: 7.5, color: C.gray400, width: 70 },
   infoValue: { fontSize: 7.5, color: C.gray700, flex: 1 },
+
+  // ── Banking details band ──────────────────────────────────────────────
+  bankingBox: {
+    borderWidth: 1,
+    borderColor: C.gray200,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 18,
+  },
+  bankingBody: {
+    flexDirection: 'row',
+    padding: 10,
+    gap: 10,
+  },
+  bankingCol: { flex: 1 },
+  bankingColLabel: {
+    fontSize: 6.5,
+    color: C.gray400,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  bankingColValue: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.green },
 
   // ── Four-column financial summary ─────────────────────────────────────
   summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
@@ -383,7 +413,7 @@ function txDescription(type: string): string {
 // ─── Document ─────────────────────────────────────────────────────────────────
 
 function StatementDocument({ data }: { data: StatementData }) {
-  const { member, period, contributions, transactions, summary, generatedAt, docRef, signature } = data
+  const { member, banking, period, contributions, transactions, summary, generatedAt, docRef, signature } = data
   const fullyPaid = summary.outstanding <= 0
 
   return (
@@ -471,6 +501,39 @@ function StatementDocument({ data }: { data: StatementData }) {
               </View>
             </View>
           </View>
+
+          {/* ── Banking details ───────────────────────── */}
+          {banking && (
+            <View style={s.bankingBox}>
+              <View style={s.infoBoxHeader}>
+                <Text style={s.infoBoxTitle}>Banking Details — Contribution Debit Account</Text>
+              </View>
+              <View style={s.bankingBody}>
+                <View style={s.bankingCol}>
+                  <Text style={s.bankingColLabel}>Bank</Text>
+                  <Text style={s.bankingColValue}>{banking.bankName}</Text>
+                </View>
+                <View style={s.bankingCol}>
+                  <Text style={s.bankingColLabel}>Account Number</Text>
+                  <Text style={s.bankingColValue}>{banking.accountNumberMasked}</Text>
+                </View>
+                <View style={s.bankingCol}>
+                  <Text style={s.bankingColLabel}>Account Type</Text>
+                  <Text style={s.bankingColValue}>{banking.accountType}</Text>
+                </View>
+                <View style={s.bankingCol}>
+                  <Text style={s.bankingColLabel}>Branch Code</Text>
+                  <Text style={s.bankingColValue}>{banking.branchCode}</Text>
+                </View>
+                <View style={s.bankingCol}>
+                  <Text style={s.bankingColLabel}>Status</Text>
+                  <Text style={[s.bankingColValue, banking.verified ? s.sPaid : s.sOverdue]}>
+                    {banking.verified ? 'Verified' : 'Unverified'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* ── Financial summary cards ───────────────── */}
           <View style={s.summaryRow}>
@@ -573,9 +636,15 @@ function StatementDocument({ data }: { data: StatementData }) {
           {/* ── Authorisation / signature ─────────────── */}
           <View style={s.signatureBlock}>
             <Text style={s.signatureLabel}>Authorised by</Text>
-            {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image, not an HTML img */}
-            <Image src={signature.imageDataUri} style={s.signatureImage} />
-            <Text style={s.signatureName}>{signature.displayName}</Text>
+            {signature ? (
+              <>
+                {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image, not an HTML img */}
+                <Image src={signature.imageDataUri} style={s.signatureImage} />
+                <Text style={s.signatureName}>{signature.displayName}</Text>
+              </>
+            ) : (
+              <Text style={s.signatureName}>Xkimm Xa Mali Administration</Text>
+            )}
             <Text style={s.signatureDate}>Generated: {generatedAt}</Text>
             <Text style={s.verificationText}>Xkimm Xa Mali — Official Document</Text>
           </View>

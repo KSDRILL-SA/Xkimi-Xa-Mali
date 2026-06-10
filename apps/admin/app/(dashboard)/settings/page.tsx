@@ -22,6 +22,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   locked: 'Your signature can only be changed once every 90 days.',
   conflict: 'A signature already exists — refresh the page and use update instead.',
   not_found: 'No signature on file — upload one first.',
+  failed: 'Could not save your signature. Please try again, or use a smaller image.',
 }
 
 async function saveSignatureAction(fd: FormData) {
@@ -58,7 +59,10 @@ async function saveSignatureAction(fd: FormData) {
     if (err instanceof SignatureLockError) errorCode = 'locked'
     else if (err instanceof AdminConflictError) errorCode = 'conflict'
     else if (err instanceof AdminNotFoundError) errorCode = 'not_found'
-    else throw err
+    else {
+      console.error('Signature save failed', err)
+      errorCode = 'failed'
+    }
   }
 
   revalidatePath('/settings')
