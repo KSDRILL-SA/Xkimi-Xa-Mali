@@ -96,6 +96,12 @@ enum BadgeTier {
   WORLD_CLASS
 }
 
+enum BudgetType {
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
 // ─── Identity ─────────────────────────────────────────────────────────────────
 
 model User {
@@ -141,6 +147,8 @@ model User {
   badgeHistory           BadgeHistory[]
   communityMessages      CommunityMessage[]      @relation("MessageAuthor")
   deletedCommunityMsgs   CommunityMessage[]      @relation("MessageDeleter")
+  budgets                UserBudget[]
+  budgetOverrides        BudgetOverride[]
 
   @@index([status])
   @@index([email, status])
@@ -607,4 +615,42 @@ model CommunityMessage {
   @@index([userId, createdAt])
   @@index([isPinned])
   @@map("community_messages")
+}
+
+// ─── Budget Guard ───────────────────────────────────────────────────────────────
+
+model UserBudget {
+  id        String     @id @default(cuid())
+  userId    String
+  type      BudgetType
+  amount    Decimal    @db.Decimal(10, 2)
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overrides BudgetOverride[]
+
+  @@index([userId, type, isActive])
+  @@map("user_budgets")
+}
+
+model BudgetOverride {
+  id              String   @id @default(cuid())
+  budgetId        String
+  userId          String
+  contributionId  String?
+  attemptedAmount Decimal  @db.Decimal(10, 2)
+  budgetAmount    Decimal  @db.Decimal(10, 2)
+  overageAmount   Decimal  @db.Decimal(10, 2)
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  budget UserBudget @relation(fields: [budgetId], references: [id], onDelete: Restrict)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("budget_overrides")
 }
