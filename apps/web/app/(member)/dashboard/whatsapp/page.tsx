@@ -4,6 +4,7 @@ import { CheckCircle2, ExternalLink, MessageCircle, Phone, Bell } from 'lucide-r
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
+import { Reveal } from '@xxm/ui'
 
 export const metadata: Metadata = { title: 'WhatsApp Notifications' }
 
@@ -59,17 +60,17 @@ export default async function WhatsAppPage({
     <div className="space-y-6 max-w-lg">
 
       {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-start gap-4">
+      <Reveal variant="up" className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
           <MessageCircle size={22} className="text-emerald-600" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">WhatsApp Notifications</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">WhatsApp Notifications</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">
             Receive payment alerts and reminders via WhatsApp.
           </p>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Success banner ─────────────────────────── */}
       {showBanner && (
@@ -80,12 +81,12 @@ export default async function WhatsAppPage({
       )}
 
       {/* ── Status card ────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
 
         {/* Linked number row */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-xxm-gray-50">
+        <div className="group flex items-center justify-between px-5 py-4 border-b border-xxm-gray-50 hover:bg-xxm-green-50/20 transition-colors">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110">
               <Phone size={15} className="text-xxm-green" aria-hidden />
             </div>
             <div>
@@ -112,9 +113,9 @@ export default async function WhatsAppPage({
         </div>
 
         {/* Opt-in toggle row */}
-        <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-xxm-gray-50">
+        <div className="group flex items-start justify-between gap-4 px-5 py-4 border-b border-xxm-gray-50 hover:bg-xxm-green-50/20 transition-colors">
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center shrink-0 mt-0.5">
+            <div className="w-9 h-9 rounded-xl bg-sky-50 flex items-center justify-center shrink-0 mt-0.5 transition-transform duration-slow group-hover:scale-110">
               <Bell size={15} className="text-sky-600" aria-hidden />
             </div>
             <div>
@@ -169,12 +170,12 @@ export default async function WhatsAppPage({
             </a>
           )}
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Group link card ────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-4">
+      <Reveal variant="up" delay={200} className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110">
             <MessageCircle size={18} className="text-emerald-600" aria-hidden />
           </div>
           <div>
@@ -207,10 +208,10 @@ export default async function WhatsAppPage({
             </a>
           </div>
         )}
-      </div>
+      </Reveal>
 
       {/* ── What you'll receive ────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-3">
+      <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-3">
         <p className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">What you will receive</p>
         <ul className="space-y-2">
           {[
@@ -229,7 +230,7 @@ export default async function WhatsAppPage({
           Full WhatsApp Business API integration is coming soon. Your preference is saved and will
           activate automatically when the channel goes live.
         </p>
-      </div>
+      </Reveal>
     </div>
   )
 }

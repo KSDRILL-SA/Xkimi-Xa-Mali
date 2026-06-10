@@ -5,6 +5,7 @@ import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { ProgressBar } from '@/components/ui/ProgressBar'
+import { Reveal } from '@xxm/ui'
 import { Target, Trophy, Clock, Lock } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Goals' }
@@ -70,21 +71,21 @@ export default async function GoalsPage({
     <div className="space-y-6">
 
       {/* ── Header ────────────────────────────────────────── */}
-      <div className="flex items-start gap-4">
+      <Reveal variant="up" className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-xxm-gold/12 flex items-center justify-center shrink-0">
           <Target size={22} className="text-xxm-gold-dark" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Financial Goals</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Financial Goals</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">
             <span className="font-semibold text-xxm-gold-dark">{activeCount}</span> active &middot;{' '}
             <span className="font-semibold text-xxm-green">{achievedCount}</span> achieved
           </p>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Filter tabs ───────────────────────────────────── */}
-      <div className="flex flex-wrap gap-1.5">
+      <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5">
         <FilterChip label="All" href="/dashboard/goals" active={!statusFilter} />
         {validStatuses.map((s) => (
           <FilterChip
@@ -94,9 +95,10 @@ export default async function GoalsPage({
             active={statusFilter === s}
           />
         ))}
-      </div>
+      </Reveal>
 
       {/* ── Goals grid ────────────────────────────────────── */}
+      <Reveal variant="up" delay={200}>
       {goals.length === 0 ? (
         <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-xxm-gold/10 flex items-center justify-center mx-auto mb-4">
@@ -121,12 +123,12 @@ export default async function GoalsPage({
               <Link
                 key={goal.id}
                 href={`/dashboard/goals/${goal.id}`}
-                className={`group block bg-white rounded-2xl border ${cfg.cardBorder} shadow-xxm-sm p-5 space-y-4 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-200`}
+                className={`group block bg-white rounded-2xl border ${cfg.cardBorder} shadow-xxm-sm p-5 space-y-4 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
               >
                 {/* Title row */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-xl ${cfg.iconBg} flex items-center justify-center shrink-0 mt-0.5`}>
+                    <div className={`w-9 h-9 rounded-xl ${cfg.iconBg} flex items-center justify-center shrink-0 mt-0.5 transition-transform duration-slow group-hover:scale-110`}>
                       {status === 'ACHIEVED'
                         ? <Trophy size={15} className={cfg.iconColor} aria-hidden />
                         : <Target  size={15} className={cfg.iconColor} aria-hidden />
@@ -153,11 +155,11 @@ export default async function GoalsPage({
                 {/* Amounts */}
                 <div className="flex items-end justify-between">
                   <div>
-                    <p className="text-xl font-extrabold text-xxm-green-900 tabular-nums">{formatZAR(goal.currentAmount)}</p>
+                    <p className="stat-number text-xl font-extrabold text-xxm-green-900">{formatZAR(goal.currentAmount)}</p>
                     <p className="text-[11px] text-xxm-gray-400">of {formatZAR(goal.targetAmount)}</p>
                   </div>
                   <div className="text-right">
-                    <p className={`text-xl font-extrabold tabular-nums ${pct >= 100 ? 'text-xxm-green' : 'text-xxm-gold-dark'}`}>{pct}%</p>
+                    <p className={`stat-number text-xl font-extrabold ${pct >= 100 ? 'text-xxm-green' : 'text-xxm-gold-dark'}`}>{pct}%</p>
                     <p className="text-[11px] text-xxm-gray-400">complete</p>
                   </div>
                 </div>
@@ -181,6 +183,7 @@ export default async function GoalsPage({
           })}
         </div>
       )}
+      </Reveal>
 
     </div>
   )

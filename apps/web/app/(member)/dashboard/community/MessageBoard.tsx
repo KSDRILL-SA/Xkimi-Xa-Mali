@@ -262,9 +262,9 @@ function MessageItem({
   const Icon = cfg.icon
 
   return (
-    <div className={`px-5 py-4 ${isReply ? 'bg-xxm-green-50/20' : ''}`}>
+    <div className={`group px-5 py-4 transition-colors hover:bg-xxm-green-50/10 ${isReply ? 'bg-xxm-green-50/20' : ''}`}>
       <div className="flex items-start gap-3">
-        <div className={`w-8 h-8 rounded-xl ${cfg.iconBg} flex items-center justify-center shrink-0`}>
+        <div className={`w-8 h-8 rounded-xl ${cfg.iconBg} flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110`}>
           <Icon size={14} className={cfg.iconColor} aria-hidden />
         </div>
         <div className="flex-1 min-w-0">
