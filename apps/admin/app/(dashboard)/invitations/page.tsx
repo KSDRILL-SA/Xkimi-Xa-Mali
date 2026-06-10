@@ -28,6 +28,7 @@ async function createInvite(_prev: InviteState, fd: FormData): Promise<InviteSta
         'Content-Type':      'application/json',
         'x-admin-secret':    adminSecret,
         'x-admin-timestamp': String(Date.now()),
+        'x-admin-user-id':   s.user.id,
       },
       body: JSON.stringify({
         firstName:     (fd.get('firstName') as string | null)?.trim(),
