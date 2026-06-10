@@ -8,7 +8,13 @@ import { assertCanAccess } from '@/lib/authorization'
 import { transactionRepo } from '@/repositories/transaction.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
+import { bankAccountRepo } from '@/repositories/bank-account.repository'
+import { decrypt, maskAccountNumber } from '@/lib/encryption'
 import { embedSignatureInPdf, verifySignatureExists } from './signature.service'
+
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+}
 
 export { ReportNotFoundError }
 
@@ -132,7 +138,9 @@ async function buildStatementData(
   month: number,
   year: number,
 ): Promise<StatementData> {
-  const signature = await verifySignatureExists()
+  // The institutional signature is embedded when configured; statements still
+  // generate (unsigned) if an admin hasn't set one up yet.
+  const signature = await verifySignatureExists().catch((): null => null)
 
   const userResults = await userRepo.findMany({ id: userId }, {
     take: 1,
@@ -158,7 +166,25 @@ async function buildStatementData(
   )
 
   const allTransactions = periodContributions.flatMap((c) => c.transactions)
-  const signatureImage = await embedSignatureInPdf(signature.signatureUrl)
+
+  // Primary banking details (the account contributions are debited from).
+  const bankAccounts = await bankAccountRepo.findByUser(userId, [
+    { isPrimary: 'desc' }, { createdAt: 'asc' },
+  ])
+  const primaryAccount = bankAccounts[0] ?? null
+  const banking = primaryAccount
+    ? {
+        bankName:            primaryAccount.bankName,
+        accountNumberMasked: maskAccountNumber(decrypt(primaryAccount.accountNumber)),
+        accountType:         titleCase(primaryAccount.accountType),
+        branchCode:          primaryAccount.branchCode,
+        verified:            primaryAccount.verifiedAt !== null,
+      }
+    : null
+
+  const signatureImage = signature
+    ? await embedSignatureInPdf(signature.signatureUrl).catch((): null => null)
+    : null
 
   return {
     member: {
@@ -171,6 +197,7 @@ async function buildStatementData(
         day: 'numeric', month: 'long', year: 'numeric',
       }),
     },
+    banking,
     period: { month, year, label: periodLabel(month, year) },
     contributions: periodContributions.map((c) => ({
       id: c.id,
@@ -204,10 +231,9 @@ async function buildStatementData(
       minute: '2-digit',
     }),
     docRef: buildDocRef(userId, month, year),
-    signature: {
-      imageDataUri: signatureImage,
-      displayName: signature.displayName,
-    },
+    signature: signature && signatureImage
+      ? { imageDataUri: signatureImage, displayName: signature.displayName }
+      : null,
   }
 }
 
