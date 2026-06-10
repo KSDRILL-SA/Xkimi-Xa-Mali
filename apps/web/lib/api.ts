@@ -1,7 +1,12 @@
 // Typed client-side fetch wrapper. All UI API calls route through here. [FRONTEND-F05]
 
 export class ApiClientError extends Error {
-  constructor(public code: string, message: string, public status: number) {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number,
+    public details?: Record<string, unknown>,
+  ) {
     super(message)
   }
 }
@@ -19,7 +24,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!res.ok) {
     const err = json?.error
-    throw new ApiClientError(err?.code ?? 'SYS_004', err?.message ?? 'Request failed', res.status)
+    throw new ApiClientError(err?.code ?? 'SYS_004', err?.message ?? 'Request failed', res.status, err?.details)
   }
 
   return (json as ApiEnvelope<T>).data

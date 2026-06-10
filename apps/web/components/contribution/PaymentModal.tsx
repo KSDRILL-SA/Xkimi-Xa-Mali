@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Alert } from '@/components/ui/Alert'
 import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
-import { api } from '@/lib/api'
+import { api, ApiClientError } from '@/lib/api'
+import { BudgetGuardModal, type BudgetGuardDetails } from './BudgetGuardModal'
 
 type OpenContribution = {
   id: string
@@ -37,6 +38,8 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
   const router = useRouter()
   const [serverError, setServerError] = useState('')
   const [result, setResult] = useState<PaymentResult | null>(null)
+  const [budgetGuard, setBudgetGuard] = useState<BudgetGuardDetails | null>(null)
+  const [overriding, setOverriding] = useState(false)
 
   const remaining = contribution.amountDue - contribution.amountPaid
   const maxPayable = Math.min(remaining, MAX_CONTRIBUTION_ZAR)
@@ -45,6 +48,8 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
     register,
     handleSubmit,
     watch,
+    setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<ManualContributionInput>({
     resolver: zodResolver(ManualContributionSchema),
@@ -57,15 +62,47 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
 
   const watchedAmount = watch('amount')
 
+  async function submitPayment(data: ManualContributionInput) {
+    const res = await api.post<PaymentResult>('/api/v1/contributions/pay', data)
+    setResult(res)
+    router.refresh()
+  }
+
   async function onSubmit(data: ManualContributionInput) {
     setServerError('')
     try {
-      const res = await api.post<PaymentResult>('/api/v1/contributions/pay', data)
-      setResult(res)
-      router.refresh()
+      await submitPayment(data)
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'BUDGET_001' && err.details) {
+        setBudgetGuard(err.details as unknown as BudgetGuardDetails)
+        return
+      }
+      const e = err as { message?: string }
+      setServerError(e.message ?? 'Payment failed. Please try again.')
+    }
+  }
+
+  function handleChangeAmount(remainingAmount: number) {
+    setValue('amount', Math.max(MIN_CONTRIBUTION_ZAR, Math.min(remainingAmount, maxPayable)))
+    setBudgetGuard(null)
+  }
+
+  async function handleProceedAnyway(reason?: string) {
+    setOverriding(true)
+    setServerError('')
+    try {
+      await submitPayment({
+        ...getValues(),
+        budgetOverrideConfirmed: true,
+        budgetOverrideReason: reason,
+      })
+      setBudgetGuard(null)
     } catch (err: unknown) {
       const e = err as { message?: string }
       setServerError(e.message ?? 'Payment failed. Please try again.')
+      setBudgetGuard(null)
+    } finally {
+      setOverriding(false)
     }
   }
 
@@ -184,6 +221,16 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
           </form>
         </div>
       </div>
+
+      {budgetGuard && (
+        <BudgetGuardModal
+          details={budgetGuard}
+          loading={overriding}
+          onChangeAmount={handleChangeAmount}
+          onProceed={handleProceedAnyway}
+          onClose={() => setBudgetGuard(null)}
+        />
+      )}
     </div>
   )
 }
