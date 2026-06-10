@@ -8,6 +8,7 @@ import { assertCanAccess } from '@/lib/authorization'
 import { transactionRepo } from '@/repositories/transaction.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
+import { embedSignatureInPdf, verifySignatureExists } from './signature.service'
 import { env } from '@/lib/env'
 
 export { ReportNotFoundError }
@@ -132,6 +133,8 @@ async function buildStatementData(
   month: number,
   year: number,
 ): Promise<StatementData> {
+  const signature = await verifySignatureExists()
+
   const userResults = await userRepo.findMany({ id: userId }, {
     take: 1,
     select: { id: true, firstName: true, lastName: true, email: true, phone: true, createdAt: true },
@@ -156,6 +159,7 @@ async function buildStatementData(
   )
 
   const allTransactions = periodContributions.flatMap((c) => c.transactions)
+  const signatureImage = await embedSignatureInPdf(signature.signatureUrl)
 
   return {
     member: {
@@ -201,6 +205,10 @@ async function buildStatementData(
       minute: '2-digit',
     }),
     docRef: buildDocRef(userId, month, year),
+    signature: {
+      imageDataUri: signatureImage,
+      displayName: signature.displayName,
+    },
   }
 }
 

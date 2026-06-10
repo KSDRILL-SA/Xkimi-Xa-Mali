@@ -31,6 +31,11 @@ vi.mock('@/lib/pdf/statement', () => ({
   renderStatementPDF: vi.fn(),
 }))
 
+vi.mock('@/services/signature.service', () => ({
+  verifySignatureExists: vi.fn(),
+  embedSignatureInPdf: vi.fn(),
+}))
+
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
@@ -38,6 +43,7 @@ vi.mock('@/lib/pdf/statement', () => ({
 import { db } from '@/lib/db'
 import { storageProvider } from '@/integrations/storage'
 import { renderStatementPDF } from '@/lib/pdf/statement'
+import { verifySignatureExists, embedSignatureInPdf } from '@/services/signature.service'
 import { ForbiddenError, ReportNotFoundError } from '@/lib/errors'
 import {
   getTransactionHistory,
@@ -60,6 +66,8 @@ const mockContribFindMany = db.contribution.findMany as MockedFunction<typeof db
 const mockContribAggregate = db.contribution.aggregate as MockedFunction<typeof db.contribution.aggregate>
 const mockUpload = storageProvider.upload as MockedFunction<typeof storageProvider.upload>
 const mockRenderPDF      = renderStatementPDF as MockedFunction<typeof renderStatementPDF>
+const mockVerifySignature = verifySignatureExists as MockedFunction<typeof verifySignatureExists>
+const mockEmbedSignature  = embedSignatureInPdf  as MockedFunction<typeof embedSignatureInPdf>
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -176,6 +184,12 @@ describe('generateMemberStatement', () => {
   })
 
   it('generates PDF, uploads to blob and returns urls', async () => {
+    mockVerifySignature.mockResolvedValueOnce({
+      signatureUrl: 'https://blob.vercel.com/signatures/admin-1/sig.png',
+      displayName: 'Maluleke Kurhula Success',
+    } as never)
+    mockEmbedSignature.mockResolvedValueOnce('data:image/png;base64,fakedata')
+
     mockUserFindMany.mockResolvedValueOnce([{
       firstName: 'Sipho', lastName: 'Dlamini', email: 's@test.com', phone: '+27821234567',
     }] as never)

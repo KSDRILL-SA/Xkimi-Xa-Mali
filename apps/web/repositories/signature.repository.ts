@@ -30,4 +30,9 @@ export const signatureRepo = {
   findHistory(adminId: string) {
     return db.adminSignatureHistory.findMany({ where: { adminId }, orderBy: { replacedAt: 'desc' } })
   },
+
+  /** The institutional signature embedded in generated documents — the earliest active one. */
+  findActiveSystem() {
+    return db.adminSignature.findFirst({ where: { isActive: true }, orderBy: { createdAt: 'asc' } })
+  },
 }

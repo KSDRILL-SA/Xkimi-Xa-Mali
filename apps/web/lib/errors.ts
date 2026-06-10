@@ -213,6 +213,25 @@ export class BudgetExceededError extends AppError {
   }
 }
 
+// ─── Signature domain ─────────────────────────────────────────────────────────
+
+export class NoSignatureError extends ConflictError {
+  constructor() {
+    super(
+      'Admin signature is required before generating documents. Please upload your signature in Settings.',
+      'SIG_001',
+    )
+  }
+}
+
+export class SignatureLockError extends AppError {
+  constructor(nextChangeAllowedAt: Date) {
+    super('Signature can only be changed once every 90 days', 'SIG_002', 423, {
+      nextChangeAllowedAt: nextChangeAllowedAt.toISOString(),
+    })
+  }
+}
+
 // ─── Type guard ───────────────────────────────────────────────────────────────
 
 export function isAppError(err: unknown): err is AppError {
