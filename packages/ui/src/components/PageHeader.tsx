@@ -16,8 +16,8 @@ export function PageHeader({ title, subtitle, action, className }: PageHeaderPro
       )}
     >
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold text-xxm-green-900 leading-tight">{title}</h1>
-        {subtitle && <p className="text-sm text-gray-500 mt-1 leading-relaxed">{subtitle}</p>}
+        <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-xxm-green-900 leading-tight">{title}</h1>
+        {subtitle && <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">{subtitle}</p>}
       </div>
       {action && <div className="shrink-0 flex items-center gap-2">{action}</div>}
     </div>
