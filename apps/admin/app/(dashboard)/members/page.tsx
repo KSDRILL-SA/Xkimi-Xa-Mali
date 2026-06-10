@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listMembers } from '@/lib/services'
-import { RouterPagination } from '@xxm/ui'
+import { Reveal, RouterPagination } from '@xxm/ui'
 import { Search, Users, CheckCircle2, Clock, Ban, ArrowRight } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Members' }
@@ -65,17 +65,17 @@ export default async function MembersPage({
     <div className="space-y-6">
 
       {/* ── Page header ─────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      <Reveal variant="up" className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Members</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Members</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">
-            <span className="font-semibold text-xxm-green">{total}</span> registered members
+            <span className="stat-number font-semibold text-xxm-green">{total}</span> registered members
           </p>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Search + filters ─────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 space-y-3">
+      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 space-y-3">
         <form method="GET" action="/members" className="flex gap-2">
           <div className="relative flex-1 min-w-0">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-xxm-gray-400 pointer-events-none" aria-hidden />
@@ -127,9 +127,10 @@ export default async function MembersPage({
             </Link>
           )}
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Members list ─────────────────────────────────────── */}
+      <Reveal variant="up" delay={200}>
       {members.length === 0 ? (
         <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
@@ -164,7 +165,7 @@ export default async function MembersPage({
                 >
                   {/* Member avatar + name */}
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-xl ${avatarColor} flex items-center justify-center text-xs font-bold shrink-0`}>
+                    <div className={`w-9 h-9 rounded-xl ${avatarColor} flex items-center justify-center text-xs font-bold shrink-0 transition-transform duration-slow group-hover:scale-110`}>
                       {initials}
                     </div>
                     <div className="min-w-0">
@@ -185,12 +186,12 @@ export default async function MembersPage({
                   </div>
 
                   {/* Contributions */}
-                  <span className="text-sm font-semibold text-xxm-gray-700 text-center hidden md:block tabular-nums">
+                  <span className="stat-number text-sm font-semibold text-xxm-gray-700 text-center hidden md:block">
                     {m._count.contributions}
                   </span>
 
                   {/* Mandates */}
-                  <span className="text-sm font-semibold text-xxm-gray-700 text-center hidden lg:block tabular-nums">
+                  <span className="stat-number text-sm font-semibold text-xxm-gray-700 text-center hidden lg:block">
                     {m._count.mandates}
                   </span>
 
@@ -210,6 +211,7 @@ export default async function MembersPage({
           </div>
         </div>
       )}
+      </Reveal>
 
       {/* ── Pagination ──────────────────────────────────────── */}
       {total > 25 && (

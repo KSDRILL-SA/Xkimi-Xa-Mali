@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllBadges } from '@/lib/services'
-import { Breadcrumb, PageHeader, RouterPagination } from '@xxm/ui'
+import { Breadcrumb, PageHeader, Reveal, RouterPagination } from '@xxm/ui'
 import { BADGE_TIERS, BADGE_TIER_LABELS } from '@/lib/badge-tier'
 import { BadgesTable, type BadgeRow } from './BadgesTable'
 
@@ -43,17 +43,21 @@ export default async function BadgesPage({
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Badges' }]} />
-      <PageHeader title="Badges" subtitle={`${total} member${total !== 1 ? 's' : ''}`} />
+      <Reveal variant="up">
+        <PageHeader title="Badges" subtitle={`${total} member${total !== 1 ? 's' : ''}`} />
+      </Reveal>
 
-      <div className="flex flex-wrap gap-1.5">
+      <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5">
         <FilterChip label="All" href="/badges" active={!tier} />
         {BADGE_TIERS.map((t) => (
           <FilterChip key={t} label={BADGE_TIER_LABELS[t]} href={`/badges?tier=${t}`} active={tier === t} />
         ))}
-      </div>
+      </Reveal>
 
-      <BadgesTable rows={rows} />
-      <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/badges" className="justify-center" />
+      <Reveal variant="up" delay={200} className="space-y-4">
+        <BadgesTable rows={rows} />
+        <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/badges" className="justify-center" />
+      </Reveal>
     </div>
   )
 }

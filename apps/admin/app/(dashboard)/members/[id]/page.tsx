@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory } from '@/lib/services'
 import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
-import { Breadcrumb, Card, CardHeader, CardBody, PageHeader } from '@xxm/ui'
+import { Breadcrumb, Card, CardHeader, CardBody, PageHeader, Reveal } from '@xxm/ui'
 import { revalidatePath } from 'next/cache'
 
 export const metadata: Metadata = { title: 'Member Detail' }
@@ -75,6 +75,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Members', href: '/members' }, { label: `${member.firstName} ${member.lastName}` }]} />
+      <Reveal variant="up">
       <PageHeader
         title={`${member.firstName} ${member.lastName}`}
         subtitle={member.email}
@@ -105,6 +106,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           </div>
         }
       />
+      </Reveal>
 
       {isLocked && (
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 flex items-center justify-between gap-4">
@@ -122,7 +124,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <Reveal variant="up" delay={100} className="grid md:grid-cols-2 gap-4">
         {/* Profile */}
         <Card>
           <CardHeader title="Profile" />
@@ -244,7 +246,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             )}
           </CardBody>
         </Card>
-      </div>
+      </Reveal>
     </div>
   )
 }
