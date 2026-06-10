@@ -62,19 +62,21 @@ export async function listMembers(
   const { search, status, page = 1, limit = 25 } = params
   const skip = (page - 1) * limit
 
+  const searchFilter: Prisma.UserWhereInput = search ? {
+    OR: [
+      { firstName: { contains: search, mode: 'insensitive' as const } },
+      { lastName:  { contains: search, mode: 'insensitive' as const } },
+      { email:     { contains: search, mode: 'insensitive' as const } },
+      { phone:     { contains: search, mode: 'insensitive' as const } },
+    ],
+  } : {}
+
   const where: Prisma.UserWhereInput = {
+    ...searchFilter,
     ...(status && { status: status as UserStatus }),
-    ...(search && {
-      OR: [
-        { firstName: { contains: search, mode: 'insensitive' as const } },
-        { lastName:  { contains: search, mode: 'insensitive' as const } },
-        { email:     { contains: search, mode: 'insensitive' as const } },
-        { phone:     { contains: search, mode: 'insensitive' as const } },
-      ],
-    }),
   }
 
-  const [items, total] = await Promise.all([
+  const [items, total, statusGroups] = await Promise.all([
     db.user.findMany({
       where, skip, take: limit,
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
@@ -86,9 +88,13 @@ export async function listMembers(
       },
     }),
     db.user.count({ where }),
+    db.user.groupBy({ by: ['status'], where: searchFilter, _count: true }),
   ])
 
-  return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+  const statusCounts: Record<UserStatus, number> = { ACTIVE: 0, PENDING: 0, SUSPENDED: 0 }
+  for (const g of statusGroups) statusCounts[g.status] = g._count
+
+  return { items, total, page, limit, totalPages: Math.ceil(total / limit), statusCounts }
 }
 
 export async function getMemberDetail(adminRoles: string[], memberId: string) {
@@ -254,6 +260,56 @@ export async function listAllContributions(
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+}
+
+export async function generateContributions(
+  adminId: string, adminRoles: string[],
+  month: number, year: number,
+) {
+  assertAdmin(adminRoles)
+
+  const mandates = await db.paymentMandate.findMany({
+    where: { status: MandateStatus.ACTIVE, user: { status: UserStatus.ACTIVE } },
+    select: { userId: true, debitDay: true, amount: true },
+  })
+
+  const existing = await db.contribution.findMany({
+    where: {
+      userId: { in: mandates.map((m) => m.userId) },
+      periodMonth: month, periodYear: year,
+    },
+    select: { userId: true },
+  })
+  const alreadyHas = new Set(existing.map((c) => c.userId))
+  const toCreate = mandates.filter((m) => !alreadyHas.has(m.userId))
+
+  if (toCreate.length > 0) {
+    await db.contribution.createMany({
+      data: toCreate.map((m) => ({
+        userId: m.userId,
+        periodMonth: month,
+        periodYear: year,
+        amountDue: m.amount,
+        amountPaid: 0,
+        dueDate: new Date(year, month - 1, m.debitDay),
+        status: ContributionStatus.PENDING,
+      })),
+      skipDuplicates: true,
+    })
+  }
+
+  const created = toCreate.length
+  const skipped = mandates.length - toCreate.length
+
+  await writeAuditLog({
+    userId: adminId,
+    action: 'ADMIN_CONTRIBUTIONS_GENERATED',
+    entity: 'Contribution',
+    entityId: `${year}-${month}`,
+    payload: { month, year, created, skipped, total: mandates.length },
+  })
+
+  return { created, skipped, total: mandates.length }
 }
 
 // ─── Goals ────────────────────────────────────────────────────────────────────
@@ -520,6 +576,29 @@ export async function getMonthlyReportSummary(adminRoles: string[], month: numbe
   const collectionRate = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 0
 
   return { month, year, memberCount, totalDue, totalPaid, paidCount, collectionRate, contributions }
+}
+
+export async function getContributionsForExport(adminRoles: string[], month: number, year: number) {
+  assertAdmin(adminRoles)
+
+  return db.contribution.findMany({
+    where: { periodMonth: month, periodYear: year },
+    select: {
+      amountDue:  true,
+      amountPaid: true,
+      dueDate:    true,
+      status:     true,
+      user: {
+        select: {
+          firstName: true,
+          lastName:  true,
+          email:     true,
+          phone:     true,
+        },
+      },
+    },
+    orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
+  })
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
