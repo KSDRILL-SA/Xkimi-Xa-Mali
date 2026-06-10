@@ -5,6 +5,7 @@ import { getMyBadge } from '@/services/badge.service'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { formatDate } from '@/lib/formatters'
 import { BADGE_TIER_CONFIG, BADGE_TIER_ORDER } from '@/lib/badge-tier'
+import { Reveal } from '@xxm/ui'
 import { ArrowUpRight, CheckCircle2, Circle, History, Trophy, Crown } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Badges' }
@@ -84,29 +85,29 @@ export default async function BadgesPage() {
     <div className="space-y-6">
 
       {/* ── Header ────────────────────────────────────────── */}
-      <div className="flex items-start gap-4">
+      <Reveal variant="up" className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-xxm-gold/12 flex items-center justify-center shrink-0">
           <Trophy size={22} className="text-xxm-gold-dark" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">My Badge</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">My Badge</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">
             Your reputation tier is based on consistency, timeliness, generosity and streaks.
           </p>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Tier card ─────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-5">
+      <Reveal variant="up" delay={100} className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-5">
         <div className="flex items-center gap-4">
-          <div className={`w-16 h-16 rounded-2xl ${cfg.iconBg} flex items-center justify-center shrink-0`}>
+          <div className={`w-16 h-16 rounded-2xl ${cfg.iconBg} flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110`}>
             <Icon size={30} className={cfg.iconColor} aria-hidden />
           </div>
           <div className="flex-1 min-w-0">
             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.badgeClass}`}>
               {cfg.label}
             </span>
-            <p className="text-2xl font-extrabold text-xxm-green-900 tabular-nums mt-1">
+            <p className="stat-number text-2xl font-extrabold text-xxm-green-900 mt-1">
               {badge.overallScore.toFixed(1)} <span className="text-sm font-medium text-xxm-gray-400">/ 100</span>
             </p>
           </div>
@@ -125,7 +126,7 @@ export default async function BadgesPage() {
                 <ArrowUpRight size={13} className="text-xxm-gold-dark" aria-hidden />
                 Progress to {BADGE_TIER_CONFIG[next.tier].label}
               </p>
-              <span className="text-xs font-bold tabular-nums text-xxm-gold-dark">{badge.progressToNext.toFixed(0)}%</span>
+              <span className="stat-number text-xs font-bold text-xxm-gold-dark">{badge.progressToNext.toFixed(0)}%</span>
             </div>
             <ProgressBar value={badge.progressToNext} size="lg" variant="gold" animated />
           </div>
@@ -137,11 +138,11 @@ export default async function BadgesPage() {
             <p className="text-sm font-semibold text-xxm-green-900">You&apos;ve reached the highest tier — World Class!</p>
           </div>
         )}
-      </div>
+      </Reveal>
 
       {/* ── Dimension breakdown ─────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
-        <h2 className="text-base font-bold text-xxm-green-900">Score breakdown</h2>
+      <Reveal variant="up" delay={200} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
+        <h2 className="font-display text-base font-bold text-xxm-green-900">Score breakdown</h2>
         <div className="space-y-4">
           {dimensions.map((d) => (
             <div key={d.label}>
@@ -149,7 +150,7 @@ export default async function BadgesPage() {
                 <p className="text-xs font-semibold text-xxm-gray-600">
                   {d.label} <span className="text-xxm-gray-400 font-normal">({d.weight} weight)</span>
                 </p>
-                <span className="text-xs font-bold tabular-nums text-xxm-green-700">{d.value.toFixed(1)}</span>
+                <span className="stat-number text-xs font-bold text-xxm-green-700">{d.value.toFixed(1)}</span>
               </div>
               <ProgressBar value={d.value} size="sm" variant="default" />
             </div>
@@ -161,12 +162,12 @@ export default async function BadgesPage() {
           <Stat label="Longest streak" value={`${badge.longestStreak} mo`} />
           <Stat label="Avg contribution" value={`R${badge.avgContribution.toFixed(0)}`} />
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Next tier requirements ──────────────────────────── */}
       {next && (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
-          <h2 className="text-base font-bold text-xxm-green-900">
+        <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+          <h2 className="font-display text-base font-bold text-xxm-green-900">
             Requirements for {BADGE_TIER_CONFIG[next.tier].label}
           </h2>
           <div className="divide-y divide-xxm-gray-50">
@@ -179,18 +180,18 @@ export default async function BadgesPage() {
                   }
                   <span className={`text-sm font-medium ${r.met ? 'text-xxm-green-900' : 'text-xxm-gray-600'}`}>{r.label}</span>
                 </div>
-                <span className="text-xs font-semibold tabular-nums text-xxm-gray-400">
+                <span className="stat-number text-xs font-semibold text-xxm-gray-400">
                   {r.current} <span className="text-xxm-gray-300">/ {r.target}</span>
                 </span>
               </div>
             ))}
           </div>
-        </div>
+        </Reveal>
       )}
 
       {/* ── History ──────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
-        <h2 className="text-base font-bold text-xxm-green-900 flex items-center gap-2">
+      <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+        <h2 className="font-display text-base font-bold text-xxm-green-900 flex items-center gap-2">
           <History size={16} className="text-xxm-gray-400" aria-hidden />
           Tier history
         </h2>
@@ -217,7 +218,7 @@ export default async function BadgesPage() {
             })}
           </div>
         )}
-      </div>
+      </Reveal>
     </div>
   )
 }
@@ -226,7 +227,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-xxm-green-50/40 rounded-xl px-3 py-2.5">
       <p className="text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest">{label}</p>
-      <p className="text-sm font-extrabold text-xxm-green-900 tabular-nums mt-0.5">{value}</p>
+      <p className="stat-number text-sm font-extrabold text-xxm-green-900 mt-0.5">{value}</p>
     </div>
   )
 }

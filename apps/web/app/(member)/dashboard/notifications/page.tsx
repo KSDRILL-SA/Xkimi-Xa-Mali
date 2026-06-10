@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
+import { Reveal } from '@xxm/ui'
 import { MessageSquare, Mail, Bell, type LucideIcon } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Notifications' }
@@ -125,13 +126,13 @@ export default async function NotificationsPage({
     <div className="space-y-6">
 
       {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      <Reveal variant="up" className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-sky-50 flex items-center justify-center shrink-0">
             <Bell size={22} className="text-sky-600" aria-hidden />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Notifications</h1>
+            <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Notifications</h1>
             <p className="text-sm text-xxm-gray-500 mt-1">
               {total} notification{total !== 1 ? 's' : ''}
               {failedCount > 0 && (
@@ -149,10 +150,10 @@ export default async function NotificationsPage({
         >
           Manage preferences
         </Link>
-      </div>
+      </Reveal>
 
       {/* ── Filter chips ───────────────────────────── */}
-      <div className="flex flex-wrap gap-1.5 items-center">
+      <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5 items-center">
         <FilterChip label="All" href={buildUrl({ channel: undefined, cursor: undefined }) as Route} active={!channelFilter} />
         {validChannels.map((ch) => (
           <FilterChip
@@ -172,9 +173,10 @@ export default async function NotificationsPage({
             active={statusFilter === s}
           />
         ))}
-      </div>
+      </Reveal>
 
       {/* ── List ───────────────────────────────────── */}
+      <Reveal variant="up" delay={200}>
       {items.length === 0 ? (
         <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
@@ -192,8 +194,8 @@ export default async function NotificationsPage({
             const date = n.sentAt ?? n.createdAt
             const ChannelIcon = CHANNEL_ICONS[n.channel as NotifChannel] ?? Bell
             return (
-              <div key={n.id} className="flex items-center gap-4 px-5 py-4 hover:bg-xxm-green-50/20 transition-colors">
-                <div className="w-9 h-9 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0" aria-hidden>
+              <div key={n.id} className="group flex items-center gap-4 px-5 py-4 hover:bg-xxm-green-50/20 transition-colors">
+                <div className="w-9 h-9 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110" aria-hidden>
                   <ChannelIcon size={15} className="text-xxm-green" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -216,6 +218,7 @@ export default async function NotificationsPage({
           })}
         </div>
       )}
+      </Reveal>
 
       {/* ── Cursor pagination ──────────────────────── */}
       {(nextCursor || cursor) && (
