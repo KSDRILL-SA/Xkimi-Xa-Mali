@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { getContributionsForExport } from '@/lib/services'
 
 const MONTHS = [
   'January','February','March','April','May','June',
@@ -25,31 +25,16 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url)
-  const month = Math.min(12, Math.max(1, parseInt(searchParams.get('month') ?? '0', 10)))
-  const year  = Math.max(2024, parseInt(searchParams.get('year') ?? '0', 10))
+  const monthRaw = parseInt(searchParams.get('month') ?? '', 10)
+  const yearRaw  = parseInt(searchParams.get('year') ?? '', 10)
 
-  if (!month || !year) {
-    return new NextResponse('Missing month or year', { status: 400 })
+  if (!Number.isInteger(monthRaw) || monthRaw < 1 || monthRaw > 12 || !Number.isInteger(yearRaw) || yearRaw < 2024) {
+    return new NextResponse('Missing or invalid month or year', { status: 400 })
   }
+  const month = monthRaw
+  const year  = yearRaw
 
-  const contributions = await db.contribution.findMany({
-    where: { periodMonth: month, periodYear: year },
-    select: {
-      amountDue:  true,
-      amountPaid: true,
-      dueDate:    true,
-      status:     true,
-      user: {
-        select: {
-          firstName: true,
-          lastName:  true,
-          email:     true,
-          phone:     true,
-        },
-      },
-    },
-    orderBy: [{ user: { lastName: 'asc' } }, { user: { firstName: 'asc' } }],
-  })
+  const contributions = await getContributionsForExport(roles, month, year)
 
   const periodLabel = `${MONTHS[month - 1] ?? `Month ${month}`} ${year}`
   const generatedAt = new Date().toLocaleString('en-ZA', {
