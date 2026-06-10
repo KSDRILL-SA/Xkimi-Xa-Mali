@@ -9,6 +9,7 @@ export { goalRepo } from './goal.repository'
 export { invitationRepo } from './invitation.repository'
 export { mandateRepo } from './mandate.repository'
 export { notificationRepo } from './notification.repository'
+export { signatureRepo } from './signature.repository'
 export { transactionRepo } from './transaction.repository'
 export { userRepo } from './user.repository'
 
