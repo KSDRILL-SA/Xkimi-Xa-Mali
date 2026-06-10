@@ -35,4 +35,18 @@ export const budgetRepo = {
   findOverridesByUser(userId: string) {
     return db.budgetOverride.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } })
   },
+
+  /** All active budgets across members, with owner details (admin only). */
+  findAllActive() {
+    return db.userBudget.findMany({
+      where: { isActive: true },
+      include: { user: { select: { id: true, firstName: true, lastName: true, email: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
+  },
+
+  /** Override counts grouped by member (admin only). */
+  countOverridesByUser() {
+    return db.budgetOverride.groupBy({ by: ['userId'], _count: { id: true } })
+  },
 }

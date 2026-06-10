@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient, BudgetType } from '@prisma/client'
 import { db } from '@/lib/db'
 
 export type TxClient = Omit<
@@ -125,6 +125,34 @@ export const contributionRepo = {
   /** Count contributions matching a where clause. */
   count(where: Prisma.ContributionWhereInput) {
     return db.contribution.count({ where })
+  },
+
+  /** Sum of amountPaid for contributions whose due date falls within a budget's active period. */
+  async sumPaidInPeriod(
+    userId: string,
+    budget: { type: BudgetType; startDate: Date; endDate: Date | null },
+  ): Promise<number> {
+    const now = new Date()
+    let gte: Date
+    let lte: Date | undefined
+
+    if (budget.type === 'MONTHLY') {
+      gte = new Date(now.getFullYear(), now.getMonth(), 1)
+      lte = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+    } else if (budget.type === 'YEARLY') {
+      gte = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1)
+      lte = now
+    } else {
+      gte = budget.startDate
+      lte = budget.endDate ?? undefined
+    }
+
+    const result = await db.contribution.aggregate({
+      where: { userId, dueDate: { gte, ...(lte ? { lte } : {}) } },
+      _sum: { amountPaid: true },
+    })
+
+    return Number(result._sum.amountPaid ?? 0)
   },
 
   // ─── Transaction-aware methods (accept optional tx) ──────────────────────

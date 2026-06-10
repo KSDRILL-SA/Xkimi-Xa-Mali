@@ -6,6 +6,7 @@ export class AppError extends Error {
     message: string,
     public readonly code: string,
     public readonly status: number,
+    public readonly details?: Record<string, unknown>,
   ) {
     super(message)
     this.name = this.constructor.name
@@ -192,6 +193,23 @@ export class MessageEditWindowError extends AppError {
 export class MessageDepthError extends AppError {
   constructor() {
     super('Cannot reply to a reply — maximum thread depth reached', 'MSG_004', 422)
+  }
+}
+
+// ─── Budget domain ────────────────────────────────────────────────────────────
+
+export class BudgetNotFoundError extends NotFoundError {
+  constructor() { super('Budget not found', 'BGT_001') }
+}
+
+export class BudgetExceededError extends AppError {
+  constructor(details: {
+    budget: number
+    alreadyContributed: number
+    remaining: number
+    overage: number
+  }) {
+    super('This contribution would exceed your budget', 'BUDGET_001', 422, details)
   }
 }
 

@@ -6,6 +6,7 @@ import { todaySAST } from '@/lib/date'
 import { redis } from '@/lib/redis'
 import { paymentGateway } from '@/integrations/payment'
 import { recalculateContributionStatus, invalidateContributionSummaryCache } from '@/services/contribution.service'
+import { checkBudget } from '@/services/budget.service'
 import { queueNotification } from '@/services/notification.service'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 
@@ -117,6 +118,22 @@ export const debitRun = inngest.createFunction(
             cache.del(CACHE_KEYS.DASHBOARD_STATS),
             invalidateContributionSummaryCache(mandate.userId),
           ])
+        })
+
+        await step.run(`budget-check-${mandate.id}`, async () => {
+          const budgetCheck = await checkBudget(mandate.userId, Number(mandate.amount))
+          if (budgetCheck.status === 'OVER_BUDGET') {
+            await queueNotification({
+              userId: mandate.userId,
+              templateSlug: 'budget-auto-exceeded',
+              channel: 'SMS',
+              payload: {
+                amount: Number(mandate.amount).toString(),
+                budget: budgetCheck.budget.toString(),
+                type: 'monthly',
+              },
+            })
+          }
         })
       }
 

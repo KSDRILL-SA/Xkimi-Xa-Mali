@@ -27,7 +27,14 @@ export function withApiHandler<P extends Record<string, string> = Record<string,
           path: req.nextUrl.pathname,
         })
         return NextResponse.json(
-          { error: { code: err.code, message: err.message, traceId } },
+          {
+            error: {
+              code: err.code,
+              message: err.message,
+              traceId,
+              ...(err.details ? { details: err.details } : {}),
+            },
+          },
           { status: err.status, headers: { 'x-trace-id': traceId } },
         )
       }
