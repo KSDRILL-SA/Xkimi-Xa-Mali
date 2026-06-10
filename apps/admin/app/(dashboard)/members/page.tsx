@@ -47,18 +47,15 @@ export default async function MembersPage({
   const status  = params.status as UserStatus | undefined
   const page    = Math.max(1, parseInt(params.page ?? '1', 10))
 
-  const { items, total } = await listMembers(roles, { search, status, page, limit: 25 })
+  const { items, total, statusCounts } = await listMembers(roles, { search, status, page, limit: 25 })
   const members = items as unknown as RawMember[]
-
-  const activeCount    = members.filter(m => m.status === 'ACTIVE').length
-  const pendingCount   = members.filter(m => m.status === 'PENDING').length
-  const suspendedCount = members.filter(m => m.status === 'SUSPENDED').length
+  const totalAll = statusCounts.ACTIVE + statusCounts.PENDING + statusCounts.SUSPENDED
 
   const filterTabs: { value: UserStatus | ''; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
-    { value: '',          label: `All (${total})`,          icon: Users },
-    { value: 'ACTIVE',    label: `Active (${activeCount})`, icon: CheckCircle2 },
-    { value: 'PENDING',   label: `Pending (${pendingCount})`, icon: Clock },
-    { value: 'SUSPENDED', label: `Suspended (${suspendedCount})`, icon: Ban },
+    { value: '',          label: `All (${totalAll})`,                icon: Users },
+    { value: 'ACTIVE',    label: `Active (${statusCounts.ACTIVE})`,   icon: CheckCircle2 },
+    { value: 'PENDING',   label: `Pending (${statusCounts.PENDING})`, icon: Clock },
+    { value: 'SUSPENDED', label: `Suspended (${statusCounts.SUSPENDED})`, icon: Ban },
   ]
 
   return (

@@ -1,10 +1,9 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { listAllContributions } from '@/lib/services'
+import { listAllContributions, generateContributions } from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
 import { Alert, Reveal, RouterPagination } from '@xxm/ui'
-import { db } from '@/lib/db'
 import { Wallet, ChevronDown, Zap } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Contributions' }
@@ -62,28 +61,7 @@ export default async function ContributionsPage({
     const m = parseInt(fd.get('month') as string, 10)
     const y = parseInt(fd.get('year')  as string, 10)
 
-    const activeMembers = await db.user.findMany({
-      where: { status: 'ACTIVE' },
-      select: {
-        id: true,
-        mandates: {
-          where: { status: 'ACTIVE' },
-          select: { debitDay: true, amount: true },
-          take: 1,
-        },
-      },
-    })
-    await Promise.all(activeMembers.map((member) => {
-      const mandate  = member.mandates[0]
-      const debitDay = mandate?.debitDay ?? 1
-      const amountDue = mandate?.amount ?? 100
-      const dueDate   = new Date(y, m - 1, debitDay)
-      return db.contribution.upsert({
-        where: { userId_periodMonth_periodYear: { userId: member.id, periodMonth: m, periodYear: y } },
-        create: { userId: member.id, periodMonth: m, periodYear: y, amountDue, amountPaid: 0, dueDate, status: 'PENDING' },
-        update: {},
-      })
-    }))
+    await generateContributions(s.user.id, r, m, y)
     redirect(`/contributions?month=${m}&year=${y}&generated=1`)
   }
 
