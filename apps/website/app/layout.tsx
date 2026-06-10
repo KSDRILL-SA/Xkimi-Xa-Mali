@@ -1,7 +1,15 @@
 import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
+import { Playfair_Display } from 'next/font/google'
 import './globals.css'
+
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['700', '800', '900'],
+  variable: '--font-display',
+  display: 'swap',
+})
 
 export const viewport: Viewport = {
   themeColor: '#1B4332',
@@ -39,7 +47,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-ZA" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+    <html lang="en-ZA" className={`${GeistSans.variable} ${GeistMono.variable} ${playfairDisplay.variable}`}>
       <body className="min-h-dvh bg-xxm-champagne antialiased selection:bg-xxm-gold/30 selection:text-xxm-green-900">
         {children}
         <script src="/nav-progress.js" defer />
