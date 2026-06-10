@@ -65,7 +65,7 @@ export function HeroSection() {
           {/* headline — word by word staggered */}
           <h1
             id="hero-headline"
-            className="text-5xl sm:text-6xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6"
+            className="font-display text-5xl sm:text-6xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6"
           >
             <span className="block overflow-hidden">
               <span
