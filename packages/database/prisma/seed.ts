@@ -59,6 +59,45 @@ async function main() {
     console.log('Founder seeded:', founder.email)
   }
 
+  // ── Member-only test user (MEMBER role, no admin) ──────────────────────────
+  const memberEmail = process.env.MEMBER_EMAIL
+  const memberPhone = process.env.MEMBER_PHONE
+  const memberPassword = process.env.MEMBER_PASSWORD
+
+  if (!memberEmail || !memberPhone || !memberPassword) {
+    console.log('Skipping member seed — MEMBER_EMAIL, MEMBER_PHONE, MEMBER_PASSWORD not set')
+  } else {
+    const memberHash = await bcrypt.hash(memberPassword, 12)
+
+    const member = await prisma.user.upsert({
+      where: { email: memberEmail },
+      update: {
+        password: memberHash,
+        loginAttempts: 0,
+        lockedUntil: null,
+        status: 'ACTIVE',
+      },
+      create: {
+        email: memberEmail,
+        phone: memberPhone,
+        firstName: process.env.MEMBER_FIRST_NAME ?? 'Member',
+        lastName: process.env.MEMBER_LAST_NAME ?? 'User',
+        password: memberHash,
+        status: 'ACTIVE',
+        emailVerified: new Date(),
+        popiaConsentAt: new Date(),
+        roles: {
+          create: [{ roleId: memberRole.id }],
+        },
+        notificationPreference: {
+          create: { sms: true, email: true, push: true, whatsapp: true },
+        },
+      },
+    })
+
+    console.log('Member seeded:', member.email)
+  }
+
   // Idempotent: create-only, never overwrite — admins can edit template bodies in the DB
   const templates: Array<{
     slug: string

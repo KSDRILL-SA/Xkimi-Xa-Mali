@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
-import { put } from '@vercel/blob'
 import { ContributionStatus, MandateStatus, UserStatus, BadgeTier, type AdminSignature } from '@prisma/client'
 import { db, Prisma } from '@/lib/db'
+import { storeSignaturePng } from '@/lib/signature-storage'
 
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
@@ -699,12 +699,12 @@ export async function createSignature(
 
   const signatureHash = createHash('sha256').update(pngBuffer).digest('hex')
   const path = `signatures/${adminId}/${Date.now()}.png`
-  const blob = await put(path, pngBuffer, { access: 'public', contentType: 'image/png', addRandomSuffix: false })
+  const signatureUrl = await storeSignaturePng(path, pngBuffer)
 
   const signature = await db.adminSignature.create({
     data: {
       adminId,
-      signatureUrl: blob.url,
+      signatureUrl,
       signatureHash,
       displayName,
       isActive: true,
@@ -734,7 +734,7 @@ export async function updateSignature(
 
   const signatureHash = createHash('sha256').update(pngBuffer).digest('hex')
   const path = `signatures/${adminId}/${Date.now()}.png`
-  const blob = await put(path, pngBuffer, { access: 'public', contentType: 'image/png', addRandomSuffix: false })
+  const signatureUrl = await storeSignaturePng(path, pngBuffer)
 
   const signature = await db.$transaction(async (tx) => {
     await tx.adminSignatureHistory.create({
@@ -749,7 +749,7 @@ export async function updateSignature(
     return tx.adminSignature.update({
       where: { adminId },
       data: {
-        signatureUrl: blob.url,
+        signatureUrl,
         signatureHash,
         displayName,
         nextChangeAllowedAt: new Date(Date.now() + SIGNATURE_LOCK_DURATION_MS),
