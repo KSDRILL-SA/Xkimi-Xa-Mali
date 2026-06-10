@@ -9,7 +9,6 @@ import { transactionRepo } from '@/repositories/transaction.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
 import { embedSignatureInPdf, verifySignatureExists } from './signature.service'
-import { env } from '@/lib/env'
 
 export { ReportNotFoundError }
 

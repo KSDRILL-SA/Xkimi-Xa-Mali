@@ -2,11 +2,12 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Reveal } from '@xxm/ui'
 import { ChevronLeft, Target, Trophy, Lock, Clock, TrendingUp } from 'lucide-react'
+import { getGoal } from '@/services/goal.service'
+import { GoalNotFoundError } from '@/lib/errors'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
 
@@ -14,8 +15,8 @@ type GoalStatus = 'DRAFT' | 'ACTIVE' | 'ACHIEVED' | 'FAILED'
 
 type ProgressEntry = {
   id: string
-  amount: number | string
-  recordedAt: Date
+  amount: number
+  recordedAt: string
 }
 
 const STATUS_CONFIG: Record<GoalStatus, {
@@ -32,7 +33,8 @@ const STATUS_CONFIG: Record<GoalStatus, {
   FAILED:   { label: 'Failed',   dot: 'bg-red-500',       badge: 'bg-red-100 text-red-700',               barVariant: 'danger',  iconBg: 'bg-red-50',         iconColor: 'text-red-500'       },
 }
 
-function formatRelative(date: Date): string {
+function formatRelative(isoDate: string): string {
+  const date = new Date(isoDate)
   const diff = Date.now() - date.getTime()
   const days = Math.floor(diff / 86_400_000)
   if (days === 0) return 'Today'
@@ -50,31 +52,20 @@ export default async function GoalDetailPage({
   const roles = (session?.user?.roles as string[] | undefined) ?? []
   const { id } = await params
 
-  const goal = await db.goal.findFirst({
-    where: { id, ...(roles.includes('ADMIN') ? {} : { status: { not: 'DRAFT' } }) },
-    include: {
-      progress: {
-        orderBy: { recordedAt: 'desc' },
-        take: 50,
-      },
-    },
-  })
+  let goal: Awaited<ReturnType<typeof getGoal>>
+  try {
+    goal = await getGoal(id, roles)
+  } catch (err) {
+    if (err instanceof GoalNotFoundError) notFound()
+    throw err
+  }
 
-  if (!goal) notFound()
-
-  const progressEntries: ProgressEntry[] = goal.progress.map((p) => ({
-    id: p.id,
-    amount: p.amount.toString(),
-    recordedAt: p.recordedAt,
-  }))
+  const progressEntries: ProgressEntry[] = goal.progress
 
   const status = goal.status as GoalStatus
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT
-  const pct = Math.min(
-    100,
-    Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100),
-  )
-  const remaining = Math.max(0, Number(goal.targetAmount) - Number(goal.currentAmount))
+  const pct = goal.progressPct
+  const remaining = goal.remaining
   const daysLeft = Math.ceil(
     (new Date(goal.deadline).getTime() - Date.now()) / 86_400_000,
   )

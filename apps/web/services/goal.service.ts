@@ -40,6 +40,7 @@ function serializeGoal(goal: GoalRow) {
     progressPct: Number(goal.targetAmount) > 0
       ? Math.min(100, Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100))
       : 0,
+    remaining: Math.max(0, Number(goal.targetAmount) - Number(goal.currentAmount)),
     deadline: goal.deadline.toISOString(),
     status: goal.status,
     isLocked: goal.lockedAt !== null,
@@ -105,7 +106,7 @@ export async function getGoals(
   return result
 }
 
-export async function getGoal(id: string) {
+export async function getGoal(id: string, roles: string[] = []) {
   const goal = await goalRepo.findById(id, {
     progress: {
       orderBy: { recordedAt: 'desc' },
@@ -117,6 +118,10 @@ export async function getGoal(id: string) {
 
   const g = goal as unknown as GoalRow & { progress: Array<{ id: string; amount: unknown; recordedAt: Date }> }
 
+  if (g.status === 'DRAFT' && !isAdmin(roles)) {
+    throw new GoalNotFoundError()
+  }
+
   return {
     ...serializeGoal(g),
     progress: g.progress.map((p) => ({
@@ -125,6 +130,16 @@ export async function getGoal(id: string) {
       recordedAt: p.recordedAt.toISOString(),
     })),
   }
+}
+
+/** Lightweight status counts for dashboard summaries — avoids loading full goal rows. */
+export async function getGoalStatusCounts(): Promise<{ active: number; achieved: number }> {
+  const [active, achieved] = await Promise.all([
+    goalRepo.count({ status: 'ACTIVE' }),
+    goalRepo.count({ status: 'ACHIEVED' }),
+  ])
+
+  return { active, achieved }
 }
 
 // ─── Admin mutations ──────────────────────────────────────────────────────────
