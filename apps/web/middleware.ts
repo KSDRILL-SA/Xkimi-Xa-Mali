@@ -162,5 +162,10 @@ export default auth(async (req) => {
 })
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw\\.js).*)'],
+  // Exclude Next internals and any static asset in /public. The trailing
+  // `.*\.[^/]+$` skips every path ending in a file extension (images, scripts,
+  // fonts, etc.) so public assets like /founders/*.png are served directly
+  // instead of being redirected to /login. Protected routes (/dashboard, /api)
+  // never end in an extension, so this does not weaken auth.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sw\\.js|.*\\.[^/]+$).*)'],
 }

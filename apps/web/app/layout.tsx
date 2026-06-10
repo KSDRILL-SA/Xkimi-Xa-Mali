@@ -47,7 +47,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <NavigationProgressLoader />
         {children}
         <script src="/nav-progress.js" defer />
-        <script src="/pwa-register.js" defer />
+        {/* Register the PWA service worker only in production. In dev a SW that
+            caches Next.js chunks serves stale assets and crashes pages after
+            load, so we actively unregister it instead. */}
+        <script
+          src={process.env.NODE_ENV === 'production' ? '/pwa-register.js' : '/pwa-unregister.js'}
+          defer
+        />
       </body>
     </html>
   )

@@ -10,6 +10,7 @@ const noopRedis = {
   get: async () => null,
   set: async () => 'OK' as const,
   del: async () => 0,
+  ping: async () => 'PONG' as const,
 } as unknown as Redis
 
 export const redis: Redis = REDIS_CONFIGURED
