@@ -3,7 +3,7 @@
 import { ArrowRight, MessageCircle } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, ADMIN_URL, adminWhatsAppUrl } from '@/lib/utils'
+import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 
 export function CTASection() {
   const revealRef = useScrollReveal(0.15)
@@ -91,13 +91,6 @@ export function CTASection() {
                 className="text-white/55 hover:text-white/80 text-sm font-medium transition-colors flex items-center gap-1.5"
               >
                 Member portal
-                <ArrowRight size={12} aria-hidden />
-              </a>
-              <a
-                href={ADMIN_URL}
-                className="text-white/55 hover:text-white/80 text-sm font-medium transition-colors flex items-center gap-1.5"
-              >
-                Admin panel
                 <ArrowRight size={12} aria-hidden />
               </a>
               <a
