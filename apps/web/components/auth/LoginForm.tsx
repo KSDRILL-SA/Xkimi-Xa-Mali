@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { signIn } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { Mail, Lock } from 'lucide-react'
 import { LoginSchema, type LoginInput } from '@/lib/validation/auth'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -93,6 +94,7 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
+          icon={Mail}
           {...register('email')}
         />
       </FormGroup>
@@ -111,6 +113,7 @@ export function LoginForm() {
           type="password"
           autoComplete="current-password"
           placeholder="••••••••"
+          icon={Lock}
           error={errors.password?.message}
           {...register('password')}
         />

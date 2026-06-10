@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { User, IdCard, Lock } from 'lucide-react'
 import { RegisterStep2Schema, type RegisterStep2Input } from '@/lib/validation/auth'
 import { api, ApiClientError } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
@@ -72,10 +73,10 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormGroup label="First name" htmlFor="firstName" required error={errors.firstName?.message}>
-          <Input id="firstName" placeholder="Kurhula" {...register('firstName')} />
+          <Input id="firstName" placeholder="Kurhula" icon={User} {...register('firstName')} />
         </FormGroup>
         <FormGroup label="Last name" htmlFor="lastName" required error={errors.lastName?.message}>
-          <Input id="lastName" placeholder="Maluleke" {...register('lastName')} />
+          <Input id="lastName" placeholder="Maluleke" icon={User} {...register('lastName')} />
         </FormGroup>
       </div>
 
@@ -88,7 +89,7 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
       </FormGroup>
 
       <FormGroup label="SA ID number" htmlFor="idNumber" hint="Optional" error={errors.idNumber?.message}>
-        <Input id="idNumber" placeholder="13-digit ID number" maxLength={13} {...register('idNumber')} />
+        <Input id="idNumber" placeholder="13-digit ID number" icon={IdCard} maxLength={13} {...register('idNumber')} />
       </FormGroup>
 
       <FormGroup
@@ -103,6 +104,7 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
           type="password"
           autoComplete="new-password"
           placeholder="Min. 8 chars, 1 uppercase, 1 number"
+          icon={Lock}
           {...register('password')}
         />
       </FormGroup>

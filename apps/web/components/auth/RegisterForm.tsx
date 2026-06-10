@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
+import { CheckCircle, User, IdCard, Lock } from 'lucide-react'
 import { RegisterStep2Schema, type RegisterStep2Input } from '@/lib/validation/auth'
 import { api, ApiClientError } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
@@ -106,12 +107,10 @@ export function RegisterForm() {
   if (success) {
     return (
       <div className="space-y-4 text-center">
-        <div className="w-16 h-16 rounded-full bg-xxm-green-100 flex items-center justify-center mx-auto">
-          <svg className="w-8 h-8 text-xxm-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+        <div className="w-16 h-16 rounded-full bg-xxm-green-100 flex items-center justify-center mx-auto animate-scale-in">
+          <CheckCircle className="w-8 h-8 text-xxm-green" aria-hidden />
         </div>
-        <h2 className="text-xl font-bold text-xxm-green-900">Check your email</h2>
+        <h2 className="font-display text-xl font-bold text-xxm-green-900">Check your email</h2>
         <p className="text-gray-600 text-sm">
           We sent a verification link to <strong>{prefilled?.email}</strong>. Click the link to activate your account.
         </p>
@@ -185,10 +184,10 @@ export function RegisterForm() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormGroup label="First name" htmlFor="firstName" required error={e2.firstName?.message}>
-            <Input id="firstName" placeholder="Kurhula" defaultValue={prefilled?.firstName} {...reg2('firstName')} />
+            <Input id="firstName" placeholder="Kurhula" icon={User} defaultValue={prefilled?.firstName} {...reg2('firstName')} />
           </FormGroup>
           <FormGroup label="Last name" htmlFor="lastName" required error={e2.lastName?.message}>
-            <Input id="lastName" placeholder="Maluleke" defaultValue={prefilled?.lastName} {...reg2('lastName')} />
+            <Input id="lastName" placeholder="Maluleke" icon={User} defaultValue={prefilled?.lastName} {...reg2('lastName')} />
           </FormGroup>
         </div>
 
@@ -201,11 +200,11 @@ export function RegisterForm() {
         </FormGroup>
 
         <FormGroup label="SA ID number" htmlFor="idNumber" hint="Optional" error={e2.idNumber?.message}>
-          <Input id="idNumber" placeholder="13-digit ID number" maxLength={13} {...reg2('idNumber')} />
+          <Input id="idNumber" placeholder="13-digit ID number" icon={IdCard} maxLength={13} {...reg2('idNumber')} />
         </FormGroup>
 
         <FormGroup label="Password" htmlFor="password" required error={e2.password?.message} hint="Min. 8 characters, 1 uppercase, 1 number">
-          <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" {...reg2('password')} />
+          <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" icon={Lock} {...reg2('password')} />
         </FormGroup>
 
         <div className="flex items-start gap-2 pt-1">
