@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllMandates, approveMandate, rejectMandate } from '@/lib/services'
 import { formatZAR, formatDate } from '@xxm/utils'
-import { Breadcrumb, RouterPagination, PageHeader } from '@xxm/ui'
+import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { MandatesTable, type MandateRow } from './MandatesTable'
 import Link from 'next/link'
 
@@ -69,19 +69,25 @@ export default async function MandatesPage({
   return (
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Mandates' }]} />
-      <PageHeader title="Mandates" subtitle={`${total} total`} />
+      <Reveal variant="up">
+        <PageHeader title="Mandates" subtitle={`${total} total`} />
+      </Reveal>
 
-      <form method="GET" action="/mandates" className="flex flex-wrap gap-2">
-        <select name="status" defaultValue={status ?? ''} className="rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25">
-          <option value="">All statuses</option>
-          {Object.entries(STATUS_CONFIG).map(([v, { label }]) => <option key={v} value={v}>{label}</option>)}
-        </select>
-        <button type="submit" className="px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors">Filter</button>
-        {status && <Link href="/mandates" className="px-4 py-2 rounded-xl border border-xxm-gray-200 text-sm text-xxm-gray-500 hover:bg-xxm-gray-50">Clear</Link>}
-      </form>
+      <Reveal variant="up" delay={100}>
+        <form method="GET" action="/mandates" className="flex flex-wrap gap-2">
+          <select name="status" defaultValue={status ?? ''} className="rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25">
+            <option value="">All statuses</option>
+            {Object.entries(STATUS_CONFIG).map(([v, { label }]) => <option key={v} value={v}>{label}</option>)}
+          </select>
+          <button type="submit" className="px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors">Filter</button>
+          {status && <Link href="/mandates" className="px-4 py-2 rounded-xl border border-xxm-gray-200 text-sm text-xxm-gray-500 hover:bg-xxm-gray-50">Clear</Link>}
+        </form>
+      </Reveal>
 
-      <MandatesTable rows={rows} approveAction={approveMandateAction} rejectAction={rejectMandateAction} />
-      <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl={`/mandates${status ? `?status=${status}` : ''}`} className="justify-center" />
+      <Reveal variant="up" delay={200} className="space-y-4">
+        <MandatesTable rows={rows} approveAction={approveMandateAction} rejectAction={rejectMandateAction} />
+        <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl={`/mandates${status ? `?status=${status}` : ''}`} className="justify-center" />
+      </Reveal>
     </div>
   )
 }

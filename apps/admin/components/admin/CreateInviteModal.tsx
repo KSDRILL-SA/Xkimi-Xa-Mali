@@ -48,8 +48,8 @@ function ModalContent({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-2xl shadow-xxm-lg w-full max-w-md p-6 space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-xxm-lg w-full max-w-md p-6 space-y-5 animate-scale-in">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-xxm-green">Create Invitation</h2>
           <button
