@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { MessageCircle } from 'lucide-react'
+import { Lock, MessageCircle } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { APP_URL, ADMIN_URL, adminWhatsAppUrl } from '@/lib/utils'
 
@@ -15,7 +15,6 @@ const links = {
   Account: [
     { label: 'Sign In',       href: `${APP_URL}/login` },
     { label: 'Member Portal', href: `${APP_URL}/dashboard` },
-    { label: 'Admin Panel',   href: ADMIN_URL },
   ],
   Legal: [
     { label: 'About',         href: '/about' },
@@ -69,7 +68,7 @@ export function Footer() {
               <ul className="space-y-2.5">
                 {items.map(({ label, href }) => (
                   <li key={label}>
-                    {href.startsWith('http') || href.startsWith(APP_URL) || href.startsWith(ADMIN_URL) ? (
+                    {href.startsWith('http') || href.startsWith(APP_URL) ? (
                       <a
                         href={href}
                         className="text-white/55 hover:text-white text-sm transition-colors duration-200"
@@ -98,9 +97,18 @@ export function Footer() {
           <p className="text-white/25 text-xs text-center sm:text-left">
             © {year} Xkimm Xa Mali. All rights reserved.
           </p>
-          <p className="text-white/20 text-xs italic text-center sm:text-right">
-            &ldquo;Contributing · Growing · Securing&rdquo;
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-white/20 text-xs italic text-center sm:text-right">
+              &ldquo;Contributing · Growing · Securing&rdquo;
+            </p>
+            <a
+              href={ADMIN_URL}
+              aria-label="Admin"
+              className="text-white/5 hover:text-white/20 transition-colors duration-300"
+            >
+              <Lock size={9} aria-hidden />
+            </a>
+          </div>
         </div>
       </div>
     </footer>
