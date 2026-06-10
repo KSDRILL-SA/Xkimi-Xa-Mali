@@ -22,6 +22,7 @@ import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
+import { getPublicStats } from '@/lib/stats'
 
 export const metadata: Metadata = {
   title: 'About',
@@ -129,7 +130,8 @@ const platformFeatures = [
   { icon: FileText,     heading: 'PDF statements',         body: 'Download formal payment statements for any contribution period — ready for records, financial planning, or tax purposes.' },
 ]
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const { members } = await getPublicStats()
   return (
     <>
       <Navbar />
@@ -200,7 +202,7 @@ export default function AboutPage() {
 
             {/* Trust signals */}
             <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
-              {['4 Founding Members', 'Netcash DebiCheck', '100% Automated', 'Full Audit Trail'].map((label) => (
+              {[`${members} Founding Member${members === 1 ? '' : 's'}`, 'Netcash DebiCheck', '100% Automated', 'Full Audit Trail'].map((label) => (
                 <span
                   key={label}
                   className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-white/60 text-xs font-semibold"

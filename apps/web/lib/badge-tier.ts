@@ -1,5 +1,6 @@
 import type { BadgeTier } from '@prisma/client'
 import { Medal, Award, Trophy, Crown } from 'lucide-react'
+import { BADGE_TIER_ORDER, BADGE_TIER_LABELS, BADGE_TIER_BADGE_CLASS } from '@xxm/types'
 
 export const BADGE_TIER_CONFIG: Record<BadgeTier, {
   label: string
@@ -9,10 +10,10 @@ export const BADGE_TIER_CONFIG: Record<BadgeTier, {
   badgeClass: string
   barVariant: 'default' | 'gold' | 'success' | 'danger'
 }> = {
-  AMATEUR:     { label: 'Amateur',     icon: Medal,  iconBg: 'bg-xxm-gray-100', iconColor: 'text-xxm-gray-500',  badgeClass: 'bg-xxm-gray-100 text-xxm-gray-600',   barVariant: 'default' },
-  SEMI_PRO:    { label: 'Semi-Pro',    icon: Award,  iconBg: 'bg-sky-50',       iconColor: 'text-sky-600',       badgeClass: 'bg-sky-100 text-sky-700',             barVariant: 'default' },
-  PRO:         { label: 'Pro',         icon: Trophy, iconBg: 'bg-xxm-gold/12',  iconColor: 'text-xxm-gold-dark', badgeClass: 'bg-amber-100 text-amber-700',         barVariant: 'gold' },
-  WORLD_CLASS: { label: 'World Class', icon: Crown,  iconBg: 'bg-xxm-green/10', iconColor: 'text-xxm-green',     badgeClass: 'bg-xxm-green-100 text-xxm-green-700', barVariant: 'success' },
+  AMATEUR:     { label: BADGE_TIER_LABELS.AMATEUR,     icon: Medal,  iconBg: 'bg-xxm-gray-100', iconColor: 'text-xxm-gray-500',  badgeClass: BADGE_TIER_BADGE_CLASS.AMATEUR,     barVariant: 'default' },
+  SEMI_PRO:    { label: BADGE_TIER_LABELS.SEMI_PRO,    icon: Award,  iconBg: 'bg-sky-50',       iconColor: 'text-sky-600',       badgeClass: BADGE_TIER_BADGE_CLASS.SEMI_PRO,    barVariant: 'default' },
+  PRO:         { label: BADGE_TIER_LABELS.PRO,         icon: Trophy, iconBg: 'bg-xxm-gold/12',  iconColor: 'text-xxm-gold-dark', badgeClass: BADGE_TIER_BADGE_CLASS.PRO,         barVariant: 'gold' },
+  WORLD_CLASS: { label: BADGE_TIER_LABELS.WORLD_CLASS, icon: Crown,  iconBg: 'bg-xxm-green/10', iconColor: 'text-xxm-green',     badgeClass: BADGE_TIER_BADGE_CLASS.WORLD_CLASS, barVariant: 'success' },
 }
 
-export const BADGE_TIER_ORDER: BadgeTier[] = ['AMATEUR', 'SEMI_PRO', 'PRO', 'WORLD_CLASS']
+export { BADGE_TIER_ORDER }
