@@ -253,3 +253,17 @@ export const TransactionFilterSchema = z.object({
 export type StatementRequest   = z.infer<typeof StatementRequestSchema>
 export type AdminReportRequest = z.infer<typeof AdminReportRequestSchema>
 export type TransactionFilter  = z.infer<typeof TransactionFilterSchema>
+
+// ── Community board schemas ─────────────────────────────────────────────────
+
+export const PostMessageSchema = z.object({
+  content: z.string().min(1, 'Message cannot be empty').max(500, 'Message cannot exceed 500 characters'),
+  replyToId: z.string().cuid('Invalid message id').optional(),
+})
+
+export const PinMessageSchema = z.object({
+  isPinned: z.boolean({ required_error: 'isPinned is required' }),
+})
+
+export type PostMessageInput = z.infer<typeof PostMessageSchema>
+export type PinMessageInput  = z.infer<typeof PinMessageSchema>
