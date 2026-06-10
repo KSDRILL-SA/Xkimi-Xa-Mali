@@ -5,6 +5,7 @@ import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { ProgressBar } from '@/components/ui/ProgressBar'
+import { Reveal } from '@xxm/ui'
 import { ChevronLeft, Target, Trophy, Lock, Clock, TrendingUp } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
@@ -92,7 +93,7 @@ export default async function GoalDetailPage({
       </Link>
 
       {/* ── Goal header card ───────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+      <Reveal variant="up" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
 
         {/* Title row */}
         <div className="flex items-start justify-between gap-4 px-5 py-5 border-b border-xxm-gray-50">
@@ -104,7 +105,7 @@ export default async function GoalDetailPage({
               }
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-extrabold text-xxm-green-900 leading-snug">{goal.title}</h1>
+              <h1 className="font-display text-xl font-extrabold text-xxm-green-900 leading-snug">{goal.title}</h1>
               {goal.description && (
                 <p className="text-sm text-xxm-gray-500 mt-1 leading-relaxed">{goal.description}</p>
               )}
@@ -140,7 +141,7 @@ export default async function GoalDetailPage({
         {/* Progress bar section */}
         <div className="px-5 py-5 space-y-3 border-t border-xxm-gray-50">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-xxm-green-900 text-base tabular-nums">{pct}%</span>
+            <span className="stat-number font-bold text-xxm-green-900 text-base">{pct}%</span>
             <span className="text-xxm-gray-400">of {formatZAR(goal.targetAmount)}</span>
           </div>
           <ProgressBar value={pct} size="lg" variant={cfg.barVariant} animated={status === 'ACTIVE' && pct < 100} />
@@ -167,9 +168,10 @@ export default async function GoalDetailPage({
             <p className="text-sm font-medium text-red-700">This goal was not achieved by the deadline.</p>
           </div>
         )}
-      </div>
+      </Reveal>
 
       {/* ── Progress history ───────────────────────── */}
+      <Reveal variant="up" delay={100}>
       <section className="space-y-3">
         <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">
           Progress history ({goal.progress.length})
@@ -190,13 +192,13 @@ export default async function GoalDetailPage({
                 .reduce((sum: number, p: ProgressEntry) => sum + Number(p.amount), 0)
 
               return (
-                <div key={entry.id} className="flex items-center justify-between px-5 py-4 hover:bg-xxm-green-50/20 transition-colors">
+                <div key={entry.id} className="group flex items-center justify-between px-5 py-4 hover:bg-xxm-green-50/20 transition-colors">
                   <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-xxm-green-50 flex items-center justify-center shrink-0">
+                    <div className="w-7 h-7 rounded-lg bg-xxm-green-50 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110">
                       <TrendingUp size={13} className="text-xxm-green" aria-hidden />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-xxm-green-900 tabular-nums">
+                      <p className="stat-number text-sm font-bold text-xxm-green-900">
                         {formatZAR(entry.amount)}
                       </p>
                       <p className="text-[11px] text-xxm-gray-400 mt-0.5">
@@ -206,7 +208,7 @@ export default async function GoalDetailPage({
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide font-semibold">Cumulative</p>
-                    <p className="text-sm font-bold text-xxm-green-700 tabular-nums">
+                    <p className="stat-number text-sm font-bold text-xxm-green-700">
                       {formatZAR(runningTotal)}
                     </p>
                   </div>
@@ -216,6 +218,7 @@ export default async function GoalDetailPage({
           </div>
         )}
       </section>
+      </Reveal>
     </div>
   )
 }
@@ -232,7 +235,7 @@ function StatCell({
   return (
     <div className="px-5 py-4">
       <p className="text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest mb-1">{label}</p>
-      <p className={`text-lg font-extrabold tabular-nums ${highlight ? 'text-red-600' : 'text-xxm-green-900'}`}>
+      <p className={`stat-number text-lg font-extrabold ${highlight ? 'text-red-600' : 'text-xxm-green-900'}`}>
         {value}
       </p>
     </div>

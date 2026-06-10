@@ -4,6 +4,7 @@ import { getMessages } from '@/services/community.service'
 import { getCommunityBadges } from '@/services/badge.service'
 import { MessageBoard } from './MessageBoard'
 import { MemberBadgeList } from './MemberBadgeList'
+import { Reveal } from '@xxm/ui'
 import { Users } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Community' }
@@ -22,19 +23,19 @@ export default async function CommunityPage() {
     <div className="space-y-6">
 
       {/* ── Header ────────────────────────────────────────── */}
-      <div className="flex items-start gap-4">
+      <Reveal variant="up" className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
           <Users size={22} className="text-xxm-green" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Community</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Community</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">
             Chat with fellow members and see everyone&apos;s reputation tier.
           </p>
         </div>
-      </div>
+      </Reveal>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+      <Reveal variant="up" delay={100} className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <MessageBoard
           initialItems={messages.items}
           initialTotalPages={messages.totalPages}
@@ -43,7 +44,7 @@ export default async function CommunityPage() {
           isAdmin={roles.includes('ADMIN')}
         />
         <MemberBadgeList members={members} />
-      </div>
+      </Reveal>
     </div>
   )
 }

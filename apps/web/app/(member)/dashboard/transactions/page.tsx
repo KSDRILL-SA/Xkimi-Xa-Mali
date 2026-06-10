@@ -6,6 +6,7 @@ import { getSession } from '@/lib/session'
 import { db } from '@/lib/db'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { RouterPagination } from '@/components/ui/RouterPagination'
+import { Reveal } from '@xxm/ui'
 import { FileText, ArrowUpCircle } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Transactions' }
@@ -81,18 +82,18 @@ export default async function TransactionsPage({
     <div className="space-y-6">
 
       {/* ── Header ─────────────────────────────────── */}
-      <div className="flex items-start gap-4">
+      <Reveal variant="up" className="flex items-start gap-4">
         <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
           <ArrowUpCircle size={22} className="text-xxm-green" aria-hidden />
         </div>
         <div>
-          <h1 className="text-2xl font-extrabold text-xxm-green-900 tracking-tight">Transactions</h1>
+          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Transactions</h1>
           <p className="text-sm text-xxm-gray-500 mt-1">Full payment history for your account</p>
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Filters ────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-3">
+      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest w-10 shrink-0">Status</span>
           <FilterPill label="All" href={buildUrl({ status: undefined, page: '1' }) as Route} active={!statusFilter} />
@@ -107,9 +108,10 @@ export default async function TransactionsPage({
             <FilterPill key={t} label={TYPE_LABELS[t]} href={buildUrl({ type: t, page: '1' }) as Route} active={typeFilter === t} />
           ))}
         </div>
-      </div>
+      </Reveal>
 
       {/* ── Transaction list ───────────────────────── */}
+      <Reveal variant="up" delay={200}>
       {txs.length === 0 ? (
         <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
@@ -135,9 +137,9 @@ export default async function TransactionsPage({
               const sc = STATUS_CONFIG[tx.status as TxStatus] ?? { label: tx.status, dot: 'bg-xxm-gray-400', badge: 'bg-xxm-gray-100 text-xxm-gray-600' }
               const period = `${MONTHS[(tx.contribution.periodMonth ?? 1) - 1]} ${tx.contribution.periodYear}`
               return (
-                <div key={tx.id} className="flex sm:grid sm:grid-cols-[1fr_100px_100px_140px_1fr_90px] gap-3 items-center px-5 py-4 hover:bg-xxm-green-50/20 transition-colors flex-wrap">
+                <div key={tx.id} className="group flex sm:grid sm:grid-cols-[1fr_100px_100px_140px_1fr_90px] gap-3 items-center px-5 py-4 hover:bg-xxm-green-50/20 transition-colors flex-wrap">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-xxm-green-50 flex items-center justify-center shrink-0">
+                    <div className="w-7 h-7 rounded-lg bg-xxm-green-50 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110">
                       <ArrowUpCircle size={13} className="text-xxm-green" aria-hidden />
                     </div>
                     <span className="text-sm font-semibold text-xxm-green-900 truncate">{period}</span>
@@ -145,7 +147,7 @@ export default async function TransactionsPage({
                   <span className="text-xs text-xxm-gray-600 hidden sm:block">
                     {TYPE_LABELS[tx.type as TxType] ?? tx.type}
                   </span>
-                  <span className="text-sm font-bold text-xxm-green-900 tabular-nums text-right hidden sm:block">
+                  <span className="stat-number text-sm font-bold text-xxm-green-900 text-right hidden sm:block">
                     {formatZAR(Number(tx.amount))}
                   </span>
                   <span
@@ -167,6 +169,7 @@ export default async function TransactionsPage({
           </div>
         </div>
       )}
+      </Reveal>
 
       {/* ── Pagination ─────────────────────────────── */}
       {totalPages > 1 && (
@@ -184,7 +187,7 @@ export default async function TransactionsPage({
       )}
 
       {/* ── Statement shortcut ─────────────────────── */}
-      <div className="bg-xxm-green-50 border border-xxm-green/15 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <Reveal variant="up" delay={300} className="bg-xxm-green-50 border border-xxm-green/15 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <p className="font-bold text-xxm-green-900 text-sm">Need a PDF statement?</p>
           <p className="text-xs text-xxm-gray-500 mt-0.5">Download a formatted statement for any contribution month</p>
@@ -196,7 +199,7 @@ export default async function TransactionsPage({
           <FileText size={14} aria-hidden />
           View Statements
         </Link>
-      </div>
+      </Reveal>
     </div>
   )
 }
