@@ -108,6 +108,8 @@ export const ManualContributionSchema = z.object({
   amount:      z.number().min(100, 'Minimum contribution is R100').max(10_000, 'Maximum contribution is R10,000'),
   periodMonth: z.number().int().min(1).max(12),
   periodYear:  z.number().int().min(2024).max(new Date().getFullYear() + 1, 'Cannot pay for periods too far in the future'),
+  budgetOverrideConfirmed: z.boolean().optional(),
+  budgetOverrideReason:    z.string().max(200, 'Reason cannot exceed 200 characters').optional(),
 })
 
 export const GenerateContributionsSchema = z.object({
@@ -267,3 +269,23 @@ export const PinMessageSchema = z.object({
 
 export type PostMessageInput = z.infer<typeof PostMessageSchema>
 export type PinMessageInput  = z.infer<typeof PinMessageSchema>
+
+// ── Budget guard schemas ────────────────────────────────────────────────────
+
+export const CreateBudgetSchema = z.object({
+  type: z.enum(['MONTHLY', 'YEARLY', 'CUSTOM']),
+  amount: z.number()
+    .min(100, 'Budget must be at least R100 (the contribution minimum)')
+    .max(10000, 'Budget cannot exceed R10,000'),
+  startDate: z.string().datetime(),
+  endDate: z.string().datetime().optional(),
+})
+
+export const UpdateBudgetAmountSchema = z.object({
+  amount: z.number()
+    .min(100, 'Budget must be at least R100 (the contribution minimum)')
+    .max(10000, 'Budget cannot exceed R10,000'),
+})
+
+export type CreateBudgetInput       = z.infer<typeof CreateBudgetSchema>
+export type UpdateBudgetAmountInput = z.infer<typeof UpdateBudgetAmountSchema>

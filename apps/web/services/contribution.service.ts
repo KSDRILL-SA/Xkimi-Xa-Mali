@@ -5,7 +5,9 @@ import { db } from '@/lib/db'
 import { contributionRepo, runTransaction, type TxClient } from '@/repositories/contribution.repository'
 import { transactionRepo } from '@/repositories/transaction.repository'
 import { mandateRepo } from '@/repositories/mandate.repository'
+import { budgetRepo } from '@/repositories/budget.repository'
 import { writeAuditLog } from './audit.service'
+import { checkBudget, recordBudgetOverride } from './budget.service'
 import { logger } from '@/lib/logger'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { inngest, InngestEvents } from '@/lib/inngest'
@@ -14,6 +16,7 @@ import {
   ContributionConflictError,
   MandateConflictError,
   TransactionNotFoundError,
+  BudgetExceededError,
 } from '@/lib/errors'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
@@ -182,6 +185,34 @@ export async function submitManualPayment(
 
   if (data.amount < 0) {
     throw new ContributionConflictError('Payment amount must be positive', 'CTR_005')
+  }
+
+  const budgetCheck = await checkBudget(userId, data.amount)
+
+  if (budgetCheck.status === 'OVER_BUDGET') {
+    if (!data.budgetOverrideConfirmed) {
+      throw new BudgetExceededError({
+        budget: budgetCheck.budget,
+        alreadyContributed: budgetCheck.alreadyContributed,
+        remaining: budgetCheck.remaining,
+        overage: budgetCheck.overage,
+      })
+    }
+
+    const activeBudget = await budgetRepo.findActiveByType(userId, 'MONTHLY')
+    if (activeBudget) {
+      await recordBudgetOverride(
+        userId,
+        activeBudget.id,
+        contribution.id,
+        {
+          attemptedAmount: data.amount,
+          budgetAmount: budgetCheck.budget,
+          overageAmount: budgetCheck.overage,
+        },
+        data.budgetOverrideReason,
+      )
+    }
   }
 
   const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${randomUUID()}`
