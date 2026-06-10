@@ -1,8 +1,8 @@
 (function () {
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-  var COLOR = '#D4AF37';
-  var bar = document.createElement('div');
+  const COLOR = '#D4AF37';
+  const bar = document.createElement('div');
   bar.setAttribute('aria-hidden', 'true');
   bar.style.cssText =
     'position:fixed;top:0;left:0;height:3px;width:0;background:' +
@@ -14,11 +14,11 @@
     ';z-index:99999;pointer-events:none;opacity:0;transition:width 200ms ease,opacity 300ms ease';
   document.body.appendChild(bar);
 
-  var trickle = null;
-  var finish = null;
-  var reset = null;
-  var progress = 0;
-  var fading = false;
+  let trickle = null;
+  let finish = null;
+  let reset = null;
+  let progress = 0;
+  let fading = false;
 
   function clearTimers() {
     if (trickle) {
@@ -75,16 +75,16 @@
   document.addEventListener(
     'click',
     function (e) {
-      var target = e.target;
+      const target = e.target;
       if (!target || typeof target.closest !== 'function') return;
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      var anchor = target.closest('a');
+      const anchor = target.closest('a');
       if (!anchor) return;
-      var href = anchor.getAttribute('href');
-      var linkTarget = anchor.getAttribute('target');
+      const href = anchor.getAttribute('href');
+      const linkTarget = anchor.getAttribute('target');
       if (!href || href.charAt(0) === '#' || (linkTarget && linkTarget !== '_self')) return;
       try {
-        var url = new URL(href, window.location.href);
+        const url = new URL(href, window.location.href);
         if (url.origin !== window.location.origin) return;
         if (url.pathname === window.location.pathname && url.search === window.location.search) return;
       } catch (_) {
@@ -101,9 +101,9 @@
   });
 
   ['pushState', 'replaceState'].forEach(function (method) {
-    var original = history[method];
+    const original = history[method];
     history[method] = function () {
-      var result = original.apply(this, arguments);
+      const result = original.apply(this, arguments);
       start();
       scheduleDone();
       return result;
