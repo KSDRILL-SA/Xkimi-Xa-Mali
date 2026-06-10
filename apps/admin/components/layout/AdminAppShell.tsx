@@ -15,6 +15,7 @@ import {
   UserPlus,
   BarChart3,
   ShieldCheck,
+  Settings,
 } from 'lucide-react'
 
 const adminNav: NavItem[] = [
@@ -28,6 +29,7 @@ const adminNav: NavItem[] = [
   { href: '/invitations',   label: 'Invitations',  icon: UserPlus },
   { href: '/reports',       label: 'Reports',      icon: BarChart3 },
   { href: '/audit',         label: 'Audit',        icon: ShieldCheck },
+  { href: '/settings',      label: 'Settings',     icon: Settings },
 ]
 
 interface AdminAppShellProps {
