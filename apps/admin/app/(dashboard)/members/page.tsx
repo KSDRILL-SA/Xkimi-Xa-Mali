@@ -72,7 +72,7 @@ export default async function MembersPage({
       </Reveal>
 
       {/* ── Search + filters ─────────────────────────────────── */}
-      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4 space-y-3">
+      <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-4 space-y-3">
         <form method="GET" action="/members" className="flex gap-2">
           <div className="relative flex-1 min-w-0">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-xxm-gray-400 pointer-events-none" aria-hidden />
@@ -129,7 +129,7 @@ export default async function MembersPage({
       {/* ── Members list ─────────────────────────────────────── */}
       <Reveal variant="up" delay={200}>
       {members.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
             <Users size={24} className="text-xxm-green-300" aria-hidden />
           </div>
@@ -137,7 +137,7 @@ export default async function MembersPage({
           <p className="text-xxm-gray-400 text-sm mt-1">Try adjusting your search or filters.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
           {/* Table header */}
           <div className="grid grid-cols-[2fr_1fr_80px_64px_64px_80px] gap-3 px-4 py-3 bg-xxm-gray-50 border-b border-xxm-gray-100">
             <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest">Member</span>
