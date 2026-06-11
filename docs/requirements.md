@@ -19,32 +19,33 @@ High-level view of the functional domains and their dependencies.
 ```mermaid
 flowchart TD
     subgraph IDENTITY["Identity"]
-        AUTH["Auth & Access\nFR-AUTH"]
-        INV["Invite & Onboarding\nFR-INV"]
-        PROF["Member Profile\nFR-PROF"]
+        AUTH["Auth & access<br/>FR-AUTH"]
+        INV["Invite & onboarding<br/>FR-INV"]
+        PROF["Member profile<br/>FR-PROF"]
     end
-
     subgraph FINANCE["Finance"]
-        MAN["Payment Mandates\nFR-MAN"]
-        CON["Contribution Engine\nFR-CON"]
-        PAY["Debit Pipeline\nFR-PAY"]
+        MAN["Mandates<br/>FR-MAN"]
+        CON["Contributions<br/>FR-CON"]
+        PAY["Debit pipeline<br/>FR-PAY"]
+        LED["Ledger<br/>FR-LED"]
     end
-
     subgraph ENGAGEMENT["Engagement"]
-        GOAL["Goals System\nFR-GOAL"]
-        NOTIF["Notifications\nFR-NOTIF"]
-        WEB["Public Stats & Website\nFR-WEB"]
+        GOAL["Goals<br/>FR-GOAL"]
+        NOTIF["Notifications<br/>FR-NOTIF"]
+        ENG["Badges · community · budgets<br/>FR-ENG"]
+        WEB["Public stats<br/>FR-WEB"]
     end
-
     subgraph OPERATIONS["Operations"]
-        REP["Reporting & Statements\nFR-REP"]
-        ADMIN["Admin Dashboard\nFR-ADMIN"]
+        REP["Reporting<br/>FR-REP"]
+        INS["Insights<br/>FR-INS"]
+        ADMIN["Admin<br/>FR-ADMIN"]
     end
 
     INV --> AUTH --> PROF
-    PROF --> MAN --> CON --> PAY
+    PROF --> MAN --> CON --> PAY --> LED
     PAY --> NOTIF
-    CON --> REP
+    CON --> REP & INS
+    LED --> REP
     GOAL --> NOTIF
     ADMIN --> IDENTITY & FINANCE & ENGAGEMENT & OPERATIONS
 ```
@@ -232,6 +233,40 @@ mindmap
 | FR-WEB-002 | Stats are served from `GET /api/v1/stats/public` — unauthenticated, zero PII, Redis-cached for 1 hour |
 | FR-WEB-003 | The WhatsApp page shows group info, rules summary, and a deep link to the WhatsApp group |
 | FR-WEB-004 | The WhatsApp page and public website are accessible without authentication |
+
+### 1.12 Ledger (Phase 3)
+
+| ID | Requirement |
+|----|-------------|
+| FR-LED-001 | The group pool is tracked in an append-only double-entry ledger; balance = Σ credits − Σ debits |
+| FR-LED-002 | A SUCCESS transaction posts a pool CREDIT; a REVERSED transaction posts a pool DEBIT |
+| FR-LED-003 | Ledger posting is idempotent — `UNIQUE(refType, refId, direction)` prevents double-posting under retries |
+| FR-LED-004 | A nightly job reconciles the ledger by rebuilding from settled transactions; admin can read the ledger and balance via `GET /api/v1/admin/ledger` |
+
+### 1.13 Engagement (Phase 3)
+
+| ID | Requirement |
+|----|-------------|
+| FR-ENG-001 | Members can cheer, comment on, and pledge toward group goals; cheer toggles are race-safe |
+| FR-ENG-002 | Members earn contribution badges/tiers recalculated from their payment history |
+| FR-ENG-003 | Members can post and read community messages |
+| FR-ENG-004 | Members can set a personal monthly budget, with admin override support |
+
+### 1.14 Member Insights (Phase 3)
+
+| ID | Requirement |
+|----|-------------|
+| FR-INS-001 | Each member sees a year-end forecast (YTD paid + monthly amount × remaining months) |
+| FR-INS-002 | Insights show on-time payment rate and an at-risk flag with plain-language nudges |
+| FR-INS-003 | A member may only read their own insights — enforced at the service layer |
+
+### 1.15 Admin Intelligence & Signatures (Phase 3)
+
+| ID | Requirement |
+|----|-------------|
+| FR-ADMIN-008 | A daily anomaly watch alerts admins (inbox + audit) on low collection rate, failed-debit spikes, or overdue thresholds |
+| FR-ADMIN-009 | Webhooks are processed exactly once via a dedupe table — redelivery returns 200 without re-processing |
+| FR-ADMIN-010 | Admins can capture a signature; it is embedded in generated statement PDFs (with signature history) |
 
 ---
 
