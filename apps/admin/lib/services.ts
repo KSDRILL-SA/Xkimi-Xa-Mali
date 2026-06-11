@@ -30,6 +30,31 @@ function assertAdmin(roles: string[]) {
   if (!roles.includes('ADMIN')) throw new AdminForbiddenError()
 }
 
+// ─── Proactive in-app notification ──────────────────────────────────────────────
+// Best-effort: the system keeps members informed in their inbox. A failure here
+// must never break the underlying admin action that triggered it.
+async function notifyInbox(opts: {
+  userId: string
+  title: string
+  body: string
+  category?: 'BROADCAST' | 'SYSTEM' | 'PAYMENT' | 'GOAL'
+  createdById?: string
+}) {
+  try {
+    await db.inboxMessage.create({
+      data: {
+        userId:      opts.userId,
+        title:       opts.title,
+        body:        opts.body,
+        category:    opts.category ?? 'SYSTEM',
+        createdById: opts.createdById ?? null,
+      },
+    })
+  } catch (err) {
+    console.error('Inbox notify failed', err)
+  }
+}
+
 // ─── Audit helper ─────────────────────────────────────────────────────────────
 
 async function writeAuditLog(data: {
@@ -146,6 +171,14 @@ export async function setMemberStatus(
     payload: { from: member.status, to: newStatus }, ipAddress: ip,
   })
 
+  if (newStatus === 'ACTIVE') {
+    await notifyInbox({
+      userId: memberId, createdById: adminId, category: 'SYSTEM',
+      title: 'Welcome — your membership is active 🎉',
+      body: 'Your account is now active. Set up your payment mandate to start contributing with the brotherhood.',
+    })
+  }
+
   return updated
 }
 
@@ -214,6 +247,11 @@ export async function approveMandate(
     where: { id: mandateId }, data: { status: 'ACTIVE', approvedAt: new Date(), approvedById: adminId }, select: { id: true, status: true },
   })
   await writeAuditLog({ userId: adminId, action: 'ADMIN_MANDATE_APPROVED', entity: 'PaymentMandate', entityId: mandateId, payload: { memberId: mandate.userId }, ipAddress: ip })
+  await notifyInbox({
+    userId: mandate.userId, createdById: adminId, category: 'PAYMENT',
+    title: 'Payment mandate approved ✅',
+    body: 'Your debit-order mandate has been approved. Your monthly contributions will now be collected automatically.',
+  })
   return updated
 }
 
@@ -229,6 +267,11 @@ export async function rejectMandate(
     where: { id: mandateId }, data: { status: 'CANCELLED' }, select: { id: true, status: true },
   })
   await writeAuditLog({ userId: adminId, action: 'ADMIN_MANDATE_REJECTED', entity: 'PaymentMandate', entityId: mandateId, payload: { memberId: mandate.userId }, ipAddress: ip })
+  await notifyInbox({
+    userId: mandate.userId, createdById: adminId, category: 'PAYMENT',
+    title: 'Payment mandate not approved',
+    body: 'Your debit-order mandate was not approved. Please review your bank details and submit a new mandate.',
+  })
   return updated
 }
 
