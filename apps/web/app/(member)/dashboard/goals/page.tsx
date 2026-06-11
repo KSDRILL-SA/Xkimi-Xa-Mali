@@ -2,36 +2,19 @@ import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
 import { getSession } from '@/lib/session'
-import { formatZAR, formatDate } from '@/lib/formatters'
-import { ProgressBar } from '@/components/ui/ProgressBar'
+import { formatZAR } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
-import { Target, Trophy, Clock, Lock } from 'lucide-react'
+import { Target, Trophy, Sparkles, TrendingUp } from 'lucide-react'
 import { getGoals, getGoalStatusCounts } from '@/services/goal.service'
 import { isAdmin } from '@/lib/authorization'
+import { GoalCard, type GoalCardData } from '@/components/goal/GoalCard'
 
 export const metadata: Metadata = { title: 'Goals' }
 
 type GoalStatus = 'DRAFT' | 'ACTIVE' | 'ACHIEVED' | 'FAILED'
 
-const STATUS_CONFIG: Record<GoalStatus, {
-  label: string
-  dot: string
-  badge: string
-  barVariant: 'default' | 'gold' | 'success' | 'danger'
-  cardBorder: string
-  iconBg: string
-  iconColor: string
-}> = {
-  DRAFT:    { label: 'Draft',    dot: 'bg-xxm-gray-400',  badge: 'bg-xxm-gray-100 text-xxm-gray-600', barVariant: 'default', cardBorder: 'border-xxm-gray-200',    iconBg: 'bg-xxm-gray-100',  iconColor: 'text-xxm-gray-500' },
-  ACTIVE:   { label: 'Active',   dot: 'bg-xxm-gold',      badge: 'bg-amber-100 text-amber-700',       barVariant: 'gold',    cardBorder: 'border-xxm-gold/30',     iconBg: 'bg-xxm-gold/12',  iconColor: 'text-xxm-gold-dark' },
-  ACHIEVED: { label: 'Achieved', dot: 'bg-xxm-green',     badge: 'bg-xxm-green-100 text-xxm-green-700', barVariant: 'success', cardBorder: 'border-xxm-green/20', iconBg: 'bg-xxm-green/10', iconColor: 'text-xxm-green' },
-  FAILED:   { label: 'Failed',   dot: 'bg-red-500',       badge: 'bg-red-100 text-red-700',           barVariant: 'danger',  cardBorder: 'border-red-200',         iconBg: 'bg-red-50',        iconColor: 'text-red-500' },
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  MONTHLY: 'Monthly goal',
-  YEARLY:  'Yearly goal',
-  CUSTOM:  'Custom goal',
+const FILTER_LABELS: Record<GoalStatus, string> = {
+  DRAFT: 'Draft', ACTIVE: 'Active', ACHIEVED: 'Achieved', FAILED: 'Failed',
 }
 
 export default async function GoalsPage({
@@ -42,7 +25,7 @@ export default async function GoalsPage({
   const session = await getSession()
   const roles = (session!.user.roles as string[] | undefined) ?? []
   const admin = isAdmin(roles)
-  const params  = await searchParams
+  const params = await searchParams
 
   const validStatuses: GoalStatus[] = admin
     ? ['DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED']
@@ -57,124 +40,87 @@ export default async function GoalsPage({
     getGoalStatusCounts(),
   ])
 
+  // Combined momentum across active goals — the collective "how close are we".
+  const activeGoals = goals.filter((g) => g.status === 'ACTIVE')
+  const combinedRaised = activeGoals.reduce((s, g) => s + g.currentAmount, 0)
+  const combinedTarget = activeGoals.reduce((s, g) => s + g.targetAmount, 0)
+  const combinedPct = combinedTarget > 0 ? Math.min(100, Math.round((combinedRaised / combinedTarget) * 100)) : 0
+
   return (
     <div className="space-y-6">
 
-      {/* ── Header ────────────────────────────────────────── */}
-      <Reveal variant="up" className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-xxm-gold/12 flex items-center justify-center shrink-0">
-          <Target size={22} className="text-xxm-gold-dark" aria-hidden />
-        </div>
-        <div>
-          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Financial Goals</h1>
-          <p className="text-sm text-xxm-gray-500 mt-1">
-            <span className="font-semibold text-xxm-gold-dark">{activeCount}</span> active &middot;{' '}
-            <span className="font-semibold text-xxm-green">{achievedCount}</span> achieved
-          </p>
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <Reveal variant="up">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-xxm-green via-xxm-canopy to-xxm-green-900 p-6 md:p-8 text-white shadow-xxm-lg">
+          <div className="noise-overlay" aria-hidden />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-xxm-gold/10 rounded-full -translate-y-1/3 translate-x-1/4 pointer-events-none animate-orb-drift-1" aria-hidden />
+          <div className="absolute -bottom-12 left-1/4 w-44 h-44 bg-white/5 rounded-full pointer-events-none animate-orb-drift-2" aria-hidden />
+
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 mb-3 glass-gold rounded-full px-3 py-1.5">
+              <Sparkles size={12} className="text-xxm-gold" aria-hidden />
+              <p className="text-xxm-gold text-[11px] font-bold tracking-widest uppercase">Brotherhood Goals</p>
+            </div>
+            <h1 className="font-display text-2xl md:text-3xl font-black tracking-tight">Financial Goals</h1>
+            <p className="text-green-100/75 mt-1.5 text-sm max-w-md leading-relaxed">
+              Every contribution moves us closer. Track what we&apos;re building together.
+            </p>
+
+            <div className="mt-6 flex flex-wrap items-stretch gap-3">
+              <HeroStat icon={<Target size={15} className="text-xxm-gold" aria-hidden />} value={String(activeCount)} label="Active" />
+              <HeroStat icon={<Trophy size={15} className="text-xxm-gold" aria-hidden />} value={String(achievedCount)} label="Achieved" />
+              <HeroStat
+                icon={<TrendingUp size={15} className="text-xxm-gold" aria-hidden />}
+                value={`${combinedPct}%`}
+                label="Combined progress"
+                sub={combinedTarget > 0 ? `${formatZAR(combinedRaised)} of ${formatZAR(combinedTarget)}` : undefined}
+              />
+            </div>
+          </div>
         </div>
       </Reveal>
 
-      {/* ── Filter tabs ───────────────────────────────────── */}
+      {/* ── Filter chips ──────────────────────────────────────── */}
       <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5">
         <FilterChip label="All" href="/dashboard/goals" active={!statusFilter} />
         {validStatuses.map((s) => (
-          <FilterChip
-            key={s}
-            label={STATUS_CONFIG[s].label}
-            href={`/dashboard/goals?status=${s}`}
-            active={statusFilter === s}
-          />
+          <FilterChip key={s} label={FILTER_LABELS[s]} href={`/dashboard/goals?status=${s}`} active={statusFilter === s} />
         ))}
       </Reveal>
 
-      {/* ── Goals grid ────────────────────────────────────── */}
-      <Reveal variant="up" delay={200}>
+      {/* ── Goals grid ────────────────────────────────────────── */}
       {goals.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
-          <div className="w-16 h-16 rounded-3xl bg-xxm-gold/10 flex items-center justify-center mx-auto mb-4">
-            <Target size={26} className="text-xxm-gold-dark/50" aria-hidden />
-          </div>
-          <p className="text-xxm-green-900 font-bold">No goals found</p>
-          {admin && (
+        <Reveal variant="up" delay={200}>
+          <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
+            <div className="w-16 h-16 rounded-3xl bg-xxm-gold/10 flex items-center justify-center mx-auto mb-4">
+              <Target size={26} className="text-xxm-gold-dark/50" aria-hidden />
+            </div>
+            <p className="text-xxm-green-900 font-bold">No goals here yet</p>
             <p className="text-xxm-gray-400 text-xs mt-1.5 max-w-xs mx-auto">
-              Create the first goal from the admin portal to start tracking collective progress.
+              {admin
+                ? 'Create the first goal from the admin portal to start tracking collective progress.'
+                : 'New goals set by the brotherhood will appear here.'}
             </p>
-          )}
-        </div>
+          </div>
+        </Reveal>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {goals.map((goal) => {
-            const pct      = goal.progressPct
-            const status   = goal.status as GoalStatus
-            const cfg      = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT
-            const isOverdue = status === 'ACTIVE' && new Date(goal.deadline) < new Date()
-
-            return (
-              <Link
-                key={goal.id}
-                href={`/dashboard/goals/${goal.id}`}
-                className={`group block bg-white rounded-3xl border ${cfg.cardBorder} shadow-xxm-sm p-5 space-y-4 hover:shadow-xxm hover:-translate-y-1 transition-all duration-slow ease-smooth`}
-              >
-                {/* Title row */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
-                    <div className={`w-9 h-9 rounded-xl ${cfg.iconBg} flex items-center justify-center shrink-0 mt-0.5 transition-transform duration-slow group-hover:scale-110`}>
-                      {status === 'ACHIEVED'
-                        ? <Trophy size={15} className={cfg.iconColor} aria-hidden />
-                        : <Target  size={15} className={cfg.iconColor} aria-hidden />
-                      }
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-xxm-green-900 leading-snug truncate">{goal.title}</p>
-                      <p className="text-[11px] text-xxm-gray-400 mt-0.5">{TYPE_LABELS[goal.type] ?? goal.type}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {goal.lockedAt && (
-                      <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center" title="Locked">
-                        <Lock size={10} className="text-amber-600" aria-hidden />
-                      </div>
-                    )}
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.badge}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} aria-hidden />
-                      {cfg.label}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Amounts */}
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="stat-number text-xl font-extrabold text-xxm-green-900">{formatZAR(goal.currentAmount)}</p>
-                    <p className="text-[11px] text-xxm-gray-400">of {formatZAR(goal.targetAmount)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className={`stat-number text-xl font-extrabold ${pct >= 100 ? 'text-xxm-green' : 'text-xxm-gold-dark'}`}>{pct}%</p>
-                    <p className="text-[11px] text-xxm-gray-400">complete</p>
-                  </div>
-                </div>
-
-                {/* Progress bar */}
-                <ProgressBar
-                  value={pct}
-                  size="md"
-                  variant={cfg.barVariant}
-                  animated={status === 'ACTIVE' && pct < 100}
-                />
-
-                {/* Deadline */}
-                <div className={`flex items-center gap-1.5 text-[11px] ${isOverdue ? 'text-red-500 font-semibold' : 'text-xxm-gray-400'}`}>
-                  <Clock size={11} aria-hidden />
-                  {isOverdue ? 'Overdue · ' : 'Deadline · '}
-                  {formatDate(goal.deadline)}
-                </div>
-              </Link>
-            )
-          })}
+          {goals.map((goal, i) => (
+            <GoalCard key={goal.id} goal={goal as GoalCardData} index={i} />
+          ))}
         </div>
       )}
-      </Reveal>
 
+    </div>
+  )
+}
+
+function HeroStat({ icon, value, label, sub }: { icon: React.ReactNode; value: string; label: string; sub?: string }) {
+  return (
+    <div className="flex-1 min-w-[130px] rounded-2xl bg-white/10 border border-white/10 backdrop-blur-sm px-4 py-3">
+      <div className="flex items-center gap-1.5 mb-1">{icon}<span className="text-[11px] font-semibold text-green-100/70 uppercase tracking-wide">{label}</span></div>
+      <p className="stat-number text-xl font-black leading-none">{value}</p>
+      {sub && <p className="text-[10px] text-green-100/60 mt-1">{sub}</p>}
     </div>
   )
 }
@@ -183,10 +129,10 @@ function FilterChip({ label, href, active }: { label: string; href: Route; activ
   return (
     <Link
       href={href}
-      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+      className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-fast ${
         active
           ? 'bg-xxm-green text-white shadow-sm'
-          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gray-200'
+          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gray-200 hover:-translate-y-0.5'
       }`}
     >
       {label}

@@ -3,45 +3,28 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR, formatDate } from '@/lib/formatters'
-import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Reveal } from '@xxm/ui'
-import { ChevronLeft, Target, Trophy, Lock, Clock, TrendingUp } from 'lucide-react'
+import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2 } from 'lucide-react'
 import { getGoal } from '@/services/goal.service'
 import { GoalNotFoundError } from '@/lib/errors'
+import { ProgressRing } from '@/components/goal/ProgressRing'
+import { MilestoneBar } from '@/components/goal/MilestoneBar'
+import { statusTheme, typeTheme, goalIcon } from '@/components/goal/goal-theme'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
 
-type GoalStatus = 'DRAFT' | 'ACTIVE' | 'ACHIEVED' | 'FAILED'
-
-type ProgressEntry = {
-  id: string
-  amount: number
-  recordedAt: string
-}
-
-const STATUS_CONFIG: Record<GoalStatus, {
-  label: string
-  dot: string
-  badge: string
-  barVariant: 'default' | 'gold' | 'success' | 'danger'
-  iconBg: string
-  iconColor: string
-}> = {
-  DRAFT:    { label: 'Draft',    dot: 'bg-xxm-gray-400',  badge: 'bg-xxm-gray-100 text-xxm-gray-600',    barVariant: 'default', iconBg: 'bg-xxm-gray-100',  iconColor: 'text-xxm-gray-500'  },
-  ACTIVE:   { label: 'Active',   dot: 'bg-xxm-gold',      badge: 'bg-amber-100 text-amber-700',           barVariant: 'gold',    iconBg: 'bg-xxm-gold/12',   iconColor: 'text-xxm-gold-dark' },
-  ACHIEVED: { label: 'Achieved', dot: 'bg-xxm-green',     badge: 'bg-xxm-green-100 text-xxm-green-700',   barVariant: 'success', iconBg: 'bg-xxm-green/10',  iconColor: 'text-xxm-green'     },
-  FAILED:   { label: 'Failed',   dot: 'bg-red-500',       badge: 'bg-red-100 text-red-700',               barVariant: 'danger',  iconBg: 'bg-red-50',         iconColor: 'text-red-500'       },
-}
+type ProgressEntry = { id: string; amount: number; recordedAt: string }
 
 function formatRelative(isoDate: string): string {
   const date = new Date(isoDate)
-  const diff = Date.now() - date.getTime()
-  const days = Math.floor(diff / 86_400_000)
+  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000)
   if (days === 0) return 'Today'
   if (days === 1) return 'Yesterday'
   if (days < 30) return `${days} days ago`
   return formatDate(date)
 }
+
+const MILESTONES = [0, 25, 50, 75, 100]
 
 export default async function GoalDetailPage({
   params,
@@ -60,175 +43,181 @@ export default async function GoalDetailPage({
     throw err
   }
 
-  const progressEntries: ProgressEntry[] = goal.progress
-
-  const status = goal.status as GoalStatus
-  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT
+  const st = statusTheme(goal.status)
+  const tt = typeTheme(goal.type)
+  const Icon = goalIcon(goal.status, goal.type)
   const pct = goal.progressPct
   const remaining = goal.remaining
-  const daysLeft = Math.ceil(
-    (new Date(goal.deadline).getTime() - Date.now()) / 86_400_000,
-  )
-  const isOverdue = status === 'ACTIVE' && daysLeft < 0
+  const daysLeft = Math.ceil((new Date(goal.deadline).getTime() - Date.now()) / 86_400_000)
+  const isOverdue = goal.status === 'ACTIVE' && daysLeft < 0
+  const progressEntries: ProgressEntry[] = goal.progress
 
   return (
     <div className="space-y-6 max-w-2xl">
 
-      {/* ── Back link ──────────────────────────────── */}
-      <Link
-        href="/dashboard/goals"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-xxm-green hover:text-xxm-canopy transition-colors"
-      >
-        <ChevronLeft size={15} aria-hidden />
-        All goals
+      {/* ── Back link ─────────────────────────────────────────── */}
+      <Link href="/dashboard/goals" className="inline-flex items-center gap-1.5 text-sm font-semibold text-xxm-green hover:text-xxm-canopy transition-colors">
+        <ChevronLeft size={15} aria-hidden /> All goals
       </Link>
 
-      {/* ── Goal header card ───────────────────────── */}
-      <Reveal variant="up" className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+      {/* ── Hero ──────────────────────────────────────────────── */}
+      <Reveal variant="up" className="relative overflow-hidden bg-white rounded-3xl border border-xxm-green/8 shadow-xxm">
+        <div className={`pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full bg-gradient-to-br ${tt.wash} blur-3xl opacity-80`} aria-hidden />
 
-        {/* Title row */}
-        <div className="flex items-start justify-between gap-4 px-5 py-5 border-b border-xxm-gray-50">
-          <div className="flex items-start gap-4 min-w-0">
-            <div className={`w-11 h-11 rounded-2xl ${cfg.iconBg} flex items-center justify-center shrink-0`}>
-              {status === 'ACHIEVED'
-                ? <Trophy size={20} className={cfg.iconColor} aria-hidden />
-                : <Target  size={20} className={cfg.iconColor} aria-hidden />
-              }
-            </div>
-            <div className="min-w-0">
-              <h1 className="font-display text-xl font-extrabold text-xxm-green-900 leading-snug">{goal.title}</h1>
-              {goal.description && (
-                <p className="text-sm text-xxm-gray-500 mt-1 leading-relaxed">{goal.description}</p>
+        <div className="relative p-6 flex flex-col sm:flex-row items-center sm:items-start gap-6">
+          <ProgressRing
+            value={pct}
+            size={150}
+            strokeWidth={12}
+            colorClass={st.ring}
+            labelClass={pct >= 100 ? 'text-xxm-green' : 'text-xxm-green-900'}
+            sublabel="complete"
+          />
+
+          <div className="min-w-0 flex-1 text-center sm:text-left">
+            <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${tt.chip}`}>
+                <Icon size={11} aria-hidden /> {tt.label}
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${st.badge}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${st.dot} ${goal.status === 'ACTIVE' ? 'animate-pulse' : ''}`} aria-hidden />
+                {st.label}
+              </span>
+              {goal.isLocked && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                  <Lock size={10} aria-hidden /> Locked
+                </span>
               )}
             </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {goal.lockedAt && (
-              <div className="w-6 h-6 rounded-md bg-amber-100 flex items-center justify-center" title="Locked">
-                <Lock size={11} className="text-amber-600" aria-hidden />
-              </div>
+
+            <h1 className="mt-2.5 font-display text-xl font-black text-xxm-green-900 leading-snug">{goal.title}</h1>
+            {goal.description ? (
+              <p className="text-sm text-xxm-gray-500 mt-1.5 leading-relaxed">{goal.description}</p>
+            ) : (
+              <p className="text-sm text-xxm-gray-400 mt-1.5 italic">{tt.blurb}</p>
             )}
-            <span
-              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.badge}`}
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} aria-hidden />
-              {cfg.label}
-            </span>
+
+            <div className="mt-4 flex items-baseline justify-center sm:justify-start gap-1.5">
+              <span className="stat-number text-3xl font-black text-xxm-green-900">{formatZAR(goal.currentAmount)}</span>
+              <span className="text-xs text-xxm-gray-400">raised of {formatZAR(goal.targetAmount)}</span>
+            </div>
           </div>
         </div>
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-xxm-gray-50">
-          <StatCell label="Raised"   value={formatZAR(goal.currentAmount)} />
-          <StatCell label="Target"   value={formatZAR(goal.targetAmount)} />
-          <StatCell label="Remaining" value={formatZAR(remaining)} />
+        {/* Stat strip */}
+        <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-px bg-xxm-gray-100 border-t border-xxm-gray-100">
+          <StatCell icon={<Wallet size={13} className="text-xxm-green" aria-hidden />} label="Raised" value={formatZAR(goal.currentAmount)} />
+          <StatCell icon={<TargetIcon size={13} className="text-xxm-gold-dark" aria-hidden />} label="Target" value={formatZAR(goal.targetAmount)} />
+          <StatCell icon={<TrendingUp size={13} className="text-sky-600" aria-hidden />} label="Remaining" value={formatZAR(remaining)} />
           <StatCell
+            icon={<Clock size={13} className={isOverdue ? 'text-red-500' : 'text-violet-600'} aria-hidden />}
             label={isOverdue ? 'Overdue by' : 'Days left'}
             value={isOverdue ? `${Math.abs(daysLeft)}d` : daysLeft > 0 ? `${daysLeft}d` : 'Today'}
             highlight={isOverdue}
           />
         </div>
-
-        {/* Progress bar section */}
-        <div className="px-5 py-5 space-y-3 border-t border-xxm-gray-50">
-          <div className="flex items-center justify-between text-xs">
-            <span className="stat-number font-bold text-xxm-green-900 text-base">{pct}%</span>
-            <span className="text-xxm-gray-400">of {formatZAR(goal.targetAmount)}</span>
-          </div>
-          <ProgressBar value={pct} size="lg" variant={cfg.barVariant} animated={status === 'ACTIVE' && pct < 100} />
-          <div className="flex items-center justify-between text-xs text-xxm-gray-400">
-            <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-500 font-semibold' : ''}`}>
-              <Clock size={11} aria-hidden />
-              {isOverdue ? 'Overdue · ' : 'Deadline · '}
-              {formatDate(goal.deadline)}
-            </span>
-            <span>{formatZAR(goal.currentAmount)} raised</span>
-          </div>
-        </div>
-
-        {/* Status banners */}
-        {status === 'ACHIEVED' && (
-          <div className="mx-5 mb-5 flex items-center gap-2.5 rounded-2xl bg-xxm-green-50 border border-xxm-green/15 px-4 py-3">
-            <Trophy size={15} className="text-xxm-green shrink-0" aria-hidden />
-            <p className="text-sm font-semibold text-xxm-green-800">Congratulations — this goal has been achieved!</p>
-          </div>
-        )}
-        {status === 'FAILED' && (
-          <div className="mx-5 mb-5 flex items-center gap-2.5 rounded-2xl bg-red-50 border border-red-100 px-4 py-3">
-            <Target size={15} className="text-red-400 shrink-0" aria-hidden />
-            <p className="text-sm font-medium text-red-700">This goal was not achieved by the deadline.</p>
-          </div>
-        )}
       </Reveal>
 
-      {/* ── Progress history ───────────────────────── */}
-      <Reveal variant="up" delay={100}>
-      <section className="space-y-3">
-        <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">
-          Progress history ({goal.progress.length})
+      {/* ── Milestones ────────────────────────────────────────── */}
+      <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">Milestones</h2>
+          <span className="text-xs text-xxm-gray-400 flex items-center gap-1">
+            <Clock size={11} aria-hidden /> {isOverdue ? 'Overdue · ' : 'Deadline · '}{formatDate(goal.deadline)}
+          </span>
+        </div>
+
+        <MilestoneBar value={pct} fromClass={st.barFrom} toClass={st.barTo} height="h-3" />
+
+        <div className="flex justify-between">
+          {MILESTONES.map((m) => {
+            const reached = pct >= m
+            return (
+              <div key={m} className="flex flex-col items-center gap-1">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${reached ? 'bg-xxm-green text-white' : 'bg-xxm-gray-100 text-xxm-gray-400'}`}>
+                  {reached ? <CheckCircle2 size={13} aria-hidden /> : <Flag size={11} aria-hidden />}
+                </div>
+                <span className={`text-[10px] font-semibold ${reached ? 'text-xxm-green-900' : 'text-xxm-gray-400'}`}>{m}%</span>
+              </div>
+            )
+          })}
+        </div>
+      </Reveal>
+
+      {/* ── Status banners ────────────────────────────────────── */}
+      {goal.status === 'ACHIEVED' && (
+        <Reveal variant="up" delay={150} className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-xxm-green-50 to-xxm-gold/10 border border-xxm-green/15 px-5 py-4">
+          <div className="w-10 h-10 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
+            <CheckCircle2 size={18} className="text-xxm-green" aria-hidden />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-xxm-green-800">Goal achieved! 🎉</p>
+            <p className="text-xs text-xxm-green-700/80">The brotherhood reached this target together.</p>
+          </div>
+        </Reveal>
+      )}
+      {goal.status === 'FAILED' && (
+        <Reveal variant="up" delay={150} className="flex items-center gap-3 rounded-2xl bg-red-50 border border-red-100 px-5 py-4">
+          <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
+            <Flag size={18} className="text-red-500" aria-hidden />
+          </div>
+          <p className="text-sm font-medium text-red-700">This goal wasn&apos;t reached by the deadline.</p>
+        </Reveal>
+      )}
+
+      {/* ── Progress history ──────────────────────────────────── */}
+      <Reveal variant="up" delay={200}>
+        <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest mb-3">
+          Contribution history ({goal.progress.length})
         </h2>
 
-        {goal.progress.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-10 text-center">
+        {progressEntries.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm-sm p-10 text-center">
             <div className="w-11 h-11 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-3">
               <TrendingUp size={18} className="text-xxm-green-300" aria-hidden />
             </div>
-            <p className="text-xxm-gray-400 text-sm font-medium">No progress recorded yet.</p>
+            <p className="text-xxm-gray-400 text-sm font-medium">No contributions recorded yet.</p>
+            <p className="text-xxm-gray-400 text-xs mt-1">Progress will appear here as the goal grows.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden divide-y divide-xxm-gray-50">
-            {progressEntries.map((entry, idx) => {
-              const runningTotal = progressEntries
-                .slice(idx)
-                .reduce((sum: number, p: ProgressEntry) => sum + Number(p.amount), 0)
-
-              return (
-                <div key={entry.id} className="group flex items-center justify-between px-5 py-4 hover:bg-xxm-green-50/20 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-xxm-green-50 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110">
-                      <TrendingUp size={13} className="text-xxm-green" aria-hidden />
+          <div className="relative pl-5">
+            {/* timeline rail */}
+            <div className="absolute left-[9px] top-2 bottom-2 w-px bg-xxm-gray-100" aria-hidden />
+            <div className="space-y-2.5">
+              {progressEntries.map((entry, idx) => {
+                const cumulative = progressEntries.slice(idx).reduce((s, p) => s + Number(p.amount), 0)
+                return (
+                  <div key={entry.id} className="relative bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm px-4 py-3 flex items-center justify-between hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-slow">
+                    <span className="absolute -left-[14px] top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-xxm-green ring-4 ring-white" aria-hidden />
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
+                        <TrendingUp size={14} className="text-xxm-green" aria-hidden />
+                      </div>
+                      <div>
+                        <p className="stat-number text-sm font-bold text-xxm-green-900">+{formatZAR(entry.amount)}</p>
+                        <p className="text-[11px] text-xxm-gray-400">{formatRelative(entry.recordedAt)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="stat-number text-sm font-bold text-xxm-green-900">
-                        {formatZAR(entry.amount)}
-                      </p>
-                      <p className="text-[11px] text-xxm-gray-400 mt-0.5">
-                        {formatRelative(entry.recordedAt)}
-                      </p>
+                    <div className="text-right">
+                      <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide font-semibold">Running total</p>
+                      <p className="stat-number text-sm font-bold text-xxm-green-700">{formatZAR(cumulative)}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide font-semibold">Cumulative</p>
-                    <p className="stat-number text-sm font-bold text-xxm-green-700">
-                      {formatZAR(runningTotal)}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
           </div>
         )}
-      </section>
       </Reveal>
     </div>
   )
 }
 
-function StatCell({
-  label,
-  value,
-  highlight = false,
-}: {
-  label: string
-  value: string
-  highlight?: boolean
-}) {
+function StatCell({ icon, label, value, highlight = false }: { icon: React.ReactNode; label: string; value: string; highlight?: boolean }) {
   return (
-    <div className="px-5 py-4">
-      <p className="text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest mb-1">{label}</p>
-      <p className={`stat-number text-lg font-extrabold ${highlight ? 'text-red-600' : 'text-xxm-green-900'}`}>
-        {value}
-      </p>
+    <div className="bg-white px-4 py-4">
+      <div className="flex items-center gap-1.5 mb-1">{icon}<p className="text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest">{label}</p></div>
+      <p className={`stat-number text-base font-extrabold ${highlight ? 'text-red-600' : 'text-xxm-green-900'}`}>{value}</p>
     </div>
   )
 }
