@@ -3,7 +3,7 @@ import { getSession } from '@/lib/session'
 import { getRecentContributions } from '@/services/contribution.service'
 import { ContributionStatusBadge } from '@/components/contribution/StatusBadge'
 import { formatZAR } from '@/lib/formatters'
-import { Wallet, ArrowRight, ChevronRight } from 'lucide-react'
+import { Wallet, ArrowRight } from 'lucide-react'
 import type { Contribution } from '@xxm/types'
 
 export async function DashboardRecentContributions() {
@@ -14,16 +14,6 @@ export async function DashboardRecentContributions() {
 
   return (
     <section>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">Recent Contributions</h2>
-        <Link
-          href="/dashboard/contributions"
-          className="inline-flex items-center gap-1 text-xs font-semibold text-xxm-green hover:text-xxm-canopy transition-colors"
-        >
-          View all <ChevronRight size={13} aria-hidden />
-        </Link>
-      </div>
-
       {recentContributions.length === 0 ? (
         <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-10 text-center">
           <div className="w-12 h-12 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-3">
@@ -68,14 +58,6 @@ export async function DashboardRecentContributions() {
               </div>
             </div>
           ))}
-          <div className="px-5 py-3 bg-xxm-gray-50 border-t border-xxm-gray-100">
-            <Link
-              href="/dashboard/contributions"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-xxm-green hover:text-xxm-canopy transition-colors"
-            >
-              View full history <ArrowRight size={12} aria-hidden />
-            </Link>
-          </div>
         </div>
       )}
     </section>
