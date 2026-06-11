@@ -6,18 +6,9 @@ import {
   generateInvite, listInvitations,
 } from '@/services/invite.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { isValidInternalRequest, getInternalAdminUserId } from '@/lib/internal-request'
 
 const SA_PHONE = /^(\+27|0)[6-8][0-9]{8}$/
-const MAX_TS_DRIFT_MS = 5 * 60 * 1000
-
-function isValidInternalRequest(req: NextRequest): boolean {
-  const expected = process.env.ADMIN_API_SECRET
-  if (!expected) return false
-  if (req.headers.get('x-admin-secret') !== expected) return false
-  const ts = req.headers.get('x-admin-timestamp')
-  if (!ts) return false
-  return Math.abs(Date.now() - Number(ts)) <= MAX_TS_DRIFT_MS
-}
 
 export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
@@ -42,7 +33,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
 
   // On the trusted server-to-server path the admin app forwards the acting
   // admin's real user id; it's required because invitedById is a FK to User.
-  const adminId = isTrusted ? (req.headers.get('x-admin-user-id') ?? '') : session!.user.id
+  const adminId = isTrusted ? (getInternalAdminUserId(req) ?? '') : session!.user.id
   if (!adminId) return apiError('SYS_002', 'Missing admin identity', 401)
   const roles   = isTrusted ? ['ADMIN'] : (session!.user.roles as string[] | undefined) ?? []
 
