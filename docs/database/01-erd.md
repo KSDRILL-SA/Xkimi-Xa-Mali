@@ -1,18 +1,14 @@
 # Entity Relationship Diagram
 
-| | |
-|---|---|
-| **Purpose** | Complete visual map of every table, relationship, cardinality, and key constraint in the database |
-| **Schema file** | `packages/database/prisma/schema.prisma` |
-| **Migration** | `packages/database/prisma/migrations/20241201000000_initial_schema` |
-| **Tables** | 18 (including Invitation — M11a) |
-| **Related Docs** | [02-normalization.md](./02-normalization.md) · [03-schema-design.md](./03-schema-design.md) |
+Visual map of the data model. Source of truth: [`packages/database/prisma/schema.prisma`](../../packages/database/prisma/schema.prisma) — **34 models, 17 enums, 16 migrations**. Next: [02-normalization.md](./02-normalization.md) · [03-schema-design.md](./03-schema-design.md).
+
+The diagrams below group the model into four areas. Auth-adapter tables (`Account`, `Session`, `VerificationToken`) and config (`SystemConfig`, `LoginHistory`) are omitted for clarity — see the schema.
 
 ---
 
-## Diagram 1 — Core Domain Relationships
+## Financial core
 
-> Identity, Banking, Contributions, and Transactions — the financial core.
+> Identity → banking → contributions → transactions → **append-only ledger**.
 
 ```mermaid
 erDiagram
@@ -20,51 +16,29 @@ erDiagram
         string id PK
         string email UK
         string phone UK
-        string firstName
-        string lastName
-        string idNumber "AES-256-GCM encrypted"
-        string password "bcrypt cost 12"
+        string idNumber "AES-256-GCM"
+        string password "bcrypt 12"
         enum status "PENDING ACTIVE SUSPENDED"
         datetime popiaConsentAt
-        datetime createdAt
-        datetime updatedAt
     }
-
-    ROLE {
-        string id PK
-        string name UK "ADMIN or MEMBER"
-    }
-
-    USER_ROLE {
-        string userId FK
-        string roleId FK
-    }
-
+    ROLE { string id PK; string name UK "ADMIN MEMBER" }
+    USER_ROLE { string userId FK; string roleId FK }
     BANK_ACCOUNT {
         string id PK
         string userId FK
-        string bankName
-        string accountNumber "AES-256-GCM encrypted"
-        enum accountType "SAVINGS CHEQUE TRANSMISSION"
-        string branchCode
+        string accountNumber "AES-256-GCM"
+        enum accountType
         boolean isPrimary
-        datetime verifiedAt
-        datetime createdAt
-        datetime updatedAt
     }
-
     PAYMENT_MANDATE {
         string id PK
         string userId FK
         string bankAccountId FK
-        int debitDay "1 to 28"
+        int debitDay "1-28"
         decimal amount
         enum status "PENDING ACTIVE SUSPENDED CANCELLED"
         string netcashMandateId
-        datetime createdAt
-        datetime updatedAt
     }
-
     CONTRIBUTION {
         string id PK
         string userId FK
@@ -72,12 +46,8 @@ erDiagram
         int periodYear
         decimal amountDue
         decimal amountPaid
-        date dueDate
         enum status "PENDING PARTIAL PAID OVERDUE WAIVED"
-        datetime createdAt
-        datetime updatedAt
     }
-
     TRANSACTION {
         string id PK
         string contributionId FK
@@ -85,214 +55,128 @@ erDiagram
         decimal amount
         enum type "DEBIT_ORDER MANUAL REVERSAL"
         enum status "PENDING PROCESSING SUCCESS FAILED REVERSED"
-        string gatewayRef
         string idempotencyKey UK
-        datetime processedAt
-        datetime createdAt
     }
+    LEDGER_ENTRY {
+        string id PK
+        enum account "POOL"
+        enum direction "CREDIT DEBIT"
+        decimal amount
+        string refType
+        string refId
+    }
+    PROCESSED_WEBHOOK_EVENT { string id PK; string source; string eventKey }
 
-    USER ||--o{ USER_ROLE : "has role"
-    ROLE ||--o{ USER_ROLE : "assigned to"
-    USER ||--o{ BANK_ACCOUNT : "owns"
-    USER ||--o{ PAYMENT_MANDATE : "holds"
-    BANK_ACCOUNT ||--o{ PAYMENT_MANDATE : "backs"
-    USER ||--o{ CONTRIBUTION : "owes"
-    PAYMENT_MANDATE ||--o{ TRANSACTION : "produces"
+    USER ||--o{ USER_ROLE : has
+    ROLE ||--o{ USER_ROLE : assigned
+    USER ||--o{ BANK_ACCOUNT : owns
+    USER ||--o{ PAYMENT_MANDATE : holds
+    BANK_ACCOUNT ||--o{ PAYMENT_MANDATE : backs
+    USER ||--o{ CONTRIBUTION : owes
+    PAYMENT_MANDATE ||--o{ TRANSACTION : produces
     CONTRIBUTION ||--o{ TRANSACTION : "settled by"
+    TRANSACTION ||--o{ LEDGER_ENTRY : "posts (idempotent)"
 ```
+
+Settlement posts a `LEDGER_ENTRY` keyed `UNIQUE(refType, refId, direction)` (CREDIT on SUCCESS, DEBIT on REVERSED). Webhooks are deduped by `PROCESSED_WEBHOOK_EVENT` `UNIQUE(source, eventKey)`. Pool balance = Σ CREDIT − Σ DEBIT.
 
 ---
 
-## Diagram 2 — Support Domain Relationships
-
-> Goals, Notifications, Audit, Auth tokens, and Invitations.
+## Engagement & goals
 
 ```mermaid
 erDiagram
-    USER {
-        string id PK
-        string email UK
-    }
-
+    USER { string id PK }
     GOAL {
         string id PK
         string createdById FK
         enum type "MONTHLY YEARLY CUSTOM"
-        string title
         decimal targetAmount
         decimal currentAmount
-        date deadline
         enum status "DRAFT ACTIVE ACHIEVED FAILED"
-        datetime createdAt
-        datetime updatedAt
     }
+    GOAL_PROGRESS { string id PK; string goalId FK; decimal amount }
+    GOAL_CHEER { string id PK; string goalId FK; string userId FK }
+    GOAL_COMMENT { string id PK; string goalId FK; string userId FK; string body }
+    GOAL_PLEDGE { string id PK; string goalId FK; string userId FK; decimal amount }
+    BADGE_SCORE { string id PK; string userId FK; enum tier; int score }
+    BADGE_HISTORY { string id PK; string userId FK; enum tier }
+    COMMUNITY_MESSAGE { string id PK; string userId FK; string body }
+    USER_BUDGET { string id PK; string userId FK; enum type; decimal amount }
+    BUDGET_OVERRIDE { string id PK; string userBudgetId FK; decimal amount }
 
-    GOAL_PROGRESS {
-        string id PK
-        string goalId FK
-        decimal amount
-        datetime recordedAt
-    }
-
-    NOTIFICATION_TEMPLATE {
-        string id PK
-        string slug UK
-        enum channel "SMS EMAIL PUSH"
-        string body
-    }
-
-    NOTIFICATION {
-        string id PK
-        string userId FK
-        string templateId FK
-        enum channel "SMS EMAIL PUSH"
-        enum status "QUEUED SENT FAILED"
-        json payload
-        datetime sentAt
-        datetime createdAt
-    }
-
-    NOTIFICATION_PREFERENCE {
-        string id PK
-        string userId FK
-        boolean sms
-        boolean email
-        boolean push
-    }
-
-    AUDIT_LOG {
-        string id PK
-        string userId FK
-        string action
-        string entity
-        string entityId
-        json payload
-        string ipAddress
-        datetime createdAt
-    }
-
-    PASSWORD_RESET_TOKEN {
-        string id PK
-        string userId FK
-        string tokenHash UK
-        datetime expiresAt
-        datetime usedAt
-    }
-
-    EMAIL_VERIFICATION_TOKEN {
-        string id PK
-        string userId FK
-        string tokenHash UK
-        datetime expiresAt
-        datetime usedAt
-    }
-
-    INVITATION {
-        string id PK
-        string invitedById FK
-        string acceptedById FK
-        string codeHash UK
-        string email UK
-        string phone UK
-        decimal minimumAmount
-        enum status "PENDING ACCEPTED REVOKED EXPIRED"
-        datetime expiresAt
-        datetime createdAt
-    }
-
-    USER ||--o{ GOAL : "creates"
+    USER ||--o{ GOAL : creates
     GOAL ||--o{ GOAL_PROGRESS : "tracked by"
-    NOTIFICATION_TEMPLATE ||--o{ NOTIFICATION : "renders"
-    USER ||--o{ NOTIFICATION : "receives"
-    USER ||--o| NOTIFICATION_PREFERENCE : "has"
-    USER ||--o{ AUDIT_LOG : "generates"
-    USER ||--o{ PASSWORD_RESET_TOKEN : "requests"
-    USER ||--o{ EMAIL_VERIFICATION_TOKEN : "verifies via"
-    USER ||--o{ INVITATION : "sends"
-    USER |o--o{ INVITATION : "accepted as"
+    GOAL ||--o{ GOAL_CHEER : cheered
+    GOAL ||--o{ GOAL_COMMENT : discussed
+    GOAL ||--o{ GOAL_PLEDGE : pledged
+    USER ||--o| BADGE_SCORE : earns
+    USER ||--o{ BADGE_HISTORY : "tier history"
+    USER ||--o{ COMMUNITY_MESSAGE : posts
+    USER ||--o| USER_BUDGET : sets
+    USER_BUDGET ||--o{ BUDGET_OVERRIDE : "overridden by"
 ```
 
 ---
 
-## Diagram 3 — Key Constraints and Indexes
+## Notifications, audit, onboarding, signatures
+
+```mermaid
+erDiagram
+    USER { string id PK }
+    NOTIFICATION_TEMPLATE { string id PK; string slug UK; enum channel }
+    NOTIFICATION { string id PK; string userId FK; enum channel; enum status "QUEUED SENT FAILED" }
+    INBOX_MESSAGE { string id PK; string userId FK; enum category; datetime readAt }
+    NOTIFICATION_PREFERENCE { string id PK; string userId FK UK }
+    AUDIT_LOG { string id PK; string userId FK; string action; string entity; string entityId }
+    PASSWORD_RESET_TOKEN { string id PK; string userId FK; string tokenHash UK; datetime usedAt }
+    EMAIL_VERIFICATION_TOKEN { string id PK; string userId FK; string tokenHash UK; datetime usedAt }
+    INVITATION { string id PK; string codeHash UK; string email UK; string phone UK; enum status "PENDING ACCEPTED REVOKED EXPIRED" }
+    ADMIN_SIGNATURE { string id PK; string adminId FK; string blobUrl }
+    ADMIN_SIGNATURE_HISTORY { string id PK; string adminId FK; string blobUrl }
+
+    NOTIFICATION_TEMPLATE ||--o{ NOTIFICATION : renders
+    USER ||--o{ NOTIFICATION : receives
+    USER ||--o{ INBOX_MESSAGE : reads
+    USER ||--o| NOTIFICATION_PREFERENCE : has
+    USER ||--o{ AUDIT_LOG : generates
+    USER ||--o{ PASSWORD_RESET_TOKEN : requests
+    USER ||--o{ EMAIL_VERIFICATION_TOKEN : "verifies via"
+    USER ||--o{ INVITATION : sends
+    USER ||--o| ADMIN_SIGNATURE : signs
+    ADMIN_SIGNATURE ||--o{ ADMIN_SIGNATURE_HISTORY : "versioned by"
+```
+
+---
+
+## Constraints & indexes that matter
 
 ```mermaid
 flowchart TD
-    subgraph DOUBLE_BILLING["Double-Billing Guards"]
-        DB1["CONTRIBUTION\nUNIQUE userId + periodMonth + periodYear\none record per member per month"]
-        DB2["TRANSACTION\nUNIQUE idempotencyKey\nblocks double-charge on retry"]
+    subgraph IDEMPOTENCY["Idempotency / no-double guards"]
+        G1["CONTRIBUTION<br/>UNIQUE(userId, periodMonth, periodYear)<br/>one record per member per month"]
+        G2["TRANSACTION<br/>UNIQUE(idempotencyKey)<br/>no double-charge on retry"]
+        G3["LEDGER_ENTRY<br/>UNIQUE(refType, refId, direction)<br/>idempotent posting"]
+        G4["PROCESSED_WEBHOOK_EVENT<br/>UNIQUE(source, eventKey)<br/>exactly-once webhook"]
+        G5["GOAL_CHEER<br/>UNIQUE(goalId, userId)<br/>race-safe toggle"]
     end
-
-    subgraph IDENTITY_UK["Identity Unique Constraints"]
-        ID1["USER.email — UK"]
-        ID2["USER.phone — UK"]
-        ID3["ROLE.name — UK"]
-        ID4["SESSION.sessionToken — UK"]
-        ID5["PASSWORD_RESET_TOKEN.tokenHash — UK"]
-        ID6["EMAIL_VERIFICATION_TOKEN.tokenHash — UK"]
-        ID7["NOTIFICATION_TEMPLATE.slug — UK"]
-        ID8["NOTIFICATION_PREFERENCE.userId — UK\none preference row per member"]
-    end
-
-    subgraph PERF_IDX["Performance Indexes"]
-        PI1["CONTRIBUTION: status + dueDate\noverdue detection — daily job"]
-        PI2["TRANSACTION: status + createdAt\ndashboard stats query"]
-        PI3["TRANSACTION: gatewayRef\nwebhook deduplication lookup"]
-        PI4["NOTIFICATION: userId + createdAt\nmember inbox pagination"]
-        PI5["NOTIFICATION: status\ndelivery queue flush"]
-        PI6["AUDIT_LOG: entity + entityId\nevent trace by entity"]
-        PI7["AUDIT_LOG: userId + createdAt\nuser activity timeline"]
+    subgraph PERF["Performance indexes"]
+        P1["CONTRIBUTION (status, dueDate) — overdue sweep"]
+        P2["TRANSACTION (status, createdAt) — dashboard"]
+        P3["NOTIFICATION (userId, createdAt) — inbox"]
+        P4["INBOX_MESSAGE (userId, readAt) — unread count"]
+        P5["AUDIT_LOG (entity, entityId) — entity trace"]
     end
 ```
 
----
-
-## Diagram 4 — Encrypted Fields
+## Encryption
 
 ```mermaid
 flowchart LR
-    subgraph ENCRYPTED["AES-256-GCM at Application Layer"]
-        E1["USER.idNumber\nSA ID number — high sensitivity PII"]
-        E2["BANK_ACCOUNT.accountNumber\nSA bank account number — financial PII"]
-    end
-
-    subgraph PLAIN["Stored Plain — Intentional"]
-        P1["USER.email\nindexed for auth lookup"]
-        P2["USER.phone\nindexed for SMS lookup"]
-        P3["BANK_ACCOUNT.bankName / branchCode\nnot sensitive"]
-        P4["CONTRIBUTION / TRANSACTION amounts\nnot PII — required for reporting"]
-    end
-
-    subgraph KEY_MGMT["Key Management"]
-        K1["ENCRYPTION_KEY env var\n64 hex chars — 32 bytes"]
-        K2["lib/encryption.ts\nencrypt and decrypt\nAES-256-GCM with random IV per value"]
-        K3["format: iv:authTag:ciphertext\neach value has unique IV"]
-    end
-
-    K1 --> K2 --> E1 & E2
+    KEY["ENCRYPTION_KEY<br/>64 hex = 32 bytes"] --> ENC["lib/encryption.ts<br/>AES-256-GCM · random IV/value<br/>format iv:authTag:ciphertext"]
+    ENC --> F1["USER.idNumber"]
+    ENC --> F2["BANK_ACCOUNT.accountNumber"]
+    PLAIN["Plain (intentional): email, phone — indexed for lookup;<br/>bank/branch names; all amounts — needed for reporting"]
 ```
 
----
-
-## Table Reference
-
-| Table | Primary Access Pattern | Notes |
-|---|---|---|
-| `users` | By email, by id | Core identity record |
-| `roles` | By name | ADMIN and MEMBER only — 2 rows total |
-| `user_roles` | By userId | Founder has 2 rows (both roles) |
-| `accounts` | By userId | NextAuth OAuth adapter table |
-| `sessions` | By sessionToken | JWT strategy — minimal rows |
-| `password_reset_tokens` | By tokenHash | Cleaned up after use |
-| `email_verification_tokens` | By tokenHash | Cleaned up after use |
-| `bank_accounts` | By userId | 1–3 accounts per member |
-| `payment_mandates` | By userId, by status | One active per member at a time |
-| `contributions` | By userId + period, by status | One per member per month |
-| `transactions` | By contributionId, by idempotencyKey | Multiple per contribution possible |
-| `goals` | By status | Admin creates, members view |
-| `goal_progress` | By goalId | Funding history per goal |
-| `notification_templates` | By slug | Seeded, rarely changes |
-| `notifications` | By userId + createdAt, by status | Inbox + delivery queue |
-| `notification_preferences` | By userId | One per member |
-| `audit_logs` | By entity + entityId | Append-only, never deleted |
-| `invitations` | By codeHash, by email | M11a — invite-only onboarding |
+Encrypting email/phone would make login `O(n)` (every row decrypted to match) — the threat model accepts them as semi-public identifiers. All money columns are `Decimal(10,2)`; `audit_logs` is append-only (no UPDATE/DELETE).
