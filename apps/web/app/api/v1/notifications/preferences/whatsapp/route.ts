@@ -1,25 +1,14 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { withApiHandler } from '@/lib/api-handler'
+import { getWhatsappPreference, setWhatsappPreference } from '@/services/member.service'
 
 export const GET = withApiHandler(async () => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
-  const [user, pref] = await Promise.all([
-    db.user.findUnique({
-      where: { id: session.user.id },
-      select: { phone: true },
-    }),
-    db.notificationPreference.findUnique({
-      where: { userId: session.user.id },
-      select: { whatsapp: true },
-    }),
-  ])
-
-  return apiSuccess({ enabled: pref?.whatsapp ?? true, phone: user?.phone ?? null })
+  return apiSuccess(await getWhatsappPreference(session.user.id))
 })
 
 export const PATCH = withApiHandler(async (req: NextRequest) => {
@@ -38,23 +27,5 @@ export const PATCH = withApiHandler(async (req: NextRequest) => {
   }
 
   const enabled = (body as { enabled: boolean }).enabled
-
-  const pref = await db.notificationPreference.upsert({
-    where: { userId: session.user.id },
-    create: { userId: session.user.id, sms: true, email: true, push: true, whatsapp: enabled },
-    update: { whatsapp: enabled },
-    select: { whatsapp: true },
-  })
-
-  await db.auditLog.create({
-    data: {
-      userId: session.user.id,
-      action: 'WHATSAPP_PREFERENCE_UPDATED',
-      entity: 'NotificationPreference',
-      entityId: session.user.id,
-      payload: { enabled },
-    },
-  })
-
-  return apiSuccess({ enabled: pref.whatsapp })
+  return apiSuccess(await setWhatsappPreference(session.user.id, enabled))
 })

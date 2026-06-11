@@ -4,6 +4,14 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 // Mocks
 // ---------------------------------------------------------------------------
 
+// Replace the validated env so the suite doesn't require real secrets at import.
+vi.mock('@/lib/env', () => ({
+  env: {
+    ENCRYPTION_KEY: '0'.repeat(64),
+    NETCASH_API_URL: 'https://netcash.test',
+  },
+}))
+
 vi.mock('@/lib/cache', () => ({
   cache: {
     get: vi.fn().mockResolvedValue(null),
