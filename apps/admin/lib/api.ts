@@ -40,3 +40,44 @@ export const api = {
   patch:  <T>(path: string, body?: unknown)   => request<T>('PATCH',  path, body),
   delete: <T>(path: string)                   => request<T>('DELETE', path),
 }
+
+export type InternalResult<T> = {
+  ok: boolean
+  status: number
+  data: T | null
+  error?: { code?: string; message?: string }
+}
+
+/**
+ * Server-to-server POST to the web app's trusted admin API. Adds the shared
+ * secret, a request timestamp (required by the web's internal-request check),
+ * and optionally the acting admin's user id. Centralises the wiring so server
+ * actions don't hand-roll fetch + headers.
+ */
+export async function internalAdminPost<T = unknown>(
+  path: string,
+  body: unknown,
+  opts: { adminUserId?: string } = {},
+): Promise<InternalResult<T>> {
+  const base   = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000'
+  const secret = process.env['ADMIN_API_SECRET']
+  if (!secret) return { ok: false, status: 500, data: null, error: { message: 'ADMIN_API_SECRET not configured' } }
+
+  try {
+    const res = await fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':      'application/json',
+        'x-admin-secret':    secret,
+        'x-admin-timestamp': String(Date.now()),
+        ...(opts.adminUserId && { 'x-admin-user-id': opts.adminUserId }),
+      },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json().catch(() => null) as { data?: T; error?: { code?: string; message?: string } } | null
+    if (!res.ok) return { ok: false, status: res.status, data: null, error: json?.error }
+    return { ok: true, status: res.status, data: (json?.data ?? null) as T }
+  } catch {
+    return { ok: false, status: 0, data: null, error: { message: 'Network error' } }
+  }
+}
