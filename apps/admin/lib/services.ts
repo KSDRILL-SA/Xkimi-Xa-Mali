@@ -327,6 +327,51 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+export async function getGoalById(adminRoles: string[], goalId: string) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({
+    where: { id: goalId },
+    include: {
+      progress: {
+        orderBy: { recordedAt: 'desc' },
+        take: 50,
+        select: {
+          id: true, amount: true, note: true, recordedAt: true,
+          recordedBy: { select: { firstName: true, lastName: true } },
+        },
+      },
+      creator: { select: { firstName: true, lastName: true } },
+      locker:  { select: { firstName: true, lastName: true } },
+    },
+  })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  return goal
+}
+
+export async function updateGoal(
+  adminId: string, adminRoles: string[], goalId: string,
+  data: { title?: string; description?: string | null; type?: string; targetAmount?: number; deadline?: string },
+) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'DRAFT') throw new AdminConflictError('Only DRAFT goals can be edited')
+  if (goal.lockedAt) throw new AdminConflictError('Goal is locked and cannot be edited')
+
+  const updated = await db.goal.update({
+    where: { id: goalId },
+    data: {
+      ...(data.title && { title: data.title }),
+      ...(data.description !== undefined && { description: data.description }),
+      ...(data.type && { type: data.type as 'MONTHLY' | 'YEARLY' | 'CUSTOM' }),
+      ...(data.targetAmount !== undefined && { targetAmount: data.targetAmount }),
+      ...(data.deadline && { deadline: new Date(data.deadline) }),
+    },
+  })
+  await writeAuditLog({ userId: adminId, action: 'GOAL_UPDATED', entity: 'Goal', entityId: goalId, payload: data })
+  return updated
+}
+
 export async function createGoal(
   adminId: string, adminRoles: string[],
   data: { title: string; description?: string; type: string; targetAmount: number; deadline: string },
