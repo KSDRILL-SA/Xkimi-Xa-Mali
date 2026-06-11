@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { paymentGateway } from '@/integrations/payment'
 import { processMandateWebhook } from '@/services/mandate.service'
 import { processTransactionWebhook } from '@/services/contribution.service'
+import { claimWebhookEvent, releaseWebhookEvent, webhookEventKey } from '@/services/webhook-dedupe.service'
 import { logger } from '@/lib/logger'
 import { withApiHandler } from '@/lib/api-handler'
 
@@ -61,34 +62,50 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   }
 
   const payload = parsed.data
-  const jobs: Promise<void>[] = []
 
-  if (payload.mandateId) {
-    jobs.push(
-      processMandateWebhook({
-        mandateId: payload.mandateId,
-        status: payload.status as Parameters<typeof processMandateWebhook>[0]['status'],
-        reason: payload.reason,
-        transactionRef: payload.transactionRef,
-        amount: payload.amount,
-        processedAt: payload.processedAt,
-      }),
-    )
+  // Idempotency: claim this exact (signed, validated) event. A redelivery is
+  // acknowledged but never reprocessed — no double-credits.
+  const eventKey = webhookEventKey(rawBody)
+  const isFirstDelivery = await claimWebhookEvent('netcash', eventKey)
+  if (!isFirstDelivery) {
+    logger.info('Duplicate Netcash webhook ignored', { eventKey })
+    return NextResponse.json({ received: true, duplicate: true }, { status: 200 })
   }
 
-  if (payload.transactionRef) {
-    jobs.push(
-      processTransactionWebhook({
-        transactionRef: payload.transactionRef,
-        status: payload.status as Parameters<typeof processTransactionWebhook>[0]['status'],
-        mandateId: payload.mandateId,
-        amount: payload.amount,
-        reason: payload.reason,
-        processedAt: payload.processedAt,
-      }),
-    )
-  }
+  try {
+    const jobs: Promise<void>[] = []
 
-  await Promise.all(jobs)
-  return NextResponse.json({ received: true }, { status: 200 })
+    if (payload.mandateId) {
+      jobs.push(
+        processMandateWebhook({
+          mandateId: payload.mandateId,
+          status: payload.status as Parameters<typeof processMandateWebhook>[0]['status'],
+          reason: payload.reason,
+          transactionRef: payload.transactionRef,
+          amount: payload.amount,
+          processedAt: payload.processedAt,
+        }),
+      )
+    }
+
+    if (payload.transactionRef) {
+      jobs.push(
+        processTransactionWebhook({
+          transactionRef: payload.transactionRef,
+          status: payload.status as Parameters<typeof processTransactionWebhook>[0]['status'],
+          mandateId: payload.mandateId,
+          amount: payload.amount,
+          reason: payload.reason,
+          processedAt: payload.processedAt,
+        }),
+      )
+    }
+
+    await Promise.all(jobs)
+    return NextResponse.json({ received: true }, { status: 200 })
+  } catch (err) {
+    // Processing failed — release the claim so a redelivery can retry it.
+    await releaseWebhookEvent('netcash', eventKey)
+    throw err
+  }
 })
