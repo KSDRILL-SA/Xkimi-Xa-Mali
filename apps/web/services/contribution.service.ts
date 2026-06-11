@@ -11,6 +11,7 @@ import { checkBudget, recordBudgetOverride } from './budget.service'
 import { logger } from '@/lib/logger'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { tallyBy } from '@/lib/aggregate'
+import { postPoolCredit, postPoolDebit } from './ledger.service'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import {
   ContributionNotFoundError,
@@ -433,6 +434,20 @@ export async function processTransactionWebhook(event: TransactionEvent) {
     cache.del(CACHE_KEYS.DASHBOARD_STATS).catch(() => {}),
     invalidateContributionSummaryCache(transaction.contribution.userId).catch(() => {}),
   ])
+
+  // Append to the immutable pool ledger. Idempotent + best-effort: a ledger
+  // hiccup must never affect payment processing, and the reconciler backstops it.
+  if (newStatus === 'SUCCESS') {
+    await postPoolCredit({
+      refType: 'TRANSACTION', refId: transaction.id, amount: Number(transaction.amount),
+      memberId: transaction.contribution.userId, description: 'Contribution received',
+    }).catch((err) => logger.error('Ledger credit post failed', { transactionId: transaction.id, error: err instanceof Error ? err.message : String(err) }))
+  } else if (newStatus === 'REVERSED') {
+    await postPoolDebit({
+      refType: 'TRANSACTION', refId: transaction.id, amount: Number(transaction.amount),
+      memberId: transaction.contribution.userId, description: 'Contribution reversed',
+    }).catch((err) => logger.error('Ledger debit post failed', { transactionId: transaction.id, error: err instanceof Error ? err.message : String(err) }))
+  }
 
   logger.info('Transaction webhook processed', {
     transactionId: transaction.id,
