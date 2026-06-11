@@ -30,7 +30,8 @@ jobs:
       DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
       AUTH_SECRET: test_secret_32_chars_minimum_here_x
       NEXTAUTH_SECRET: test_secret_32_chars_minimum_here
-      ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY_TEST }}
+      # Throwaway CI-only key (32 bytes / 64 hex chars). Not a real secret.
+      ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
       NETCASH_SERVICE_KEY: test
       NETCASH_WEBHOOK_SECRET: test
       NETCASH_API_URL: https://ws.netcash.co.za/NSWSSX/NetcashTest.asmx
