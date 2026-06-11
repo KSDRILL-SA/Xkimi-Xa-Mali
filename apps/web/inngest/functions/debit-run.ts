@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { todaySAST } from '@/lib/date'
 import { redis } from '@/lib/redis'
 import { paymentGateway } from '@/integrations/payment'
+import { debitAmountWithFee } from '@/lib/group-account'
 import { recalculateContributionStatus, invalidateContributionSummaryCache } from '@/services/contribution.service'
 import { checkBudget } from '@/services/budget.service'
 import { queueNotification } from '@/services/notification.service'
@@ -84,7 +85,7 @@ export const debitRun = inngest.createFunction(
       const gatewayRes = await step.run(`submit-debit-${mandate.id}`, () =>
         paymentGateway.submitScheduledDebit({
           mandateId: mandate.netcashMandateId!,
-          amount: Number(mandate.amount),
+          amount: debitAmountWithFee(Number(mandate.amount)),
           reference: `XXM-${parts[0]}-${parts[1]}`,
           idempotencyKey,
         }),

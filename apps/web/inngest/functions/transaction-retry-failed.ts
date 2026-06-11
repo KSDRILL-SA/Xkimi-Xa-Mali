@@ -4,6 +4,7 @@ import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { paymentGateway } from '@/integrations/payment'
+import { debitAmountWithFee } from '@/lib/group-account'
 import { recalculateContributionStatus } from '@/services/contribution.service'
 import { writeAuditLog } from '@/services/audit.service'
 import { queueNotification } from '@/services/notification.service'
@@ -47,7 +48,7 @@ export const transactionRetryFailed = inngest.createFunction(
         try {
           const gatewayRes = await submitFn({
             mandateId: tx.mandate.netcashMandateId!,
-            amount: Number(tx.amount),
+            amount: debitAmountWithFee(Number(tx.amount)),
             reference: `XXM-RETRY-${tx.id.slice(-8)}`,
             idempotencyKey: `retry:${tx.idempotencyKey}:${tx.retryCount + 1}`,
           })

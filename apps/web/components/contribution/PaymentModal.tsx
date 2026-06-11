@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/Label'
 import { Alert } from '@/components/ui/Alert'
 import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
 import { api, ApiClientError } from '@/lib/api'
+import { NETCASH_FEE_BUFFER, debitAmountWithFee } from '@/lib/group-account'
 import { BudgetGuardModal, type BudgetGuardDetails } from './BudgetGuardModal'
 import { GroupCollectionAccount } from './GroupCollectionAccount'
 
@@ -218,8 +219,28 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
               </p>
             </div>
 
+            {NETCASH_FEE_BUFFER > 0 && (
+              <div className="rounded-xl border border-gray-100 bg-gray-50/70 px-4 py-3 space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Contribution</span>
+                  <span className="font-semibold text-xxm-green-900">{formatZAR(watchedAmount || 0)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Netcash processing fee</span>
+                  <span className="font-semibold text-amber-700">+{formatZAR(NETCASH_FEE_BUFFER)}</span>
+                </div>
+                <div className="flex justify-between text-sm pt-1.5 border-t border-gray-200">
+                  <span className="font-semibold text-xxm-green-900">Total debited</span>
+                  <span className="font-bold text-xxm-green-900">{formatZAR(debitAmountWithFee(watchedAmount || 0))}</span>
+                </div>
+                <p className="text-[10px] text-gray-400 pt-0.5">
+                  The fee covers Netcash&rsquo;s per-debit charge so the group receives your full contribution.
+                </p>
+              </div>
+            )}
+
             <Button type="submit" className="w-full" size="lg" loading={isSubmitting}>
-              Pay {formatZAR(watchedAmount || 0)} now
+              Pay {formatZAR(debitAmountWithFee(watchedAmount || 0))} now
             </Button>
           </form>
         </div>

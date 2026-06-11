@@ -20,6 +20,7 @@ import {
 } from '@/lib/errors'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
+import { debitAmountWithFee } from '@/lib/group-account'
 import type { ManualContributionInput, GenerateContributionsInput } from '@/lib/validation/contribution'
 
 const MAX_OPTIMISTIC_RETRIES = 3
@@ -254,9 +255,11 @@ export async function submitManualPayment(
 
   const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${randomUUID()}`
 
+  // Debit the contribution PLUS the Netcash fee buffer so the group nets the
+  // full contribution; the transaction/contribution stay at data.amount.
   const gatewayRes = await paymentGateway.submitOnceOffDebit({
     mandateId: mandate.netcashMandateId,
-    amount: data.amount,
+    amount: debitAmountWithFee(data.amount),
     reference: `XXM-${data.periodYear}-${String(data.periodMonth).padStart(2, '0')}`,
     idempotencyKey,
   })
