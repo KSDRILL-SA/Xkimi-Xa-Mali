@@ -90,7 +90,7 @@ export default async function NotificationsPage({
         <form action={broadcast} className="space-y-6">
 
           {/* ── Message ──────────────────────────────────────── */}
-          <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+          <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-3">
             <div className="flex items-center gap-2 mb-1">
               <MessageSquare size={16} className="text-xxm-gray-500" aria-hidden />
               <label htmlFor="bc-message" className="text-sm font-bold text-xxm-green-900">
@@ -111,7 +111,7 @@ export default async function NotificationsPage({
           </Reveal>
 
           {/* ── Channel ──────────────────────────────────────── */}
-          <Reveal variant="up" delay={200} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+          <Reveal variant="up" delay={200} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-3">
             <p className="text-sm font-bold text-xxm-green-900 mb-3">Delivery Channel</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {channels.map(({ value, label, icon: Icon, description }) => (
@@ -126,7 +126,7 @@ export default async function NotificationsPage({
           </Reveal>
 
           {/* ── Audience filter ───────────────────────────────── */}
-          <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+          <Reveal variant="up" delay={300} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-3">
             <p className="text-sm font-bold text-xxm-green-900 mb-3">Send To</p>
             <div className="grid grid-cols-2 gap-2">
               {filters.map(({ value, label, icon: Icon, description }) => (

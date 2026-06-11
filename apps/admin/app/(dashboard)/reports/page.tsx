@@ -81,7 +81,7 @@ export default async function ReportsPage({
       </Reveal>
 
       {/* ── Period selector ──────────────────────────────────────── */}
-      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4">
+      <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-4">
         <form method="GET" action="/reports" className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold text-xxm-gray-600 mr-1">Viewing period:</p>
           <div className="relative">
@@ -139,7 +139,7 @@ export default async function ReportsPage({
       </Reveal>
 
       {/* ── Collection progress ──────────────────────────────────── */}
-      <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
+      <Reveal variant="up" delay={300} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h3 className="font-display text-base font-bold text-xxm-green-900">Collection Progress</h3>
@@ -164,7 +164,7 @@ export default async function ReportsPage({
 
       {/* ── Status breakdown ─────────────────────────────────────── */}
       {Object.keys(statusGroups).length > 0 && (
-        <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6">
+        <Reveal variant="up" delay={300} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6">
           <h3 className="font-display text-base font-bold text-xxm-green-900 mb-5">Contribution Status Breakdown</h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {Object.entries(statusGroups).sort(([a], [b]) => a.localeCompare(b)).map(([status, count]) => {

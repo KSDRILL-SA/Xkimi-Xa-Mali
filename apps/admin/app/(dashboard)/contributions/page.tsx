@@ -98,7 +98,7 @@ export default async function ContributionsPage({
       )}
 
       {/* ── Filters ─────────────────────────────────────────── */}
-      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4">
+      <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-4">
         <form method="GET" action="/contributions" className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <select
@@ -145,7 +145,7 @@ export default async function ContributionsPage({
       {/* ── Contributions list ──────────────────────────────── */}
       <Reveal variant="up" delay={200}>
       {contributions.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-12 text-center">
           <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
             <Wallet size={24} className="text-xxm-green-300" aria-hidden />
           </div>
@@ -155,7 +155,7 @@ export default async function ContributionsPage({
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
           <div className="grid grid-cols-[2fr_1fr_1fr_1fr_90px] gap-3 px-4 py-3 bg-xxm-gray-50 border-b border-xxm-gray-100">
             <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest">Member</span>
             <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest hidden sm:block">Period</span>
