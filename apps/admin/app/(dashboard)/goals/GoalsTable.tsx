@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+import type { Route } from 'next'
 import { DataTable, type Column, ProgressBar } from '@xxm/ui'
 
 export type GoalRow = {
@@ -19,7 +21,14 @@ export function GoalsTable({
   progressAction: GoalAction
 }) {
   const columns: Column<GoalRow>[] = [
-    { key: 'title', header: 'Goal', sortable: true },
+    {
+      key: 'title', header: 'Goal', sortable: true,
+      render: (r) => (
+        <Link href={`/goals/${r.id}` as Route} className="font-semibold text-xxm-green-900 hover:text-xxm-green hover:underline">
+          {r.title}
+        </Link>
+      ),
+    },
     { key: 'type',  header: 'Type' },
     { key: 'status', header: 'Status', align: 'center', render: (r) => <span className={r.statusClass}>{r.status}</span> },
     { key: 'target',  header: 'Target',  align: 'right' },
@@ -38,6 +47,7 @@ export function GoalsTable({
       key: 'id', header: 'Actions', align: 'center',
       render: (r) => (
         <div className="flex items-center gap-2 justify-center flex-wrap">
+          <Link href={`/goals/${r.id}` as Route} className="text-xs text-xxm-green hover:underline font-semibold">View</Link>
           {r.status === 'Draft' && (
             <>
               <form action={activateAction}>
