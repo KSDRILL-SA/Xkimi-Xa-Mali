@@ -124,11 +124,11 @@ export default async function ContributionsPage({
 
       {/* Contribution list */}
       {contributions.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
-            <Wallet size={24} className="text-xxm-green-300" aria-hidden />
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
+          <div className="w-16 h-16 rounded-3xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
+            <Wallet size={26} className="text-xxm-green/40" aria-hidden />
           </div>
-          <p className="text-xxm-gray-600 font-semibold">No contribution records yet</p>
+          <p className="text-xxm-green-900 font-bold">No contribution records yet</p>
           <p className="text-xxm-gray-400 text-xs mt-1.5 max-w-xs mx-auto">
             Records are generated automatically each month once your mandate is active.
           </p>

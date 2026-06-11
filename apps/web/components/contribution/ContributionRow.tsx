@@ -59,7 +59,7 @@ export function ContributionRow({ contribution, mandate }: Props) {
 
   return (
     <>
-      <div className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden hover:shadow-xxm transition-all duration-fast ease-smooth">
+      <div className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden hover:shadow-xxm hover:border-xxm-green/15 hover:-translate-y-0.5 transition-all duration-slow ease-smooth">
 
         {/* ── Main row ────────────────────────────────────── */}
         <div
