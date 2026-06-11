@@ -97,51 +97,55 @@ export default async function BadgesPage() {
         </div>
       </Reveal>
 
-      {/* ── Tier card ─────────────────────────────────────── */}
-      <Reveal variant="up" delay={100} className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-5">
-        <div className="flex items-center gap-4">
-          <div className={`w-16 h-16 rounded-2xl ${cfg.iconBg} flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110`}>
-            <Icon size={30} className={cfg.iconColor} aria-hidden />
+      {/* ── Tier card — premium achievement showcase ──────── */}
+      <Reveal variant="up" delay={100} className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-xxm-green via-xxm-canopy to-xxm-green-900 p-6 md:p-7 text-white shadow-xxm-lg space-y-5">
+        <div className="noise-overlay" aria-hidden />
+        <div className="absolute top-0 right-0 w-52 h-52 bg-xxm-gold/10 rounded-full -translate-y-1/3 translate-x-1/4 pointer-events-none animate-orb-drift-1" aria-hidden />
+        <div className="absolute bottom-0 left-1/4 w-32 h-32 bg-white/5 rounded-full translate-y-1/2 pointer-events-none animate-orb-drift-2" aria-hidden />
+
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-white/12 ring-1 ring-xxm-gold/30 flex items-center justify-center shrink-0 transition-transform duration-slow ease-bounce group-hover:scale-110">
+            <Icon size={30} className="text-xxm-gold" aria-hidden />
           </div>
           <div className="flex-1 min-w-0">
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.badgeClass}`}>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/15 text-xxm-gold uppercase tracking-wide">
               {cfg.label}
             </span>
-            <p className="stat-number text-2xl font-extrabold text-xxm-green-900 mt-1">
-              {badge.overallScore.toFixed(1)} <span className="text-sm font-medium text-xxm-gray-400">/ 100</span>
+            <p className="stat-number text-3xl font-black mt-1.5">
+              {badge.overallScore.toFixed(1)} <span className="text-sm font-medium text-green-100/60">/ 100</span>
             </p>
           </div>
           {badge.graceUntil && (
             <div className="text-right shrink-0">
-              <p className="text-[11px] font-bold text-amber-600 uppercase tracking-widest">Grace period</p>
-              <p className="text-xs text-xxm-gray-500 mt-0.5">until {formatDate(badge.graceUntil)}</p>
+              <p className="text-[11px] font-bold text-xxm-gold uppercase tracking-widest">Grace period</p>
+              <p className="text-xs text-green-100/70 mt-0.5">until {formatDate(badge.graceUntil)}</p>
             </div>
           )}
         </div>
 
         {!isMaxTier && next && (
-          <div>
+          <div className="relative z-10">
             <div className="flex items-center justify-between mb-1.5">
-              <p className="text-xs font-semibold text-xxm-gray-600 flex items-center gap-1.5">
-                <ArrowUpRight size={13} className="text-xxm-gold-dark" aria-hidden />
+              <p className="text-xs font-semibold text-green-100/80 flex items-center gap-1.5">
+                <ArrowUpRight size={13} className="text-xxm-gold" aria-hidden />
                 Progress to {BADGE_TIER_CONFIG[next.tier].label}
               </p>
-              <span className="stat-number text-xs font-bold text-xxm-gold-dark">{badge.progressToNext.toFixed(0)}%</span>
+              <span className="stat-number text-xs font-bold text-xxm-gold">{badge.progressToNext.toFixed(0)}%</span>
             </div>
             <ProgressBar value={badge.progressToNext} size="lg" variant="gold" animated />
           </div>
         )}
 
         {isMaxTier && (
-          <div className="flex items-center gap-2 bg-xxm-green-50 border border-xxm-green/15 rounded-xl px-4 py-2.5">
-            <Crown size={15} className="text-xxm-green" aria-hidden />
-            <p className="text-sm font-semibold text-xxm-green-900">You&apos;ve reached the highest tier — World Class!</p>
+          <div className="relative z-10 flex items-center gap-2 bg-white/12 ring-1 ring-xxm-gold/30 rounded-2xl px-4 py-2.5">
+            <Crown size={15} className="text-xxm-gold" aria-hidden />
+            <p className="text-sm font-bold text-white">You&apos;ve reached the highest tier — World Class!</p>
           </div>
         )}
       </Reveal>
 
       {/* ── Dimension breakdown ─────────────────────────────── */}
-      <Reveal variant="up" delay={200} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
+      <Reveal variant="up" delay={200} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-4">
         <h2 className="font-display text-base font-bold text-xxm-green-900">Score breakdown</h2>
         <div className="space-y-4">
           {dimensions.map((d) => (
@@ -166,7 +170,7 @@ export default async function BadgesPage() {
 
       {/* ── Next tier requirements ──────────────────────────── */}
       {next && (
-        <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+        <Reveal variant="up" delay={300} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-3">
           <h2 className="font-display text-base font-bold text-xxm-green-900">
             Requirements for {BADGE_TIER_CONFIG[next.tier].label}
           </h2>
@@ -190,7 +194,7 @@ export default async function BadgesPage() {
       )}
 
       {/* ── History ──────────────────────────────────────────── */}
-      <Reveal variant="up" delay={300} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-3">
+      <Reveal variant="up" delay={300} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-3">
         <h2 className="font-display text-base font-bold text-xxm-green-900 flex items-center gap-2">
           <History size={16} className="text-xxm-gray-400" aria-hidden />
           Tier history
