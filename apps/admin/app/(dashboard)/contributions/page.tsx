@@ -34,7 +34,7 @@ type RawItem = {
 export default async function ContributionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string }>
+  searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string; created?: string; skipped?: string; total?: string }>
 }) {
   const session = await auth()
   const roles   = (session?.user?.roles as string[] | undefined) ?? []
@@ -47,7 +47,10 @@ export default async function ContributionsPage({
   const year      = Math.max(2024, parseInt(params.year ?? String(now.getFullYear()), 10))
   const status    = params.status ?? undefined
   const page      = Math.max(1, parseInt(params.page ?? '1', 10))
-  const generated = params.generated === '1'
+  const generated  = params.generated === '1'
+  const genCreated = parseInt(params.created ?? '0', 10) || 0
+  const genSkipped = parseInt(params.skipped ?? '0', 10) || 0
+  const genTotal   = parseInt(params.total   ?? '0', 10) || 0
 
   const { items, total } = await listAllContributions(roles, { month, year, status, page, limit: 25 })
   const contributions = items as unknown as RawItem[]
@@ -61,8 +64,8 @@ export default async function ContributionsPage({
     const m = parseInt(fd.get('month') as string, 10)
     const y = parseInt(fd.get('year')  as string, 10)
 
-    await generateContributions(s.user.id, r, m, y)
-    redirect(`/contributions?month=${m}&year=${y}&generated=1`)
+    const result = await generateContributions(s.user.id, r, m, y)
+    redirect(`/contributions?month=${m}&year=${y}&generated=1&created=${result.created}&skipped=${result.skipped}&total=${result.total}`)
   }
 
   const yearOpts = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
@@ -92,8 +95,14 @@ export default async function ContributionsPage({
       </Reveal>
 
       {generated && (
-        <Alert variant="success" title="Generated">
-          Contributions created for {MONTHS[month - 1]} {year}.
+        <Alert variant="success" title="Contributions generated">
+          {genCreated > 0 ? (
+            <>Created <strong>{genCreated}</strong> new contribution{genCreated === 1 ? '' : 's'} for {MONTHS[month - 1]} {year}.</>
+          ) : (
+            <>No new contributions needed for {MONTHS[month - 1]} {year} — every active mandate was already billed.</>
+          )}
+          {genSkipped > 0 && <> {genSkipped} already existed and {genSkipped === 1 ? 'was' : 'were'} skipped.</>}
+          {genTotal > 0 && <> <span className="text-xxm-gray-500">({genTotal} active mandate{genTotal === 1 ? '' : 's'} in total.)</span></>}
         </Alert>
       )}
 
