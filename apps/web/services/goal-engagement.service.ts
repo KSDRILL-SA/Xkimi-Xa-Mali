@@ -128,19 +128,33 @@ export async function cancelGoalPledge(goalId: string, userId: string): Promise<
   return getGoalPledgeSummary(goalId, userId)
 }
 
-/** Toggle the viewer's cheer on a goal. Returns the new state + total. */
+function isUniqueViolation(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'P2002'
+}
+
+/**
+ * Toggle the viewer's cheer on a goal. Atomic and race-safe: we try to remove an
+ * existing cheer and only add one if nothing was removed, so rapid double-clicks
+ * (and concurrent requests) can't trip the unique constraint into a 500.
+ */
 export async function toggleGoalCheer(goalId: string, userId: string, roles: string[]): Promise<{ cheered: boolean; cheerCount: number }> {
   await assertGoalVisible(goalId, roles)
 
-  const existing = await db.goalCheer.findUnique({ where: { goalId_userId: { goalId, userId } } })
-  if (existing) {
-    await db.goalCheer.delete({ where: { id: existing.id } })
-  } else {
-    await db.goalCheer.create({ data: { goalId, userId } })
+  const removed = await db.goalCheer.deleteMany({ where: { goalId, userId } })
+  let cheered = false
+  if (removed.count === 0) {
+    try {
+      await db.goalCheer.create({ data: { goalId, userId } })
+      cheered = true
+    } catch (e) {
+      // A concurrent request already created the cheer — treat as cheering.
+      if (!isUniqueViolation(e)) throw e
+      cheered = true
+    }
   }
 
   const cheerCount = await db.goalCheer.count({ where: { goalId } })
-  return { cheered: existing === null, cheerCount }
+  return { cheered, cheerCount }
 }
 
 /** Post a comment on a goal. */
