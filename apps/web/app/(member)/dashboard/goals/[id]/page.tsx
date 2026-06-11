@@ -6,9 +6,11 @@ import { formatZAR, formatDate } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
 import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2 } from 'lucide-react'
 import { getGoal } from '@/services/goal.service'
+import { getGoalEngagement } from '@/services/goal-engagement.service'
 import { GoalNotFoundError } from '@/lib/errors'
 import { ProgressRing } from '@/components/goal/ProgressRing'
 import { MilestoneBar } from '@/components/goal/MilestoneBar'
+import { GoalEngagement } from '@/components/goal/GoalEngagement'
 import { statusTheme, typeTheme, goalIcon } from '@/components/goal/goal-theme'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
@@ -42,6 +44,8 @@ export default async function GoalDetailPage({
     if (err instanceof GoalNotFoundError) notFound()
     throw err
   }
+
+  const engagement = await getGoalEngagement(id, session!.user.id, roles)
 
   const st = statusTheme(goal.status)
   const tt = typeTheme(goal.type)
@@ -164,6 +168,11 @@ export default async function GoalDetailPage({
           <p className="text-sm font-medium text-red-700">This goal wasn&apos;t reached by the deadline.</p>
         </Reveal>
       )}
+
+      {/* ── Engagement: cheer, contribute, discuss ────────────── */}
+      <Reveal variant="up" delay={175}>
+        <GoalEngagement goalId={id} initial={engagement} contributable={goal.status === 'ACTIVE'} />
+      </Reveal>
 
       {/* ── Progress history ──────────────────────────────────── */}
       <Reveal variant="up" delay={200}>
