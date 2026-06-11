@@ -3,7 +3,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
+import { getMemberNotifications } from '@/services/notification.service'
 import { Reveal } from '@xxm/ui'
 import { MessageSquare, Mail, Bell, type LucideIcon } from 'lucide-react'
 
@@ -80,32 +80,12 @@ export default async function NotificationsPage({
   const channelWhere = channelFilter && validChannels.includes(channelFilter) ? channelFilter : undefined
   const statusWhere = statusFilter && validStatuses.includes(statusFilter) ? statusFilter : undefined
 
-  const [notifications, total, failedCount] = await Promise.all([
-    db.notification.findMany({
-      where: {
-        userId,
-        ...(channelWhere && { channel: channelWhere }),
-        ...(statusWhere && { status: statusWhere }),
-      },
-      take: PAGE_SIZE + 1,
-      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        channel: true,
-        status: true,
-        sentAt: true,
-        createdAt: true,
-        template: { select: { slug: true } },
-      },
-    }),
-    db.notification.count({ where: { userId } }),
-    db.notification.count({ where: { userId, status: 'FAILED' } }),
-  ])
-
-  const hasNextPage = notifications.length > PAGE_SIZE
-  const items = hasNextPage ? notifications.slice(0, PAGE_SIZE) : notifications
-  const nextCursor = hasNextPage ? items[items.length - 1]?.id : null
+  const { items, total, failedCount, nextCursor } = await getMemberNotifications(userId, {
+    channel: channelWhere,
+    status: statusWhere,
+    cursor,
+    limit: PAGE_SIZE,
+  })
 
   const buildUrl = (overrides: Record<string, string | undefined>) => {
     const p = new URLSearchParams()
