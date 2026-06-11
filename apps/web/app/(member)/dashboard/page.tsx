@@ -5,6 +5,7 @@ import { getSession } from '@/lib/session'
 import { SkeletonCard, SkeletonRow } from '@/components/ui/Skeleton'
 import { Reveal } from '@xxm/ui'
 import { DashboardStats } from './_sections/DashboardStats'
+import { DashboardBadge } from './_sections/DashboardBadge'
 import { DashboardRecentContributions } from './_sections/DashboardRecentContributions'
 import { DashboardActiveGoals } from './_sections/DashboardActiveGoals'
 import {
@@ -159,6 +160,13 @@ export default async function DashboardPage() {
             <DashboardStats />
           </Suspense>
         </section>
+      </Reveal>
+
+      {/* ── Reputation badge — clickable into the badge section ── */}
+      <Reveal variant="up" delay={120}>
+        <Suspense fallback={<SkeletonCard />}>
+          <DashboardBadge />
+        </Suspense>
       </Reveal>
 
       {/* ── Recent contributions ── */}
