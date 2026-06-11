@@ -128,7 +128,7 @@ export default async function NotificationsPage({
       {/* ── Header ─────────────────────────────────── */}
       <Reveal variant="up" className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-100 to-sky-50 flex items-center justify-center shrink-0 ring-1 ring-sky-200/60">
             <Bell size={22} className="text-sky-600" aria-hidden />
           </div>
           <div>
@@ -178,17 +178,17 @@ export default async function NotificationsPage({
       {/* ── List ───────────────────────────────────── */}
       <Reveal variant="up" delay={200}>
       {items.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
-            <Bell size={24} className="text-sky-300" aria-hidden />
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
+          <div className="w-16 h-16 rounded-3xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
+            <Bell size={26} className="text-sky-300" aria-hidden />
           </div>
-          <p className="text-xxm-gray-600 font-semibold">No notifications yet</p>
+          <p className="text-xxm-green-900 font-bold">No notifications yet</p>
           <p className="text-xxm-gray-400 text-xs mt-1.5 max-w-xs mx-auto">
             Delivery confirmations, payment alerts, and reminders will appear here.
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden divide-y divide-xxm-gray-50">
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden divide-y divide-xxm-gray-50">
           {(items as NotificationItem[]).map((n) => {
             const cfg = STATUS_CONFIG[n.status as NotifStatus] ?? STATUS_CONFIG.QUEUED
             const date = n.sentAt ?? n.createdAt

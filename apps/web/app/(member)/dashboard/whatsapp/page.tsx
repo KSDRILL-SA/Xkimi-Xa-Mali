@@ -45,7 +45,7 @@ export default async function WhatsAppPage({
 
       {/* ── Header ─────────────────────────────────── */}
       <Reveal variant="up" className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-100 to-emerald-50 flex items-center justify-center shrink-0 ring-1 ring-emerald-200/60">
           <MessageCircle size={22} className="text-emerald-600" aria-hidden />
         </div>
         <div>
@@ -65,7 +65,7 @@ export default async function WhatsAppPage({
       )}
 
       {/* ── Status card ────────────────────────────── */}
-      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+      <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
 
         {/* Linked number row */}
         <div className="group flex items-center justify-between px-5 py-4 border-b border-xxm-gray-50 hover:bg-xxm-green-50/20 transition-colors">
