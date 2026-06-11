@@ -16,6 +16,7 @@ import {
   badgeRecalculation,
   badgeGraceCheck,
   financialAnomalyWatch,
+  monthlyStatementNotice,
 } from '@/inngest'
 
 export const { GET, POST, PUT } = serve({
@@ -36,5 +37,6 @@ export const { GET, POST, PUT } = serve({
     badgeRecalculation,
     badgeGraceCheck,
     financialAnomalyWatch,
+    monthlyStatementNotice,
   ],
 })
