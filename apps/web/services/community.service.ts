@@ -159,7 +159,6 @@ export async function editMessage(
   userId: string,
   messageId: string,
   content: string,
-  roles: string[],
 ) {
   const trimmed = content.trim()
   if (trimmed.length === 0 || trimmed.length > MAX_CONTENT_LENGTH) {

@@ -15,7 +15,7 @@ export const PATCH = withApiHandler<{ id: string }>(async (req: NextRequest, { p
   const content = (body as { content?: unknown }).content
   if (typeof content !== 'string') return apiError('VAL_002', '"content" is required', 400)
 
-  const updated = await editMessage(session.user.id, id, content, session.user.roles ?? [])
+  const updated = await editMessage(session.user.id, id, content)
   return apiSuccess(updated)
 })
 
