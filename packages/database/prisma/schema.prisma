@@ -82,6 +82,13 @@ enum NotifStatus {
   FAILED
 }
 
+enum InboxCategory {
+  BROADCAST
+  SYSTEM
+  PAYMENT
+  GOAL
+}
+
 enum InvitationStatus {
   PENDING
   ACCEPTED
@@ -150,6 +157,8 @@ model User {
   goalCheers             GoalCheer[]             @relation("GoalCheerUser")
   goalComments           GoalComment[]           @relation("GoalCommentAuthor")
   deletedGoalComments    GoalComment[]           @relation("GoalCommentDeleter")
+  inboxMessages          InboxMessage[]          @relation("InboxRecipient")
+  sentInboxMessages      InboxMessage[]          @relation("InboxSender")
   budgets                UserBudget[]
   budgetOverrides        BudgetOverride[]
   signature              AdminSignature?
@@ -490,6 +499,26 @@ model Notification {
   @@index([status, createdAt])
   @@index([externalRef])
   @@map("notifications")
+}
+
+/// Member-facing in-app messages (admin broadcasts and key system events).
+/// Distinct from Notification, which is an SMS/email delivery log.
+model InboxMessage {
+  id          String        @id @default(cuid())
+  userId      String
+  title       String
+  body        String        @db.Text
+  category    InboxCategory @default(BROADCAST)
+  readAt      DateTime?
+  createdById String?
+  createdAt   DateTime      @default(now())
+
+  user      User  @relation("InboxRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("InboxSender", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("inbox_messages")
 }
 
 model NotificationPreference {

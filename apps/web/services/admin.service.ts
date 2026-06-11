@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client'
 import { writeAuditLog } from './audit.service'
 import { queueNotification } from './notification.service'
+import { createInboxMessages } from './inbox.service'
 import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { assertAdmin, assertNotSelf } from '@/lib/authorization'
 import { smsProvider } from '@/integrations/sms'
@@ -49,7 +50,7 @@ export type ListAuditParams = {
   limit?: number
 }
 
-export type BroadcastChannel = 'SMS' | 'EMAIL' | 'BOTH'
+export type BroadcastChannel = 'SMS' | 'EMAIL' | 'BOTH' | 'IN_APP'
 export type BroadcastFilter = 'ALL' | 'ACTIVE' | 'PENDING' | 'SUSPENDED'
 
 type DashboardStats = {
@@ -407,16 +408,27 @@ export async function broadcastNotification(
   const emailSent = results.reduce((n, r) => n + r.email, 0)
   const failed    = results.filter((r) => r.failed).length
 
+  // In-app: a free, instant message that lands in each member's inbox.
+  let inAppSent = 0
+  if (channel === 'IN_APP') {
+    inAppSent = await createInboxMessages(members.map((m) => m.id), {
+      title: 'Message from Xkimm Xa Mali',
+      body: message,
+      category: 'BROADCAST',
+      createdById: adminId,
+    })
+  }
+
   await writeAuditLog({
     userId: adminId,
     action: 'ADMIN_BROADCAST_SENT',
     entity: 'Notification',
     entityId: adminId,
-    payload: { channel, filter, total: members.length, smsSent, emailSent, failed },
+    payload: { channel, filter, total: members.length, smsSent, emailSent, inAppSent, failed },
     ipAddress: ip,
   })
 
-  return { total: members.length, smsSent, emailSent, failed }
+  return { total: members.length, smsSent, emailSent, inAppSent, failed }
 }
 
 // ─── Audit log ────────────────────────────────────────────────────────────────
