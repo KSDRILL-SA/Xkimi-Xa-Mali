@@ -7,6 +7,7 @@ import {
   BankAccountConflictError,
 } from '@/lib/errors'
 import { assertCanAccess } from '@/lib/authorization'
+import { tallyBy } from '@/lib/aggregate'
 import type {
   UpdateProfileInput,
   CreateBankAccountInput,
@@ -143,15 +144,7 @@ export async function getMemberSummary(
     mandateRepo.findActiveByUser(targetUserId, { id: true, amount: true, debitDay: true }),
   ])
 
-  const statusMap = Object.fromEntries(
-    statusCounts.map((r) => {
-      const count =
-        typeof r._count === 'object' && r._count !== null && 'status' in r._count
-          ? Number((r._count as { status: number }).status)
-          : 0
-      return [r.status, count]
-    }),
-  )
+  const statusMap = tallyBy(statusCounts, (r) => r.status, 'status')
 
   return {
     totalContributed: Number(allTimeTotals._sum?.amountPaid ?? 0),
