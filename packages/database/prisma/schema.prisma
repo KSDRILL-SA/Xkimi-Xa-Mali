@@ -381,6 +381,19 @@ model Transaction {
   @@map("transactions")
 }
 
+/// Idempotency guard for inbound webhooks (e.g. Netcash). A redelivered event
+/// with the same (source, eventKey) is acknowledged but never reprocessed.
+model ProcessedWebhookEvent {
+  id        String   @id @default(cuid())
+  source    String
+  eventKey  String
+  createdAt DateTime @default(now())
+
+  @@unique([source, eventKey])
+  @@index([createdAt])
+  @@map("processed_webhook_events")
+}
+
 // ─── Goals ────────────────────────────────────────────────────────────────────
 
 model Goal {
