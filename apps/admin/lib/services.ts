@@ -449,7 +449,33 @@ export async function recordGoalProgress(
     return record
   })
   await writeAuditLog({ userId: adminId, action: 'GOAL_PROGRESS_RECORDED', entity: 'Goal', entityId: goalId, payload: { amount, newTotal, note } })
-  return { id: progress.id, amount: Number(progress.amount), newTotal, achieved: newTotal >= Number(goal.targetAmount) }
+
+  const achieved = newTotal >= Number(goal.targetAmount)
+
+  // Intelligent system behaviour: when a goal is reached, the engine proactively
+  // celebrates it in every active member's inbox. Best-effort — a failure here
+  // must never undo the recorded progress.
+  if (achieved) {
+    try {
+      const members = await db.user.findMany({ where: { status: UserStatus.ACTIVE }, select: { id: true } })
+      if (members.length > 0) {
+        const target = `R ${Number(goal.targetAmount).toLocaleString('en-ZA')}`
+        await db.inboxMessage.createMany({
+          data: members.map((m) => ({
+            userId: m.id,
+            title: `Goal achieved: ${goal.title} 🎉`,
+            body: `The brotherhood reached its "${goal.title}" target of ${target}. Well done — every contribution counted.`,
+            category: 'GOAL',
+            createdById: adminId,
+          })),
+        })
+      }
+    } catch (err) {
+      console.error('Goal-achieved inbox fan-out failed', err)
+    }
+  }
+
+  return { id: progress.id, amount: Number(progress.amount), newTotal, achieved }
 }
 
 // ─── Audit ────────────────────────────────────────────────────────────────────
