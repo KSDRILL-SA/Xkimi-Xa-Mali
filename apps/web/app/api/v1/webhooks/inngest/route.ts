@@ -15,6 +15,7 @@ import {
   inviteExpiry,
   badgeRecalculation,
   badgeGraceCheck,
+  financialAnomalyWatch,
 } from '@/inngest'
 
 export const { GET, POST, PUT } = serve({
@@ -34,5 +35,6 @@ export const { GET, POST, PUT } = serve({
     inviteExpiry,
     badgeRecalculation,
     badgeGraceCheck,
+    financialAnomalyWatch,
   ],
 })
