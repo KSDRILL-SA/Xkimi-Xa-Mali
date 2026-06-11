@@ -61,9 +61,7 @@ export default async function ReportsPage({
         </div>
         <div className="flex items-center gap-2.5">
           <a
-            href={`/api/v1/admin/reports/pdf?month=${month}&year=${year}`}
-            target="_blank"
-            rel="noreferrer"
+            href={`/api/export/pdf?month=${month}&year=${year}`}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-xxm-green text-white text-sm font-semibold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm"
           >
             <FileText size={14} aria-hidden />
