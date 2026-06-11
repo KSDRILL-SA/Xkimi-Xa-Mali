@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { listInvitations, revokeInvitation } from '@/lib/services'
 import { formatDate, formatZAR } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
+import { Mail } from 'lucide-react'
 import { CreateInviteModal } from '@/components/admin/CreateInviteModal'
 import { InvitationsTable, type InviteRow } from './InvitationsTable'
 
@@ -105,7 +106,7 @@ export default async function InvitationsPage({
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Invitations' }]} />
       <Reveal variant="up">
-        <PageHeader title="Invitations" subtitle={`${total} total`} action={<CreateInviteModal createAction={createInvite} />} />
+        <PageHeader title="Invitations" subtitle={`${total} total`} icon={<Mail size={22} className="text-xxm-green" aria-hidden />} action={<CreateInviteModal createAction={createInvite} />} />
       </Reveal>
 
       {revoked && (
