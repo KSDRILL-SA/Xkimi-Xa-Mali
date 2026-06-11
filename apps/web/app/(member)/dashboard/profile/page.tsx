@@ -71,7 +71,7 @@ export default async function ProfilePage() {
       </Reveal>
 
       {/* ── Tabbed settings card ───────────────────── */}
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
         <Tabs
           tabs={[
             {

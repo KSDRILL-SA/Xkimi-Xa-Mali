@@ -61,7 +61,7 @@ export default async function MandatesPage() {
 
       {/* ── Header ─────────────────────────────────── */}
       <Reveal variant="up" className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-xxm-gold/12 flex items-center justify-center shrink-0">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-xxm-gold/20 to-xxm-gold/5 flex items-center justify-center shrink-0 ring-1 ring-xxm-gold/20">
           <CreditCard size={22} className="text-xxm-gold-dark" aria-hidden />
         </div>
         <div>
@@ -74,8 +74,8 @@ export default async function MandatesPage() {
 
       {/* ── Create form ────────────────────────────── */}
       {!hasActiveOrPending && (
-        <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-xxm-gray-100 bg-xxm-green-50/30">
+        <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
+          <div className="px-5 py-4 border-b border-xxm-gray-100 bg-gradient-to-br from-xxm-green-50/60 to-transparent">
             <h2 className="text-base font-bold text-xxm-green-900">Set up a mandate</h2>
             <p className="text-sm text-xxm-gray-400 mt-0.5">
               Authorise a monthly debit from your bank account.
