@@ -10,6 +10,7 @@ import { writeAuditLog } from './audit.service'
 import { checkBudget, recordBudgetOverride } from './budget.service'
 import { logger } from '@/lib/logger'
 import { cache, CACHE_KEYS } from '@/lib/cache'
+import { tallyBy } from '@/lib/aggregate'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import {
   ContributionNotFoundError,
@@ -136,15 +137,7 @@ export async function getContributionSummary(
     }),
   ])
 
-  const statusCounts = Object.fromEntries(
-    byStatus.map((r) => {
-      const count =
-        typeof r._count === 'object' && r._count !== null && 'status' in r._count
-          ? Number((r._count as { status: number }).status)
-          : 0
-      return [r.status, count]
-    }),
-  )
+  const statusCounts = tallyBy(byStatus, (r) => r.status, 'status')
 
   const summary = buildSummary(
     totals as Parameters<typeof buildSummary>[0],
