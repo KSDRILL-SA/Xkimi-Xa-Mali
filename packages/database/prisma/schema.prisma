@@ -394,6 +394,36 @@ model ProcessedWebhookEvent {
   @@map("processed_webhook_events")
 }
 
+enum LedgerAccount {
+  POOL
+}
+
+enum LedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+/// Append-only, immutable ledger of every movement in/out of the collective
+/// pool. The unique (refType, refId, direction) makes posting idempotent, so an
+/// entry is recorded exactly once per source event no matter how many times the
+/// hook or the reconciler runs. The pool balance is CREDIT sum minus DEBIT sum.
+model LedgerEntry {
+  id          String          @id @default(cuid())
+  account     LedgerAccount   @default(POOL)
+  direction   LedgerDirection
+  amount      Decimal         @db.Decimal(12, 2)
+  refType     String
+  refId       String
+  memberId    String?
+  description String?
+  createdAt   DateTime        @default(now())
+
+  @@unique([refType, refId, direction])
+  @@index([account, createdAt])
+  @@index([memberId])
+  @@map("ledger_entries")
+}
+
 // ─── Goals ────────────────────────────────────────────────────────────────────
 
 model Goal {
