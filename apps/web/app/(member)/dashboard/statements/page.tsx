@@ -52,22 +52,22 @@ export default async function StatementsPage() {
 
       {/* ── Header ─────────────────────────────────── */}
       <Reveal variant="up" className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center shrink-0">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-100 to-indigo-50 flex items-center justify-center shrink-0 ring-1 ring-indigo-200/60">
           <FileText size={22} className="text-indigo-600" aria-hidden />
         </div>
         <div>
           <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Statements</h1>
-          <p className="text-sm text-xxm-gray-500 mt-1">Download PDF statements for any contribution period</p>
+          <p className="text-sm text-xxm-gray-500 mt-1">Download premium PDF statements for any contribution period</p>
         </div>
       </Reveal>
 
       <Reveal variant="up" delay={100}>
       {contributions.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
-            <FileText size={24} className="text-indigo-300" aria-hidden />
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
+          <div className="w-16 h-16 rounded-3xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
+            <FileText size={26} className="text-indigo-300" aria-hidden />
           </div>
-          <p className="text-xxm-gray-600 font-semibold">No contribution periods yet</p>
+          <p className="text-xxm-green-900 font-bold">No contribution periods yet</p>
           <p className="text-xxm-gray-400 text-xs mt-1.5 max-w-xs mx-auto">
             Statements will appear once contributions are generated for your account.
           </p>
@@ -75,7 +75,7 @@ export default async function StatementsPage() {
       ) : (
         <div className="space-y-5">
           {years.map((year) => (
-            <div key={year} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+            <div key={year} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
               {/* Year header */}
               <div className="group flex items-center gap-3 px-5 py-3.5 bg-xxm-green-50/40 border-b border-xxm-gray-100">
                 <div className="w-7 h-7 rounded-lg bg-xxm-green-100 flex items-center justify-center transition-transform duration-slow group-hover:scale-110">
@@ -118,12 +118,12 @@ export default async function StatementsPage() {
                       </span>
                       <a
                         href={`/api/v1/transactions/statement?month=${c.periodMonth}&year=${c.periodYear}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-xxm-green text-white text-xs font-semibold hover:bg-xxm-canopy transition-colors shrink-0"
+                        className="group/btn inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-xxm-green text-white text-xs font-bold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm hover:shadow-gold-sm shrink-0"
                         target="_blank"
                         rel="noreferrer"
                         aria-label={`Download PDF for ${MONTHS[c.periodMonth - 1]} ${c.periodYear}`}
                       >
-                        <Download size={12} aria-hidden />
+                        <Download size={12} className="group-hover/btn:translate-y-0.5 transition-transform" aria-hidden />
                         PDF
                       </a>
                     </div>
