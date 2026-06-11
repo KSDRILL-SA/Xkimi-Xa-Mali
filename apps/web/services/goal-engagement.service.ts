@@ -17,11 +17,21 @@ export type GoalComment = {
   canDelete: boolean
 }
 
+export type PledgeSummary = {
+  pledgeTotal: number
+  pledgeCount: number
+  myPledge: number | null
+}
+
 export type GoalEngagement = {
   cheerCount: number
   hasCheered: boolean
   comments: GoalComment[]
+  pledge: PledgeSummary
 }
+
+const MIN_PLEDGE = 10
+const MAX_PLEDGE = 1_000_000
 
 /**
  * Loads a goal and enforces visibility: draft goals are admin-only, so members
@@ -59,7 +69,7 @@ const COMMENT_SELECT = {
 export async function getGoalEngagement(goalId: string, userId: string, roles: string[]): Promise<GoalEngagement> {
   await assertGoalVisible(goalId, roles)
 
-  const [cheerCount, myCheer, comments] = await Promise.all([
+  const [cheerCount, myCheer, comments, pledge] = await Promise.all([
     db.goalCheer.count({ where: { goalId } }),
     db.goalCheer.findUnique({ where: { goalId_userId: { goalId, userId } } }),
     db.goalComment.findMany({
@@ -68,13 +78,54 @@ export async function getGoalEngagement(goalId: string, userId: string, roles: s
       take: COMMENT_LIMIT,
       select: COMMENT_SELECT,
     }),
+    getGoalPledgeSummary(goalId, userId),
   ])
 
   return {
     cheerCount,
     hasCheered: myCheer !== null,
     comments: comments.map((c) => serializeComment(c, userId, roles)),
+    pledge,
   }
+}
+
+/** Total pledged toward a goal, how many members pledged, and the viewer's pledge. */
+export async function getGoalPledgeSummary(goalId: string, userId: string): Promise<PledgeSummary> {
+  const [agg, mine] = await Promise.all([
+    db.goalPledge.aggregate({ where: { goalId }, _sum: { amount: true }, _count: true }),
+    db.goalPledge.findUnique({ where: { goalId_userId: { goalId, userId } }, select: { amount: true } }),
+  ])
+  return {
+    pledgeTotal: Number(agg._sum.amount ?? 0),
+    pledgeCount: agg._count,
+    myPledge: mine ? Number(mine.amount) : null,
+  }
+}
+
+/** Create or update the viewer's pledge toward an active goal. */
+export async function setGoalPledge(goalId: string, userId: string, amount: number, roles: string[]): Promise<PledgeSummary> {
+  const goal = await goalRepo.findById(goalId)
+  if (!goal) throw new GoalNotFoundError()
+  const status = (goal as { status: string }).status
+  if (status === 'DRAFT' && !isAdmin(roles)) throw new GoalNotFoundError()
+  if (status !== 'ACTIVE') throw new ValidationError('You can only pledge toward an active goal')
+  if (!Number.isFinite(amount) || amount < MIN_PLEDGE || amount > MAX_PLEDGE) {
+    throw new ValidationError(`Pledge must be between R${MIN_PLEDGE} and R${MAX_PLEDGE.toLocaleString('en-ZA')}`)
+  }
+
+  const rounded = Math.round(amount * 100) / 100
+  await db.goalPledge.upsert({
+    where: { goalId_userId: { goalId, userId } },
+    create: { goalId, userId, amount: rounded },
+    update: { amount: rounded },
+  })
+  return getGoalPledgeSummary(goalId, userId)
+}
+
+/** Withdraw the viewer's pledge. */
+export async function cancelGoalPledge(goalId: string, userId: string): Promise<PledgeSummary> {
+  await db.goalPledge.deleteMany({ where: { goalId, userId } })
+  return getGoalPledgeSummary(goalId, userId)
 }
 
 /** Toggle the viewer's cheer on a goal. Returns the new state + total. */
