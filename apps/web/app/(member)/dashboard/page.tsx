@@ -6,6 +6,7 @@ import { SkeletonCard, SkeletonRow } from '@/components/ui/Skeleton'
 import { Reveal } from '@xxm/ui'
 import { DashboardStats } from './_sections/DashboardStats'
 import { DashboardBadge } from './_sections/DashboardBadge'
+import { DashboardInsights } from './_sections/DashboardInsights'
 import { DashboardRecentContributions } from './_sections/DashboardRecentContributions'
 import { DashboardActiveGoals } from './_sections/DashboardActiveGoals'
 import {
@@ -166,6 +167,13 @@ export default async function DashboardPage() {
       <Reveal variant="up" delay={120}>
         <Suspense fallback={<SkeletonCard />}>
           <DashboardBadge />
+        </Suspense>
+      </Reveal>
+
+      {/* ── Smart insights — financial-health intelligence ── */}
+      <Reveal variant="up" delay={140}>
+        <Suspense fallback={<SkeletonCard />}>
+          <DashboardInsights />
         </Suspense>
       </Reveal>
 
