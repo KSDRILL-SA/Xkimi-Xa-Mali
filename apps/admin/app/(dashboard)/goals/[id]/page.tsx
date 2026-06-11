@@ -65,17 +65,16 @@ export default async function AdminGoalDetailPage({
   if (!yearOpts.includes(deadlineDate.getFullYear())) yearOpts.unshift(deadlineDate.getFullYear())
 
   // ── Server actions ──────────────────────────────────────────────
-  async function ensureAdmin() {
+  // Auth is inlined in each action: a `'use server'` function must not close
+  // over a component-scope helper (functions aren't serialisable as bound
+  // args), which previously made every action fail.
+  async function updateAction(fd: FormData) {
+    'use server'
     const s = await auth()
     if (!s?.user?.id) redirect('/login')
     const r = (s.user.roles as string[] | undefined) ?? []
     if (!r.includes('ADMIN')) redirect('/forbidden')
-    return { id: s.user.id, roles: r }
-  }
 
-  async function updateAction(fd: FormData) {
-    'use server'
-    const { id: adminId, roles: r } = await ensureAdmin()
     const title       = (fd.get('title') as string)?.trim()
     const description = (fd.get('description') as string)?.trim() || null
     const type        = fd.get('type') as string
@@ -85,7 +84,7 @@ export default async function AdminGoalDetailPage({
     if (!title || !type || !targetAmount || isNaN(targetAmount)) redirect(`/goals/${id}?error=update`)
     const deadline = `${year}-${String(month).padStart(2, '0')}-01`
     try {
-      await updateGoal(adminId, r, id, { title, description, type, targetAmount, deadline })
+      await updateGoal(s.user.id, r, id, { title, description, type, targetAmount, deadline })
     } catch (e) {
       if (e instanceof AdminConflictError || e instanceof AdminNotFoundError) redirect(`/goals/${id}?error=update`)
       throw e
@@ -96,35 +95,62 @@ export default async function AdminGoalDetailPage({
 
   async function activateAction() {
     'use server'
-    const { id: adminId, roles: r } = await ensureAdmin()
-    try { await activateGoal(adminId, r, id) } catch { redirect(`/goals/${id}?error=activate`) }
+    const s = await auth()
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
+    try {
+      await activateGoal(s.user.id, r, id)
+    } catch (e) {
+      if (e instanceof AdminConflictError || e instanceof AdminNotFoundError) redirect(`/goals/${id}?error=activate`)
+      throw e
+    }
     revalidatePath(`/goals/${id}`)
     redirect(`/goals/${id}?activated=1`)
   }
 
   async function lockAction() {
     'use server'
-    const { id: adminId, roles: r } = await ensureAdmin()
-    try { await lockGoal(adminId, r, id) } catch { redirect(`/goals/${id}?error=lock`) }
+    const s = await auth()
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
+    try {
+      await lockGoal(s.user.id, r, id)
+    } catch (e) {
+      if (e instanceof AdminConflictError || e instanceof AdminNotFoundError) redirect(`/goals/${id}?error=lock`)
+      throw e
+    }
     revalidatePath(`/goals/${id}`)
     redirect(`/goals/${id}?locked=1`)
   }
 
   async function deleteAction() {
     'use server'
-    const { id: adminId, roles: r } = await ensureAdmin()
-    await deleteGoal(adminId, r, id)
+    const s = await auth()
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
+    await deleteGoal(s.user.id, r, id)
     revalidatePath('/goals')
     redirect('/goals')
   }
 
   async function progressAction(fd: FormData) {
     'use server'
-    const { id: adminId, roles: r } = await ensureAdmin()
+    const s = await auth()
+    if (!s?.user?.id) redirect('/login')
+    const r = (s.user.roles as string[] | undefined) ?? []
+    if (!r.includes('ADMIN')) redirect('/forbidden')
     const amount = Number(fd.get('amount'))
     const note   = (fd.get('note') as string)?.trim() || undefined
     if (!amount || amount <= 0) redirect(`/goals/${id}?error=progress`)
-    try { await recordGoalProgress(adminId, r, id, amount, note) } catch { redirect(`/goals/${id}?error=progress`) }
+    try {
+      await recordGoalProgress(s.user.id, r, id, amount, note)
+    } catch (e) {
+      if (e instanceof AdminConflictError || e instanceof AdminNotFoundError) redirect(`/goals/${id}?error=progress`)
+      throw e
+    }
     revalidatePath(`/goals/${id}`)
     redirect(`/goals/${id}?progress=1`)
   }
