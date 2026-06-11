@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllBadges } from '@/lib/services'
 import { Breadcrumb, PageHeader, Reveal, RouterPagination } from '@xxm/ui'
+import { Trophy } from 'lucide-react'
 import { BADGE_TIERS, BADGE_TIER_LABELS } from '@/lib/badge-tier'
 import { BadgesTable, type BadgeRow } from './BadgesTable'
 
@@ -44,7 +45,7 @@ export default async function BadgesPage({
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Badges' }]} />
       <Reveal variant="up">
-        <PageHeader title="Badges" subtitle={`${total} member${total !== 1 ? 's' : ''}`} />
+        <PageHeader title="Badges" subtitle={`${total} member${total !== 1 ? 's' : ''}`} icon={<Trophy size={22} className="text-xxm-green" aria-hidden />} />
       </Reveal>
 
       <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5">

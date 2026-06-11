@@ -13,6 +13,7 @@ import {
   AdminNotFoundError,
 } from '@/lib/services'
 import { Breadcrumb, PageHeader, Reveal, Alert } from '@xxm/ui'
+import { PenLine } from 'lucide-react'
 import { SignaturePadCard } from './SignaturePadCard'
 
 export const metadata: Metadata = { title: 'Settings' }
@@ -93,7 +94,7 @@ export default async function SettingsPage({
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Settings' }]} />
       <Reveal variant="up">
-        <PageHeader title="Settings" subtitle="Manage your authorisation signature" />
+        <PageHeader title="Settings" subtitle="Manage your authorisation signature" icon={<PenLine size={22} className="text-xxm-green" aria-hidden />} />
       </Reveal>
 
       {saved && <Alert variant="success">Signature saved successfully.</Alert>}
