@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { api } from '@/lib/api'
-import { PartyPopper, MessageCircle, Send, Trash2, Wallet, ArrowRight, Loader2 } from 'lucide-react'
+import { formatZAR } from '@/lib/formatters'
+import { PartyPopper, MessageCircle, Send, Trash2, Coins, HandCoins, Pencil, X, Loader2 } from 'lucide-react'
 
 type Comment = {
   id: string
@@ -15,10 +15,12 @@ type Comment = {
   canDelete: boolean
 }
 
+type Pledge = { pledgeTotal: number; pledgeCount: number; myPledge: number | null }
+
 type Props = {
   goalId: string
-  initial: { cheerCount: number; hasCheered: boolean; comments: Comment[] }
-  /** Active goals can still be contributed toward; achieved/failed cannot. */
+  initial: { cheerCount: number; hasCheered: boolean; comments: Comment[]; pledge: Pledge }
+  /** Active goals can be pledged toward; achieved/failed cannot. */
   contributable?: boolean
 }
 
@@ -40,14 +42,22 @@ function relative(iso: string): string {
 const MAX = 500
 
 export function GoalEngagement({ goalId, initial, contributable = false }: Props) {
+  // ── Cheers ──
   const [cheerCount, setCheerCount] = useState(initial.cheerCount)
   const [hasCheered, setHasCheered] = useState(initial.hasCheered)
   const [cheering, setCheering] = useState(false)
   const [burst, setBurst] = useState(false)
 
+  // ── Comments ──
   const [comments, setComments] = useState<Comment[]>(initial.comments)
   const [text, setText] = useState('')
   const [posting, setPosting] = useState(false)
+
+  // ── Pledges ──
+  const [pledge, setPledge] = useState<Pledge>(initial.pledge)
+  const [showPledgeForm, setShowPledgeForm] = useState(false)
+  const [pledgeAmount, setPledgeAmount] = useState('')
+  const [pledging, setPledging] = useState(false)
 
   async function toggleCheer() {
     if (cheering) return
@@ -69,6 +79,42 @@ export function GoalEngagement({ goalId, initial, contributable = false }: Props
     }
   }
 
+  async function submitPledge(e: React.FormEvent) {
+    e.preventDefault()
+    const amount = Number(pledgeAmount)
+    if (!Number.isFinite(amount) || amount <= 0 || pledging) return
+    setPledging(true)
+    try {
+      const res = await api.post<Pledge>(`/api/v1/goals/${goalId}/pledge`, { amount })
+      setPledge(res)
+      setShowPledgeForm(false)
+      setPledgeAmount('')
+    } catch {
+      /* keep form open for retry */
+    } finally {
+      setPledging(false)
+    }
+  }
+
+  async function withdrawPledge() {
+    if (pledging) return
+    setPledging(true)
+    const prev = pledge
+    try {
+      const res = await api.delete<Pledge>(`/api/v1/goals/${goalId}/pledge`)
+      setPledge(res)
+    } catch {
+      setPledge(prev)
+    } finally {
+      setPledging(false)
+    }
+  }
+
+  function openPledgeForm() {
+    setPledgeAmount(pledge.myPledge ? String(pledge.myPledge) : '')
+    setShowPledgeForm(true)
+  }
+
   async function submitComment(e: React.FormEvent) {
     e.preventDefault()
     const content = text.trim()
@@ -79,13 +125,13 @@ export function GoalEngagement({ goalId, initial, contributable = false }: Props
       setComments((prev) => [created, ...prev])
       setText('')
     } catch {
-      /* leave text so the member can retry */
+      /* leave text for retry */
     } finally {
       setPosting(false)
     }
   }
 
-  async function remove(id: string) {
+  async function removeComment(id: string) {
     const prev = comments
     setComments((c) => c.filter((x) => x.id !== id))
     try {
@@ -97,7 +143,7 @@ export function GoalEngagement({ goalId, initial, contributable = false }: Props
 
   return (
     <div className="space-y-4">
-      {/* ── Cheer + Contribute ─────────────────────────────────── */}
+      {/* ── Cheer ──────────────────────────────────────────────── */}
       <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm-sm p-5 flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -110,30 +156,81 @@ export function GoalEngagement({ goalId, initial, contributable = false }: Props
               : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gold/15 hover:text-xxm-gold-dark'
           }`}
         >
-          <PartyPopper size={16} className={`transition-transform duration-slow ${hasCheered ? 'scale-110 -rotate-12' : 'group-hover:scale-110'} ${burst ? 'animate-fade-in-up' : ''}`} aria-hidden />
+          <PartyPopper size={16} className={`transition-transform duration-slow ${hasCheered ? 'scale-110 -rotate-12' : 'group-hover:scale-110'}`} aria-hidden />
           {hasCheered ? 'Cheering' : 'Cheer'}
           <span className={`stat-number tabular-nums px-1.5 py-0.5 rounded-lg text-xs ${hasCheered ? 'bg-white/30' : 'bg-white'}`}>{cheerCount}</span>
-          {burst && (
-            <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-xs animate-fade-in-up" aria-hidden>🎉</span>
-          )}
+          {burst && <span className="pointer-events-none absolute -top-2 left-1/2 -translate-x-1/2 text-xs animate-fade-in-up" aria-hidden>🎉</span>}
         </button>
-
         <p className="text-xs text-xxm-gray-400 flex-1 min-w-[120px]">
           {cheerCount === 0
             ? 'Be the first to cheer this goal on.'
             : `${cheerCount} member${cheerCount === 1 ? '' : 's'} ${cheerCount === 1 ? 'is' : 'are'} backing this.`}
         </p>
+      </div>
 
-        {contributable && (
-          <Link
-            href="/dashboard/contribute"
-            className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-xxm-green text-white text-sm font-bold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm shrink-0"
-          >
-            <Wallet size={15} aria-hidden />
-            Contribute toward this goal
-            <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" aria-hidden />
-          </Link>
-        )}
+      {/* ── Pledge ─────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden bg-white rounded-3xl border border-xxm-gold/20 shadow-xxm-sm p-5">
+        <div className="pointer-events-none absolute -top-12 -right-12 w-40 h-40 rounded-full bg-gradient-to-br from-xxm-gold/15 to-transparent blur-2xl" aria-hidden />
+        <div className="relative flex items-start gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-xxm-gold/20 to-xxm-gold/5 ring-1 ring-xxm-gold/25 flex items-center justify-center shrink-0">
+            <Coins size={19} className="text-xxm-gold-dark" aria-hidden />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-display text-lg font-black text-xxm-green-900 leading-tight">
+              {formatZAR(pledge.pledgeTotal)} <span className="text-sm font-bold text-xxm-gray-400">pledged</span>
+            </p>
+            <p className="text-xs text-xxm-gray-500 mt-0.5">
+              {pledge.pledgeCount === 0
+                ? 'No pledges yet — be the first to back this goal.'
+                : `${pledge.pledgeCount} member${pledge.pledgeCount === 1 ? '' : 's'} backing this goal`}
+            </p>
+
+            {contributable && (
+              <div className="mt-3">
+                {showPledgeForm ? (
+                  <form onSubmit={submitPledge} className="flex items-center gap-2">
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-xxm-gray-400">R</span>
+                      <input
+                        type="number" min={10} step={10} autoFocus
+                        value={pledgeAmount}
+                        onChange={(e) => setPledgeAmount(e.target.value)}
+                        placeholder="500"
+                        className="w-32 rounded-xl border border-xxm-gray-200 pl-7 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-gold/30"
+                      />
+                    </div>
+                    <button type="submit" disabled={pledging || !pledgeAmount} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-xxm-gold text-xxm-green-900 text-sm font-bold hover:bg-xxm-gold-light transition-colors disabled:opacity-50 shadow-gold-sm">
+                      {pledging ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <HandCoins size={14} aria-hidden />}
+                      {pledge.myPledge ? 'Update' : 'Pledge'}
+                    </button>
+                    <button type="button" onClick={() => setShowPledgeForm(false)} className="p-2 text-xxm-gray-400 hover:text-xxm-gray-600" aria-label="Cancel">
+                      <X size={15} aria-hidden />
+                    </button>
+                  </form>
+                ) : pledge.myPledge !== null ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-xxm-green-50 text-xxm-green-800 text-sm font-bold">
+                      <HandCoins size={14} aria-hidden /> You pledged {formatZAR(pledge.myPledge)}
+                    </span>
+                    <button type="button" onClick={openPledgeForm} className="inline-flex items-center gap-1 text-xs font-semibold text-xxm-gray-500 hover:text-xxm-green transition-colors">
+                      <Pencil size={12} aria-hidden /> Edit
+                    </button>
+                    <button type="button" onClick={withdrawPledge} disabled={pledging} className="inline-flex items-center gap-1 text-xs font-semibold text-xxm-gray-400 hover:text-red-500 transition-colors disabled:opacity-50">
+                      <X size={12} aria-hidden /> Withdraw
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={openPledgeForm} className="group inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-xxm-green text-white text-sm font-bold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm">
+                    <HandCoins size={15} aria-hidden /> Back this goal
+                  </button>
+                )}
+                <p className="text-[11px] text-xxm-gray-400 mt-2 leading-relaxed">
+                  A pledge is your commitment toward this goal — it rallies the brotherhood. Funds are still collected through your monthly contributions to the pool.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── Discussion ─────────────────────────────────────────── */}
@@ -181,12 +278,7 @@ export function GoalEngagement({ goalId, initial, contributable = false }: Props
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] text-xxm-gray-400">{relative(c.createdAt)}</span>
                         {c.canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => remove(c.id)}
-                            className="text-xxm-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                            aria-label="Delete comment"
-                          >
+                          <button type="button" onClick={() => removeComment(c.id)} className="text-xxm-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100" aria-label="Delete comment">
                             <Trash2 size={13} aria-hidden />
                           </button>
                         )}
