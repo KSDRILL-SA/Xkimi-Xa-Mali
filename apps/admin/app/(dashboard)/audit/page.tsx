@@ -65,7 +65,7 @@ export default async function AuditPage({
       </Reveal>
 
       <Reveal variant="up" delay={200} className="space-y-4">
-      <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm divide-y divide-xxm-gray-50 overflow-hidden">
+      <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm divide-y divide-xxm-gray-50 overflow-hidden">
         {items.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-xxm-gray-400">No audit events found.</div>
         ) : (
