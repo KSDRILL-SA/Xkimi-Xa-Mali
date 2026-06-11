@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
-import { decrypt } from '@/lib/encryption'
+import { getMandates } from '@/services/mandate.service'
+import { listBankAccounts } from '@/services/member.service'
 import { MandateCard } from '@/components/mandate/MandateCard'
 import { MandateForm } from '@/components/mandate/MandateForm'
 import { Reveal } from '@xxm/ui'
@@ -15,28 +15,17 @@ export default async function MandatesPage() {
   const session = await getSession()
   if (!session?.user?.id) redirect('/login')
   const userId = session.user.id
+  const roles = (session.user.roles as string[] | undefined) ?? []
 
   const [bankAccounts, mandates] = await Promise.all([
-    db.bankAccount.findMany({
-      where: { userId },
-      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
-      select: { id: true, bankName: true, accountNumber: true, accountType: true, branchCode: true },
-    }),
-    db.paymentMandate.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        bankAccount: {
-          select: { bankName: true, accountNumber: true, accountType: true, branchCode: true },
-        },
-      },
-    }),
+    listBankAccounts(userId),
+    getMandates(userId, userId, roles),
   ])
 
   const maskedBankAccounts = bankAccounts.map((a) => ({
     id: a.id,
     bankName: a.bankName,
-    accountNumberMasked: maskAccount(a.accountNumber),
+    accountNumberMasked: a.accountNumberMasked,
     accountType: a.accountType,
   }))
 
@@ -47,7 +36,7 @@ export default async function MandatesPage() {
     updatedAt: m.updatedAt.toISOString(),
     bankAccount: {
       bankName: m.bankAccount.bankName,
-      accountNumberMasked: maskAccount(m.bankAccount.accountNumber),
+      accountNumberMasked: m.bankAccount.accountNumberMasked,
       accountType: m.bankAccount.accountType,
     },
   }))
@@ -131,9 +120,4 @@ export default async function MandatesPage() {
       )}
     </div>
   )
-}
-
-function maskAccount(encrypted: string): string {
-  const plain = decrypt(encrypted)
-  return plain.slice(-4).padStart(plain.length, '*')
 }

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client'
 import { env } from '@/lib/env'
+import { db } from '@/lib/db'
 import { notificationRepo } from '@/repositories/notification.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { smsProvider } from '@/integrations/sms'
@@ -10,6 +11,40 @@ type NotifChannel = 'SMS' | 'EMAIL' | 'PUSH' | 'WHATSAPP'
 type NotifStatus = 'QUEUED' | 'SENT' | 'FAILED'
 
 type NotifPrefs = { userId: string; sms: boolean; email: boolean; push: boolean; whatsapp: boolean }
+
+/** Member-facing notification feed: filtered, cursor-paginated, with totals. */
+export async function getMemberNotifications(
+  userId: string,
+  opts: { channel?: NotifChannel; status?: NotifStatus; cursor?: string; limit?: number } = {},
+) {
+  const limit = opts.limit ?? 25
+  const where: Prisma.NotificationWhereInput = {
+    userId,
+    ...(opts.channel && { channel: opts.channel }),
+    ...(opts.status && { status: opts.status }),
+  }
+
+  const [rows, total, failedCount] = await Promise.all([
+    db.notification.findMany({
+      where,
+      take: limit + 1,
+      ...(opts.cursor && { cursor: { id: opts.cursor }, skip: 1 }),
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, channel: true, status: true, sentAt: true, createdAt: true,
+        template: { select: { slug: true } },
+      },
+    }),
+    db.notification.count({ where: { userId } }),
+    db.notification.count({ where: { userId, status: 'FAILED' } }),
+  ])
+
+  const hasNextPage = rows.length > limit
+  const items = hasNextPage ? rows.slice(0, limit) : rows
+  const nextCursor = hasNextPage ? (items[items.length - 1]?.id ?? null) : null
+
+  return { items, total, failedCount, nextCursor }
+}
 
 type QueuedNotification = {
   id: string
