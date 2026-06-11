@@ -159,6 +159,7 @@ model User {
   deletedGoalComments    GoalComment[]           @relation("GoalCommentDeleter")
   inboxMessages          InboxMessage[]          @relation("InboxRecipient")
   sentInboxMessages      InboxMessage[]          @relation("InboxSender")
+  goalPledges            GoalPledge[]            @relation("GoalPledger")
   budgets                UserBudget[]
   budgetOverrides        BudgetOverride[]
   signature              AdminSignature?
@@ -404,6 +405,7 @@ model Goal {
   progress GoalProgress[]
   cheers   GoalCheer[]
   comments GoalComment[]
+  pledges  GoalPledge[]
 
   @@index([lockedById])
   @@index([createdById])
@@ -442,6 +444,22 @@ model GoalComment {
 
   @@index([goalId, createdAt])
   @@map("goal_comments")
+}
+
+model GoalPledge {
+  id        String   @id @default(cuid())
+  goalId    String
+  userId    String
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation("GoalPledger", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, userId])
+  @@index([goalId])
+  @@map("goal_pledges")
 }
 
 model GoalProgress {
