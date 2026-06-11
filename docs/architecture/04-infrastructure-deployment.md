@@ -1,284 +1,125 @@
-# Infrastructure and Deployment
+# Infrastructure & Deployment
 
-| | |
-|---|---|
-| **Purpose** | Documents the deployment topology, CI/CD pipeline, environment tiers, and cloud service wiring |
-| **Audience** | Engineers, DevOps, anyone deploying or debugging the system |
-| **Related Docs** | [01-system-context.md](./01-system-context.md) · [02-container-architecture.md](./02-container-architecture.md) · [../database/01-erd.md](../database/01-erd.md) |
+Deployment topology, CI/CD, and how the cloud services wire together at runtime. Ordered go-live steps: [../../DEPLOYMENT.md](../../DEPLOYMENT.md).
 
----
+## Environment tiers
 
-## Environment Tiers
+Three fully isolated tiers — no tier shares data or credentials with another.
 
-XXM runs across three fully isolated environment tiers. Each tier has its own database, Redis instance, and external service credentials. No tier shares data with another.
-
-| Tier | Trigger | Database | Redis | Netcash | Purpose |
-|---|---|---|---|---|---|
-| **Local** | Developer machine | Docker PostgreSQL 16 | Docker Redis 7 | Sandbox | Active development |
-| **Preview** | Push to `Dev` branch | Neon Dev branch | Upstash Dev | Sandbox | Integration testing |
-| **Production** | Push to `main` branch | Neon Production branch | Upstash Production | Live | Live system |
+| Tier | Trigger | Database | Redis | Netcash |
+|---|---|---|---|---|
+| **Local** | Dev machine | Neon dev branch *(Docker optional via `docker-compose.yml`)* | Upstash dev | Test gateway |
+| **Preview** | PR / push to `Dev` | Neon PR branch (auto) | Upstash dev | Test gateway |
+| **Production** | Promote to `main` | Neon production (pooled) | Upstash production | **Live** |
 
 ---
 
-## Diagram 1 — CI/CD Pipeline
-
-> From code push to live deployment, every step in order.
+## CI/CD pipeline
 
 ```mermaid
 flowchart TD
-    subgraph DEV["Developer"]
-        CODE["Write code on\nfeature branch"]
-        COMMIT["git commit\nconventional commits"]
-        PR["Open PR to Dev\nwith labels and milestone"]
+    DEV["feature branch<br/>conventional commits"] --> PR["PR → Dev"]
+    PR --> CI
+
+    subgraph CI["GitHub Actions"]
+        direction LR
+        INSTALL["npm ci"] --> GEN["prisma generate"] --> MIG["migrate deploy<br/>(test DB)"] --> SEED["db:seed"]
+        SEED --> TC["typecheck"] --> LINT["lint"] --> TEST["test"] --> BUILD["build"] --> VAL["prisma validate"]
     end
 
-    subgraph CI["GitHub Actions — CI Pipeline"]
-        CHECKOUT["actions/checkout@v4"]
-        NODE["Setup Node.js 20\ncache npm"]
-        INSTALL["npm ci\ninstall all workspaces"]
-        GENERATE["prisma generate\ngenerate Prisma client"]
-        MIGRATE["prisma migrate deploy\nrun against test DB"]
-        TYPECHECK["npm run typecheck\ntsc --noEmit"]
-        LINT["npm run lint\nESLint across workspaces"]
-        TEST["npm run test\nVitest test suite"]
-        VALIDATE["prisma validate\nschema integrity check"]
-    end
-
-    subgraph VERCEL_PREVIEW["Vercel — Preview Deployment"]
-        VP_BUILD["Next.js build\nnpm run build"]
-        VP_DEPLOY["Deploy to preview URL\n*.vercel.app subdomain"]
-        VP_ENV["Neon Dev DB branch\nUpstash Dev\nNetcash Sandbox"]
-    end
-
-    subgraph MERGE["Merge to Dev"]
-        REVIEW["PR review\ndiagrams, test plan checked"]
-        MERGE_BTN["Merge PR\ndelete feature branch"]
-    end
-
-    subgraph PROD["Vercel — Production Deployment"]
-        PROD_MIGRATE["prisma migrate deploy\nagainst Neon production"]
-        PROD_BUILD["Next.js production build\nbundle optimisation"]
-        PROD_DEPLOY["Deploy to production\nVercel CDN edge network"]
-        PROD_ENV["Neon Production DB\nUpstash Production\nNetcash Live"]
-    end
-
-    CODE --> COMMIT --> PR
-    PR --> CHECKOUT --> NODE --> INSTALL --> GENERATE
-    GENERATE --> MIGRATE --> TYPECHECK --> LINT --> TEST --> VALIDATE
-    VALIDATE -->|"CI green"| REVIEW
-    REVIEW --> MERGE_BTN
-
-    MERGE_BTN -->|"push to Dev"| VP_BUILD
-    VP_BUILD --> VP_DEPLOY --> VP_ENV
-
-    MERGE_BTN -->|"PR to main, then merge"| PROD_MIGRATE
-    PROD_MIGRATE --> PROD_BUILD --> PROD_DEPLOY --> PROD_ENV
+    CI -->|green| REVIEW["review"] --> MERGE["squash merge"]
+    MERGE -->|push Dev| PREV["Vercel preview<br/>Neon PR branch · test gateway"]
+    MERGE -->|promote main| PROD["Vercel production<br/>migrate deploy → build → deploy<br/>Neon prod · live gateway"]
 ```
+
+> CI is currently paused (Actions minutes exhausted on the private repo); the workflow is correct and goes green once minutes return. Until then the local `typecheck · lint · test · build` is the gate. See [../../DEPLOYMENT.md](../../DEPLOYMENT.md#8-known-limitations-today).
 
 ---
 
-## Diagram 2 — Production Topology
-
-> How every cloud service connects at runtime in production.
+## Production topology
 
 ```mermaid
 flowchart TB
-    subgraph USERS["End Users"]
-        MB["Member\nbrowser or PWA"]
-        AD["Admin\nbrowser"]
+    MB["Member"] & AD["Admin"] --> CDN["Vercel CDN<br/>edge · auto HTTPS"]
+
+    subgraph APP["Next.js app"]
+        SSR["RSC / SSR"]
+        API["API /api/v1/*"]
+        WH["Webhook receivers<br/>inngest · netcash · bulksms"]
     end
+    CDN --> SSR & API
 
-    subgraph VERCEL_PROD["Vercel Production"]
-        CDN["Vercel CDN\nEdge Network\nGlobal PoPs\nAutomatic HTTPS"]
-        subgraph APP["Next.js Application"]
-            SSR["Server-side rendering\nApp Router RSC"]
-            APIROUTES["API Routes\n/api/v1/*"]
-            JOBS_RECV["Inngest webhook receiver\n/api/v1/webhooks/inngest"]
-            NC_RECV["Netcash webhook receiver\n/api/v1/webhooks/netcash"]
-            SMS_RECV["BulkSMS receipt receiver\n/api/v1/webhooks/bulksms"]
-        end
+    subgraph NEON["Neon production"]
+        POOL["PgBouncer pooler"] --> PRIMARY["primary node"]
+        PRIMARY --> BACKUP["WAL backups · PITR"]
     end
-
-    subgraph NEON["Neon — PostgreSQL Production"]
-        POOLER["PgBouncer\nConnection Pooler"]
-        PRIMARY["Primary DB node\nWrite and read queries"]
-        REPLICA["Read replica\nOptional future read offload"]
-        BACKUP["Continuous WAL backups\nPoint-in-time recovery"]
+    REDIS["Upstash Redis"]
+    subgraph INNGEST["Inngest Cloud"]
+        CRON["cron schedules"]
+        HIST["execution history"]
     end
+    NC["Netcash (live)"]
+    BULK["BulkSMS"]
+    RESEND["Resend"]
+    BLOB["Vercel Blob"]
 
-    subgraph UPSTASH_PROD["Upstash — Redis Production"]
-        REDIS_PROD["Redis cluster\nAuto-replicated\nREST API only\nNo persistent WebSocket"]
-    end
-
-    subgraph INNGEST_PROD["Inngest Cloud Production"]
-        CRON["Cron schedules\n07h00 and 20h00 SAST\n1st of month\nDaily overdue"]
-        EVENTS["Event fan-out\nDelay handler\nNotification flush"]
-        HISTORY["Full execution history\n30-day retention\nStep-level replay"]
-    end
-
-    subgraph EXTERNAL_PROD["External Services — Production Credentials"]
-        NC_PROD["Netcash\nLive DebiCheck API\nProduction service key"]
-        BULK_PROD["BulkSMS\nLive SA SMS delivery"]
-        RESEND_PROD["Resend\nLive email delivery\nCustom domain sender"]
-        BLOB_PROD["Vercel Blob\nProduction bucket\nSigned URL delivery"]
-    end
-
-    MB --> CDN
-    AD --> CDN
-    CDN --> SSR
-    CDN --> APIROUTES
-
-    APIROUTES --> POOLER --> PRIMARY
-    APIROUTES --> REDIS_PROD
-    APIROUTES --> NC_PROD
-    APIROUTES --> BULK_PROD
-    APIROUTES --> RESEND_PROD
-    APIROUTES --> BLOB_PROD
-    APIROUTES --> INNGEST_PROD
-
-    INNGEST_PROD --> JOBS_RECV
-    JOBS_RECV --> POOLER
-    JOBS_RECV --> REDIS_PROD
-    JOBS_RECV --> NC_PROD
-    JOBS_RECV --> BULK_PROD
-    JOBS_RECV --> RESEND_PROD
-
-    NC_PROD -->|"mandate status webhooks"| NC_RECV
-    BULK_PROD -->|"delivery receipt webhooks"| SMS_RECV
-    NC_RECV --> APIROUTES
-    SMS_RECV --> APIROUTES
+    API --> POOL & REDIS & NC & BULK & RESEND & BLOB & INNGEST
+    INNGEST --> WH --> POOL & REDIS & NC & BULK & RESEND
+    NC -->|mandate webhooks| WH
+    BULK -->|receipts| WH
 ```
+
+**Scheduled jobs (Inngest cron):** 07:00 morning warning · 20:00 debit run · daily overdue reminder · 1st-of-month rollover · nightly ledger + contribution reconciliation · daily financial-anomaly watch · monthly statement notice · badge recalculation · invite expiry.
 
 ---
 
-## Diagram 3 — Environment Isolation
-
-> How local, preview, and production environments are kept completely separate.
+## Environment isolation
 
 ```mermaid
 flowchart LR
-    subgraph LOCAL["Local Development"]
-        L_APP["Next.js dev server\nlocalhost:3000"]
-        L_DB["Docker PostgreSQL 16\nlocalhost:5432"]
-        L_REDIS["Docker Redis 7\nlocalhost:6379"]
-        L_INNGEST["Inngest Dev Server\nlocalhost:8288"]
-        L_NC["Netcash Sandbox\nTest ASMX endpoint"]
+    subgraph L["Local"]
+        LA["next dev :3000"] --- LDB["Neon dev branch"]
+        LA --- LIN["Inngest dev :8288"]
     end
-
-    subgraph PREVIEW["Preview — Dev branch"]
-        P_APP["Vercel preview deployment\n*.vercel.app"]
-        P_DB["Neon Dev DB branch\nisolated from production"]
-        P_REDIS["Upstash Dev database"]
-        P_NC["Netcash Sandbox"]
+    subgraph P["Preview — Dev"]
+        PA["*.vercel.app"] --- PDB["Neon PR branch"]
     end
-
-    subgraph PRODUCTION["Production — main branch"]
-        PR_APP["Vercel production\nxkimmxamali.co.za"]
-        PR_DB["Neon Production branch\nreal member data"]
-        PR_REDIS["Upstash Production database"]
-        PR_NC["Netcash Live\nreal debit orders"]
+    subgraph PR["Production — main"]
+        PRA["xkimmxamali.co.za"] --- PRDB["Neon prod — real data"]
+        PRA --- PRNC["Netcash live — real debits"]
     end
-
-    L_APP --- L_DB
-    L_APP --- L_REDIS
-    L_APP --- L_INNGEST
-    L_APP --- L_NC
-
-    P_APP --- P_DB
-    P_APP --- P_REDIS
-    P_APP --- P_NC
-
-    PR_APP --- PR_DB
-    PR_APP --- PR_REDIS
-    PR_APP --- PR_NC
-
-    LOCAL -.->|"no data sharing\nno credential sharing"| PREVIEW
-    PREVIEW -.->|"no data sharing\nno credential sharing"| PRODUCTION
+    L -.->|no shared data or creds| P -.->|no shared data or creds| PR
 ```
 
 ---
 
-## Diagram 4 — Monorepo Workspace Structure
+## Monorepo & env reference
 
-```mermaid
-flowchart TD
-    subgraph ROOT["Root Workspace — Turborepo"]
-        direction LR
-        PKG["package.json\nworkspaces config\nturbo.json pipeline"]
-        GH[".github/workflows/ci.yml\nGitHub Actions pipeline"]
-        DC["docker-compose.yml\nPostgreSQL + Redis\nlocal dev services"]
-        ENV[".env.example\nall required env vars\nwith descriptions"]
-    end
-
-    subgraph APPS["apps/"]
-        subgraph WEB["apps/web — Next.js Application"]
-            APP_DIR["app/\nApp Router pages\nAPI routes\nLayouts"]
-            COMP["components/\nReact components\nui, auth, member\ncontribution, mandate"]
-            SVC["services/\nBusiness logic\none file per domain"]
-            LIB["lib/\nInfrastructure clients\nvalidation schemas\nutility functions"]
-            INNGEST_DIR["inngest/\nJob functions\nInngest client config"]
-            MW_FILE["middleware.ts\nRoute protection"]
-        end
-    end
-
-    subgraph PACKAGES["packages/"]
-        subgraph DB_PKG["packages/database — Prisma Package"]
-            SCHEMA["prisma/schema.prisma\n382 lines\n14 tables 13 enums"]
-            MIGRATIONS["prisma/migrations/\n20241201000000_initial_schema\nAll future migrations"]
-            SEED["prisma/seed.ts\nRoles, founder, templates"]
-        end
-    end
-
-    subgraph DOCS_DIR["docs/"]
-        ARCH["architecture/\nC4 diagrams"]
-        DB_DOCS["database/\nERD, normalization"]
-        FLOWS["flows/\nSequence diagrams"]
-        SEC["security/\nSecurity architecture"]
-        CONST["constitutions/\nCoding standards"]
-        BUILD["build-order.md\nModule build plan"]
-        API_SPEC["api-contract.yaml\nOpenAPI 3.0 spec"]
-    end
-
-    ROOT --> APPS
-    ROOT --> PACKAGES
-    ROOT --> DOCS_DIR
+```
+apps/web        Next.js — pages · api/v1 · services · lib · inngest · middleware.ts
+apps/admin      Admin dashboard          apps/website   Marketing site
+packages/database   schema.prisma (34 models · 17 enums) · 16 migrations · seed.ts
+packages/ui|utils|types|config   shared libraries
+docs/           architecture · flows · database · security · adr · constitutions
+                api-contract.yaml (OpenAPI 3.1)
 ```
 
----
+Every tier needs the same core secrets (full list + descriptions in [`.env.example`](../../.env.example) and [DEPLOYMENT.md](../../DEPLOYMENT.md#2-environment-variables-production)). The ones that bite if wrong:
 
-## Environment Variable Reference
+| Variable | Note |
+|---|---|
+| `ENCRYPTION_KEY` | 64 hex chars — **set once, never change** (decrypts stored bank/ID numbers) |
+| `ADMIN_API_SECRET` | Must match on web + admin (admin→web internal calls) |
+| `NETCASH_API_URL` | Defaults to the **test** gateway — override for production |
+| `INNGEST_EVENT_KEY` / `_SIGNING_KEY` | Or no scheduled job fires |
 
-| Variable | Required In | Purpose |
-|---|---|---|
-| `DATABASE_URL` | All tiers | Neon PostgreSQL connection string |
-| `NEXTAUTH_SECRET` | All tiers | JWT signing secret (min 32 chars) |
-| `NEXTAUTH_URL` | All tiers | Base URL for NextAuth callbacks |
-| `ENCRYPTION_KEY` | All tiers | AES-256 key for ID and bank account encryption (64 hex chars) |
-| `NETCASH_SERVICE_KEY` | All tiers | Netcash API authentication key |
-| `NETCASH_WEBHOOK_SECRET` | All tiers | HMAC secret for webhook verification |
-| `NETCASH_API_URL` | All tiers | Sandbox or live Netcash endpoint |
-| `BULKSMS_USERNAME` | All tiers | BulkSMS account username |
-| `BULKSMS_PASSWORD` | All tiers | BulkSMS account password |
-| `RESEND_API_KEY` | All tiers | Resend API key |
-| `RESEND_FROM_EMAIL` | All tiers | Verified sender email address |
-| `INNGEST_EVENT_KEY` | All tiers | Inngest event publish key |
-| `INNGEST_SIGNING_KEY` | All tiers | Inngest webhook signature key |
-| `UPSTASH_REDIS_REST_URL` | All tiers | Upstash Redis endpoint |
-| `UPSTASH_REDIS_REST_TOKEN` | All tiers | Upstash Redis auth token |
-| `BLOB_READ_WRITE_TOKEN` | All tiers | Vercel Blob read/write token |
-| `FOUNDER_EMAIL` | Seed script | Founder admin account email |
-| `FOUNDER_PHONE` | Seed script | Founder admin account phone |
-| `FOUNDER_PASSWORD` | Seed script | Founder admin account password |
-| `WHATSAPP_GROUP_LINK` | Runtime | WhatsApp group deep link |
+### Service failure behaviour
 
-## Service Dependency Matrix
-
-| Service | Used By | Failure Behaviour | Retry? |
+| Service | Used by | On failure | Retry |
 |---|---|---|---|
-| Neon PostgreSQL | All API routes, all Inngest jobs | Hard failure — request returns 500 | Yes — Prisma connection retry |
-| Upstash Redis | Middleware, mandate service, Inngest jobs | Soft failure — rate limit skipped, idempotency bypassed | Yes — Upstash client retry |
-| Netcash API | mandate.service, contribution.service, debit-run job | Hard failure — payment not processed, status unchanged | Yes — Inngest step retry |
-| BulkSMS | notification.service, morning warning job | Soft failure — SMS not sent, notification marked FAILED | Yes — Inngest step retry |
-| Resend | auth.service, notification.service | Soft failure — email not sent, can be resent | Yes — Inngest step retry |
-| Inngest Cloud | Scheduled payment pipeline | Deferred — jobs do not run until recovered | Built-in — automatic backoff |
-| Vercel Blob | contribution.service PDF export | Soft failure — statement not generated, can be retried | Manual retry via endpoint |
+| Neon | All routes + jobs | Hard 500 | Prisma reconnect |
+| Upstash | Middleware, mandate, jobs | Soft — limit/idempotency fall back | Client retry |
+| Netcash | mandate, contribution, debit-run | Hard — payment unchanged | Inngest step retry |
+| BulkSMS / Resend | notification | Soft — marked FAILED | Inngest step retry |
+| Inngest | Payment pipeline | Deferred until recovered | Built-in backoff |
+| Vercel Blob | Statement export | Soft — guarded by `withRetry` + circuit breaker | Auto + manual |
