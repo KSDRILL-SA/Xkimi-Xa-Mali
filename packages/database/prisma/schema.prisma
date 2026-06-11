@@ -147,6 +147,9 @@ model User {
   badgeHistory           BadgeHistory[]
   communityMessages      CommunityMessage[]      @relation("MessageAuthor")
   deletedCommunityMsgs   CommunityMessage[]      @relation("MessageDeleter")
+  goalCheers             GoalCheer[]             @relation("GoalCheerUser")
+  goalComments           GoalComment[]           @relation("GoalCommentAuthor")
+  deletedGoalComments    GoalComment[]           @relation("GoalCommentDeleter")
   budgets                UserBudget[]
   budgetOverrides        BudgetOverride[]
   signature              AdminSignature?
@@ -390,12 +393,46 @@ model Goal {
   locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
   creator  User?          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: SetNull)
   progress GoalProgress[]
+  cheers   GoalCheer[]
+  comments GoalComment[]
 
   @@index([lockedById])
   @@index([createdById])
   @@index([status])
   @@index([status, deadline])
   @@map("goals")
+}
+
+model GoalCheer {
+  id        String   @id @default(cuid())
+  goalId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation("GoalCheerUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, userId])
+  @@index([goalId])
+  @@map("goal_cheers")
+}
+
+model GoalComment {
+  id          String    @id @default(cuid())
+  goalId      String
+  userId      String
+  content     String    @db.VarChar(500)
+  isDeleted   Boolean   @default(false)
+  deletedById String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  goal      Goal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user      User  @relation("GoalCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  deletedBy User? @relation("GoalCommentDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
+
+  @@index([goalId, createdAt])
+  @@map("goal_comments")
 }
 
 model GoalProgress {
