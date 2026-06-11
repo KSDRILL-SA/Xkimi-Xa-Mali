@@ -42,15 +42,15 @@ chore/deps-upgrade-prisma
 
 ```mermaid
 flowchart TD
-    BRANCH["Create feature branch\nfrom Dev"]
-    CODE["Implement changes\nFollow constitutions"]
-    TESTS["Run tests\nnpm run test"]
-    TYPECHECK["Type check\nnpm run typecheck"]
-    LINT["Lint\nnpm run lint"]
-    PR["Open PR → Dev\nFill PR template"]
+    BRANCH["Create feature branch<br/>from Dev"]
+    CODE["Implement changes<br/>follow constitutions"]
+    TESTS["npm run test"]
+    TYPECHECK["npm run typecheck"]
+    LINT["npm run lint"]
+    PR["Open PR → Dev<br/>fill PR template"]
     REVIEW["Code review"]
     MERGE["Squash merge to Dev"]
-    RELEASE["Tagged release → main\n(admin only)"]
+    RELEASE["Tagged release → main<br/>(admin only)"]
 
     BRANCH --> CODE --> TESTS --> TYPECHECK --> LINT --> PR --> REVIEW --> MERGE --> RELEASE
 ```
@@ -84,7 +84,7 @@ Use conventional commits:
 feat(auth): add email verification resend endpoint
 fix(payments): handle Netcash TIMEOUT webhook status
 docs(db): add index strategy for contributions table
-chore(deps): upgrade Prisma to 5.x
+chore(deps): upgrade Prisma to 6.x
 refactor(api): extract mandate validation to shared schema
 ```
 
@@ -98,9 +98,9 @@ One subject line. Present tense. No period at the end. Under 72 characters.
 # Install dependencies
 npm install
 
-# Set up environment
-cp apps/web/.env.example apps/web/.env.local
-# Fill in: DATABASE_URL, NEXTAUTH_SECRET, ENCRYPTION_KEY, etc.
+# Set up environment (root .env.example → one per app)
+cp .env.example apps/web/.env.local
+# Fill in: DATABASE_URL, AUTH_SECRET, ENCRYPTION_KEY, etc.
 
 # Start all apps
 npm run dev
@@ -130,7 +130,7 @@ npx prisma migrate deploy
 
 Migration naming convention: `snake_case_description` (Prisma prepends the timestamp).
 
-Every migration must have a paired rollback script in `/packages/database/prisma/rollbacks/`.
+Migrations are **additive and forward-only** — no destructive schema changes. Roll back a bad release by promoting the previous Vercel deployment (see [DEPLOYMENT.md](./DEPLOYMENT.md#9-rollback)); the additive schema stays compatible.
 
 ---
 
