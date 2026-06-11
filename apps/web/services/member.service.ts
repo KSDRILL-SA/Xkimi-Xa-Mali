@@ -404,3 +404,70 @@ export async function updateNotificationPreferences(
 
   return prefs
 }
+
+// ─── WhatsApp preference (single-channel toggle) ────────────────────────────
+
+/** The member's WhatsApp opt-in state plus the phone WhatsApp would target. */
+export async function getWhatsappPreference(userId: string) {
+  const [user, pref] = await Promise.all([
+    userRepo.findById(userId, { select: { phone: true } }) as Promise<{ phone: string | null } | null>,
+    notificationRepo.findPreference(userId),
+  ])
+  return { enabled: pref?.whatsapp ?? true, phone: user?.phone ?? null }
+}
+
+export async function setWhatsappPreference(
+  userId: string,
+  enabled: boolean,
+  ipAddress?: string,
+) {
+  const pref = await notificationRepo.upsertPreference(userId, { whatsapp: enabled })
+
+  await writeAuditLog({
+    userId,
+    action: 'WHATSAPP_PREFERENCE_UPDATED',
+    entity: 'NotificationPreference',
+    entityId: userId,
+    payload: { enabled },
+    ipAddress,
+  })
+
+  return { enabled: pref.whatsapp }
+}
+
+// ─── Authenticated user (own profile, /me) ──────────────────────────────────
+
+/** Compact self-profile for the session endpoint; null when the user is gone. */
+export async function getAuthenticatedUser(userId: string) {
+  type MeUser = Prisma.UserGetPayload<{
+    select: {
+      id: true
+      email: true
+      phone: true
+      firstName: true
+      lastName: true
+      status: true
+      emailVerified: true
+      createdAt: true
+      roles: { select: { role: { select: { name: true } } } }
+    }
+  }>
+
+  const user = (await userRepo.findById(userId, {
+    select: {
+      id: true,
+      email: true,
+      phone: true,
+      firstName: true,
+      lastName: true,
+      status: true,
+      emailVerified: true,
+      createdAt: true,
+      roles: { select: { role: { select: { name: true } } } },
+    },
+  })) as MeUser | null
+
+  if (!user) return null
+
+  return { ...user, roles: user.roles.map((r) => r.role.name) }
+}

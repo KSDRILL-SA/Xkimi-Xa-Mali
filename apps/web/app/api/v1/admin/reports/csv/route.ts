@@ -4,17 +4,7 @@ import { apiError } from '@/lib/api-response'
 import { AdminReportRequestSchema } from '@/lib/validation/report'
 import { exportAdminReportCSV } from '@/services/report.service'
 import { withApiHandler } from '@/lib/api-handler'
-
-const MAX_TS_DRIFT_MS = 5 * 60 * 1000
-
-function isValidInternalRequest(req: NextRequest): boolean {
-  const expected = process.env.ADMIN_API_SECRET
-  if (!expected) return false
-  if (req.headers.get('x-admin-secret') !== expected) return false
-  const ts = req.headers.get('x-admin-timestamp')
-  if (!ts) return false
-  return Math.abs(Date.now() - Number(ts)) <= MAX_TS_DRIFT_MS
-}
+import { isValidInternalRequest } from '@/lib/internal-request'
 
 export const GET = withApiHandler(async (req: NextRequest) => {
   const isTrusted = isValidInternalRequest(req)

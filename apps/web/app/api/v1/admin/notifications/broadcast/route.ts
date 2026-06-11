@@ -1,26 +1,14 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
-import { env } from '@/lib/env'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { adminBroadcastRatelimit } from '@/lib/redis'
 import { broadcastNotification } from '@/services/admin.service'
 import type { BroadcastChannel, BroadcastFilter } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { isValidInternalRequest } from '@/lib/internal-request'
 
 const VALID_CHANNELS: BroadcastChannel[] = ['SMS', 'EMAIL', 'BOTH']
 const VALID_FILTERS: BroadcastFilter[]  = ['ALL', 'ACTIVE', 'PENDING', 'SUSPENDED']
-
-const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000
-
-function isValidInternalRequest(req: NextRequest): boolean {
-  if (!env.ADMIN_API_SECRET) return false
-  const secret = req.headers.get('x-admin-secret')
-  if (secret !== env.ADMIN_API_SECRET) return false
-  const ts = req.headers.get('x-admin-timestamp')
-  if (!ts) return false
-  const drift = Math.abs(Date.now() - Number(ts))
-  return drift <= MAX_TIMESTAMP_DRIFT_MS
-}
 
 export const POST = withApiHandler(async (req: NextRequest) => {
   const isTrustedInternal = isValidInternalRequest(req)

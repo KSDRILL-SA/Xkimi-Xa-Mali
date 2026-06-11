@@ -15,6 +15,15 @@ vi.mock('@/lib/auth', () => ({
   auth: vi.fn(),
 }))
 
+// The route now resolves preferences through member.service, which transitively
+// imports @/lib/encryption (and thus the validated env). Mock env so the suite
+// doesn't require real secrets.
+vi.mock('@/lib/env', () => ({
+  env: {
+    ENCRYPTION_KEY: '0'.repeat(64),
+  },
+}))
+
 vi.mock('next/server', () => ({
   NextResponse: {
     json: (body: unknown, init?: { status?: number }) => ({
