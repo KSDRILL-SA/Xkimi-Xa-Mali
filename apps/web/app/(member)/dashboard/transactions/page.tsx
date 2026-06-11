@@ -71,14 +71,22 @@ export default async function TransactionsPage({
     <div className="space-y-6">
 
       {/* ── Header ─────────────────────────────────── */}
-      <Reveal variant="up" className="flex items-start gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
-          <ArrowUpCircle size={22} className="text-xxm-green" aria-hidden />
+      <Reveal variant="up" className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-xxm-green/15 to-xxm-green/5 flex items-center justify-center shrink-0 ring-1 ring-xxm-green/10">
+            <ArrowUpCircle size={22} className="text-xxm-green" aria-hidden />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Transactions</h1>
+            <p className="text-sm text-xxm-gray-500 mt-1">Full payment history for your account</p>
+          </div>
         </div>
-        <div>
-          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Transactions</h1>
-          <p className="text-sm text-xxm-gray-500 mt-1">Full payment history for your account</p>
-        </div>
+        {total > 0 && (
+          <div className="inline-flex items-center gap-2 rounded-2xl bg-white border border-xxm-green/10 shadow-xxm-sm px-4 py-2 shrink-0">
+            <span className="stat-number text-xl font-black text-xxm-green-900">{total}</span>
+            <span className="text-[11px] text-xxm-gray-400 leading-tight">total<br />records</span>
+          </div>
+        )}
       </Reveal>
 
       {/* ── Filters ────────────────────────────────── */}
@@ -102,15 +110,15 @@ export default async function TransactionsPage({
       {/* ── Transaction list ───────────────────────── */}
       <Reveal variant="up" delay={200}>
       {txs.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
-            <ArrowUpCircle size={24} className="text-xxm-green-300" aria-hidden />
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
+          <div className="w-16 h-16 rounded-3xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
+            <ArrowUpCircle size={26} className="text-xxm-green/40" aria-hidden />
           </div>
-          <p className="text-xxm-gray-600 font-semibold">No transactions found</p>
-          <p className="text-xxm-gray-400 text-xs mt-1.5">Try adjusting your filters</p>
+          <p className="text-xxm-green-900 font-bold">No transactions found</p>
+          <p className="text-xxm-gray-400 text-xs mt-1.5">Try adjusting your filters above.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden">
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
           {/* Column header */}
           <div className="hidden sm:grid grid-cols-[1fr_100px_100px_140px_1fr_90px] gap-3 px-5 py-2.5 bg-xxm-gray-50 border-b border-xxm-gray-100">
             <span className="text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest">Period</span>
@@ -176,17 +184,23 @@ export default async function TransactionsPage({
       )}
 
       {/* ── Statement shortcut ─────────────────────── */}
-      <Reveal variant="up" delay={300} className="bg-xxm-green-50 border border-xxm-green/15 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="font-bold text-xxm-green-900 text-sm">Need a PDF statement?</p>
-          <p className="text-xs text-xxm-gray-500 mt-0.5">Download a formatted statement for any contribution month</p>
+      <Reveal variant="up" delay={300} className="relative overflow-hidden bg-gradient-to-br from-xxm-green to-xxm-canopy rounded-3xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xxm">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/4 pointer-events-none" aria-hidden />
+        <div className="relative z-10 flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+            <FileText size={18} className="text-xxm-gold" aria-hidden />
+          </div>
+          <div>
+            <p className="font-bold text-white text-sm">Need a PDF statement?</p>
+            <p className="text-xs text-green-100/70 mt-0.5">Download a premium formatted statement for any contribution month.</p>
+          </div>
         </div>
         <Link
           href="/dashboard/statements"
-          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm rounded-xl bg-xxm-green text-white font-semibold hover:bg-xxm-canopy transition-colors shrink-0 self-start sm:self-auto"
+          className="relative z-10 inline-flex items-center gap-2 px-5 py-2.5 text-sm rounded-2xl bg-xxm-gold text-xxm-green-900 font-bold hover:bg-xxm-gold-light hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-gold-sm shrink-0 self-start sm:self-auto"
         >
           <FileText size={14} aria-hidden />
-          View Statements
+          View statements
         </Link>
       </Reveal>
     </div>
