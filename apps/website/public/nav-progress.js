@@ -87,7 +87,7 @@
         const url = new URL(href, window.location.href);
         if (url.origin !== window.location.origin) return;
         if (url.pathname === window.location.pathname && url.search === window.location.search) return;
-      } catch (_) {
+      } catch {
         return;
       }
       start();
