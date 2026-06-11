@@ -2,6 +2,7 @@ import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { recalculateContributionStatus } from '@/services/contribution.service'
+import { reconcileLedger } from '@/services/ledger.service'
 import { writeAuditLog } from '@/services/audit.service'
 
 export const ledgerReconciliation = inngest.createFunction(
@@ -61,6 +62,14 @@ export const ledgerReconciliation = inngest.createFunction(
       })
     }
 
-    return { checked: drifted.length + corrected, drifted: drifted.length, corrected }
+    // Backfill any missing immutable-ledger entries from settled transactions.
+    const ledger = await step.run('reconcile-ledger', () => reconcileLedger())
+
+    return {
+      checked: drifted.length + corrected,
+      drifted: drifted.length,
+      corrected,
+      ledger,
+    }
   },
 )
