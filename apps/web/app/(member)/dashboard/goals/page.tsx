@@ -90,11 +90,11 @@ export default async function GoalsPage({
       {/* ── Goals grid ────────────────────────────────────── */}
       <Reveal variant="up" delay={200}>
       {goals.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-12 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-xxm-gold/10 flex items-center justify-center mx-auto mb-4">
-            <Target size={24} className="text-xxm-gold-dark/50" aria-hidden />
+        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
+          <div className="w-16 h-16 rounded-3xl bg-xxm-gold/10 flex items-center justify-center mx-auto mb-4">
+            <Target size={26} className="text-xxm-gold-dark/50" aria-hidden />
           </div>
-          <p className="text-xxm-gray-600 font-medium">No goals found</p>
+          <p className="text-xxm-green-900 font-bold">No goals found</p>
           {admin && (
             <p className="text-xxm-gray-400 text-xs mt-1.5 max-w-xs mx-auto">
               Create the first goal from the admin portal to start tracking collective progress.
@@ -113,7 +113,7 @@ export default async function GoalsPage({
               <Link
                 key={goal.id}
                 href={`/dashboard/goals/${goal.id}`}
-                className={`group block bg-white rounded-2xl border ${cfg.cardBorder} shadow-xxm-sm p-5 space-y-4 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
+                className={`group block bg-white rounded-3xl border ${cfg.cardBorder} shadow-xxm-sm p-5 space-y-4 hover:shadow-xxm hover:-translate-y-1 transition-all duration-slow ease-smooth`}
               >
                 {/* Title row */}
                 <div className="flex items-start justify-between gap-3">

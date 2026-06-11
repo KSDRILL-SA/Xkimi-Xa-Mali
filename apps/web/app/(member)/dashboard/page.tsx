@@ -36,9 +36,9 @@ function GoalsSkeleton() {
 
 const QUICK_ACTIONS = [
   { href: '/dashboard/contribute',    label: 'Make a payment', sub: 'Pay your contribution', icon: CreditCard, primary: true },
-  { href: '/dashboard/contributions', label: 'Contributions',  sub: 'Your monthly ledger',   icon: Wallet },
-  { href: '/dashboard/goals',         label: 'Goals',          sub: 'Track your targets',    icon: Target },
-  { href: '/dashboard/statements',    label: 'Statements',     sub: 'Download PDFs',         icon: FileText },
+  { href: '/dashboard/contributions', label: 'Contributions',  sub: 'Your monthly ledger',   icon: Wallet,     primary: false },
+  { href: '/dashboard/goals',         label: 'Goals',          sub: 'Track your targets',    icon: Target,     primary: false },
+  { href: '/dashboard/statements',    label: 'Statements',     sub: 'Download PDFs',         icon: FileText,   primary: false },
 ] as const
 
 function SectionHeading({
