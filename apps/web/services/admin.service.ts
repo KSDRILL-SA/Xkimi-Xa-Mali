@@ -8,6 +8,7 @@ import { smsProvider } from '@/integrations/sms'
 import { emailProvider } from '@/integrations/email'
 import { generateMonthlyContributions } from './contribution.service'
 import { cache, CACHE_KEYS } from '@/lib/cache'
+import { tallyBy } from '@/lib/aggregate'
 import { bumpRoleVersion } from '@/lib/role-version'
 import { userRepo } from '@/repositories/user.repository'
 import { mandateRepo } from '@/repositories/mandate.repository'
@@ -527,24 +528,8 @@ export async function getDashboardStats(adminRoles: string[]) {
     contributionRepo.count({ createdAt: { gte: monthStart } }),
   ])
 
-  const memberMap = Object.fromEntries(
-    memberCounts.map((r) => {
-      const count =
-        typeof r._count === 'object' && r._count !== null && 'status' in r._count
-          ? Number((r._count as { status: number }).status)
-          : 0
-      return [r.status, count]
-    }),
-  )
-  const mandateMap = Object.fromEntries(
-    mandateCounts.map((r: { status: string; _count: unknown }) => {
-      const count =
-        typeof r._count === 'object' && r._count !== null && 'status' in r._count
-          ? Number((r._count as { status: number }).status)
-          : 0
-      return [r.status, count]
-    }),
-  )
+  const memberMap = tallyBy(memberCounts, (r: { status: string; _count: unknown }) => r.status, 'status')
+  const mandateMap = tallyBy(mandateCounts, (r: { status: string; _count: unknown }) => r.status, 'status')
 
   const thisMonthDue = Number(contributionSummary._sum?.amountDue ?? 0)
   const thisMonthPaid = Number(contributionSummary._sum?.amountPaid ?? 0)
