@@ -4,6 +4,14 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 // Mocks
 // ---------------------------------------------------------------------------
 
+// Replace the validated env so the suite doesn't require real secrets at import
+// (report.service transitively imports @/lib/encryption).
+vi.mock('@/lib/env', () => ({
+  env: {
+    ENCRYPTION_KEY: '0'.repeat(64),
+  },
+}))
+
 vi.mock('@/lib/db', () => ({
   db: {
     transaction: {
@@ -17,6 +25,9 @@ vi.mock('@/lib/db', () => ({
     contribution: {
       findMany: vi.fn(),
       aggregate: vi.fn(),
+    },
+    bankAccount: {
+      findMany: vi.fn(),
     },
   },
 }))
@@ -64,6 +75,7 @@ const mockUserFindUnique = db.user.findUnique as MockedFunction<typeof db.user.f
 const mockUserFindMany   = db.user.findMany   as MockedFunction<typeof db.user.findMany>
 const mockContribFindMany = db.contribution.findMany as MockedFunction<typeof db.contribution.findMany>
 const mockContribAggregate = db.contribution.aggregate as MockedFunction<typeof db.contribution.aggregate>
+const mockBankAccountFindMany = db.bankAccount.findMany as MockedFunction<typeof db.bankAccount.findMany>
 const mockUpload = storageProvider.upload as MockedFunction<typeof storageProvider.upload>
 const mockRenderPDF      = renderStatementPDF as MockedFunction<typeof renderStatementPDF>
 const mockVerifySignature = verifySignatureExists as MockedFunction<typeof verifySignatureExists>
@@ -167,6 +179,15 @@ describe('getTransactionHistory', () => {
 describe('generateMemberStatement', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset implementations so a queued mockResolvedValueOnce can't leak between
+    // tests, and provide safe defaults for the always-called dependencies.
+    mockVerifySignature.mockReset()
+    mockEmbedSignature.mockReset()
+    mockUserFindMany.mockReset()
+    mockContribFindMany.mockReset()
+    mockBankAccountFindMany.mockReset()
+    mockVerifySignature.mockResolvedValue(null as never)
+    mockBankAccountFindMany.mockResolvedValue([] as never)
   })
 
   it('throws ReportForbiddenError for cross-user access by member', async () => {
@@ -191,7 +212,8 @@ describe('generateMemberStatement', () => {
     mockEmbedSignature.mockResolvedValueOnce('data:image/png;base64,fakedata')
 
     mockUserFindMany.mockResolvedValueOnce([{
-      firstName: 'Sipho', lastName: 'Dlamini', email: 's@test.com', phone: '+27821234567',
+      id: 'user-1', firstName: 'Sipho', lastName: 'Dlamini', email: 's@test.com',
+      phone: '+27821234567', createdAt: new Date('2025-01-01T00:00:00Z'),
     }] as never)
 
     mockContribFindMany.mockResolvedValueOnce([
@@ -325,12 +347,15 @@ describe('exportAdminReportCSV', () => {
     mockContribAggregate.mockResolvedValue({ _sum: { amountPaid: 5000 } } as never)
 
     const csv = await exportAdminReportCSV(5, 2025)
-    const lines = csv.split('\n')
+    const lines = csv.split('\r\n')
 
-    expect(lines[0]).toBe('Name,Email,Phone,Amount Due,Amount Paid,Outstanding,Status')
-    expect(lines[1]).toContain('"Sipho Dlamini"')
-    expect(lines[1]).toContain('500.00')
-    expect(lines).toContain('"Total Paid",500.00')
-    expect(lines).toContain('"Collection Rate",100%')
+    // Title block, then the column header row, then member rows, then summary.
+    expect(lines[0]).toBe('XKIMM XA MALI — CONTRIBUTION REPORT')
+    expect(lines[1]).toBe('Period: May 2025')
+    expect(lines[4]).toBe('Member Name,Email Address,Phone Number,Amount Due (R),Amount Paid (R),Outstanding (R),Status')
+    expect(lines[5]).toContain('Sipho Dlamini')
+    expect(lines[5]).toContain('500.00')
+    expect(lines).toContain('Collection Rate,100%')
+    expect(lines).toContain('Total Paid,R 500.00')
   })
 })
