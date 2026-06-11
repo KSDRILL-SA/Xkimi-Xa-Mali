@@ -486,6 +486,7 @@ export async function getDashboardStats(adminRoles: string[]) {
     recentAuditLogs,
     poolTotal,
     pendingInvites,
+    newContributionsThisMonth,
   ] = await Promise.all([
     // Member counts by status
     userRepo.groupBy({ by: ['status'], _count: { status: true } }),
@@ -521,12 +522,10 @@ export async function getDashboardStats(adminRoles: string[]) {
 
     // Open invitation count
     invitationRepo.count({ status: 'PENDING', expiresAt: { gt: now } }),
-  ])
 
-  // Contributions received this calendar month
-  const newContributionsThisMonth = await contributionRepo.count(
-    { createdAt: { gte: monthStart } },
-  )
+    // Contributions received this calendar month
+    contributionRepo.count({ createdAt: { gte: monthStart } }),
+  ])
 
   const memberMap = Object.fromEntries(
     memberCounts.map((r) => {
