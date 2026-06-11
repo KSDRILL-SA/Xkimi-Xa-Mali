@@ -2,10 +2,9 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
-import { db } from '@/lib/db'
-import { decrypt } from '@/lib/encryption'
 import { env } from '@/lib/env'
 import { getContributions, getContributionSummary } from '@/services/contribution.service'
+import { getMandates } from '@/services/mandate.service'
 import { ContributionSummaryCards } from '@/components/contribution/SummaryCards'
 import { GroupCollectionAccount } from '@/components/contribution/GroupCollectionAccount'
 import { ContributionRow } from '@/components/contribution/ContributionRow'
@@ -30,16 +29,13 @@ export default async function ContributionsPage({
   const params  = await searchParams
   const page    = Math.max(1, Number(params.page ?? '1'))
 
-  const [summary, paginated, activeMandate] = await Promise.all([
+  const [summary, paginated, allMandates] = await Promise.all([
     getContributionSummary(userId, userId, roles),
     getContributions(userId, userId, roles, page, PAGE_SIZE),
-    db.paymentMandate.findFirst({
-      where: { userId, status: 'ACTIVE' },
-      include: {
-        bankAccount: { select: { bankName: true, accountNumber: true } },
-      },
-    }),
+    getMandates(userId, userId, roles),
   ])
+
+  const activeMandate = allMandates.find((m) => m.status === 'ACTIVE') ?? null
 
   const { items: contributions, total, totalPages } = paginated
 
@@ -48,7 +44,7 @@ export default async function ContributionsPage({
   const mandateInfo = activeMandate && manualPaymentsEnabled
     ? {
         bankName: activeMandate.bankAccount.bankName,
-        accountNumberMasked: maskAccount(activeMandate.bankAccount.accountNumber),
+        accountNumberMasked: activeMandate.bankAccount.accountNumberMasked,
       }
     : null
 
@@ -155,7 +151,3 @@ export default async function ContributionsPage({
   )
 }
 
-function maskAccount(encrypted: string): string {
-  const plain = decrypt(encrypted)
-  return plain.slice(-4).padStart(plain.length, '*')
-}
