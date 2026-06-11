@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory } from '@/lib/services'
 import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader, Reveal } from '@xxm/ui'
+import { UserCircle } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
 
 export const metadata: Metadata = { title: 'Member Detail' }
@@ -79,6 +80,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       <PageHeader
         title={`${member.firstName} ${member.lastName}`}
         subtitle={member.email}
+        icon={<UserCircle size={22} className="text-xxm-green" aria-hidden />}
         action={
           <div className="flex items-center gap-2 flex-wrap">
             <form action={handleStatusChange} className="flex items-center gap-2">

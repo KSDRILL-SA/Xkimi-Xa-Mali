@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { listAllGoals, createGoal, activateGoal, lockGoal, deleteGoal, recordGoalProgress } from '@/lib/services'
 import { formatZAR, formatDate, MONTHS } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
+import { Target } from 'lucide-react'
 import { GoalsTable, type GoalRow } from './GoalsTable'
 
 export const metadata: Metadata = { title: 'Goals' }
@@ -121,7 +122,7 @@ export default async function GoalsPage({
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Goals' }]} />
       <Reveal variant="up">
-        <PageHeader title="Goals" subtitle={`${total} total`} />
+        <PageHeader title="Goals" subtitle={`${total} total`} icon={<Target size={22} className="text-xxm-green" aria-hidden />} />
       </Reveal>
 
       {created && (

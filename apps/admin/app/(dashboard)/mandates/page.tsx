@@ -5,6 +5,7 @@ import { auth } from '@/lib/auth'
 import { listAllMandates, approveMandate, rejectMandate } from '@/lib/services'
 import { formatZAR, formatDate } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
+import { CreditCard } from 'lucide-react'
 import { MandatesTable, type MandateRow } from './MandatesTable'
 import Link from 'next/link'
 
@@ -70,7 +71,7 @@ export default async function MandatesPage({
     <div className="space-y-6">
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Mandates' }]} />
       <Reveal variant="up">
-        <PageHeader title="Mandates" subtitle={`${total} total`} />
+        <PageHeader title="Mandates" subtitle={`${total} total`} icon={<CreditCard size={22} className="text-xxm-green" aria-hidden />} />
       </Reveal>
 
       <Reveal variant="up" delay={100}>
