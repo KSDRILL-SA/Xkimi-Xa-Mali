@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
+import { internalAdminPost } from '@/lib/api'
 import { listInvitations, revokeInvitation } from '@/lib/services'
 import { formatDate, formatZAR } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
@@ -19,39 +20,22 @@ async function createInvite(_prev: InviteState, fd: FormData): Promise<InviteSta
   const sr = (s.user.roles as string[] | undefined) ?? []
   if (!sr.includes('ADMIN')) redirect('/forbidden')
 
-  const webUrl      = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000'
-  const adminSecret = process.env['ADMIN_API_SECRET'] ?? ''
+  const result = await internalAdminPost<CreatedInvite>(
+    '/api/v1/admin/invitations',
+    {
+      firstName:     (fd.get('firstName') as string | null)?.trim(),
+      lastName:      (fd.get('lastName')  as string | null)?.trim(),
+      email:         (fd.get('email')     as string | null)?.trim().toLowerCase(),
+      phone:          fd.get('phone'),
+      minimumAmount:  Number(fd.get('minimumAmount')),
+    },
+    { adminUserId: s.user.id },
+  )
 
-  try {
-    const res = await fetch(`${webUrl}/api/v1/admin/invitations`, {
-      method:  'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'x-admin-secret':    adminSecret,
-        'x-admin-timestamp': String(Date.now()),
-        'x-admin-user-id':   s.user.id,
-      },
-      body: JSON.stringify({
-        firstName:     (fd.get('firstName') as string | null)?.trim(),
-        lastName:      (fd.get('lastName')  as string | null)?.trim(),
-        email:         (fd.get('email')     as string | null)?.trim().toLowerCase(),
-        phone:          fd.get('phone'),
-        minimumAmount:  Number(fd.get('minimumAmount')),
-      }),
-    })
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as { error?: { message?: string } }
-      return { error: err.error?.message ?? 'Failed to create invitation' }
-    }
-
-    const json = await res.json() as { data?: CreatedInvite }
-    if (!json.data) return { error: 'Unexpected response from server' }
-    revalidatePath('/invitations')
-    return { data: json.data }
-  } catch {
-    return { error: 'Network error. Please try again.' }
-  }
+  if (!result.ok)   return { error: result.error?.message ?? 'Failed to create invitation' }
+  if (!result.data) return { error: 'Unexpected response from server' }
+  revalidatePath('/invitations')
+  return { data: result.data }
 }
 
 export const metadata: Metadata = { title: 'Invitations' }

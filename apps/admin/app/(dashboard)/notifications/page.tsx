@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
+import { internalAdminPost } from '@/lib/api'
 import { Alert, Reveal } from '@xxm/ui'
 import { Megaphone, MessageSquare, Mail, Layers, Users, UserCheck, Clock, Ban, Send } from 'lucide-react'
 
@@ -35,25 +36,8 @@ export default async function NotificationsPage({
 
     if (!message || message.length < 5) redirect('/notifications?failed=1')
 
-    const webUrl      = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? ''
-    const adminSecret = process.env['ADMIN_API_SECRET'] ?? ''
-    if (!webUrl || !adminSecret) redirect('/notifications?failed=1')
-
-    try {
-      const res = await fetch(`${webUrl}/api/v1/admin/notifications/broadcast`, {
-        method: 'POST',
-        headers: {
-          'Content-Type':      'application/json',
-          'x-admin-secret':    adminSecret,
-          'x-admin-timestamp': String(Date.now()),
-        },
-        body: JSON.stringify({ message, channel, filter }),
-      })
-      if (!res.ok) redirect('/notifications?failed=1')
-      redirect('/notifications?sent=1')
-    } catch {
-      redirect('/notifications?failed=1')
-    }
+    const result = await internalAdminPost('/api/v1/admin/notifications/broadcast', { message, channel, filter })
+    redirect(result.ok ? '/notifications?sent=1' : '/notifications?failed=1')
   }
 
   const channels: { value: Channel; label: string; icon: React.FC<{ size?: number; className?: string }>; description: string }[] = [
