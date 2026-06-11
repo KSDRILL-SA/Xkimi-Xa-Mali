@@ -20,12 +20,14 @@ function validateSAId(id: string): boolean {
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export const LoginSchema = z.object({
-  email:    z.string().email('Please enter a valid email address'),
+  // Emails are case-insensitive — normalise so "Kurhula@x.com" matches the
+  // stored "kurhula@x.com" record.
+  email:    z.string().trim().toLowerCase().email('Please enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
 })
 
 export const RegisterSchema = z.object({
-  email:    z.string().email('Please enter a valid email address'),
+  email:    z.string().trim().toLowerCase().email('Please enter a valid email address'),
   phone:    z.string().regex(SA_PHONE_REGEX, 'Please enter a valid SA mobile number (e.g. 0821234567)'),
   firstName: z.string().min(2, 'First name must be at least 2 characters').max(50),
   lastName:  z.string().min(2, 'Last name must be at least 2 characters').max(50),
