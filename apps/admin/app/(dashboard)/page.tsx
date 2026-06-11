@@ -84,37 +84,42 @@ export default async function AdminOverviewPage() {
     <div className="space-y-7">
 
       {/* ── Hero greeting ─────────────────────────────────────────── */}
-      <Reveal variant="up" className="relative overflow-hidden bg-gradient-to-br from-xxm-green via-xxm-canopy to-xxm-green-900 rounded-2xl p-6 md:p-8 text-white shadow-xxm-lg">
+      <Reveal variant="up" className="relative overflow-hidden bg-gradient-to-br from-xxm-green via-xxm-canopy to-xxm-green-900 rounded-3xl p-6 md:p-9 text-white shadow-xxm-lg">
         <div className="noise-overlay" aria-hidden />
-        <div className="relative z-10">
-          <p className="text-xxm-gold text-xs font-bold tracking-widest uppercase mb-2">Xkimm Xa Mali — Admin</p>
-          <h1 className="font-display text-2xl md:text-3xl font-extrabold tracking-tight">
-            Welcome back, {firstName}
+        <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/4 pointer-events-none animate-orb-drift-1" aria-hidden />
+        <div className="absolute bottom-0 right-1/3 w-44 h-44 bg-xxm-gold/10 rounded-full translate-y-1/2 pointer-events-none animate-orb-drift-2" aria-hidden />
+        <div className="absolute -bottom-10 -left-6 w-40 h-40 bg-white/[0.04] rounded-full pointer-events-none animate-orb-drift-3" aria-hidden />
+        <div className="relative z-10 max-w-2xl">
+          <div className="inline-flex items-center gap-2 mb-3 glass-gold rounded-full px-3 py-1.5">
+            <ShieldCheck size={12} className="text-xxm-gold" aria-hidden />
+            <p className="text-xxm-gold text-[11px] font-bold tracking-widest uppercase">Xkimm Xa Mali — Admin</p>
+          </div>
+          <h1 className="font-display text-3xl md:text-4xl font-black tracking-tight">
+            Welcome back, <span className="text-shimmer">{firstName}</span>
           </h1>
-          <p className="text-green-200/90 mt-2 text-sm max-w-md leading-relaxed">
+          <p className="text-green-100/75 mt-2.5 text-sm md:text-base max-w-md leading-relaxed">
             Platform overview for{' '}
             <span className="text-white font-semibold">{monthName} {year}</span>.{' '}
             {collectionRate >= 80
               ? 'Collections are on track — excellent work!'
               : 'Some contributions still need attention this month.'}
           </p>
-          <div className="mt-5 flex items-center gap-3 flex-wrap">
-            <Link
-              href="/reports"
-              className="inline-flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors border border-white/10"
-            >
-              <FileText size={14} aria-hidden /> View Reports
-            </Link>
+          <div className="mt-6 flex items-center gap-3 flex-wrap">
             <Link
               href="/invitations"
-              className="inline-flex items-center gap-2 bg-xxm-gold hover:bg-xxm-gold-light text-xxm-green-900 text-sm font-bold px-4 py-2 rounded-xl transition-colors shadow-gold-sm"
+              className="group inline-flex items-center gap-2 bg-xxm-gold hover:bg-xxm-gold-light text-xxm-green-900 text-sm font-bold px-5 py-2.5 rounded-2xl transition-all duration-fast ease-smooth hover:-translate-y-0.5 shadow-gold-sm"
             >
-              <UserPlus size={14} aria-hidden /> Invite Member
+              <UserPlus size={15} aria-hidden /> Invite member
+              <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" aria-hidden />
+            </Link>
+            <Link
+              href="/reports"
+              className="inline-flex items-center gap-2 bg-white/12 hover:bg-white/20 text-white text-sm font-semibold px-5 py-2.5 rounded-2xl transition-all duration-fast ease-smooth hover:-translate-y-0.5 border border-white/10 backdrop-blur-sm"
+            >
+              <FileText size={14} aria-hidden /> View reports
             </Link>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full -translate-y-1/3 translate-x-1/4 pointer-events-none animate-orb-drift-1" aria-hidden />
-        <div className="absolute bottom-0 right-1/4 w-40 h-40 bg-xxm-gold/10 rounded-full translate-y-1/2 pointer-events-none animate-orb-drift-2" aria-hidden />
       </Reveal>
 
       {/* ── Stat cards ────────────────────────────────────────────── */}
@@ -122,7 +127,7 @@ export default async function AdminOverviewPage() {
         {stats.map(({ icon: Icon, label, value, subtext, gradient, iconBg, iconColor, border }) => (
           <div
             key={label}
-            className={`group relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
+            className={`group relative overflow-hidden bg-gradient-to-b ${gradient} rounded-3xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-1 transition-all duration-slow ease-smooth`}
           >
             <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-transform duration-slow group-hover:scale-110`}>
               <Icon size={18} className={iconColor} aria-hidden />
@@ -137,7 +142,7 @@ export default async function AdminOverviewPage() {
       </Reveal>
 
       {/* ── Collection rate ─────────────────────────────────────────── */}
-      <Reveal variant="up" delay={200} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-6 space-y-4">
+      <Reveal variant="up" delay={200} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h2 className="font-display text-base font-bold text-xxm-green-900">{monthName} Collection Rate</h2>
@@ -176,16 +181,16 @@ export default async function AdminOverviewPage() {
             <Link
               key={href}
               href={href}
-              className="group flex flex-col gap-3 p-4 bg-white rounded-2xl border border-xxm-green/7 shadow-xxm-sm hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth"
+              className="group relative flex flex-col gap-3 p-4 bg-white rounded-2xl border border-xxm-green/7 shadow-xxm-sm hover:shadow-xxm hover:-translate-y-1 transition-all duration-slow ease-smooth"
             >
-              <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center transition-transform duration-slow group-hover:scale-110`}>
+              <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center transition-transform duration-slow ease-bounce group-hover:scale-110`}>
                 <Icon size={18} className={iconColor} aria-hidden />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-xxm-green-900">{label}</p>
+                <p className="text-sm font-bold text-xxm-green-900">{label}</p>
                 <p className="text-[11px] text-xxm-gray-400 mt-0.5 leading-snug">{description}</p>
               </div>
-              <ArrowRight size={12} className={`${iconColor} opacity-0 group-hover:opacity-100 transition-opacity`} aria-hidden />
+              <ArrowRight size={14} className={`absolute top-4 right-4 ${iconColor} opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-slow`} aria-hidden />
             </Link>
           ))}
         </div>
