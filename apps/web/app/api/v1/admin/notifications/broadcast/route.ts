@@ -7,7 +7,7 @@ import type { BroadcastChannel, BroadcastFilter } from '@/services/admin.service
 import { withApiHandler } from '@/lib/api-handler'
 import { isValidInternalRequest } from '@/lib/internal-request'
 
-const VALID_CHANNELS: BroadcastChannel[] = ['SMS', 'EMAIL', 'BOTH']
+const VALID_CHANNELS: BroadcastChannel[] = ['SMS', 'EMAIL', 'BOTH', 'IN_APP']
 const VALID_FILTERS: BroadcastFilter[]  = ['ALL', 'ACTIVE', 'PENDING', 'SUSPENDED']
 
 export const POST = withApiHandler(async (req: NextRequest) => {

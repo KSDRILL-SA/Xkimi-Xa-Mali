@@ -3,11 +3,11 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { internalAdminPost } from '@/lib/api'
 import { Alert, Reveal } from '@xxm/ui'
-import { Megaphone, MessageSquare, Mail, Layers, Users, UserCheck, Clock, Ban, Send } from 'lucide-react'
+import { Megaphone, MessageSquare, Mail, Layers, Inbox, Users, UserCheck, Clock, Ban, Send } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Broadcast' }
 
-type Channel = 'SMS' | 'EMAIL' | 'BOTH'
+type Channel = 'SMS' | 'EMAIL' | 'BOTH' | 'IN_APP'
 type Filter  = 'ALL' | 'ACTIVE' | 'PENDING' | 'SUSPENDED'
 
 export default async function NotificationsPage({
@@ -41,9 +41,10 @@ export default async function NotificationsPage({
   }
 
   const channels: { value: Channel; label: string; icon: React.FC<{ size?: number; className?: string }>; description: string }[] = [
-    { value: 'SMS',   label: 'SMS only',    icon: MessageSquare, description: 'Text message to phone' },
-    { value: 'EMAIL', label: 'Email only',  icon: Mail,          description: 'Email to inbox' },
-    { value: 'BOTH',  label: 'SMS + Email', icon: Layers,        description: 'Both channels' },
+    { value: 'IN_APP', label: 'In-app',      icon: Inbox,         description: 'Lands in the member inbox · free' },
+    { value: 'SMS',    label: 'SMS only',    icon: MessageSquare, description: 'Text message to phone' },
+    { value: 'EMAIL',  label: 'Email only',  icon: Mail,          description: 'Email to inbox' },
+    { value: 'BOTH',   label: 'SMS + Email', icon: Layers,        description: 'Both channels' },
   ]
 
   const filters: { value: Filter; label: string; icon: React.FC<{ size?: number; className?: string }>; description: string }[] = [
@@ -97,10 +98,10 @@ export default async function NotificationsPage({
           {/* ── Channel ──────────────────────────────────────── */}
           <Reveal variant="up" delay={200} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-3">
             <p className="text-sm font-bold text-xxm-green-900 mb-3">Delivery Channel</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {channels.map(({ value, label, icon: Icon, description }) => (
                 <label key={value} className="relative flex flex-col gap-2 p-4 rounded-xl border-2 border-xxm-gray-200 cursor-pointer hover:border-xxm-green/40 has-[:checked]:border-xxm-green has-[:checked]:bg-xxm-green-50 transition-all">
-                  <input type="radio" name="channel" value={value} defaultChecked={value === 'SMS'} className="sr-only" />
+                  <input type="radio" name="channel" value={value} defaultChecked={value === 'IN_APP'} className="sr-only" />
                   <Icon size={18} className="text-xxm-green-700" aria-hidden />
                   <span className="text-sm font-semibold text-xxm-green-900">{label}</span>
                   <span className="text-[11px] text-xxm-gray-400 leading-snug">{description}</span>
