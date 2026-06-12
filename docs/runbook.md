@@ -1,280 +1,116 @@
-# Operational Runbook — Xkimm Xa Mali
+# Operational Runbook
 
-> This runbook covers: failed debit runs, stuck transactions, webhook failures, and emergency procedures.
-> For infrastructure setup, see [constitutions/infra.md](./constitutions/infra.md).
+Incident response for the money-moving paths: failed debit runs, stuck webhooks, reconciliation, mandate issues, and emergency halts. Infra setup: [constitutions/infra.md](./constitutions/infra.md) · go-live: [../DEPLOYMENT.md](../DEPLOYMENT.md).
+
+> **Reconciliation has changed:** the system keeps an append-only ledger and reconciles nightly. Prefer the built-in tools (re-drive the webhook, run `reconcileLedger`) over raw SQL. Reach for SQL only as a last resort — and then also post the matching ledger entry, or the pool balance drifts.
 
 ---
 
-## Debit Run Failure
-
-### Triage Decision Tree
+## Debit run failure
 
 ```mermaid
 flowchart TD
-    ALERT["Debit run alert fired\nor no SMS confirmations by 22:00"]
-
-    CHECK_INNGEST["Check Inngest dashboard\n— did debit.run job execute?"]
-
-    JOB_FAILED["Job failed\nbefore submitting"]
-    JOB_PARTIAL["Job ran but\nsome mandates failed"]
-    JOB_NO_WEBHOOK["Job ran, mandates submitted\nbut no webhook callbacks"]
-
-    NETCASH_DOWN["Netcash outage\n→ check status.netcash.co.za"]
-    INNGEST_ISSUE["Inngest execution issue\n→ check Inngest dashboard"]
-    WEBHOOK_ISSUE["Webhook delivery issue\n→ check /api/v1/webhooks/netcash logs"]
-
-    RETRY_JOB["Trigger debit.run manually\nvia Inngest dashboard"]
-    CHECK_TRANSACTIONS["Query DB: Transactions\nWHERE status = PENDING\nAND createdAt < now - 2h"]
-    MANUAL_RECONCILE["Manual reconciliation\n→ see Reconciliation section"]
-
-    ALERT --> CHECK_INNGEST
-    CHECK_INNGEST -->|"job not found"| INNGEST_ISSUE
-    CHECK_INNGEST -->|"job errored"| JOB_FAILED
-    CHECK_INNGEST -->|"job succeeded"| JOB_PARTIAL
-    CHECK_INNGEST -->|"job succeeded, 0 callbacks"| JOB_NO_WEBHOOK
-
-    JOB_FAILED --> INNGEST_ISSUE --> RETRY_JOB
-    JOB_PARTIAL --> NETCASH_DOWN
-    JOB_NO_WEBHOOK --> WEBHOOK_ISSUE
-
-    RETRY_JOB --> CHECK_TRANSACTIONS
-    NETCASH_DOWN -->|"outage confirmed"| MANUAL_RECONCILE
-    WEBHOOK_ISSUE --> CHECK_TRANSACTIONS
-    CHECK_TRANSACTIONS --> MANUAL_RECONCILE
+    ALERT["no SMS confirmations by 22:00<br/>or alert fired"] --> INNGEST["Inngest dashboard:<br/>did debit-run execute?"]
+    INNGEST -->|not found| IISSUE["Inngest issue → re-invoke"]
+    INNGEST -->|errored| IISSUE
+    INNGEST -->|ok, some failed| NC["Netcash outage?<br/>status.netcash.co.za"]
+    INNGEST -->|ok, 0 callbacks| WH["webhook delivery issue<br/>check /webhooks/netcash logs"]
+    IISSUE --> PEND["query PENDING transactions > 2h"]
+    NC -->|confirmed| RECON["reconcile (below)"]
+    WH --> PEND --> RECON
 ```
 
+1. **Verify the job ran** — Inngest → Functions → `debit-run`, look for the ~20:00 SAST run. Common failures: missing `DATABASE_URL`, Neon pool exhausted, unhandled exception in the function body.
+2. **Find stuck transactions:**
+   ```sql
+   SELECT t.id, t."idempotencyKey", t.amount, t."createdAt", u.email
+   FROM "Transaction" t
+   JOIN "Contribution" c ON t."contributionId" = c.id
+   JOIN "User" u ON c."userId" = u.id
+   WHERE t.status = 'PENDING' AND t."createdAt" < NOW() - INTERVAL '2 hours'
+   ORDER BY t."createdAt";
+   ```
+3. **Retry** — re-invoke `debit-run` from the Inngest dashboard. The idempotency key (`userId_mandateId_month_year`) means already-submitted mandates are skipped — no double charge.
+
 ---
 
-### Step 1 — Verify the Job Ran
+## Reconciliation (webhook missed but Netcash settled)
 
-1. Open the **Inngest dashboard** → Functions → `debit.run`
-2. Look for a run around 20:00 SAST on the target date
-3. Check status: `Completed`, `Failed`, or `Cancelled`
+**Preferred path — let the system do it:**
+1. If Netcash supports webhook replay, replay the callback. The handler is idempotent (dedupe table) and posts the ledger entry as part of normal settlement.
+2. Otherwise, run the **`ledgerReconciliation`** Inngest job (or wait for the nightly run) — it rebuilds ledger state from settled transactions. Check the result via `GET /api/v1/admin/ledger` (returns balance + entries).
 
-If the job failed: check the error in the Inngest run detail. Common causes:
-- `DATABASE_URL` environment variable missing in production
-- Neon connection pool exhausted (check Neon dashboard)
-- Unhandled exception in `debit.run` function body
-
----
-
-### Step 2 — Check Pending Transactions
+**Last resort — manual SQL** (only if the above can't run). Mark the transaction and contribution, **then post the ledger CREDIT**, all in one transaction, and write an audit row:
 
 ```sql
--- Find all transactions stuck in PENDING older than 2 hours
-SELECT t.id, t.idempotencyKey, t.amount, t.createdAt, u.email
-FROM "Transaction" t
-JOIN "Contribution" c ON t.contributionId = c.id
-JOIN "User" u ON c.userId = u.id
-WHERE t.status = 'PENDING'
-  AND t.createdAt < NOW() - INTERVAL '2 hours'
-ORDER BY t.createdAt ASC;
+BEGIN;
+UPDATE "Transaction" SET status = 'SUCCESS', "processedAt" = NOW()
+  WHERE id = '<txn_id>' AND status = 'PENDING';
+UPDATE "Contribution" SET status = 'PAID', "updatedAt" = NOW()
+  WHERE id = '<contribution_id>';
+-- keep the pool balance correct (idempotent on refType/refId/direction):
+INSERT INTO "LedgerEntry" (id, account, direction, amount, "refType", "refId", "createdAt")
+  VALUES (gen_random_uuid(), 'POOL', 'CREDIT', <amount>, 'Transaction', '<txn_id>', NOW())
+  ON CONFLICT ("refType", "refId", direction) DO NOTHING;
+INSERT INTO "AuditLog" (id, "userId", action, entity, "entityId", payload, "ipAddress", "createdAt")
+  VALUES (gen_random_uuid(), '<admin_user_id>', 'MANUAL_RECONCILE', 'Transaction', '<txn_id>',
+          '{"reason":"webhook delivery failure"}', NULL, NOW());
+COMMIT;
 ```
+
+> `AuditLog` columns are `userId, action, entity, entityId, payload, ipAddress` — match them exactly.
 
 ---
 
-### Step 3 — Retry via Inngest
+## Stuck webhook
 
-To re-trigger the debit run for a specific date:
+Netcash shows SUCCESS/FAILED but the DB didn't update and no confirmation SMS went out.
 
-1. Inngest dashboard → Functions → `debit.run` → **Invoke**
-2. Pass the payload: `{ "date": "YYYY-MM-DD" }`
-3. The function uses the idempotency key `debit-run-{date}-{mandateId}` — already-submitted mandates will not be double-charged
-
----
-
-### Step 4 — Manual Reconciliation
-
-If Netcash confirms a transaction succeeded but the webhook was never received:
-
-1. Log into the **Netcash portal** and pull the batch result
-2. For each successful transaction, run:
-
-```sql
--- Mark transaction as SUCCESS
-UPDATE "Transaction"
-SET status = 'SUCCESS', updatedAt = NOW()
-WHERE id = '<transaction_id>'
-  AND status = 'PENDING';
-
--- Mark contribution as PAID
-UPDATE "Contribution"
-SET status = 'PAID', paidAt = NOW(), updatedAt = NOW()
-WHERE id = '<contribution_id>'
-  AND status = 'PENDING';
-```
-
-3. Create an AuditLog entry for each manual update:
-
-```sql
-INSERT INTO "AuditLog" (id, action, entityType, entityId, adminId, note, createdAt)
-VALUES (
-  gen_random_uuid(),
-  'MANUAL_RECONCILE',
-  'Transaction',
-  '<transaction_id>',
-  '<admin_user_id>',
-  'Manual reconcile after webhook delivery failure on YYYY-MM-DD',
-  NOW()
-);
-```
-
----
-
-## Stuck Webhook
-
-### Symptoms
-- Netcash dashboard shows debit as `SUCCESS` or `FAILED`
-- No corresponding `Transaction` status update in DB
-- Member did not receive confirmation SMS
-
-### Diagnosis
-
-```bash
-# Check Better Stack logs for webhook endpoint
-# Filter: path=/api/v1/webhooks/netcash, date=target date
-```
-
-Common causes:
-
-| Cause | Signal | Fix |
+| Cause | Signal in logs | Fix |
 |---|---|---|
-| HMAC signature mismatch | `403 Forbidden` in logs | Verify `NETCASH_WEBHOOK_SECRET` env var matches Netcash portal setting |
-| Duplicate webhook (Netcash retries) | `409 Conflict` in logs | Already processed — check Transaction status |
-| Database write failure | `500` in logs | Check Neon connection, retry transaction |
-| IP not allowlisted | `403` before reaching handler | Add Netcash IP to Vercel allowlist |
+| HMAC mismatch | `401` | `NETCASH_WEBHOOK_SECRET` must match the Netcash portal value |
+| Duplicate (Netcash retried) | `200` no-op | Already processed — verify Transaction status; nothing to do |
+| DB write failure | `500` | Check Neon connection; the handler released the event key, so a replay re-runs cleanly |
+| IP not allowlisted | `403` before handler | Add the Netcash IP to the allowlist |
 
-### Force Replay
-
-If Netcash supports webhook replay (check their portal), replay the callback.
-
-If not: use manual reconciliation (Step 4 above).
+A **REVERSED** result posts a ledger DEBIT — confirm the balance moved via `GET /api/v1/admin/ledger`.
 
 ---
 
-## Overdue Contribution Recovery
+## Mandate & contribution
 
-### Member pays outside the system
+**Member paid outside the system (EFT):** Admin → Contributions → mark the OVERDUE record paid with a reference; this creates a `MANUAL` transaction and settles normally (ledger CREDIT posted).
 
-When a member pays via EFT directly (outside Netcash):
+**Reversal:** transactions are immutable. Create a new `REVERSAL` transaction — never `UPDATE`/`DELETE` an existing one. Settlement posts a ledger DEBIT.
 
-1. Admin portal → Contributions → Find OVERDUE contribution
-2. Mark as PAID with manual payment reference
-3. This creates a `Transaction` of type `MANUAL` in the DB
+**Mandate rejected by bank:** read the rejection reason from the webhook payload. Insufficient/wrong account details → admin verifies with the member and asks them to resubmit. Bank blocked DebiCheck → member contacts their bank.
 
-```sql
--- Verify before marking paid
-SELECT c.id, c.periodMonth, c.periodYear, c.status, u.email
-FROM "Contribution" c
-JOIN "User" u ON c.userId = u.id
-WHERE c.id = '<contribution_id>';
-```
+**Cancel a mandate** (member leaves/requests): Admin → Mandates → Cancel → sets `CANCELLED`, sends the Netcash cancellation, member gets an SMS.
 
 ---
 
-### Reversal
+## Emergency procedures
 
-Transactions are immutable. To reverse a charge:
-
-1. Create a new `Transaction` record with `type = 'REVERSAL'`
-2. Link it to the original transaction via the contribution
-3. Update the `Contribution` status back to `PENDING` or `OVERDUE`
-
-**Never UPDATE or DELETE a Transaction record directly.**
+- **Halt the debit run:** Inngest → `debit-run` → cancel queued/running invocations; set `DEBIT_RUN_PAUSED=true` in Vercel prod (the job checks it at startup and exits cleanly). Tell members in the WhatsApp group immediately.
+- **Roll back a bad release:** promote the previous Vercel deployment (one click). Migrations are additive, so no schema rollback is needed.
+- **DB emergency access:** Neon → `xxm-prod` → Query console. Read-only unless the incident requires a write; any write is audited and reviewed by a second person first.
+- **Rate-limit a legitimate user out:** Upstash → find `ratelimit:{endpoint}:{ip}` → delete the key to reset the window. Don't raise limits without a capacity review.
 
 ---
 
-## Mandate Issues
+## Monitoring & escalation
 
-### Mandate Rejected by Bank
+| Tool | Check |
+|---|---|
+| Better Stack | `/api/v1/health` uptime, alert history |
+| Sentry | errors by release, error-rate trends |
+| Inngest | job success/failure, retry depth |
+| Vercel / Neon | deploy status, function logs / pool usage, slow queries |
+| Netcash portal | batch results, mandate status, webhook logs |
 
-```mermaid
-flowchart TD
-    REJECT["Mandate rejected\nNetcash webhook: MANDATE_REJECTED"]
-    CHECK["Check rejection reason\nin webhook payload"]
-
-    INSUFF["Insufficient account details\nor wrong account type"]
-    BANK_BLOCK["Bank has blocked DebiCheck\nfor this account"]
-    WRONG_DETAILS["Account number / branch\nnot matching bank records"]
-
-    MEMBER_RESUBMIT["Ask member to resubmit\nwith corrected details"]
-    CONTACT_BANK["Member to contact\ntheir bank"]
-    MANUAL_VERIFY["Admin verifies details\nwith member directly"]
-
-    REJECT --> CHECK
-    CHECK --> INSUFF --> MANUAL_VERIFY --> MEMBER_RESUBMIT
-    CHECK --> WRONG_DETAILS --> MANUAL_VERIFY --> MEMBER_RESUBMIT
-    CHECK --> BANK_BLOCK --> CONTACT_BANK
-```
-
-### Cancelling a Mandate
-
-Mandates are only cancelled when a member leaves the group or requests it:
-
-1. Admin portal → Mandates → Cancel
-2. This sets `PaymentMandate.status = 'CANCELLED'` in DB
-3. Sends cancellation notice to Netcash via API
-4. Member receives confirmation SMS
-
----
-
-## Emergency Procedures
-
-### Full Debit Run Halt
-
-To stop the debit run from submitting (emergency only — e.g., data integrity concern):
-
-1. Inngest dashboard → Functions → `debit.run` → **Cancel** any queued/running invocation
-2. Set environment variable `DEBIT_RUN_PAUSED=true` in Vercel production settings
-3. The job checks this flag at startup and exits cleanly
-
-> Communicate to all members via WhatsApp group immediately.
-
----
-
-### Database Emergency Access
-
-Production DB: Neon dashboard → `xxm-prod` project → Query console
-
-All production queries must be:
-- Read-only unless an incident requires it
-- Logged with context in the AuditLog table
-- Reviewed by a second person before any UPDATE/DELETE
-
----
-
-### Rate Limit Breach
-
-If legitimate traffic is being rate-limited (e.g., bulk admin import):
-
-1. Upstash dashboard → Redis instance → Keys
-2. Find the rate limit key: `ratelimit:{endpoint}:{ip}`
-3. Delete the key to reset the window
-
-Do not permanently increase limits without a capacity review.
-
----
-
-## Monitoring Reference
-
-| Tool | URL | What to check |
+| Severity | Definition | Response |
 |---|---|---|
-| Better Stack | uptime.betterstack.com | `/api/v1/health` uptime, alert history |
-| Sentry | sentry.io | Errors by release, error rate trends |
-| Inngest | app.inngest.com | Job success/failure rates, retry queue depth |
-| Vercel | vercel.com/dashboard | Deployment status, function logs |
-| Neon | console.neon.tech | Connection pool usage, slow queries |
-| Netcash | portal.netcash.co.za | Batch results, mandate status, webhook logs |
-
----
-
-## On-Call Escalation
-
-| Severity | Definition | Response time |
-|---|---|---|
-| P1 | Money not moving on debit day | Immediate |
+| P1 | Money not moving on debit day | Immediate — start here; if unresolved in 30 min, contact Netcash support |
 | P2 | Members cannot log in | 1 hour |
 | P3 | Notifications not sending | 4 hours |
 | P4 | Reports unavailable | Next business day |
-
-P1 incidents: start with this runbook. If unresolved within 30 minutes, contact Netcash support directly.

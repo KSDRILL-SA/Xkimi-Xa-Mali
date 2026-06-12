@@ -9,35 +9,28 @@ flowchart TD
     REQUEST["Inbound Request"]
 
     subgraph L1["Layer 1 — Transport"]
-        TLS["HTTPS / TLS 1.3\nHSTS header\nHTTP → HTTPS redirect"]
+        TLS["HTTPS / TLS 1.3<br/>HSTS<br/>HTTP → HTTPS redirect"]
     end
-
     subgraph L2["Layer 2 — Session"]
-        COOKIE["HTTP-only cookie\nSameSite=Strict\nJWT verified by NextAuth"]
+        COOKIE["HTTP-only + Secure cookie<br/>SameSite=Lax<br/>JWT verified by NextAuth"]
     end
-
     subgraph L3["Layer 3 — Rate Limiting"]
-        RL["Upstash sliding window\nPer IP or per userId\n429 on breach"]
+        RL["Upstash sliding window<br/>per IP or userId<br/>429 on breach"]
     end
-
     subgraph L4["Layer 4 — Input Validation"]
-        ZOD["Zod schema\nEvery API boundary\n400 on invalid"]
+        ZOD["Zod at every boundary<br/>400 on invalid"]
     end
-
     subgraph L5["Layer 5 — Authorisation"]
-        RBAC["Role check\nL0/L1/L2/L3 tier enforcement\nService-layer resource ownership"]
+        RBAC["route tiers L0–L3<br/>+ service-layer L4 ownership"]
     end
-
     subgraph L6["Layer 6 — Data Protection"]
-        ENC["AES-256-GCM at rest\nbcrypt passwords\nSHA-256 token hashes"]
+        ENC["AES-256-GCM at rest<br/>bcrypt passwords<br/>SHA-256 token hashes"]
     end
-
     subgraph L7["Layer 7 — Audit"]
-        AUDIT["append-only AuditLog\nEvery state-changing operation\nIP + userId + timestamp"]
+        AUDIT["append-only AuditLog<br/>every state change<br/>IP + userId + timestamp"]
     end
-
-    subgraph WEBHOOK["Webhook Path (parallel)"]
-        HMAC["HMAC-SHA256 + timingSafeEqual\nNetcash / Inngest / BulkSMS\nSession cookies rejected"]
+    subgraph WEBHOOK["Webhook path (parallel)"]
+        HMAC["HMAC-SHA256 + timingSafeEqual<br/>+ exactly-once dedupe<br/>session cookies rejected"]
     end
 
     REQUEST --> L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7
@@ -53,7 +46,8 @@ flowchart TD
            Cost never reduced without explicit security review.
 
 [SEC-S02]  All sessions use HTTP-only cookies.
-           SameSite=Strict. Secure flag on all non-localhost environments.
+           SameSite=Lax (auth cookie must survive top-level navigation from
+           email links). Secure flag on all non-localhost environments.
            No session tokens in localStorage, sessionStorage, or URL.
 
 [SEC-S03]  SA ID numbers and bank account numbers encrypted at rest.

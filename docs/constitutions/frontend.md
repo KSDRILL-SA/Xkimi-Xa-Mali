@@ -62,19 +62,17 @@ The rule: server components fetch and own data, client components own interactiv
 
 ```mermaid
 flowchart TD
-    subgraph SERVER["Server — runs on Vercel edge/serverless"]
-        PAGE["page.tsx\nAsync Server Component\nCalls service layer directly\nNo fetch() needed"]
-        LAYOUT["layout.tsx\nShared chrome — nav, sidebar\nPasses session as prop"]
+    subgraph SERVER["Server — Vercel edge/serverless"]
+        PAGE["page.tsx<br/>async Server Component<br/>calls services directly, no fetch()"]
+        LAYOUT["layout.tsx<br/>shared chrome<br/>passes session as prop"]
     end
-
-    subgraph CLIENT["Client — runs in browser"]
-        FORM["Form Component\n'use client'\nReact Hook Form + Zod resolver"]
-        HOOK["Custom Hook\nhooks/*.ts\nAPI calls via lib/api.ts"]
-        UI["UI Primitives\ncomponents/ui/*\nshadcn/ui — no business logic"]
+    subgraph CLIENT["Client — browser"]
+        FORM["Form ('use client')<br/>React Hook Form + Zod"]
+        HOOK["Custom hook<br/>API via lib/api.ts"]
+        UI["UI primitives<br/>components/ui/* — no logic"]
     end
-
-    subgraph API["API Layer"]
-        APIROUTE["POST/PATCH/DELETE route\nMutation only\nGET data served direct in page.tsx"]
+    subgraph API["API"]
+        APIROUTE["POST/PATCH/DELETE (mutations)<br/>GET data served in page.tsx"]
     end
 
     PAGE -->|"passes data as props"| FORM
