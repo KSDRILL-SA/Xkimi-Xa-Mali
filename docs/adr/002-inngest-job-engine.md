@@ -32,27 +32,25 @@ Use **Inngest** as the job engine.
 ```mermaid
 flowchart LR
     subgraph INNGEST["Inngest"]
-        I1["✅ Durable execution\nsurvives function timeouts"]
-        I2["✅ Built-in retry\nwith backoff"]
-        I3["✅ Idempotency keys\nnative support"]
-        I4["✅ Full run history\nstep-level visibility"]
-        I5["✅ Serverless-native\nVercel compatible"]
-        I6["✅ Manual trigger\nfor incident recovery"]
+        I1["✅ Durable — survives timeouts"]
+        I2["✅ Built-in retry with backoff"]
+        I3["✅ Native idempotency"]
+        I4["✅ Full step-level run history"]
+        I5["✅ Serverless-native (Vercel)"]
+        I6["✅ Manual trigger for recovery"]
     end
-
     subgraph VERCEL_CRON["Vercel Cron"]
-        VC1["✅ Zero additional service"]
+        VC1["✅ Zero extra service"]
         VC2["✅ Simple cron syntax"]
-        VC3["❌ No retry guarantee\non failure"]
-        VC4["❌ 60s max execution\nfor serverless functions"]
-        VC5["❌ No run history\nor observability"]
-        VC6["❌ Silent failure\nno alerting"]
+        VC3["❌ No retry guarantee"]
+        VC4["❌ 60s function timeout"]
+        VC5["❌ No history / observability"]
+        VC6["❌ Silent failure, no alerts"]
     end
-
-    subgraph BG_JOBS["Other Options\nQStash / BullMQ"]
-        BJ1["⚠️ Additional infra\nto manage"]
-        BJ2["⚠️ BullMQ requires Redis\nqueue management"]
-        BJ3["⚠️ QStash: limited\nstep support"]
+    subgraph BG_JOBS["QStash / BullMQ"]
+        BJ1["⚠️ Extra infra to manage"]
+        BJ2["⚠️ BullMQ needs Redis queues"]
+        BJ3["⚠️ QStash: limited step support"]
     end
 ```
 
@@ -80,11 +78,11 @@ Inngest wraps the job in a durable execution envelope. Each step is checkpointed
 
 ## Consequences
 
-- All scheduled jobs defined in `packages/jobs/` as Inngest functions
-- `apps/web` serves the Inngest webhook endpoint at `/api/inngest`
-- The Inngest endpoint is an L3 (system) route — HMAC-verified, no session
-- Inngest is NOT wrapped by `withApiHandler` (its own signature verification handles request integrity)
-- Production secret: `INNGEST_SIGNING_KEY` + `INNGEST_EVENT_KEY` in environment
+- All scheduled jobs defined in `apps/web/inngest/functions/` as Inngest functions
+- `apps/web` serves the Inngest webhook endpoint at `/api/v1/webhooks/inngest`
+- That endpoint is an L3 (system) route — signing-key verified, no session
+- It is NOT wrapped by `withApiHandler` (Inngest's `serve()` handles signature verification)
+- Production secrets: `INNGEST_SIGNING_KEY` + `INNGEST_EVENT_KEY`
 - Local development: `npx inngest-cli@latest dev` alongside `npm run dev`
 
-See [docs/flows/02-debit-run-flow.md](../flows/02-debit-run-flow.md) for the full debit run sequence diagram.
+See [docs/flows/02-payment-flow.md](../flows/02-payment-flow.md) for the full debit-run sequence diagram.
