@@ -87,7 +87,7 @@ flowchart TD
 | Transaction amounts, ledger | Financial | Access-controlled, `Decimal(10,2)` |
 | Passwords | Credentials | bcrypt cost 12 |
 | Reset / verify / invite tokens | Credentials | SHA-256 hash only |
-| Session | Credentials | HTTP-only cookie, SameSite=Strict |
+| Session | Credentials | HTTP-only + Secure cookie, SameSite=Lax |
 
 Data model: **34 models, 17 enums** — full ERD in [database/01-erd.md](./database/01-erd.md).
 

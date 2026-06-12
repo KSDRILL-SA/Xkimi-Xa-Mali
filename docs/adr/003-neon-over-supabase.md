@@ -30,26 +30,24 @@ Use **Neon** as the PostgreSQL hosting provider.
 ```mermaid
 flowchart LR
     subgraph NEON["Neon"]
-        N1["✅ Database branching\nper PR preview"]
-        N2["✅ Serverless driver\nHTTP-based connections"]
-        N3["✅ pgbouncer built-in\nconnection pooling"]
-        N4["✅ Scale to zero\nno idle cost"]
-        N5["✅ Prisma native\nfirst-class support"]
-        N6["✅ Vercel integration\nauto branch per PR"]
+        N1["✅ Database branching per PR"]
+        N2["✅ Serverless HTTP driver"]
+        N3["✅ Built-in pgbouncer pooling"]
+        N4["✅ Scale to zero — no idle cost"]
+        N5["✅ First-class Prisma support"]
+        N6["✅ Native Vercel integration"]
     end
-
     subgraph SUPABASE["Supabase"]
-        S1["✅ Full platform\nAuth + Storage + Realtime"]
+        S1["✅ Full platform (Auth/Storage/Realtime)"]
         S2["✅ PostgreSQL compatible"]
-        S3["⚠️ Supabase Auth conflicts\nwith NextAuth.js"]
-        S4["⚠️ Realtime / Storage\nnot needed — adds cost"]
-        S5["❌ No database branching\nfor PR previews"]
-        S6["❌ Connection pooling\nrequires manual pgbouncer setup"]
+        S3["⚠️ Auth conflicts with NextAuth"]
+        S4["⚠️ Realtime/Storage unused — adds cost"]
+        S5["❌ No branching for PR previews"]
+        S6["❌ Manual pgbouncer setup"]
     end
-
-    subgraph RAILWAY["Railway / PlanetScale"]
-        R1["⚠️ Railway: good DX\nbut no branching"]
-        R2["❌ PlanetScale: MySQL\nnot PostgreSQL"]
+    subgraph OTHER["Railway / PlanetScale"]
+        R1["⚠️ Railway: good DX, no branching"]
+        R2["❌ PlanetScale: MySQL, not Postgres"]
     end
 ```
 

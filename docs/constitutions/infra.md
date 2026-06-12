@@ -48,31 +48,31 @@
 
 ```mermaid
 flowchart TD
-    PR["Pull Request opened\nor pushed to"]
+    PR["PR opened / pushed"]
 
-    subgraph CI["CI Gate — must all pass before merge"]
-        TC["typecheck\ntsc --noEmit"]
-        LT["lint\neslint"]
-        TS["test\nvitest — 116 tests"]
-        PV["prisma validate\nschema + migration diff"]
+    subgraph CI["CI gate — all must pass before merge"]
+        TC["typecheck<br/>tsc --noEmit"]
+        LT["lint<br/>eslint"]
+        TS["test<br/>vitest"]
+        PV["prisma validate"]
     end
 
-    subgraph PREVIEW["Preview Deployment"]
-        VPD["Vercel preview deploy"]
-        NBD["Neon branch database\n(isolated from prod)"]
+    subgraph PREVIEW["Preview deployment"]
+        VPD["Vercel preview"]
+        NBD["Neon branch DB<br/>(isolated from prod)"]
         VPD --- NBD
     end
 
     subgraph MERGE["On merge to Dev / main"]
-        PMD["prisma migrate deploy\n(Neon production)"]
-        PSD["prisma db seed\n(idempotent — safe every time)"]
+        PMD["prisma migrate deploy<br/>(Neon production)"]
+        PSD["prisma db seed<br/>(idempotent)"]
         VPR["Vercel production deploy"]
         SR["Sentry release"]
     end
 
-    subgraph ROLLBACK["Emergency Rollback"]
-        VR["Vercel instant rollback\n(previous deployment — 1 click)"]
-        DR["DB rollback script\n/packages/database/prisma/rollbacks/"]
+    subgraph ROLLBACK["Emergency rollback"]
+        VR["Vercel instant rollback<br/>(promote previous deploy)"]
+        DR["migrations are additive<br/>— no schema rollback needed"]
     end
 
     PR --> TC & LT & TS & PV
@@ -88,24 +88,24 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    subgraph LOCAL["Local Development"]
-        LD["npm run dev\nlocalhost:3000 / 3001 / 3002"]
-        LDB["Neon dev branch\n(personal, not shared)"]
-        LR["Upstash free tier\n(shared or personal)"]
+    subgraph LOCAL["Local development"]
+        LD["npm run dev<br/>:3000 / :3001 / :3002"]
+        LDB["Neon dev branch<br/>(personal)"]
+        LR["Upstash free tier"]
         LD --- LDB & LR
     end
 
-    subgraph PREVIEW["PR Preview"]
-        PD["Vercel preview URL\nauto-deployed on push"]
-        PDB["Neon PR branch\n(auto-created, auto-deleted)"]
-        PR["Upstash free tier"]
-        PD --- PDB & PR
+    subgraph PREVIEW["PR preview"]
+        PD["Vercel preview URL<br/>auto on push"]
+        PDB["Neon PR branch<br/>(auto create/delete)"]
+        PRR["Upstash free tier"]
+        PD --- PDB & PRR
     end
 
     subgraph PROD["Production"]
-        VPROD["Vercel production\n3 projects: web / admin / website"]
-        NEON["Neon production\npooled connection string"]
-        UPS["Upstash pro\nRate limiting + cache"]
+        VPROD["Vercel — 3 projects<br/>web / admin / website"]
+        NEON["Neon production<br/>pooled connection"]
+        UPS["Upstash pro<br/>rate limit + cache"]
         VPROD --- NEON & UPS
     end
 

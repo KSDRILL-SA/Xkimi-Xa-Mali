@@ -30,21 +30,20 @@ Use **Netcash** as the payment processor.
 ```mermaid
 flowchart LR
     subgraph NETCASH["Netcash"]
-        NC1["✅ DebiCheck / NAEDO\nrecurring debit orders"]
-        NC2["✅ Mandate management\nvia API"]
-        NC3["✅ Webhook callbacks\nper transaction"]
-        NC4["✅ SA-native\nall major banks"]
-        NC5["⚠️ More complex\nintegration"]
-        NC6["⚠️ Higher per-transaction\nfee vs e-commerce tools"]
+        NC1["✅ DebiCheck / NAEDO recurring debits"]
+        NC2["✅ Mandate management via API"]
+        NC3["✅ Webhook callbacks per transaction"]
+        NC4["✅ SA-native, all major banks"]
+        NC5["⚠️ More complex integration"]
+        NC6["⚠️ Higher per-transaction fee"]
     end
-
     subgraph PAYFAST["PayFast"]
         PF1["✅ Simple integration"]
-        PF2["✅ Lower fees\nfor once-off payments"]
-        PF3["❌ No recurring\ndebit order support"]
-        PF4["❌ Member-initiated\npayments only"]
-        PF5["❌ Cannot hold\npayment mandates"]
-        PF6["❌ Not designed for\nsavings group model"]
+        PF2["✅ Lower fees for once-off payments"]
+        PF3["❌ No recurring debit orders"]
+        PF4["❌ Member-initiated payments only"]
+        PF5["❌ Cannot hold mandates"]
+        PF6["❌ Not built for the savings-group model"]
     end
 ```
 
@@ -78,4 +77,4 @@ The higher integration complexity is accepted because there is no viable alterna
 - Webhook verification: HMAC-SHA256 signature on every callback
 - IP allowlist: Netcash callback IPs added to Vercel trusted IPs
 
-See [docs/flows/02-debit-run-flow.md](../flows/02-debit-run-flow.md) and [docs/flows/03-mandate-setup-flow.md](../flows/03-mandate-setup-flow.md) for full sequence diagrams.
+See [docs/flows/02-payment-flow.md](../flows/02-payment-flow.md) for the mandate and debit-run sequence diagrams.
