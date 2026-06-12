@@ -110,4 +110,4 @@ flowchart TD
 ...
 ```
 
-Each migration file paired with a rollback script in `/packages/database/prisma/rollbacks/`.
+Migrations are **additive and forward-only** — never edited retroactively, no destructive changes. A bad release is rolled back by promoting the previous Vercel deployment; the additive schema stays compatible. (See [DB-D01].)

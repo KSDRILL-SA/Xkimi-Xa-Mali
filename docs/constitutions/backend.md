@@ -65,14 +65,14 @@ Every HTTP request follows this strict path. No layer skips another.
 ```mermaid
 flowchart TD
     REQ["HTTP Request"]
-    WH["withApiHandler\nStamps x-trace-id\nCatches all unhandled errors → Sentry"]
-    ZOD["Zod Validation\nlib/validation/*.ts\nRejects malformed input — 400"]
-    SVC["Service Layer\nservices/*.service.ts\nAll business logic lives here"]
-    REPO["Repository Layer\nrepositories/*.repo.ts\nAll Prisma calls here"]
-    DB[("PostgreSQL\nNeon")]
-    AUDIT["audit.service.ts\nEvery write → AuditLog row"]
-    EXT["External Clients\nlib/netcash.ts\nlib/bulksms.ts\nlib/resend.ts"]
-    ERR["AppError subclass\nStructured: code + message + status"]
+    WH["withApiHandler<br/>stamps x-trace-id<br/>unhandled errors → Sentry"]
+    ZOD["Zod validation<br/>lib/validation/*<br/>malformed input → 400"]
+    SVC["Service layer<br/>services/*.service.ts<br/>all business logic"]
+    REPO["Data access<br/>Prisma via lib/db"]
+    DB[("PostgreSQL · Neon")]
+    AUDIT["audit.service.ts<br/>every write → AuditLog"]
+    EXT["External clients<br/>lib/netcash · bulksms · email"]
+    ERR["AppError subclass<br/>code + message + status"]
 
     REQ --> WH --> ZOD --> SVC
     SVC --> REPO --> DB
