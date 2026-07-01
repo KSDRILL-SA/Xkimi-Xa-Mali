@@ -182,7 +182,7 @@ export default async function WhatsAppPage({
           <div className="pt-3 border-t border-xxm-gray-100">
             <p className="text-xs text-xxm-gray-400 mb-2">Want to join? Message the admin directly:</p>
             <a
-              href={`https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I would like to join the Xkimm Xa Mali WhatsApp group. Please add me.')}`}
+              href={`https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I would like to join the Xkimm Xa Mali Foundation WhatsApp group. Please add me.')}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-sm font-semibold text-xxm-green hover:text-xxm-canopy transition-colors"

@@ -17,7 +17,7 @@ Three features. Full V2 design. No shortcuts.
 
 ---
 
-## V2 Feature Design — Xkimm Xa Mali
+## V2 Feature Design — Xkimm Xa Mali Foundation
 
 These three features are purely additive. No existing model is altered. No existing service logic is touched. Every integration point is a new call appended to an existing flow.
 
@@ -916,7 +916,7 @@ const pdf = await renderStatementPdf({ ...statementData, signature })
     Generated: {format(new Date(), 'dd MMMM yyyy', { timeZone: 'Africa/Johannesburg' })}
   </Text>
   <Text style={styles.verificationText}>
-    Xkimm Xa Mali — Official Document
+    Xkimm Xa Mali Foundation — Official Document
   </Text>
 </View>
 ```

@@ -1,4 +1,4 @@
-# Database Constitution — Xkimm Xa Mali
+# Database Constitution — Xkimm Xa Mali Foundation
 
 ## Rules
 

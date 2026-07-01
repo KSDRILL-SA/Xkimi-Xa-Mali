@@ -54,7 +54,7 @@ export function CTASection() {
                 <span className="text-shimmer">wealth together?</span>
               </h2>
               <p className="mt-5 text-white/55 text-base md:text-lg max-w-lg mx-auto leading-relaxed">
-                Xkimm Xa Mali is an invite-only platform. If you&rsquo;re already a member,
+                Xkimm Xa Mali Foundation is an invite-only platform. If you&rsquo;re already a member,
                 sign in to your account. If you&rsquo;d like to connect with the brotherhood,
                 reach us on WhatsApp.
               </p>
@@ -71,7 +71,7 @@ export function CTASection() {
               </a>
 
               <a
-                href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
+                href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali Foundation group. Please add me.')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary flex-1 inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-2xl border border-white/20 text-white/80 font-semibold text-base"

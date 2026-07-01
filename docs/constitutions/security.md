@@ -1,4 +1,4 @@
-# Security Constitution — Xkimm Xa Mali
+# Security Constitution — Xkimm Xa Mali Foundation
 
 ## Security Defence Layers
 

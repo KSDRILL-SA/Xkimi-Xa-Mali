@@ -22,7 +22,7 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title:       { default: 'Xkimm Xa Mali', template: '%s | Xkimm Xa Mali' },
+  title:       { default: 'Xkimm Xa Mali Foundation', template: '%s | Xkimm Xa Mali Foundation' },
   description: 'A collective financial platform built on trust, brotherhood, and shared wealth.',
   metadataBase: new URL(env.NEXTAUTH_URL ?? 'http://localhost:3000'),
   manifest:    '/manifest.webmanifest',
@@ -34,8 +34,8 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false },
   openGraph: {
     type:        'website',
-    siteName:    'Xkimm Xa Mali',
-    title:       'Xkimm Xa Mali',
+    siteName:    'Xkimm Xa Mali Foundation',
+    title:       'Xkimm Xa Mali Foundation',
     description: 'A collective financial platform built on trust, brotherhood, and shared wealth.',
   },
 }

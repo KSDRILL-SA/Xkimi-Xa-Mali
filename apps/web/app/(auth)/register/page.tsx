@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Create account' }
 export default function RegisterPage() {
   return (
     <>
-      <AuthHeading title="Join Xkimm Xa Mali" subtitle="Create your member account" />
+      <AuthHeading title="Join Xkimm Xa Mali Foundation" subtitle="Create your member account" />
       <RegisterForm />
     </>
   )

@@ -27,7 +27,7 @@ import { getPublicStats } from '@/lib/stats'
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'Learn about Xkimm Xa Mali — a collective financial platform built on trust, brotherhood, and shared wealth.',
+    'Learn about Xkimm Xa Mali Foundation — a collective financial platform built on trust, brotherhood, and shared wealth.',
 }
 
 const founders = [
@@ -35,7 +35,7 @@ const founders = [
     photo: '/founders/maluleke-kurhula-success.jpg',
     name: 'Maluleke Kurhula Success',
     title: 'Founder & Chairman',
-    bio: 'The visionary behind Xkimm Xa Mali. Kurhula identified the need for a disciplined, technology-powered approach to communal savings and built the platform from the ground up.',
+    bio: 'The visionary behind Xkimm Xa Mali Foundation. Kurhula identified the need for a disciplined, technology-powered approach to communal savings and built the platform from the ground up.',
     ring: 'ring-xxm-green/25',
     accent: 'from-xxm-green/5',
   },
@@ -59,7 +59,7 @@ const founders = [
     photo: '/founders/nkuna-rito-blessing.png',
     name: 'Nkuna Rito Blessing',
     title: 'Co-Founder & Welfare Officer',
-    bio: 'The heart of the brotherhood. Rito champions member welfare, nurtures relationships within the collective, and ensures Xkimm Xa Mali remains rooted in human trust.',
+    bio: 'The heart of the brotherhood. Rito champions member welfare, nurtures relationships within the collective, and ensures Xkimm Xa Mali Foundation remains rooted in human trust.',
     ring: 'ring-xxm-green-900/20',
     accent: 'from-xxm-green-900/5',
   },
@@ -102,7 +102,7 @@ const values = [
   {
     icon: Lock,
     title: 'Financial Discipline',
-    body: 'The culture of Xkimm Xa Mali is built on non-negotiable commitment. Deadlines are respected. Amounts are honoured. Discipline is the foundation everything else rests on.',
+    body: 'The culture of Xkimm Xa Mali Foundation is built on non-negotiable commitment. Deadlines are respected. Amounts are honoured. Discipline is the foundation everything else rests on.',
   },
   {
     icon: Users,
@@ -117,7 +117,7 @@ const values = [
   {
     icon: Handshake,
     title: 'Trust Above All',
-    body: "Xkimm Xa Mali runs on trust. The technology enforces it. The governance backs it. But it all began with four men who chose to keep their word to each other.",
+    body: "Xkimm Xa Mali Foundation runs on trust. The technology enforces it. The governance backs it. But it all began with four men who chose to keep their word to each other.",
   },
 ]
 
@@ -176,7 +176,7 @@ export default async function AboutPage() {
                 <span className="text-xxm-gold text-xs font-bold tracking-widest uppercase">Private · Invite-Only · Brotherhood</span>
               </div>
               <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.05]">
-                Xkimm Xa Mali
+                Xkimm Xa Mali Foundation
               </h1>
               <p className="text-xxm-gold text-sm font-bold tracking-widest uppercase mt-2">
                 Contributing · Growing · Securing
@@ -233,14 +233,14 @@ export default async function AboutPage() {
 
             <div className="space-y-6 text-gray-600 text-base leading-loose max-w-prose mx-auto">
               <p className="text-lg text-gray-700 font-medium leading-relaxed">
-                Xkimm Xa Mali was born from a conversation between four men who shared a common
+                Xkimm Xa Mali Foundation was born from a conversation between four men who shared a common
                 frustration: despite earning consistently, individual financial progress felt slow,
                 scattered, and unaccountable.
               </p>
               <p>
                 They recognised what generations of their people had always known — that money moves
                 faster and further when it moves together. Rooted in the age-old African wisdom of
-                ubuntu, Xkimm Xa Mali was conceived as something more than ordinary group savings:
+                ubuntu, Xkimm Xa Mali Foundation was conceived as something more than ordinary group savings:
                 a structured, transparent, technology-powered platform that takes the principle of
                 collective financial discipline and gives it the rigour, accountability, and
                 automation of a proper financial institution.
@@ -290,7 +290,7 @@ export default async function AboutPage() {
                 Three pillars, one purpose
               </h2>
               <p className="text-gray-500 text-base max-w-sm leading-relaxed">
-                Every decision, feature, and rule inside Xkimm Xa Mali flows from these three principles.
+                Every decision, feature, and rule inside Xkimm Xa Mali Foundation flows from these three principles.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -445,7 +445,7 @@ export default async function AboutPage() {
                 Built for serious savers
               </h2>
               <p className="text-gray-500 text-base leading-relaxed max-w-xl mx-auto">
-                Xkimm Xa Mali is purpose-built software that automates every aspect of running a
+                Xkimm Xa Mali Foundation is purpose-built software that automates every aspect of running a
                 financial collective — from invite-gated onboarding to bank-verified debit mandates,
                 from real-time contribution tracking to goal-based savings milestones.
               </p>
@@ -517,7 +517,7 @@ export default async function AboutPage() {
                 <ArrowRight size={15} aria-hidden />
               </a>
               <a
-                href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
+                href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali Foundation group. Please add me.')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-white/15 text-white/70 font-semibold text-sm hover:text-white hover:border-white/30 transition-colors"

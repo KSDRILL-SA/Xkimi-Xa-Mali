@@ -243,10 +243,10 @@ function StatementDocument({ data }: { data: StatementData }) {
 
   return (
     <Document
-      title={`Xkimm Xa Mali — Statement — ${member.firstName} ${member.lastName} — ${period.label}`}
-      author="Xkimm Xa Mali"
+      title={`Xkimm Xa Mali Foundation — Statement — ${member.firstName} ${member.lastName} — ${period.label}`}
+      author="Xkimm Xa Mali Foundation"
       subject="Contribution Statement of Account"
-      creator="Xkimm Xa Mali Platform"
+      creator="Xkimm Xa Mali Foundation Platform"
       keywords="statement contribution savings xkimm"
     >
       <Page size="A4" style={s.page}>
@@ -408,7 +408,7 @@ function StatementDocument({ data }: { data: StatementData }) {
             <View style={s.notes}>
               <Text style={s.notesTitle}>Important Notice</Text>
               <Text style={s.notesText}>
-                This statement reflects your contributions and transactions for the stated period on the Xkimm Xa Mali
+                This statement reflects your contributions and transactions for the stated period on the Xkimm Xa Mali Foundation
                 private group-savings platform, and is intended solely for the named account holder. All amounts are in
                 South African Rand (ZAR). If any detail appears incorrect, contact your group administrator immediately.
                 Generated electronically and authorised below.
@@ -427,7 +427,7 @@ function StatementDocument({ data }: { data: StatementData }) {
                 <>
                   <View style={{ height: 30 }} />
                   <View style={s.signRule} />
-                  <Text style={s.signName}>Xkimm Xa Mali Administration</Text>
+                  <Text style={s.signName}>Xkimm Xa Mali Foundation Administration</Text>
                 </>
               )}
               <Text style={s.signMeta}>Generated {generatedAt}</Text>
