@@ -101,7 +101,7 @@ export async function HeroSection() {
             className="text-white/65 text-lg md:text-xl leading-relaxed max-w-xl mb-10 animate-fade-in-up"
             style={{ animationDelay: '0.65s' }}
           >
-            Xkimm Xa Mali is a private, invite-only collective financial platform built
+            Xkimm Xa Mali Foundation is a private, invite-only collective financial platform built
             on the African principle that{' '}
             <em className="text-xxm-gold/90 not-italic font-semibold">
               money moves faster and further when it moves together.
@@ -122,7 +122,7 @@ export async function HeroSection() {
             </a>
 
             <a
-              href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
+              href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali Foundation group. Please add me.')}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-secondary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl border border-white/20 text-white/80 font-semibold text-base hover:border-xxm-gold/40"

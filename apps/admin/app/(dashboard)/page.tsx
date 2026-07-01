@@ -92,7 +92,7 @@ export default async function AdminOverviewPage() {
         <div className="relative z-10 max-w-2xl">
           <div className="inline-flex items-center gap-2 mb-3 glass-gold rounded-full px-3 py-1.5">
             <ShieldCheck size={12} className="text-xxm-gold" aria-hidden />
-            <p className="text-xxm-gold text-[11px] font-bold tracking-widest uppercase">Xkimm Xa Mali — Admin</p>
+            <p className="text-xxm-gold text-[11px] font-bold tracking-widest uppercase">Xkimm Xa Mali Foundation — Admin</p>
           </div>
           <h1 className="font-display text-3xl md:text-4xl font-black tracking-tight">
             Welcome back, <span className="text-shimmer">{firstName}</span>

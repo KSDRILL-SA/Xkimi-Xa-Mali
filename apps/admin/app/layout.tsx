@@ -14,7 +14,7 @@ const playfairDisplay = Playfair_Display({
 
 export const metadata: Metadata = {
   title: { template: '%s — XXM Admin', default: 'XXM Admin' },
-  description: 'Xkimm Xa Mali — Admin Portal',
+  description: 'Xkimm Xa Mali Foundation — Admin Portal',
   robots: { index: false, follow: false },
 }
 

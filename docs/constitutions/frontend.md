@@ -1,4 +1,4 @@
-# Frontend Constitution — Xkimm Xa Mali
+# Frontend Constitution — Xkimm Xa Mali Foundation
 
 ## Rules
 

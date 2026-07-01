@@ -10,7 +10,7 @@ The whole system on one page. Deeper detail lives in [requirements](./requiremen
 
 | | |
 |---|---|
-| **System** | Xkimm Xa Mali (XXM) — family savings group |
+| **System** | Xkimm Xa Mali Foundation (XXM) — family savings group |
 | **Does** | Contribution tracking, automated DebiCheck debits, append-only financial ledger |
 | **Users** | Admin (founder, dual-role) · Members |
 | **Scale** | 4–50 members, <1,000 req/day (v1) |

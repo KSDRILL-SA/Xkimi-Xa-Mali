@@ -46,13 +46,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <Link
           href="/"
           className="mb-8 flex flex-col items-center gap-3 group outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-2xl p-2 -m-2 animate-fade-in-down"
-          aria-label="Xkimm Xa Mali home"
+          aria-label="Xkimm Xa Mali Foundation home"
         >
           <div className="group-hover:scale-105 transition-transform duration-slow ease-bounce">
             <XmmLogo size={64} />
           </div>
           <span className="font-display text-white font-extrabold text-2xl tracking-wide drop-shadow-sm">
-            Xkimm Xa Mali
+            Xkimm Xa Mali Foundation
           </span>
           <span className="text-white/50 text-xs italic tracking-wide">
             &ldquo;Blessed is the hand that giveth.&rdquo;
@@ -68,7 +68,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         <div className="mt-6 flex items-center gap-4 text-white/35 text-xs animate-fade-in delay-300">
-          <span>&copy; {new Date().getFullYear()} Xkimm Xa Mali</span>
+          <span>&copy; {new Date().getFullYear()} Xkimm Xa Mali Foundation</span>
           <Link
             href="/about"
             className="gold-underline hover:text-white/60 transition-colors"

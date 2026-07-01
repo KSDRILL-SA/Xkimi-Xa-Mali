@@ -129,10 +129,10 @@ function ReportDocument({ data }: { data: ContributionReportData }) {
 
   return (
     <Document
-      title={`Xkimm Xa Mali — Contribution Report — ${period.label}`}
-      author="Xkimm Xa Mali"
+      title={`Xkimm Xa Mali Foundation — Contribution Report — ${period.label}`}
+      author="Xkimm Xa Mali Foundation"
       subject="Monthly Group Contribution Report"
-      creator="Xkimm Xa Mali Platform"
+      creator="Xkimm Xa Mali Foundation Platform"
       keywords="report contribution group savings xkimm"
     >
       <Page size="A4" style={s.page}>
@@ -242,7 +242,7 @@ function ReportDocument({ data }: { data: ContributionReportData }) {
             <View style={s.notes}>
               <Text style={s.notesTitle}>About This Report</Text>
               <Text style={s.notesText}>
-                This report summarises group contribution activity for {period.label} on the Xkimm Xa Mali
+                This report summarises group contribution activity for {period.label} on the Xkimm Xa Mali Foundation
                 private group-savings platform. Figures reflect records at the time of generation; all amounts are in
                 South African Rand (ZAR). This is an internal administrative document — handle in confidence.
                 Generated electronically and authorised below.
@@ -261,7 +261,7 @@ function ReportDocument({ data }: { data: ContributionReportData }) {
                 <>
                   <View style={{ height: 30 }} />
                   <View style={s.signRule} />
-                  <Text style={s.signName}>Xkimm Xa Mali Administration</Text>
+                  <Text style={s.signName}>Xkimm Xa Mali Foundation Administration</Text>
                 </>
               )}
               <Text style={s.signMeta}>Generated {generatedAt}</Text>

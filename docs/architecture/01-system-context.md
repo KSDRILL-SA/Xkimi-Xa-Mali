@@ -18,7 +18,7 @@ flowchart TB
     MEMBER["Member<br/>views dashboard, manages<br/>mandate, tracks contributions"]
     ADMIN["Admin (dual role)<br/>oversees members, goals,<br/>reports, ledger, audit"]
 
-    subgraph XXM["Xkimm Xa Mali — Vercel"]
+    subgraph XXM["Xkimm Xa Mali Foundation — Vercel"]
         APP["Next.js 15 platform<br/>member portal · admin · API<br/>scheduled payment pipeline"]
     end
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import { View, Text, Svg, Path, Circle, Line, StyleSheet } from '@react-pdf/renderer'
 
-// ─── Shared design tokens for all Xkimm Xa Mali PDF documents ──────────────────
+// ─── Shared design tokens for all Xkimm Xa Mali Foundation PDF documents ──────────────────
 
 export const C = {
   ink:       '#0A1F17',
@@ -154,7 +154,7 @@ export function Masthead({ docType, period, docRef }: { docType: string; period:
         <View style={chrome.brandRow}>
           <View style={chrome.monogram}><Text style={chrome.monogramText}>X</Text></View>
           <View>
-            <Text style={chrome.orgName}>XKIMM XA MALI</Text>
+            <Text style={chrome.orgName}>XKIMM XA MALI FOUNDATION</Text>
             <Text style={chrome.orgTagline}>Contributing · Growing · Securing</Text>
           </View>
         </View>
@@ -173,7 +173,7 @@ export function Masthead({ docType, period, docRef }: { docType: string; period:
 export function PageFooter({ docRef }: { docRef: string }) {
   return (
     <View style={chrome.footer} fixed>
-      <Text style={chrome.fLeft}>XKIMM XA MALI</Text>
+      <Text style={chrome.fLeft}>XKIMM XA MALI FOUNDATION</Text>
       <Text style={chrome.fCenter} render={({ pageNumber, totalPages }) => (
         `Confidential · ${docRef} · Page ${pageNumber} of ${totalPages}`
       )} />

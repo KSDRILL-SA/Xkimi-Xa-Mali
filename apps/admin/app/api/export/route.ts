@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     : 0
 
   const headerTitle = [
-    `XKIMM XA MALI — CONTRIBUTION REPORT`,
+    `XKIMM XA MALI FOUNDATION — CONTRIBUTION REPORT`,
     `Period: ${periodLabel}`,
     `Generated: ${generatedAt}`,
     '',

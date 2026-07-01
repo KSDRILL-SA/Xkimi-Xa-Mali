@@ -10,7 +10,7 @@ export function AppFooter() {
           <div className="flex items-center gap-3">
             <XmmLogo size={28} />
             <p className="text-xs text-gray-400">
-              &copy; {year} Xkimm Xa Mali. Admin portal — restricted access.
+              &copy; {year} Xkimm Xa Mali Foundation. Admin portal — restricted access.
             </p>
           </div>
           <div className="flex items-center gap-1 text-[10px] text-xxm-green/40 font-medium uppercase tracking-wider">

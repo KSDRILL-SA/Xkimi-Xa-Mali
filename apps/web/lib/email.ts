@@ -4,7 +4,7 @@ import { withRetry } from './retry'
 import { ExternalServiceError } from './errors'
 
 const FROM = env.RESEND_FROM_EMAIL
-const APP_NAME = 'Xkimm Xa Mali'
+const APP_NAME = 'Xkimm Xa Mali Foundation'
 
 // ─── Layout helpers ───────────────────────────────────────────────────────────
 

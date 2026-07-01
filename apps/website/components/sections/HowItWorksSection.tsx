@@ -126,7 +126,7 @@ export function HowItWorksSection() {
           </div>
 
           <a
-            href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
+            href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali Foundation group. Please add me.')}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary inline-flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-xxm-green text-white font-bold text-sm shadow-xxm whitespace-nowrap shrink-0"

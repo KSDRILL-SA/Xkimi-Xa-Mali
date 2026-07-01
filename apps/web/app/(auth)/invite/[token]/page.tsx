@@ -5,7 +5,7 @@ import { InviteRegisterForm } from '@/components/auth/InviteRegisterForm'
 import { InviteErrorView } from '@/components/auth/InviteErrorView'
 import { AuthHeading } from '@/components/auth/AuthHeading'
 
-export const metadata: Metadata = { title: 'Join Xkimm Xa Mali' }
+export const metadata: Metadata = { title: 'Join Xkimm Xa Mali Foundation' }
 
 export default async function InvitePage({
   params,
@@ -26,7 +26,7 @@ export default async function InvitePage({
   if (errorCode || !invite) {
     return (
       <>
-        <AuthHeading title="Invite link" subtitle="Join Xkimm Xa Mali" centered />
+        <AuthHeading title="Invite link" subtitle="Join Xkimm Xa Mali Foundation" centered />
         <InviteErrorView code={errorCode ?? 'SYS_500'} />
       </>
     )
@@ -34,7 +34,7 @@ export default async function InvitePage({
 
   return (
     <>
-      <AuthHeading title="Create your account" subtitle="Complete your registration to join Xkimm Xa Mali" />
+      <AuthHeading title="Create your account" subtitle="Complete your registration to join Xkimm Xa Mali Foundation" />
       <InviteRegisterForm invite={invite} inviteCode={token} />
     </>
   )
