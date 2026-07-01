@@ -396,7 +396,7 @@ export async function exportAdminReportCSV(month: number, year: number): Promise
   })
 
   const headerTitle = [
-    'XKIMM XA MALI — CONTRIBUTION REPORT',
+    'XKIMM XA MALI FOUNDATION — CONTRIBUTION REPORT',
     `Period: ${report.period.label}`,
     `Generated: ${generatedAt}`,
     '',

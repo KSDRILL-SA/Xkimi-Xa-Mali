@@ -2,7 +2,7 @@ import type { MetadataRoute } from 'next'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'Xkimm Xa Mali',
+    name: 'Xkimm Xa Mali Foundation',
     short_name: 'XkiMali',
     description: 'Group savings and contribution management platform.',
     start_url: '/dashboard',

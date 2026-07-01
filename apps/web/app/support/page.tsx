@@ -6,14 +6,14 @@ import { ArrowLeft, MessageCircle, Mail, HelpCircle, Users, FileText, Shield } f
 import { env } from '@/lib/env'
 
 export const metadata: Metadata = {
-  title: 'Support — Xkimm Xa Mali',
-  description: 'Get help with the Xkimm Xa Mali platform.',
+  title: 'Support — Xkimm Xa Mali Foundation',
+  description: 'Get help with the Xkimm Xa Mali Foundation platform.',
 }
 
 const faqs = [
   {
     q: 'How do I join the platform?',
-    a: 'Xkimm Xa Mali is invite-only. You will receive a unique invitation code via SMS or email from an existing administrator. Use that code to complete your registration.',
+    a: 'Xkimm Xa Mali Foundation is invite-only. You will receive a unique invitation code via SMS or email from an existing administrator. Use that code to complete your registration.',
   },
   {
     q: 'My debit order failed — what should I do?',
@@ -51,9 +51,9 @@ export default function SupportPage() {
             <ArrowLeft size={16} aria-hidden />
             <span className="hidden sm:inline">Back</span>
           </Link>
-          <Link href="/" className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg" aria-label="Xkimm Xa Mali home">
+          <Link href="/" className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg" aria-label="Xkimm Xa Mali Foundation home">
             <XmmLogo size={32} />
-            <span className="font-bold text-white text-sm hidden sm:block">Xkimm Xa Mali</span>
+            <span className="font-bold text-white text-sm hidden sm:block">Xkimm Xa Mali Foundation</span>
           </Link>
         </div>
       </header>
@@ -97,7 +97,7 @@ export default function SupportPage() {
               <a
                 href={
                   env.ADMIN_WHATSAPP_NUMBER
-                    ? `https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I need support with my Xkimm Xa Mali account. Please assist me.')}`
+                    ? `https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I need support with my Xkimm Xa Mali Foundation account. Please assist me.')}`
                     : env.WHATSAPP_GROUP_LINK
                 }
                 target="_blank"

@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
 
         <div className="relative flex items-center gap-3 animate-fade-in-down">
           <XmmLogo variant="light" size={36} />
-          <span className="font-bold text-lg tracking-tight">Xkimm Xa Mali</span>
+          <span className="font-bold text-lg tracking-tight">Xkimm Xa Mali Foundation</span>
         </div>
 
         <div className="relative space-y-8">
@@ -62,7 +62,7 @@ export default function AdminLoginPage() {
         </div>
 
         <p className="relative text-[11px] text-green-200/40 animate-fade-in delay-300">
-          © {new Date().getFullYear()} Xkimm Xa Mali. Restricted access only.
+          © {new Date().getFullYear()} Xkimm Xa Mali Foundation. Restricted access only.
         </p>
       </div>
 

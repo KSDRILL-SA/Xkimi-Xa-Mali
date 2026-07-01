@@ -10,7 +10,7 @@
 
 ## Context
 
-Xkimm Xa Mali requires PostgreSQL with ACID guarantees for financial data. The hosting provider must work well with:
+Xkimm Xa Mali Foundation requires PostgreSQL with ACID guarantees for financial data. The hosting provider must work well with:
 
 1. **Vercel serverless** — connection pooling is essential; PostgreSQL connections are expensive in serverless environments
 2. **Prisma ORM** — the project uses Prisma for all DB access

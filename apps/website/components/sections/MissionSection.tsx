@@ -62,7 +62,7 @@ export function MissionSection() {
 
             <div className="mt-8 space-y-5 text-white/60 text-[15px] leading-relaxed">
               <p>
-                Xkimm Xa Mali was born from a conversation between four men who shared a
+                Xkimm Xa Mali Foundation was born from a conversation between four men who shared a
                 common frustration: despite earning consistently, individual financial progress
                 felt slow, scattered, and unaccountable.
               </p>

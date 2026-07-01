@@ -4,7 +4,7 @@
 // transparency on the payment surfaces. Override per-environment via NEXT_PUBLIC_*.
 
 export const GROUP_ACCOUNT = {
-  accountName:   process.env.NEXT_PUBLIC_GROUP_ACCOUNT_NAME ?? 'Xkimm Xa Mali',
+  accountName:   process.env.NEXT_PUBLIC_GROUP_ACCOUNT_NAME ?? 'Xkimm Xa Mali Foundation',
   bankName:      process.env.NEXT_PUBLIC_GROUP_BANK_NAME    ?? 'ABSA Bank',
   accountNumber: process.env.NEXT_PUBLIC_GROUP_BANK_ACCOUNT ?? '9385143164',
   branchCode:    process.env.NEXT_PUBLIC_GROUP_BANK_BRANCH  ?? '632005',

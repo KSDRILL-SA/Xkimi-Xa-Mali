@@ -44,7 +44,7 @@ export function Footer() {
             </p>
 
             <a
-              href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali group. Please add me.')}
+              href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali Foundation group. Please add me.')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 text-xxm-gold/70 hover:text-xxm-gold text-sm font-medium transition-colors w-fit"
@@ -95,7 +95,7 @@ export function Footer() {
       <div className="border-t border-white/6">
         <div className="max-w-screen-xl mx-auto px-4 md:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-white/25 text-xs text-center sm:text-left">
-            © {year} Xkimm Xa Mali. All rights reserved.
+            © {year} Xkimm Xa Mali Foundation. All rights reserved.
           </p>
           <div className="flex items-center gap-3">
             <p className="text-white/20 text-xs italic text-center sm:text-right">

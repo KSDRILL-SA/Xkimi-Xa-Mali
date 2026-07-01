@@ -21,25 +21,25 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: 'Xkimm Xa Mali — Contributing. Growing. Securing.',
-    template: '%s | Xkimm Xa Mali',
+    default: 'Xkimm Xa Mali Foundation — Contributing. Growing. Securing.',
+    template: '%s | Xkimm Xa Mali Foundation',
   },
   description:
-    'Xkimm Xa Mali is a private, invite-only collective financial platform built on trust, brotherhood, and shared wealth — powered by the African wisdom of ubuntu.',
+    'Xkimm Xa Mali Foundation is a private, invite-only collective financial platform built on trust, brotherhood, and shared wealth — powered by the African wisdom of ubuntu.',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://xkimimamali.co.za'),
   keywords: ['savings group', 'stokvel', 'collective savings', 'South Africa', 'financial platform'],
   authors: [{ name: 'KSDRILL-SA' }],
   openGraph: {
     type: 'website',
-    siteName: 'Xkimm Xa Mali',
-    title: 'Xkimm Xa Mali — Contributing. Growing. Securing.',
+    siteName: 'Xkimm Xa Mali Foundation',
+    title: 'Xkimm Xa Mali Foundation — Contributing. Growing. Securing.',
     description:
       'A private, invite-only collective financial platform built on trust, brotherhood, and shared wealth.',
     locale: 'en_ZA',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Xkimm Xa Mali',
+    title: 'Xkimm Xa Mali Foundation',
     description: 'A collective financial platform built on trust, brotherhood, and shared wealth.',
   },
   robots: { index: true, follow: true },

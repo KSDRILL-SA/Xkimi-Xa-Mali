@@ -1,4 +1,4 @@
-# Deployment & Launch Runbook — Xkimm Xa Mali
+# Deployment & Launch Runbook — Xkimm Xa Mali Foundation
 
 A practical go-live guide for the three apps. The **code is production-build
 verified** (web 75/75, admin 18/18, website 8/8 static pages compile). What's

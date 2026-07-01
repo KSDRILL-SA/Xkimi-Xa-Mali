@@ -350,7 +350,7 @@ describe('exportAdminReportCSV', () => {
     const lines = csv.split('\r\n')
 
     // Title block, then the column header row, then member rows, then summary.
-    expect(lines[0]).toBe('XKIMM XA MALI — CONTRIBUTION REPORT')
+    expect(lines[0]).toBe('XKIMM XA MALI FOUNDATION — CONTRIBUTION REPORT')
     expect(lines[1]).toBe('Period: May 2025')
     expect(lines[4]).toBe('Member Name,Email Address,Phone Number,Amount Due (R),Amount Paid (R),Outstanding (R),Status')
     expect(lines[5]).toContain('Sipho Dlamini')

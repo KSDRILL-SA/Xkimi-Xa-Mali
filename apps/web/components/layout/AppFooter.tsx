@@ -17,7 +17,7 @@ interface AppFooterProps {
 
 export function AppFooter({
   whatsappGroupLink = 'https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb',
-  whatsappGroupName = 'Xkimm Xa Mali',
+  whatsappGroupName = 'Xkimm Xa Mali Foundation',
 }: AppFooterProps = {}) {
   const year = new Date().getFullYear()
 
@@ -81,7 +81,7 @@ export function AppFooter({
         <div className="mt-8 pt-5 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-1 text-center sm:text-left">
             <p className="text-xs text-gray-400">
-              &copy; {year} Xkimm Xa Mali. Private members&rsquo; platform.
+              &copy; {year} Xkimm Xa Mali Foundation. Private members&rsquo; platform.
             </p>
             <span className="hidden sm:inline text-gray-300 mx-1.5">·</span>
             <p className="text-xs text-gray-400">

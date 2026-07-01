@@ -58,7 +58,7 @@ export function AppHeader({
         >
           <XmmLogo size={fixedHeight ? 36 : 32} className="shrink-0 group-hover:scale-105 transition-transform duration-200" />
           <span className="flex flex-col leading-none min-w-0 hidden sm:flex">
-            <span className="font-bold text-white text-sm tracking-wide truncate">Xkimm Xa Mali</span>
+            <span className="font-bold text-white text-sm tracking-wide truncate">Xkimm Xa Mali Foundation</span>
             <span className="text-white/45 text-[10px] tracking-widest uppercase mt-0.5">{subtitle}</span>
           </span>
           {showAdminBadge && (

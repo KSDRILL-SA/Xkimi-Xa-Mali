@@ -114,7 +114,7 @@ async function dispatchEmail(
     default:
       await emailProvider.sendGenericEmail(
         to,
-        `Xkimm Xa Mali`,
+        `Xkimm Xa Mali Foundation`,
         `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">${interpolate(body, payload)}</div>`,
       )
   }

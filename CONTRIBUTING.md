@@ -1,4 +1,4 @@
-# Contributing to Xkimm Xa Mali
+# Contributing to Xkimm Xa Mali Foundation
 
 ---
 
