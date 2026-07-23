@@ -74,6 +74,17 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
+// Without this the PAID/OVERDUE paths call the real Inngest client, which makes
+// a live network request and intermittently blows the per-test timeout. Only
+// the client is stubbed — the real event names are reused so they cannot drift.
+vi.mock('@/lib/inngest', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/inngest')>('@/lib/inngest')
+  return {
+    inngest: { send: vi.fn().mockResolvedValue(undefined) },
+    InngestEvents: actual.InngestEvents,
+  }
+})
+
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
