@@ -15,6 +15,9 @@ export async function storeSignaturePng(path: string, pngBuffer: Buffer): Promis
       access: 'public',
       contentType: 'image/png',
       addRandomSuffix: false,
+      // Signatures are addressed by a stable path and may be re-captured. Since
+      // v1 the SDK throws on an existing pathname unless overwriting is allowed.
+      allowOverwrite: true,
     })
     return blob.url
   }
