@@ -53,14 +53,24 @@ const nextConfig: NextConfig = {
   },
 }
 
-const sentryOptions = {
+// Explicitly typed so that options a future SDK major removes or renames fail
+// the build rather than being silently ignored. An untyped object literal
+// assigned to a variable skips excess-property checking, which is how the
+// now-removed `hideSourceMaps` kept type-checking while doing nothing.
+const sentryOptions: Parameters<typeof withSentryConfig>[1] = {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: true,
   widenClientFileUpload: true,
-  hideSourceMaps: true,
-  disableLogger: true,
-  automaticVercelMonitors: true,
+  // `hideSourceMaps` was removed in v10. Source maps are now deleted from the
+  // build output after upload by default (sourcemaps.deleteSourcemapsAfterUpload),
+  // so they are still never served publicly.
+  webpack: {
+    // Replaces the deprecated top-level `disableLogger`.
+    treeshake: { removeDebugLogging: true },
+    // Replaces the deprecated top-level `automaticVercelMonitors`.
+    automaticVercelMonitors: true,
+  },
 }
 
 let config: NextConfig = nextConfig
