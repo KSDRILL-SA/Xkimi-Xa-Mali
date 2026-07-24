@@ -167,7 +167,9 @@ model User {
 
   @@index([status])
   @@index([email, status])
-  @@index([deletedAt])
+  // Active-user filtering is served by the partial index `idx_users_active`
+  // (status WHERE deletedAt IS NULL), created in raw SQL — Prisma's DSL cannot
+  // express a partial index, so it is intentionally not declared here.
   @@map("users")
 }
 
@@ -285,7 +287,7 @@ model BankAccount {
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   mandates PaymentMandate[]
 
-  @@index([userId])
+  // userId lookups are served by the composite below (leading column).
   @@index([userId, isPrimary])
   @@map("bank_accounts")
 }
@@ -311,7 +313,10 @@ model PaymentMandate {
   approvedBy   User?         @relation("MandateApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   transactions Transaction[]
 
-  @@index([userId])
+  // netcashMandateId uniqueness is enforced by a partial unique index
+  // (WHERE netcashMandateId IS NOT NULL) in raw SQL. The @unique above keeps the
+  // Prisma client aware of it; the DB shape is intentionally partial.
+  // userId lookups are served by the [userId, status] composite (leading column).
   @@index([userId, status])
   @@index([bankAccountId])
   @@index([status])
@@ -339,11 +344,11 @@ model Contribution {
   transactions Transaction[]
 
   @@unique([userId, periodMonth, periodYear])
-  @@index([userId])
+  // userId lookups are served by the [userId, ...] composites below (leading column).
   @@index([userId, status])
   @@index([periodYear, periodMonth])
   @@index([status, dueDate])
-  @@index([status, periodYear, periodMonth])
+  @@index([status, periodYear, periodMonth], map: "contributions_status_period_idx")
   @@index([userId, createdAt])
   @@map("contributions")
 }
@@ -370,14 +375,15 @@ model Transaction {
   reversalOf   Transaction?   @relation("TransactionReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
   reversal     Transaction?   @relation("TransactionReversal")
 
-  @@index([contributionId])
+  // reversalOfId uniqueness (double-reversal guard) is enforced by a partial
+  // unique index (WHERE reversalOfId IS NOT NULL) in raw SQL; @unique above keeps
+  // the client aware. contributionId lookups are served by [contributionId, status].
   @@index([contributionId, status])
   @@index([mandateId])
   @@index([status, createdAt])
   @@index([gatewayRef])
   @@index([type])
   @@index([status, retryCount])
-  @@index([createdAt])
   @@map("transactions")
 }
 
@@ -516,7 +522,7 @@ model GoalProgress {
   goal       Goal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
   recordedBy User? @relation("ProgressRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
 
-  @@index([goalId])
+  // goalId lookups are served by the [goalId, recordedAt] composite (leading column).
   @@index([goalId, recordedAt])
   @@map("goal_progress")
 }
@@ -558,7 +564,9 @@ model Notification {
   @@index([status])
   @@index([channel])
   @@index([status, createdAt])
-  @@index([externalRef])
+  // externalRef lookups are served by a partial index (WHERE externalRef IS NOT
+  // NULL) in raw SQL — lookups are always by a concrete provider ref, so the
+  // partial covers them without indexing the many NULL rows.
   @@map("notifications")
 }
 
@@ -641,6 +649,10 @@ model Invitation {
   acceptedBy User? @relation("InviteAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
   revokedBy  User? @relation("InviteRevoker",  fields: [revokedById],  references: [id], onDelete: SetNull)
 
+  // "One PENDING invite per contact" is enforced by partial unique indexes
+  // (email/phone WHERE status = 'PENDING') in raw SQL — this matches the service,
+  // which only blocks a pending duplicate and allows re-inviting an expired or
+  // revoked contact. There is deliberately NO full unique on email/phone.
   @@index([invitedById])
   @@index([email])
   @@index([status])
