@@ -40,8 +40,7 @@ export default async function StatementsPage() {
   const contributions = await getStatementPeriods(userId, userId, roles)
 
   const byYear = (contributions as ContribRow[]).reduce<Record<number, ContribRow[]>>((acc, c) => {
-    if (!acc[c.periodYear]) acc[c.periodYear] = []
-    acc[c.periodYear].push(c)
+    ;(acc[c.periodYear] ??= []).push(c)
     return acc
   }, {})
 
@@ -82,12 +81,12 @@ export default async function StatementsPage() {
                   <FileText size={12} className="text-xxm-green" aria-hidden />
                 </div>
                 <h2 className="font-bold text-xxm-green-900">{year}</h2>
-                <span className="text-xs text-xxm-gray-400 ml-auto">{byYear[year].length} period{byYear[year].length !== 1 ? 's' : ''}</span>
+                <span className="text-xs text-xxm-gray-400 ml-auto">{byYear[year]!.length} period{byYear[year]!.length !== 1 ? 's' : ''}</span>
               </div>
 
               {/* Month rows */}
               <div className="divide-y divide-xxm-gray-50">
-                {byYear[year].map((c) => {
+                {byYear[year]!.map((c) => {
                   const sc = STATUS_CONFIG[c.status as ContribStatus] ?? { label: c.status, dot: 'bg-xxm-gray-400', badge: 'bg-xxm-gray-100 text-xxm-gray-600' }
                   const outstanding = Math.max(0, c.amountDue - c.amountPaid)
 

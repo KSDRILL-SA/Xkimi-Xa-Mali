@@ -8,6 +8,9 @@ export const contributionMonthRollover = inngest.createFunction(
   async ({ step }) => {
     const today = await step.run('get-today', () => todaySAST())
     const [year, month] = today.split('-')
+    if (!year || !month) {
+      throw new Error(`contribution-month-rollover: unexpected date format from todaySAST(): ${today}`)
+    }
 
     await step.run('generate', () =>
       generateMonthlyContributions(

@@ -20,7 +20,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   }
 
   const parsed = PasswordResetSchema.safeParse(body)
-  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
+  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
   await resetPassword(parsed.data.token, parsed.data.password, ip)
   return apiSuccess({ message: 'Password reset successful. You can now log in.' })

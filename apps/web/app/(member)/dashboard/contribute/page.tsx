@@ -208,6 +208,7 @@ export default function ContributePage() {
                       value={`${watch('periodYear')}-${watch('periodMonth')}`}
                       onChange={(e) => {
                         const [y, m] = e.target.value.split('-').map(Number)
+                        if (y === undefined || m === undefined) return
                         setValue('periodMonth', m, { shouldValidate: true })
                         setValue('periodYear', y, { shouldValidate: true })
                       }}
