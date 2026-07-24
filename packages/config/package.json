@@ -5,7 +5,6 @@
   "description": "Shared configuration \u2014 tsconfig, tailwind, eslint",
   "exports": {
     "./tsconfig/base": "./tsconfig/base.json",
-    "./tsconfig/nextjs": "./tsconfig/nextjs.json",
     "./tailwind": "./tailwind/base.ts",
     "./eslint": "./eslint/index.mjs"
   },
