@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { setMemberStatus } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 const VALID_STATUSES = ['ACTIVE', 'SUSPENDED'] as const
 type UserStatus = typeof VALID_STATUSES[number]
@@ -22,7 +23,7 @@ export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { pa
     return apiError('VAL_002', `status must be one of: ${VALID_STATUSES.join(', ')}`, 400)
   }
 
-  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  const ip = getClientIP(req)
 
   const updated = await setMemberStatus(session.user.id, roles, id, status as UserStatus, ip)
   return apiSuccess(updated)

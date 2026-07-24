@@ -4,6 +4,7 @@ import { CreateBankAccountSchema } from '@/lib/validation/profile'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { listBankAccounts, addBankAccount } from '@/services/member.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const GET = withApiHandler(async () => {
   const session = await auth()
@@ -27,7 +28,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   const parsed = CreateBankAccountSchema.safeParse(body)
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  const ip = getClientIP(req) ?? 'unknown'
 
   const account = await addBankAccount(session.user.id, parsed.data, ip)
   return apiSuccess(account, 201)

@@ -4,6 +4,7 @@ import { ChangePasswordSchema } from '@/lib/validation/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { changePassword } from '@/services/auth.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const PATCH = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
@@ -19,7 +20,7 @@ export const PATCH = withApiHandler(async (req: NextRequest) => {
   const parsed = ChangePasswordSchema.safeParse(body)
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  const ip = getClientIP(req) ?? 'unknown'
 
   await changePassword(session.user.id, parsed.data.currentPassword, parsed.data.newPassword, ip)
   return apiSuccess({ message: 'Password changed successfully.' })

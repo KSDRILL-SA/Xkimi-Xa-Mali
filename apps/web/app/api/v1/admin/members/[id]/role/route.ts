@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { setMemberRole } from '@/services/invite.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
@@ -20,7 +21,7 @@ export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { pa
   if (typeof b.assign !== 'boolean')
     return apiError('VAL_003', '"assign" must be a boolean', 400)
 
-  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  const ip = getClientIP(req)
 
   const result = await setMemberRole(session.user.id, roles, id, b.role, b.assign, ip)
   return apiSuccess(result)

@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from '@/lib/api-response'
 import { adminBulkRatelimit } from '@/lib/redis'
 import { bulkGenerateContributions } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const POST = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
@@ -24,7 +25,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   if (typeof year !== 'number' || year < 2024)
     return apiError('VAL_003', '"year" must be ≥ 2024', 400)
 
-  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  const ip = getClientIP(req)
 
   const result = await bulkGenerateContributions(session.user.id, roles, month, year, ip)
   return apiSuccess(result, 201)

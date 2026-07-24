@@ -6,6 +6,7 @@ import { broadcastNotification } from '@/services/admin.service'
 import type { BroadcastChannel, BroadcastFilter } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
 import { isValidInternalRequest } from '@/lib/internal-request'
+import { getClientIP } from '@/lib/request'
 
 const VALID_CHANNELS: BroadcastChannel[] = ['SMS', 'EMAIL', 'BOTH', 'IN_APP']
 const VALID_FILTERS: BroadcastFilter[]  = ['ALL', 'ACTIVE', 'PENDING', 'SUSPENDED']
@@ -41,7 +42,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     ? (filter as BroadcastFilter)
     : 'ALL'
 
-  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  const ip = getClientIP(req)
 
   const result = await broadcastNotification(
     adminId, adminRoles,

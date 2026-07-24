@@ -5,6 +5,7 @@ import { apiSuccess, apiError } from '@/lib/api-response'
 import { requestDelay } from '@/services/mandate.service'
 import { DelayMandateSchema } from '@/lib/validation/mandate'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
@@ -20,7 +21,7 @@ export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { pa
     return apiError('VAL_001', parsed.error.errors[0]?.message ?? 'Invalid request', 422)
   }
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
+  const ip = getClientIP(req)
 
   const result = await requestDelay(id, parsed.data, session.user.id, session.user.roles ?? [], ip)
   return apiSuccess(result)
