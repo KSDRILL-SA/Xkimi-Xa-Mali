@@ -64,4 +64,4 @@ export const POST = withApiHandler(async (req: NextRequest) => {
 
   // BulkSMS requires a 200 response regardless of processing outcome.
   return new NextResponse(null, { status: 200 })
-})
+}, { rateLimit: false })
