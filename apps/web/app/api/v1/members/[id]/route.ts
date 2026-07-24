@@ -29,7 +29,7 @@ export const PATCH = withApiHandler<{ id: string }>(async (req: NextRequest, { p
   }
 
   const parsed = UpdateProfileSchema.safeParse(body)
-  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
+  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
 

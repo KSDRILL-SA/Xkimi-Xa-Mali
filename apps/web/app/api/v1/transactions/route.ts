@@ -25,7 +25,7 @@ export const GET = withApiHandler(async (req: NextRequest) => {
     limit: searchParams.get('limit') ? Number(searchParams.get('limit')) : 20,
   })
 
-  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
+  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
   const result = await getTransactionHistory(targetUserId, session.user.id, roles, parsed.data)
   return apiSuccess(result.items, 200, {

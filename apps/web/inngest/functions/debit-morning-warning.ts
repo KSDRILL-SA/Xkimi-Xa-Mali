@@ -9,8 +9,11 @@ export const debitMorningWarning = inngest.createFunction(
   { cron: '0 6 * * *' }, // 08:00 SAST (UTC+2)
   async ({ step }) => {
     const today = await step.run('get-today', () => todaySAST())
-    const dayOfMonth = parseInt(today.split('-')[2], 10)
-    const [year, month] = today.split('-')
+    const [year, month, dayStr] = today.split('-')
+    if (!year || !month || !dayStr) {
+      throw new Error(`debit-morning-warning: unexpected date format from todaySAST(): ${today}`)
+    }
+    const dayOfMonth = parseInt(dayStr, 10)
     const periodKey = `${year}-${month}`
 
     const mandates = await step.run('find-mandates', () =>

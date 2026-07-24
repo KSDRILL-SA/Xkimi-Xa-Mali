@@ -16,11 +16,14 @@ export const debitRun = inngest.createFunction(
   { cron: '0 16 * * *' }, // 18:00 SAST (UTC+2)
   async ({ step }) => {
     const today = await step.run('get-today', () => todaySAST())
-    const parts = today.split('-')
-    const dayOfMonth = parseInt(parts[2], 10)
-    const periodYear = parseInt(parts[0], 10)
-    const periodMonth = parseInt(parts[1], 10)
-    const periodKey = `${parts[0]}-${parts[1]}`
+    const [yearStr, monthStr, dayStr] = today.split('-')
+    if (!yearStr || !monthStr || !dayStr) {
+      throw new Error(`debit-run: unexpected date format from todaySAST(): ${today}`)
+    }
+    const dayOfMonth = parseInt(dayStr, 10)
+    const periodYear = parseInt(yearStr, 10)
+    const periodMonth = parseInt(monthStr, 10)
+    const periodKey = `${yearStr}-${monthStr}`
 
     const mandates = await step.run('find-mandates', () =>
       db.paymentMandate.findMany({
@@ -86,7 +89,7 @@ export const debitRun = inngest.createFunction(
         paymentGateway.submitScheduledDebit({
           mandateId: mandate.netcashMandateId!,
           amount: debitAmountWithFee(Number(mandate.amount)),
-          reference: `XXM-${parts[0]}-${parts[1]}`,
+          reference: `XXM-${yearStr}-${monthStr}`,
           idempotencyKey,
         }),
       )

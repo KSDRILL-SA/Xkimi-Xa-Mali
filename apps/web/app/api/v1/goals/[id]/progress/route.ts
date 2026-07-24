@@ -52,7 +52,7 @@ export const POST = withApiHandler<{ id: string }>(async (
   }
 
   const parsed = RecordProgressSchema.safeParse(body)
-  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
+  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
   const { id } = await params
   const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
