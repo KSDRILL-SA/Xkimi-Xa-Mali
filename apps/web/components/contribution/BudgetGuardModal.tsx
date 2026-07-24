@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Label } from '@/components/ui/Label'
 import { formatZAR } from '@/lib/formatters'
@@ -23,11 +23,26 @@ interface Props {
 export function BudgetGuardModal({ details, loading, onChangeAmount, onProceed, onClose }: Props) {
   const [reason, setReason] = useState('')
 
+  // Escape closes the guard (returns to the payment form); a disabled control
+  // during an in-flight override keeps the choice deliberate.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !loading) onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose, loading])
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="budget-guard-title"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+    >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-base font-semibold text-xxm-green-900">Budget limit reached</h2>
+          <h2 id="budget-guard-title" className="text-base font-semibold text-xxm-green-900">Budget limit reached</h2>
           <button
             type="button"
             onClick={onClose}
