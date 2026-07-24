@@ -10,7 +10,7 @@
   "types": "./src/index.ts",
   "sideEffects": false,
   "peerDependencies": {
-    "@prisma/client": ">=6.0.0"
+    "@prisma/client": "^6.0.0"
   },
   "scripts": {
     "test": "exit 0"
