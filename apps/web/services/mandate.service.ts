@@ -4,6 +4,7 @@ import {
   MandateNotFoundError,
   MandateConflictError,
   BankAccountNotFoundError,
+  isUniqueViolation,
 } from '@/lib/errors'
 import { assertCanAccess } from '@/lib/authorization'
 import {
@@ -130,7 +131,16 @@ export async function createMandate(
       netcashMandateId: netcashRes.mandateId,
     })
   } catch (dbErr) {
+    // The Netcash mandate is already live; cancel it so we never orphan a debit
+    // authorisation with no local record.
     await paymentGateway.cancelMandate(netcashRes.mandateId).catch(() => {})
+    // A unique-violation here means a concurrent request won the race to create
+    // the single allowed active/pending mandate. Return a clean conflict instead
+    // of a raw Prisma error (the DB partial unique index is the race-safe backstop
+    // for the non-atomic pre-check above).
+    if (isUniqueViolation(dbErr)) {
+      throw new MandateConflictError('An active or pending mandate already exists', 'MND_002')
+    }
     throw dbErr
   }
 

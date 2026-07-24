@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { isUniqueViolation } from '@/lib/errors'
 
 type Direction = 'CREDIT' | 'DEBIT'
 
@@ -11,10 +12,6 @@ export type LedgerEntryView = {
   memberId: string | null
   description: string | null
   createdAt: string
-}
-
-function isUniqueViolation(e: unknown): boolean {
-  return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'P2002'
 }
 
 type PostParams = {
