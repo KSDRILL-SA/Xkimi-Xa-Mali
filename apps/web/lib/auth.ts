@@ -11,6 +11,12 @@ import { logger } from './logger'
 const MAX_LOGIN_ATTEMPTS = env.MAX_LOGIN_ATTEMPTS
 const LOCKOUT_DURATION_MS = env.LOCKOUT_DURATION_MINUTES * 60 * 1000
 
+// A valid cost-12 bcrypt hash of a throwaway value. When no account matches, we
+// still run bcrypt.compare against this decoy so a non-existent email costs the
+// same time as a real one — closing the timing side-channel that would otherwise
+// let an attacker enumerate registered emails (SEC-S07).
+const DECOY_HASH = '$2a$12$0qvDdA8aXMT/QLT7ggsLKess1fpkA0Uy07.gAmSqiJcZy7/AcziCi'
+
 async function recordLoginHistory(userId: string, success: boolean) {
   await db.loginHistory
     .create({ data: { userId, success } })
@@ -27,9 +33,13 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
     include: { roles: { include: { role: true } } },
   })
 
-  if (!user?.password) return null
-
-  if (user.deletedAt) return null
+  // Constant-time reject for absent/soft-deleted accounts: burn an equivalent
+  // bcrypt comparison so response time cannot distinguish "no such user" from
+  // "user exists, wrong password" (SEC-S07 — no user enumeration).
+  if (!user?.password || user.deletedAt) {
+    await bcrypt.compare(parsed.data.password, DECOY_HASH)
+    return null
+  }
 
   // Account lockout check — checked before bcrypt to short-circuit fast
   if (user.lockedUntil && user.lockedUntil > new Date()) {
@@ -47,21 +57,23 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
   const valid = await bcrypt.compare(parsed.data.password, user.password)
 
   if (!valid) {
-    const newAttempts = user.loginAttempts + 1
-    const lockout = newAttempts >= MAX_LOGIN_ATTEMPTS
-    await db.user.update({
+    // Atomic increment so parallel failed attempts cannot under-count the
+    // counter (a read-modify-write here would let concurrent guesses share a
+    // single increment and evade the lockout threshold).
+    const { loginAttempts: attempts } = await db.user.update({
       where: { id: user.id },
-      data: {
-        loginAttempts: newAttempts,
-        ...(lockout && { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) }),
-      },
+      data: { loginAttempts: { increment: 1 } },
+      select: { loginAttempts: true },
     })
+    const lockout = attempts >= MAX_LOGIN_ATTEMPTS
+    if (lockout) {
+      await db.user.update({
+        where: { id: user.id },
+        data: { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) },
+      })
+    }
     await recordLoginHistory(user.id, false)
-    logger.warn('Failed login attempt', {
-      userId: user.id,
-      attempts: newAttempts,
-      locked: lockout,
-    })
+    logger.warn('Failed login attempt', { userId: user.id, attempts, locked: lockout })
     return null
   }
 
