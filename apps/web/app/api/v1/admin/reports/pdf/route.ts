@@ -19,7 +19,7 @@ export const GET = withApiHandler(async (req: NextRequest) => {
     month: Number(searchParams.get('month')),
     year: Number(searchParams.get('year')),
   })
-  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
+  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
   const { month, year } = parsed.data
   const buffer = await generateContributionReportPdf(roles, month, year)

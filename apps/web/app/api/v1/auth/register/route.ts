@@ -10,7 +10,7 @@ const SA_ID    = /^\d{13}$/
 function validateSAId(id: string): boolean {
   let sum = 0; let alt = false
   for (let i = id.length - 1; i >= 0; i--) {
-    let n = parseInt(id[i], 10)
+    let n = parseInt(id.charAt(i), 10)
     if (alt) { n *= 2; if (n > 9) n -= 9 }
     sum += n; alt = !alt
   }

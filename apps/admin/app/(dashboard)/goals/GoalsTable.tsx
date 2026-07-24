@@ -58,7 +58,7 @@ export function GoalsTable({
 
           <div className="divide-y divide-xxm-gray-50">
             {rows.map((r, i) => {
-              const meta = TYPE_META[r.type] ?? TYPE_META.CUSTOM
+              const meta = TYPE_META[r.type] ?? TYPE_META.CUSTOM!
               const Icon = r.status === 'Achieved' ? Trophy : meta.icon
               return (
                 <div

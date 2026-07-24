@@ -19,7 +19,7 @@ export const GET = withApiHandler(async (req: NextRequest) => {
     year: Number(searchParams.get('year')),
   })
 
-  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
+  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
   const report = await getAdminReport(parsed.data.month, parsed.data.year)
   return apiSuccess(report)
