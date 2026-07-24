@@ -4,6 +4,7 @@ import { UpdateProfileSchema } from '@/lib/validation/profile'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { getMemberProfile, updateMemberProfile } from '@/services/member.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const GET = withApiHandler<{ id: string }>(async (_req: NextRequest, { params }) => {
   const session = await auth()
@@ -31,7 +32,7 @@ export const PATCH = withApiHandler<{ id: string }>(async (req: NextRequest, { p
   const parsed = UpdateProfileSchema.safeParse(body)
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  const ip = getClientIP(req) ?? 'unknown'
 
   const updated = await updateMemberProfile(id, session.user.id, session.user.roles, parsed.data, ip)
   return apiSuccess(updated)

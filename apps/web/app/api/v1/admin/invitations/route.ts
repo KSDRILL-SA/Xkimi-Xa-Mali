@@ -7,6 +7,7 @@ import {
 } from '@/services/invite.service'
 import { withApiHandler } from '@/lib/api-handler'
 import { isValidInternalRequest, getInternalAdminUserId } from '@/lib/internal-request'
+import { getClientIP } from '@/lib/request'
 
 const SA_PHONE = /^(\+27|0)[6-8][0-9]{8}$/
 
@@ -59,7 +60,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     return apiError('VAL_006', '"minimumAmount" must be at least 100', 400)
 
   const baseUrl = new URL(req.url).origin
-  const ip      = req.headers.get('x-forwarded-for') ?? undefined
+  const ip      = getClientIP(req)
 
   const result = await generateInvite(
     adminId,
