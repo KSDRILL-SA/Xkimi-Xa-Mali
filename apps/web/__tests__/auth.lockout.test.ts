@@ -94,21 +94,35 @@ describe('authorizeCredentials', () => {
     expect(db.user.findUnique).not.toHaveBeenCalled()
   })
 
-  it('returns null when user is not found', async () => {
+  it('returns null when user is not found — and still runs bcrypt (no timing enumeration)', async () => {
     setupValidCredentials()
     ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>).mockResolvedValue(null)
 
     const result = await authorizeCredentials({ email: 'x@x.com', password: 'pw' })
     expect(result).toBeNull()
+    // SEC-S07: a missing account must cost the same bcrypt work as a real one,
+    // so response time cannot distinguish "no such user" from "wrong password".
+    expect(bcrypt.compare).toHaveBeenCalledTimes(1)
   })
 
-  it('returns null when user has no password (OAuth account)', async () => {
+  it('returns null when user has no password — and still runs bcrypt', async () => {
     setupValidCredentials()
     ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
       .mockResolvedValue({ ...ACTIVE_USER, password: null } as never)
 
     const result = await authorizeCredentials({ email: 'test@example.com', password: 'pw' })
     expect(result).toBeNull()
+    expect(bcrypt.compare).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns null for a soft-deleted account — and still runs bcrypt', async () => {
+    setupValidCredentials()
+    ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
+      .mockResolvedValue({ ...ACTIVE_USER, deletedAt: new Date() } as never)
+
+    const result = await authorizeCredentials({ email: 'test@example.com', password: 'pw' })
+    expect(result).toBeNull()
+    expect(bcrypt.compare).toHaveBeenCalledTimes(1)
   })
 
   it('throws ACCOUNT_LOCKED when lockedUntil is in the future', async () => {
@@ -141,46 +155,48 @@ describe('authorizeCredentials', () => {
       .rejects.toThrow('ACCOUNT_SUSPENDED')
   })
 
-  it('increments loginAttempts and returns null on wrong password', async () => {
+  it('atomically increments loginAttempts and returns null on wrong password', async () => {
     setupValidCredentials()
     ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
       .mockResolvedValue({ ...ACTIVE_USER, loginAttempts: 2 } as never)
     ;(bcrypt.compare as MockedFunction<typeof bcrypt.compare>).mockResolvedValue(false as never)
-    ;(db.user.update as MockedFunction<typeof db.user.update>).mockResolvedValue({} as never)
+    // Returns the post-increment count (3) — below the lockout threshold.
+    ;(db.user.update as MockedFunction<typeof db.user.update>).mockResolvedValue({ loginAttempts: 3 } as never)
     ;(db.loginHistory.create as MockedFunction<typeof db.loginHistory.create>).mockResolvedValue({} as never)
 
     const result = await authorizeCredentials({ email: 'test@example.com', password: 'wrong' })
 
     expect(result).toBeNull()
+    // Atomic increment — not a read-modify-write — so parallel guesses can't
+    // share one increment and evade the lockout threshold.
     expect(db.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ loginAttempts: 3 }),
-      }),
+      expect.objectContaining({ data: { loginAttempts: { increment: 1 } } }),
     )
-    // Login history recorded on failure
+    // No lockout write below the threshold.
+    expect(db.user.update).toHaveBeenCalledTimes(1)
     expect(db.loginHistory.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ success: false }) }),
     )
   })
 
-  it('sets lockedUntil when attempt count reaches MAX_LOGIN_ATTEMPTS (5)', async () => {
+  it('sets lockedUntil when the post-increment count reaches MAX_LOGIN_ATTEMPTS (5)', async () => {
     setupValidCredentials()
-    // 4 prior failures — this 5th attempt triggers lockout
     ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
       .mockResolvedValue({ ...ACTIVE_USER, loginAttempts: 4 } as never)
     ;(bcrypt.compare as MockedFunction<typeof bcrypt.compare>).mockResolvedValue(false as never)
-    ;(db.user.update as MockedFunction<typeof db.user.update>).mockResolvedValue({} as never)
+    // First update (increment) returns the new count 5; second update sets the lock.
+    ;(db.user.update as MockedFunction<typeof db.user.update>)
+      .mockResolvedValueOnce({ loginAttempts: 5 } as never)
+      .mockResolvedValueOnce({} as never)
     ;(db.loginHistory.create as MockedFunction<typeof db.loginHistory.create>).mockResolvedValue({} as never)
 
     await authorizeCredentials({ email: 'test@example.com', password: 'wrong' })
 
-    const [{ data }] = (db.user.update as MockedFunction<typeof db.user.update>).mock.calls[0] as [
-      { data: { loginAttempts: number; lockedUntil?: Date } },
-    ]
-    expect(data.loginAttempts).toBe(5)
-    expect(data.lockedUntil).toBeInstanceOf(Date)
-    // lockedUntil should be ~15 minutes from now
-    expect((data.lockedUntil as Date).getTime()).toBeGreaterThan(Date.now() + 14 * 60_000)
+    const calls = (db.user.update as MockedFunction<typeof db.user.update>).mock.calls
+    expect(calls[0][0]).toEqual(expect.objectContaining({ data: { loginAttempts: { increment: 1 } } }))
+    const lockData = (calls[1][0] as { data: { lockedUntil?: Date } }).data
+    expect(lockData.lockedUntil).toBeInstanceOf(Date)
+    expect((lockData.lockedUntil as Date).getTime()).toBeGreaterThan(Date.now() + 14 * 60_000)
   })
 
   it('resets loginAttempts and lockedUntil on successful login when prior failures exist', async () => {

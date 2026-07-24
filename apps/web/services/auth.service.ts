@@ -96,7 +96,8 @@ export async function verifyEmail(rawToken: string, ipAddress?: string) {
   if (record.usedAt) throw new InvalidTokenError('This verification link has already been used')
 
   await runTransaction(async (tx) => {
-    await authTokenRepo.updateVerificationToken(tokenHash, { usedAt: new Date() }, tx)
+    const consumed = await authTokenRepo.consumeVerificationToken(tokenHash, tx)
+    if (!consumed) throw new InvalidTokenError('This verification link has already been used')
     await tx.user.update({
       where: { id: record.userId },
       data: { status: 'ACTIVE', emailVerified: new Date() },
@@ -151,10 +152,8 @@ export async function resetPassword(rawToken: string, newPassword: string, ipAdd
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
   await runTransaction(async (tx) => {
-    await tx.passwordResetToken.update({
-      where: { tokenHash },
-      data: { usedAt: new Date() },
-    })
+    const consumed = await authTokenRepo.consumeResetToken(tokenHash, tx)
+    if (!consumed) throw new InvalidTokenError('This reset link has already been used')
     await tx.user.update({
       where: { id: record.userId },
       data: { password: passwordHash },
