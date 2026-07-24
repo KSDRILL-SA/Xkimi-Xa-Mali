@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { Route } from 'next'
 import { ProgressBar } from '@xxm/ui'
 import { Target, Trophy, Calendar, CalendarRange, Sparkles, Lock, Check, Trash2, Plus, ArrowRight, type LucideIcon } from 'lucide-react'
+import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 
 export type GoalRow = {
   id: string; title: string; type: string; status: string; statusClass: string
@@ -114,9 +115,14 @@ export function GoalsTable({
                         {!r.locked && (
                           <form action={deleteAction}>
                             <input type="hidden" name="goalId" value={r.id} />
-                            <button type="submit" className="inline-flex items-center justify-center w-6 h-6 rounded-lg text-red-500 hover:bg-red-50 transition-colors" title="Delete" aria-label="Delete">
+                            <ConfirmSubmitButton
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                              title="Delete this goal?"
+                              message={`"${r.title}" will be permanently deleted. This cannot be undone.`}
+                              confirmLabel="Delete goal"
+                            >
                               <Trash2 size={12} aria-hidden />
-                            </button>
+                            </ConfirmSubmitButton>
                           </form>
                         )}
                       </>

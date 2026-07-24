@@ -1,6 +1,7 @@
 'use client'
 
 import { Mail, Phone, CalendarClock, CheckCircle2, Ban } from 'lucide-react'
+import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 
 export type InviteRow = {
   id: string; name: string; email: string; phone: string; rawStatus: string
@@ -96,9 +97,14 @@ export function InvitationsTable({
                     {r.rawStatus === 'PENDING' ? (
                       <form action={revokeAction}>
                         <input type="hidden" name="id" value={r.id} />
-                        <button type="submit" className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-red-500 text-xs font-semibold hover:bg-red-50 transition-colors" title="Revoke invitation">
+                        <ConfirmSubmitButton
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-red-500 text-xs font-semibold hover:bg-red-50 transition-colors"
+                          title="Revoke this invitation?"
+                          message={`The invite for ${r.name} (${r.email}) will be revoked and its code can no longer be used to register.`}
+                          confirmLabel="Revoke invitation"
+                        >
                           <Ban size={12} aria-hidden /> Revoke
-                        </button>
+                        </ConfirmSubmitButton>
                       </form>
                     ) : (
                       <span className="text-[11px] text-xxm-gray-300">—</span>
