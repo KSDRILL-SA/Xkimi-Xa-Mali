@@ -9,6 +9,11 @@ import { LoginSchema } from '@xxm/utils/schemas'
 const MAX_LOGIN_ATTEMPTS = env.MAX_LOGIN_ATTEMPTS
 const LOCKOUT_DURATION_MS = env.LOCKOUT_DURATION_MINUTES * 60 * 1000
 
+// Valid cost-12 bcrypt hash of a throwaway value — compared against when no
+// account matches so a non-existent email costs the same time as a real one,
+// closing the timing side-channel for email enumeration (SEC-S07).
+const DECOY_HASH = '$2a$12$0qvDdA8aXMT/QLT7ggsLKess1fpkA0Uy07.gAmSqiJcZy7/AcziCi'
+
 async function recordLoginHistory(userId: string, success: boolean) {
   await db.loginHistory
     .create({ data: { userId, success } })
@@ -35,8 +40,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           include: { roles: { include: { role: true } } },
         })
 
-        if (!user?.password) return null
-        if (user.deletedAt) return null
+        // Constant-time reject for absent/soft-deleted accounts (SEC-S07).
+        if (!user?.password || user.deletedAt) {
+          await bcrypt.compare(parsed.data.password, DECOY_HASH)
+          return null
+        }
 
         if (user.lockedUntil && user.lockedUntil > new Date()) {
           throw new Error('ACCOUNT_LOCKED')
@@ -54,15 +62,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             await recordLoginHistory(user.id, false)
             return null
           }
-          const newAttempts = user.loginAttempts + 1
-          const lockout = newAttempts >= MAX_LOGIN_ATTEMPTS
-          await db.user.update({
+          // Atomic increment so parallel failed attempts cannot under-count and
+          // evade the lockout threshold.
+          const { loginAttempts: attempts } = await db.user.update({
             where: { id: user.id },
-            data: {
-              loginAttempts: newAttempts,
-              ...(lockout && { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) }),
-            },
+            data: { loginAttempts: { increment: 1 } },
+            select: { loginAttempts: true },
           })
+          if (attempts >= MAX_LOGIN_ATTEMPTS) {
+            await db.user.update({
+              where: { id: user.id },
+              data: { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) },
+            })
+          }
           await recordLoginHistory(user.id, false)
           return null
         }
