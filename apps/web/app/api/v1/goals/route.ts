@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from '@/lib/api-response'
 import { CreateGoalSchema } from '@/lib/validation/goal'
 import { getGoals, createGoal } from '@/services/goal.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
@@ -44,7 +45,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   const parsed = CreateGoalSchema.safeParse(body)
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  const ip = getClientIP(req) ?? 'unknown'
   const goal = await createGoal(parsed.data, session.user.id, ip)
   return apiSuccess(goal, 201)
 })

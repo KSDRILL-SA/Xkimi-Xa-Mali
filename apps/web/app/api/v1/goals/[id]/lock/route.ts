@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { lockGoal } from '@/services/goal.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const POST = withApiHandler<{ id: string }>(async (
   req: NextRequest,
@@ -15,7 +16,7 @@ export const POST = withApiHandler<{ id: string }>(async (
   if (!roles?.includes('ADMIN')) return apiError('SYS_003', 'Forbidden', 403)
 
   const { id } = await params
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  const ip = getClientIP(req) ?? 'unknown'
   const goal = await lockGoal(id, session.user.id, ip)
   return apiSuccess(goal)
 })
