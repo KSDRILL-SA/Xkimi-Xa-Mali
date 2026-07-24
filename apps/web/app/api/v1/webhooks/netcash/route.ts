@@ -108,4 +108,4 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     await releaseWebhookEvent('netcash', eventKey)
     throw err
   }
-})
+}, { rateLimit: false })

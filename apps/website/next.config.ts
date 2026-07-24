@@ -28,6 +28,11 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
+              // base-uri and form-action have no default-src fallback — lock both
+              // to same-origin to block <base> injection and form hijacking.
+              "base-uri 'self'",
+              "form-action 'self'",
+              "object-src 'none'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://images.unsplash.com",
