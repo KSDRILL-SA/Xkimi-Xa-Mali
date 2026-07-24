@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { authRatelimit } from '@/lib/redis'
+import { getClientIP } from '@/lib/request'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { acceptInviteRegistration } from '@/services/invite.service'
 import { withApiHandler } from '@/lib/api-handler'
@@ -18,7 +19,7 @@ function validateSAId(id: string): boolean {
 }
 
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const ip = req.headers.get('x-forwarded-for') ?? 'unknown'
+  const ip = getClientIP(req) ?? 'unknown'
 
   const { success } = await authRatelimit.limit(ip)
   if (!success) return apiError('SYS_005', 'Too many requests. Please try again later.', 429)
