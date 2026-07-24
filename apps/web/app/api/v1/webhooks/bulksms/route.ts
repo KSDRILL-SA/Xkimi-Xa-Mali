@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { updateSMSDeliveryStatus } from '@/services/notification.service'
 import { withApiHandler } from '@/lib/api-handler'
 
-// BulkSMS documented IP ranges for delivery receipts
-const BULKSMS_IP_RANGES = [
+// BulkSMS documented IP ranges for delivery receipts. Overridable via
+// BULKSMS_WEBHOOK_IPS (comma-separated prefixes) for local/preview testing,
+// mirroring the Netcash allowlist — so the check is driven by config, not by a
+// NODE_ENV branch (INFRA-I03), and stays enforced in every deployed environment.
+const DEFAULT_BULKSMS_IP_RANGES = [
   '196.38.122.',
   '196.38.123.',
   '196.38.124.',
@@ -12,8 +15,12 @@ const BULKSMS_IP_RANGES = [
   '41.72.105.',
 ]
 
+const BULKSMS_IP_RANGES =
+  process.env.BULKSMS_WEBHOOK_IPS?.split(',').map((p) => p.trim()).filter(Boolean) ??
+  DEFAULT_BULKSMS_IP_RANGES
+
 function isAllowedBulkSMSIp(ip: string): boolean {
-  return BULKSMS_IP_RANGES.some((prefix) => ip.startsWith(prefix))
+  return ip !== '' && BULKSMS_IP_RANGES.some((prefix) => ip.startsWith(prefix))
 }
 
 type DeliveryReceiptEntry = {
@@ -25,7 +32,9 @@ type DeliveryReceiptEntry = {
 export const POST = withApiHandler(async (req: NextRequest) => {
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
 
-  if (process.env.NODE_ENV === 'production' && !isAllowedBulkSMSIp(clientIp)) {
+  // Delivery receipts are authenticated by source IP only (BulkSMS does not sign
+  // them). Enforced in every environment — an empty/unknown IP is rejected.
+  if (!isAllowedBulkSMSIp(clientIp)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
