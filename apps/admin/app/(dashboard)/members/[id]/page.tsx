@@ -6,6 +6,7 @@ import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYL
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader, Reveal } from '@xxm/ui'
 import { UserCircle } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
+import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 
 export const metadata: Metadata = { title: 'Member Detail' }
 
@@ -90,19 +91,36 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                 <option value="PENDING">Pending</option>
                 <option value="SUSPENDED">Suspended</option>
               </select>
-              <button type="submit" className="px-4 py-1.5 rounded-lg bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors">Update status</button>
+              <ConfirmSubmitButton
+                className="px-4 py-1.5 rounded-lg bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors"
+                title="Change member status?"
+                message={`This updates ${member.firstName} ${member.lastName}'s account status. Suspending blocks their sign-in immediately.`}
+                confirmLabel="Update status"
+              >
+                Update status
+              </ConfirmSubmitButton>
             </form>
             {isAdmin ? (
               <form action={handleRemoveAdmin}>
-                <button type="submit" className="px-4 py-1.5 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors">
+                <ConfirmSubmitButton
+                  className="px-4 py-1.5 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors"
+                  title="Remove admin access?"
+                  message={`${member.firstName} ${member.lastName} will lose all administrator privileges. Existing admin sessions are invalidated.`}
+                  confirmLabel="Remove admin"
+                >
                   Remove admin
-                </button>
+                </ConfirmSubmitButton>
               </form>
             ) : (
               <form action={handlePromoteAdmin}>
-                <button type="submit" className="px-4 py-1.5 rounded-lg border border-xxm-green/30 text-xxm-green text-sm font-medium hover:bg-xxm-green/5 transition-colors">
+                <ConfirmSubmitButton
+                  className="px-4 py-1.5 rounded-lg border border-xxm-green/30 text-xxm-green text-sm font-medium hover:bg-xxm-green/5 transition-colors"
+                  title="Grant admin access?"
+                  message={`${member.firstName} ${member.lastName} will gain full administrator privileges, including member management and financial operations.`}
+                  confirmLabel="Make admin"
+                >
                   Make admin
-                </button>
+                </ConfirmSubmitButton>
               </form>
             )}
           </div>
@@ -119,9 +137,14 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             </p>
           </div>
           <form action={handleUnlock}>
-            <button type="submit" className="px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors shrink-0">
+            <ConfirmSubmitButton
+              className="px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors shrink-0"
+              title="Unlock this account?"
+              message={`${member.firstName} ${member.lastName} will be able to sign in again and their failed-attempt counter is reset.`}
+              confirmLabel="Unlock account"
+            >
               Unlock account
-            </button>
+            </ConfirmSubmitButton>
           </form>
         </div>
       )}
