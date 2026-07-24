@@ -316,6 +316,9 @@ model PaymentMandate {
   // netcashMandateId uniqueness is enforced by a partial unique index
   // (WHERE netcashMandateId IS NOT NULL) in raw SQL. The @unique above keeps the
   // Prisma client aware of it; the DB shape is intentionally partial.
+  // "At most one PENDING or ACTIVE mandate per user" is enforced by a partial
+  // unique index (payment_mandates_one_active_per_user, userId WHERE status IN
+  // ('PENDING','ACTIVE')) in raw SQL — the race-safe backstop for createMandate.
   // userId lookups are served by the [userId, status] composite (leading column).
   @@index([userId, status])
   @@index([bankAccountId])

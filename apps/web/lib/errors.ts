@@ -1,6 +1,11 @@
 // Central error hierarchy for the entire application.
 // All services import from here; API routes catch AppError and map it to HTTP responses.
 
+/** True when an error is a Prisma unique-constraint violation (P2002). */
+export function isUniqueViolation(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'P2002'
+}
+
 export class AppError extends Error {
   constructor(
     message: string,
