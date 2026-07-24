@@ -32,6 +32,11 @@ const config: NextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
+            // base-uri and form-action have no default-src fallback — lock both
+            // to same-origin to block <base> injection and form hijacking.
+            "base-uri 'self'",
+            "form-action 'self'",
+            "object-src 'none'",
             `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob:",
