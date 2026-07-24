@@ -7,7 +7,7 @@ const BADGE_CONFIG: Record<string, { label: string; dot: string; badge: string }
 }
 
 export function ContributionStatusBadge({ status }: { status: string }) {
-  const cfg = BADGE_CONFIG[status] ?? BADGE_CONFIG.PENDING
+  const cfg = BADGE_CONFIG[status] ?? BADGE_CONFIG.PENDING!
   return (
     <span
       className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.badge}`}

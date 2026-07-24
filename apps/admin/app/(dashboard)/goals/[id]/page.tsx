@@ -48,7 +48,7 @@ export default async function AdminGoalDetailPage({
     notFound()
   }
 
-  const cfg        = STATUS_CONFIG[goal.status] ?? STATUS_CONFIG.DRAFT
+  const cfg        = STATUS_CONFIG[goal.status] ?? STATUS_CONFIG.DRAFT!
   const target     = Number(goal.targetAmount)
   const current    = Number(goal.currentAmount)
   const pct        = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0

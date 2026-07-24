@@ -59,7 +59,7 @@ export const TYPE_THEME: Record<string, TypeTheme> = {
 }
 
 export function typeTheme(type: string): TypeTheme {
-  return TYPE_THEME[type] ?? TYPE_THEME.CUSTOM
+  return TYPE_THEME[type] ?? TYPE_THEME.CUSTOM!
 }
 
 export function statusTheme(status: string): StatusTheme {

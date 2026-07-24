@@ -49,7 +49,7 @@ export async function DashboardInsights() {
       {data.insights.length > 0 && (
         <ul className="space-y-2.5">
           {data.insights.map((ins) => {
-            const t = TONE[ins.tone] ?? TONE.neutral
+            const t = TONE[ins.tone] ?? TONE.neutral!
             const Icon = t.icon
             return (
               <li key={ins.code} className="flex items-start gap-3">

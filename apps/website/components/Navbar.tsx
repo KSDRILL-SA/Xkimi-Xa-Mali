@@ -32,7 +32,7 @@ export function Navbar() {
       const el = document.getElementById(id)
       if (!el) return null
       const obs = new IntersectionObserver(
-        ([e]) => { if (e.isIntersecting) setActive(id) },
+        ([e]) => { if (e?.isIntersecting) setActive(id) },
         { threshold: 0.3, rootMargin: '-64px 0px 0px 0px' }
       )
       obs.observe(el)

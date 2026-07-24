@@ -21,7 +21,7 @@ export const GET = withApiHandler(async (req: NextRequest) => {
     year: Number(searchParams.get('year')),
   })
 
-  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0].message, 400)
+  if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
   const csv = await exportAdminReportCSV(parsed.data.month, parsed.data.year)
   const filename = `xxm-report-${parsed.data.year}-${String(parsed.data.month).padStart(2, '0')}.csv`
