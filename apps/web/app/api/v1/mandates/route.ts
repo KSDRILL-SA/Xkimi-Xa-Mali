@@ -5,6 +5,7 @@ import { apiSuccess, apiError } from '@/lib/api-response'
 import { getMandates, createMandate } from '@/services/mandate.service'
 import { CreateMandateSchema } from '@/lib/validation/mandate'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const GET = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
@@ -30,7 +31,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     return apiError('VAL_001', parsed.error.errors[0]?.message ?? 'Invalid request', 422)
   }
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
+  const ip = getClientIP(req)
 
   const mandate = await createMandate(
     session.user.id,

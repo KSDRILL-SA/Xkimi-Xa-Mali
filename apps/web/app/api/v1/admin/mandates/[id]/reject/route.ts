@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { rejectMandate } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   const session = await auth()
@@ -10,7 +11,7 @@ export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { pa
 
   const roles = (session.user.roles as string[] | undefined) ?? []
   const { id } = await params
-  const ip = req.headers.get('x-forwarded-for') ?? undefined
+  const ip = getClientIP(req)
 
   const updated = await rejectMandate(session.user.id, roles, id, ip)
   return apiSuccess(updated)
