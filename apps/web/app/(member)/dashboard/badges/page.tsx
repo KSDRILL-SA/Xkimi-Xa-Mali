@@ -3,7 +3,7 @@ import type { BadgeTier } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { getMyBadge } from '@/services/badge.service'
 import { ProgressBar } from '@/components/ui/ProgressBar'
-import { formatDate } from '@/lib/formatters'
+import { formatDate, formatZAR } from '@/lib/formatters'
 import { BADGE_TIER_CONFIG, BADGE_TIER_ORDER } from '@/lib/badge-tier'
 import { Reveal } from '@xxm/ui'
 import { ArrowUpRight, CheckCircle2, Circle, History, Trophy, Crown } from 'lucide-react'
@@ -164,7 +164,7 @@ export default async function BadgesPage() {
           <Stat label="Months active" value={`${badge.monthsActive}`} />
           <Stat label="Current streak" value={`${badge.currentStreak} mo`} />
           <Stat label="Longest streak" value={`${badge.longestStreak} mo`} />
-          <Stat label="Avg contribution" value={`R${badge.avgContribution.toFixed(0)}`} />
+          <Stat label="Avg contribution" value={formatZAR(badge.avgContribution)} />
         </div>
       </Reveal>
 

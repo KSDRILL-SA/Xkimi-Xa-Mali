@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -45,6 +45,21 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
 
   const remaining = contribution.amountDue - contribution.amountPaid
   const maxPayable = Math.min(remaining, MAX_CONTRIBUTION_ZAR)
+
+  // Dialog semantics: Escape closes and body scroll is locked while open. We do
+  // NOT dismiss on backdrop click here — an accidental outside click must never
+  // discard an in-progress payment.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = ''
+    }
+  }, [onClose])
 
   const {
     register,
@@ -116,13 +131,18 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
   if (result) {
     const isSuccess = result.transaction.status === 'SUCCESS'
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="payment-result-title"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+      >
         <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
           <div className="px-6 py-8 text-center space-y-4">
             <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center ${isSuccess ? 'bg-xxm-green-100' : 'bg-amber-100'}`}>
               <span className="text-3xl" aria-hidden>{isSuccess ? '✓' : '⌛'}</span>
             </div>
-            <h2 className="text-lg font-bold text-xxm-green-900">
+            <h2 id="payment-result-title" className="text-lg font-bold text-xxm-green-900">
               {isSuccess ? 'Payment successful' : 'Payment submitted'}
             </h2>
             <p className="text-sm text-gray-500">
@@ -144,11 +164,16 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="payment-modal-title"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+    >
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <div>
-            <h2 className="text-base font-semibold text-xxm-green-900">Make a payment</h2>
+            <h2 id="payment-modal-title" className="text-base font-semibold text-xxm-green-900">Make a payment</h2>
             <p className="text-xs text-gray-400 mt-0.5">
               {formatMonth(contribution.periodMonth, contribution.periodYear)}
             </p>
