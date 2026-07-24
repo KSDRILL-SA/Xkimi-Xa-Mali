@@ -2,7 +2,12 @@ import { Redis } from '@upstash/redis'
 import { Ratelimit } from '@upstash/ratelimit'
 import { env } from './env'
 
-const REDIS_CONFIGURED = !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
+// Exported so the health check can report the honest Redis state. When this is
+// false the redis client is a no-op whose ping() still returns 'PONG', so a
+// health check must not infer "reachable" from a successful ping — that would
+// hide a production misconfiguration that silently disables rate limiting and
+// role-version session invalidation.
+export const REDIS_CONFIGURED = !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
 
 // No-op redis shim — used in local dev when Upstash is not configured.
 // All cache reads return null (cache miss), writes silently succeed.
