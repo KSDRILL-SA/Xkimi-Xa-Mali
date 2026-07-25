@@ -30,6 +30,15 @@ function assertAdmin(roles: string[]) {
   if (!roles.includes('ADMIN')) throw new AdminForbiddenError()
 }
 
+/**
+ * Round a rand amount to 2 decimal places, eliminating binary-float dust
+ * (0.1 + 0.2 → 0.30000000000000004). Money is stored and aggregated exactly by
+ * Postgres DECIMAL; this guards the few places a total crosses into JS.
+ */
+function roundZAR(amount: number): number {
+  return Math.round((amount + Number.EPSILON) * 100) / 100
+}
+
 // ─── Proactive in-app notification ──────────────────────────────────────────────
 // Best-effort: the system keeps members informed in their inbox. A failure here
 // must never break the underlying admin action that triggered it.
@@ -363,7 +372,7 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
   const [items, total] = await Promise.all([
     db.goal.findMany({
       skip, take: limit, orderBy: { createdAt: 'desc' },
-      select: { id: true, title: true, type: true, status: true, targetAmount: true, currentAmount: true, deadline: true, lockedAt: true, createdAt: true },
+      select: { id: true, title: true, type: true, status: true, targetAmount: true, currentAmount: true, deadline: true, lockedAt: true, isPrimary: true, createdAt: true },
     }),
     db.goal.count(),
   ])
@@ -460,6 +469,65 @@ export async function lockGoal(adminId: string, adminRoles: string[], goalId: st
   return updated
 }
 
+/**
+ * Recompute the primary fund's total from the money that actually landed: every
+ * contribution paid in the fund's deadline-year plus any extra payments members
+ * directed straight at it. The primary fund's `currentAmount` is DERIVED, never
+ * hand-typed — that is what keeps it honest and reversal-safe.
+ *
+ * The ACTIVE→ACHIEVED transition is deliberately NOT made here. The member app
+ * owns that transition (it also fires the group celebration), and it re-syncs
+ * after every payment and nightly — so leaving status alone here guarantees the
+ * celebration is never silently skipped.
+ *
+ */
+async function derivePrimaryFundTotal(goal: { id: string; currentAmount: unknown; deadline: Date }) {
+  const year = goal.deadline.getFullYear()
+  const [contributions, directPayments] = await Promise.all([
+    db.contribution.aggregate({ where: { periodYear: year }, _sum: { amountPaid: true } }),
+    db.goalPayment.aggregate({ where: { goalId: goal.id, status: 'SUCCESS' }, _sum: { amount: true } }),
+  ])
+
+  const pooled = roundZAR(
+    Number(contributions._sum.amountPaid ?? 0) + Number(directPayments._sum.amount ?? 0),
+  )
+  if (roundZAR(Number(goal.currentAmount)) === pooled) return
+
+  await db.goal.update({ where: { id: goal.id }, data: { currentAmount: pooled } })
+}
+
+/**
+ * Designate a goal as THE primary fund — the common yearly pot every monthly
+ * contribution flows into. At most one goal may hold the flag (enforced by a
+ * partial unique index), so the current holder is demoted in the same
+ * transaction as the new one is promoted.
+ */
+export async function setPrimaryGoal(adminId: string, adminRoles: string[], goalId: string) {
+  assertAdmin(adminRoles)
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'ACTIVE') throw new AdminConflictError('Only an active goal can be set as the primary fund')
+  if (goal.isPrimary) return goal
+
+  const updated = await db.$transaction(async (tx) => {
+    await tx.goal.updateMany({ where: { isPrimary: true }, data: { isPrimary: false } })
+    return tx.goal.update({ where: { id: goalId }, data: { isPrimary: true } })
+  })
+
+  await writeAuditLog({ userId: adminId, action: 'GOAL_SET_PRIMARY', entity: 'Goal', entityId: goalId, payload: { title: goal.title } })
+
+  // Fill the fund with what members have already paid, so it reads true the
+  // moment it is designated instead of waiting for the next payment or the
+  // nightly sync. Best-effort — the designation itself has already succeeded.
+  try {
+    await derivePrimaryFundTotal(updated)
+  } catch (err) {
+    console.error('Primary fund initial sync failed', err)
+  }
+
+  return updated
+}
+
 export async function deleteGoal(adminId: string, adminRoles: string[], goalId: string) {
   assertAdmin(adminRoles)
   const goal = await db.goal.findUnique({ where: { id: goalId } })
@@ -476,7 +544,13 @@ export async function recordGoalProgress(
   const goal = await db.goal.findUnique({ where: { id: goalId } })
   if (!goal) throw new AdminNotFoundError('Goal not found')
   if (goal.status !== 'ACTIVE') throw new AdminConflictError('Progress can only be recorded on ACTIVE goals')
-  const newTotal = Number(goal.currentAmount) + amount
+  // The primary fund's total is derived from real contributions and directed
+  // payments; a hand-typed figure would be silently overwritten by the next sync
+  // and would leave a phantom progress record behind. Refuse it outright.
+  if (goal.isPrimary) {
+    throw new AdminConflictError('The primary fund fills automatically from contributions and cannot be adjusted manually')
+  }
+  const newTotal = roundZAR(Number(goal.currentAmount) + amount)
   const goalVersion = (goal as typeof goal & { version: number }).version
   const progress = await db.$transaction(async (tx) => {
     const record = await tx.goalProgress.create({ data: { goalId, amount, note: note ?? null, recordedById: adminId } })

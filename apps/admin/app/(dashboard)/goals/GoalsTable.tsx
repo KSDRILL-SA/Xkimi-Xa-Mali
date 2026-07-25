@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import type { Route } from 'next'
 import { ProgressBar } from '@xxm/ui'
-import { Target, Trophy, Calendar, CalendarRange, Sparkles, Lock, Check, Trash2, Plus, ArrowRight, type LucideIcon } from 'lucide-react'
+import { Target, Trophy, Calendar, CalendarRange, Sparkles, Lock, Check, Trash2, Plus, Star, ArrowRight, type LucideIcon } from 'lucide-react'
 import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 
 export type GoalRow = {
   id: string; title: string; type: string; status: string; statusClass: string
   target: string; current: string; progress: number; deadline: string; locked: boolean
+  isPrimary: boolean
 }
 
 type GoalAction = (formData: FormData) => Promise<void>
@@ -22,13 +23,14 @@ const TYPE_META: Record<string, { label: string; icon: LucideIcon; chip: string;
 const GRID = 'grid grid-cols-[2fr_96px_96px_150px_120px_110px_190px] gap-3'
 
 export function GoalsTable({
-  rows, activateAction, deleteAction, lockAction, progressAction,
+  rows, activateAction, deleteAction, lockAction, progressAction, primaryAction,
 }: {
   rows: GoalRow[]
   activateAction: GoalAction
   deleteAction: GoalAction
   lockAction: GoalAction
   progressAction: GoalAction
+  primaryAction: GoalAction
 }) {
   if (rows.length === 0) {
     return (
@@ -75,7 +77,14 @@ export function GoalsTable({
                       <Link href={`/goals/${r.id}` as Route} className="text-sm font-semibold text-xxm-green-900 truncate block hover:text-xxm-green hover:underline">
                         {r.title}
                       </Link>
-                      <span className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${meta.chip}`}>{meta.label}</span>
+                      <span className="flex items-center gap-1 mt-0.5">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold ${meta.chip}`}>{meta.label}</span>
+                        {r.isPrimary && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-xxm-gold/15 text-xxm-gold-dark">
+                            <Star size={9} aria-hidden /> Primary fund
+                          </span>
+                        )}
+                      </span>
                     </div>
                     {r.locked && (
                       <span className="ml-auto w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center shrink-0" title="Locked">
@@ -137,14 +146,34 @@ export function GoalsTable({
                             </button>
                           </form>
                         )}
-                        <form action={progressAction} className="flex items-center gap-1">
-                          <input type="hidden" name="goalId" value={r.id} />
-                          <input type="number" name="amount" min={1} step={50} required placeholder="R"
-                            className="w-16 rounded-lg border border-xxm-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-xxm-green/30" />
-                          <button type="submit" className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-xxm-green-50 text-xxm-green hover:bg-xxm-green hover:text-white transition-colors" title="Add progress" aria-label="Add progress">
-                            <Plus size={12} aria-hidden />
-                          </button>
-                        </form>
+                        {r.isPrimary ? (
+                          /* The primary fund fills itself from real contributions —
+                             manual progress is refused server-side, so don't offer it. */
+                          <span className="text-[10px] font-semibold text-xxm-gray-400">Auto-filled</span>
+                        ) : (
+                          <>
+                            <form action={primaryAction}>
+                              <input type="hidden" name="goalId" value={r.id} />
+                              <ConfirmSubmitButton
+                                className="inline-flex items-center justify-center w-6 h-6 rounded-lg text-xxm-gray-400 hover:bg-xxm-gold/15 hover:text-xxm-gold-dark transition-colors"
+                                title="Make this the primary fund?"
+                                message={`"${r.title}" will become the fund every monthly contribution flows into, and its total will fill automatically. Any goal currently set as primary loses that status.`}
+                                confirmLabel="Make primary"
+                              >
+                                <Star size={12} aria-hidden />
+                                <span className="sr-only">Make primary fund</span>
+                              </ConfirmSubmitButton>
+                            </form>
+                            <form action={progressAction} className="flex items-center gap-1">
+                              <input type="hidden" name="goalId" value={r.id} />
+                              <input type="number" name="amount" min={1} step={50} required placeholder="R" aria-label={`Progress amount for ${r.title}`}
+                                className="w-16 rounded-lg border border-xxm-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-xxm-green/30" />
+                              <button type="submit" className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-xxm-green-50 text-xxm-green hover:bg-xxm-green hover:text-white transition-colors" title="Add progress" aria-label="Add progress">
+                                <Plus size={12} aria-hidden />
+                              </button>
+                            </form>
+                          </>
+                        )}
                       </>
                     )}
                     <Link href={`/goals/${r.id}` as Route} className="inline-flex items-center gap-0.5 text-xs font-semibold text-xxm-gray-400 hover:text-xxm-green transition-colors">
