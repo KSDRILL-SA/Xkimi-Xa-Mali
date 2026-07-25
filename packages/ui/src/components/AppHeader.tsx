@@ -15,9 +15,14 @@ export interface AppHeaderProps {
   showAdminBadge?: boolean
   showBell?: boolean
   bellHref?: string
+  /** Unread messages waiting behind the bell. 0 or undefined shows no badge. */
+  unreadCount?: number
   showSkipLink?: boolean
   fixedHeight?: boolean
 }
+
+/** Counts above this are shown as "9+" so the badge never distorts the bell. */
+const MAX_BADGE_COUNT = 9
 
 export function AppHeader({
   userName,
@@ -28,6 +33,7 @@ export function AppHeader({
   showAdminBadge = false,
   showBell = false,
   bellHref = '/dashboard/notifications',
+  unreadCount = 0,
   showSkipLink = false,
   fixedHeight = true,
 }: AppHeaderProps) {
@@ -73,10 +79,22 @@ export function AppHeader({
           {showBell && (
             <Link
               href={bellHref as Route}
-              aria-label="Notifications"
+              aria-label={
+                unreadCount > 0
+                  ? `Notifications, ${unreadCount} unread`
+                  : 'Notifications'
+              }
               className="relative w-9 h-9 rounded-full flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold"
             >
               <Bell size={17} aria-hidden />
+              {unreadCount > 0 && (
+                <span
+                  aria-hidden
+                  className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 rounded-full bg-xxm-gold text-xxm-green-900 text-[10px] font-black leading-none flex items-center justify-center ring-2 ring-xxm-green"
+                >
+                  {unreadCount > MAX_BADGE_COUNT ? `${MAX_BADGE_COUNT}+` : unreadCount}
+                </span>
+              )}
             </Link>
           )}
 
