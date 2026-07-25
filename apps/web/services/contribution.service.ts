@@ -8,6 +8,7 @@ import { mandateRepo } from '@/repositories/mandate.repository'
 import { budgetRepo } from '@/repositories/budget.repository'
 import { writeAuditLog } from './audit.service'
 import { checkBudget, recordBudgetOverride } from './budget.service'
+import { syncPrimaryGoalProgress } from './goal.service'
 import { logger } from '@/lib/logger'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { tallyBy } from '@/lib/aggregate'
@@ -290,6 +291,11 @@ export async function submitManualPayment(
     invalidateContributionSummaryCache(userId),
   ])
 
+  // Reflect this payment in the primary fund's progress right away (best-effort).
+  await syncPrimaryGoalProgress().catch((err) =>
+    logger.error('Primary goal sync failed after manual payment', { error: err instanceof Error ? err.message : String(err) }),
+  )
+
   await writeAuditLog({
     userId,
     action: 'MANUAL_PAYMENT_SUBMITTED',
@@ -435,6 +441,11 @@ export async function processTransactionWebhook(event: TransactionEvent) {
     cache.del(CACHE_KEYS.DASHBOARD_STATS).catch(() => {}),
     invalidateContributionSummaryCache(transaction.contribution.userId).catch(() => {}),
   ])
+
+  // A settlement or reversal moved the paid total — keep the primary fund in step.
+  await syncPrimaryGoalProgress().catch((err) =>
+    logger.error('Primary goal sync failed after transaction webhook', { error: err instanceof Error ? err.message : String(err) }),
+  )
 
   // Append to the immutable pool ledger. Idempotent + best-effort: a ledger
   // hiccup must never affect payment processing, and the reconciler backstops it.

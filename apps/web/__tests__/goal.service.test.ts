@@ -20,6 +20,7 @@ vi.mock('@/lib/db', () => ({
       count: vi.fn(),
       create: vi.fn(),
     },
+    contribution: { aggregate: vi.fn() },
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -63,6 +64,7 @@ import {
   recordProgress,
   markExpiredGoalsFailed,
   setPrimaryGoal,
+  syncPrimaryGoalProgress,
 } from '@/services/goal.service'
 
 const GoalForbiddenError = ForbiddenError
@@ -444,5 +446,71 @@ describe('setPrimaryGoal', () => {
   it('rejects a non-admin before reading anything', async () => {
     await expect(setPrimaryGoal('goal-1', 'member-1', MEMBER, '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
     expect(db.goal.findUnique).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// syncPrimaryGoalProgress
+// ---------------------------------------------------------------------------
+
+describe('syncPrimaryGoalProgress', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  const PRIMARY = { ...ACTIVE_GOAL, isPrimary: true, currentAmount: 5000, targetAmount: 120000, deadline: new Date('2026-12-31') }
+
+  it('does nothing when no primary goal is designated', async () => {
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue([] as never)
+
+    await syncPrimaryGoalProgress()
+
+    expect(db.contribution.aggregate).not.toHaveBeenCalled()
+    expect(db.goal.update).not.toHaveBeenCalled()
+  })
+
+  it('re-derives the primary fund from contributions in its year', async () => {
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue([PRIMARY] as never)
+    ;(db.contribution.aggregate as MockedFunction<typeof db.contribution.aggregate>).mockResolvedValue({ _sum: { amountPaid: 48200 } } as never)
+    ;(db.goal.update as MockedFunction<typeof db.goal.update>).mockResolvedValue({} as never)
+
+    await syncPrimaryGoalProgress()
+
+    expect(db.contribution.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { periodYear: 2026 }, _sum: { amountPaid: true } }),
+    )
+    expect(db.goal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'goal-1' }, data: expect.objectContaining({ currentAmount: 48200 }) }),
+    )
+  })
+
+  it('marks the fund ACHIEVED once contributions reach the target', async () => {
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue([{ ...PRIMARY, targetAmount: 40000 }] as never)
+    ;(db.contribution.aggregate as MockedFunction<typeof db.contribution.aggregate>).mockResolvedValue({ _sum: { amountPaid: 48200 } } as never)
+    ;(db.goal.update as MockedFunction<typeof db.goal.update>).mockResolvedValue({} as never)
+
+    await syncPrimaryGoalProgress()
+
+    expect(db.goal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ currentAmount: 48200, status: 'ACHIEVED' }) }),
+    )
+  })
+
+  it('does not write when the figure has not moved', async () => {
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue([{ ...PRIMARY, currentAmount: 48200 }] as never)
+    ;(db.contribution.aggregate as MockedFunction<typeof db.contribution.aggregate>).mockResolvedValue({ _sum: { amountPaid: 48200 } } as never)
+
+    await syncPrimaryGoalProgress()
+
+    expect(db.goal.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('recordProgress on the primary fund', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('is refused — the primary fills automatically', async () => {
+    ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue({ ...ACTIVE_GOAL, isPrimary: true } as never)
+
+    await expect(recordProgress('goal-1', { amount: 500 }, 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
+    expect(db.$transaction).not.toHaveBeenCalled()
   })
 })
