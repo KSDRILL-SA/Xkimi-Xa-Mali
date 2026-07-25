@@ -95,6 +95,11 @@ export const goalRepo = {
     return db.goalProgress.count({ where })
   },
 
+  /** Sum of admin-recorded progress on a goal. */
+  sumProgress(goalId: string) {
+    return db.goalProgress.aggregate({ where: { goalId }, _sum: { amount: true } })
+  },
+
   /** Update goal inside a transaction (optimistic lock via updateMany). */
   updateGoalInTx(
     where: Prisma.GoalWhereInput,
@@ -104,11 +109,6 @@ export const goalRepo = {
     return tx.goal.updateMany({ where, data })
   },
 
-  /** Atomically add to a goal's currentAmount; returns the updated goal. */
-  incrementAmount(id: string, amount: number) {
-    return db.goal.update({ where: { id }, data: { currentAmount: { increment: amount } } })
-  },
-
   // ─── GoalPayment methods ────────────────────────────────────────────────
 
   /** Record a directed goal payment. */
@@ -116,7 +116,14 @@ export const goalRepo = {
     return db.goalPayment.create({ data })
   },
 
-  /** Sum of settled (SUCCESS) directed payments toward a goal. */
+  /**
+   * Sum of settled (SUCCESS) directed payments toward a goal.
+   *
+   * SUCCESS is the only status that counts as money in the fund — a REVERSED
+   * payment drops straight out of this sum, which is what makes a goal total
+   * derived from it self-correcting. Any new "money paid toward a goal" query
+   * must filter the same way or it will count reversals as inflows.
+   */
   sumSuccessfulPayments(goalId: string) {
     return db.goalPayment.aggregate({ where: { goalId, status: 'SUCCESS' }, _sum: { amount: true } })
   },

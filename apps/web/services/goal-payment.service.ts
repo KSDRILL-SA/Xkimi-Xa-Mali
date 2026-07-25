@@ -9,9 +9,9 @@ import { GoalNotFoundError, GoalConflictError, MandateConflictError } from '@/li
 import { MIN_GOAL_PAYMENT } from '@/lib/validation/goal'
 import { roundZAR } from '@/lib/money'
 import { writeAuditLog } from './audit.service'
-import { postPoolCredit } from './ledger.service'
+import { postPoolCredit, postPoolDebit } from './ledger.service'
 import { queueNotification } from './notification.service'
-import { syncPrimaryGoalProgress, emitGoalAchieved } from './goal.service'
+import { syncPrimaryGoalProgress, syncAdditionalGoalProgress } from './goal.service'
 import { logger } from '@/lib/logger'
 
 type GoalForPayment = {
@@ -29,20 +29,23 @@ type SettledPayment = {
   amount: unknown
 }
 
-/** Increment an additional goal atomically and mark it achieved once it lands. */
-async function reflectAdditionalGoalPayment(goalId: string, amount: number): Promise<void> {
-  const updated = await goalRepo.incrementAmount(goalId, amount)
-  if (Number(updated.currentAmount) >= Number(updated.targetAmount) && updated.status === 'ACTIVE') {
-    await goalRepo.update(goalId, { status: 'ACHIEVED' })
-    await emitGoalAchieved(goalId, updated.title)
+/**
+ * Bring a goal's total back in line with the money actually behind it. Both
+ * funds derive rather than accumulate, so this is the single call that settles
+ * and un-settles a payment alike — it simply re-reads the sums.
+ */
+async function resyncGoal(goal: GoalForPayment): Promise<void> {
+  if (goal.isPrimary) {
+    await syncPrimaryGoalProgress()
+  } else {
+    await syncAdditionalGoalProgress(goal.id)
   }
 }
 
 /**
  * Everything that must happen once a directed payment is settled money, whether
- * it settled inline at submission or later via the gateway webhook. The primary
- * fund re-derives (its sync counts directed payments); an additional goal is
- * incremented. The pool ledger credit and the thank-you are best-effort — a
+ * it settled inline at submission or later via the gateway webhook. The goal
+ * total re-derives; the pool ledger credit and the thank-you are best-effort — a
  * hiccup in either must never unwind a payment we have already taken.
  */
 async function applySettledPayment(
@@ -51,11 +54,7 @@ async function applySettledPayment(
 ): Promise<void> {
   const amount = roundZAR(Number(payment.amount))
 
-  if (goal.isPrimary) {
-    await syncPrimaryGoalProgress()
-  } else {
-    await reflectAdditionalGoalPayment(goal.id, amount)
-  }
+  await resyncGoal(goal)
 
   await postPoolCredit({
     refType: 'GOAL_PAYMENT', refId: payment.id, amount, memberId: payment.userId,
@@ -68,6 +67,31 @@ async function applySettledPayment(
     userId: payment.userId, templateSlug: 'goal-payment-thanks', channel: 'SMS',
     payload: { amount: amount.toString(), goal: goal.title },
   }).catch(() => {})
+}
+
+/**
+ * Unwind a payment that settled and was later reversed by the bank.
+ *
+ * The money left the fund, so the goal total must come down and the pool must be
+ * debited. Both halves are safe to repeat: the goal figure is derived from the
+ * SUCCESS sum (which no longer includes this payment), and the ledger is
+ * idempotent on (refType, refId, direction) — so the original CREDIT stays as
+ * the immutable record of what happened and the DEBIT sits alongside it.
+ */
+async function applyReversedPayment(
+  payment: SettledPayment,
+  goal: GoalForPayment,
+): Promise<void> {
+  const amount = roundZAR(Number(payment.amount))
+
+  await resyncGoal(goal)
+
+  await postPoolDebit({
+    refType: 'GOAL_PAYMENT', refId: payment.id, amount, memberId: payment.userId,
+    description: `Goal contribution reversed: ${goal.title}`,
+  }).catch((err) => logger.error('Pool debit failed on reversed goal payment', {
+    paymentId: payment.id, error: err instanceof Error ? err.message : String(err),
+  }))
 }
 
 /**
@@ -157,10 +181,14 @@ type GoalPaymentEvent = {
  *
  * Directed payments live in their own table, so the contribution webhook handler
  * cannot see them — without this a PENDING goal payment would be collected from
- * the member and never credited to the fund. Mirrors the transaction handler's
- * semantics: unknown reference is a no-op (the event belongs to a contribution),
- * an already-terminal or unchanged status is a no-op (redelivery safe), and only
- * a SUCCESS moves money into the goal.
+ * the member and never credited to the fund. An unknown reference is a no-op
+ * (the event belongs to a contribution) and an unchanged status is a no-op
+ * (redelivery safe).
+ *
+ * REVERSED is the one status a settled payment can still move to: the bank can
+ * pull money back after it cleared, and when it does the goal total and the pool
+ * have to follow it down. Every other transition out of a terminal state is
+ * refused, so a late or replayed SUCCESS can never resurrect reversed money.
  */
 export async function processGoalPaymentWebhook(event: GoalPaymentEvent): Promise<void> {
   const payment = await goalRepo.findPaymentByGatewayRef(event.transactionRef)
@@ -169,27 +197,44 @@ export async function processGoalPaymentWebhook(event: GoalPaymentEvent): Promis
   const newStatus = paymentGateway.mapTransactionStatus(event.status)
   if (!newStatus) return
 
-  const terminal = ['SUCCESS', 'REVERSED']
-  if (terminal.includes(payment.status)) return
   if (payment.status === newStatus) return
 
+  const isReversalOfSettled = payment.status === 'SUCCESS' && newStatus === 'REVERSED'
+  const terminal = ['SUCCESS', 'REVERSED']
+  if (terminal.includes(payment.status) && !isReversalOfSettled) return
+
+  // processedAt is only ever stamped by settlement, never cleared. On a reversal
+  // it is the record that this payment DID clear once — which is how the ledger
+  // reconciler tells a reversal that needs undoing from one that never settled
+  // and so has no credit to undo.
   await goalRepo.updatePayment(payment.id, {
     status: newStatus,
-    processedAt: newStatus === 'SUCCESS' ? new Date() : null,
+    ...(newStatus === 'SUCCESS' && { processedAt: new Date() }),
   })
 
-  if (newStatus !== 'SUCCESS') {
+  // A payment that never settled has nothing to unwind — no goal total moved and
+  // no pool entry was written, so recording the status is the whole job.
+  if (newStatus !== 'SUCCESS' && !isReversalOfSettled) {
     logger.info('Goal payment did not settle', { paymentId: payment.id, status: newStatus })
     return
   }
 
   const goal = await goalRepo.findById(payment.goalId)
   if (!goal) {
-    logger.error('Settled goal payment references a missing goal', { paymentId: payment.id, goalId: payment.goalId })
+    logger.error('Goal payment references a missing goal', { paymentId: payment.id, goalId: payment.goalId })
+    return
+  }
+  const g = goal as unknown as GoalForPayment
+
+  if (isReversalOfSettled) {
+    await applyReversedPayment(payment, g)
+    logger.warn('Settled goal payment reversed', {
+      paymentId: payment.id, goalId: payment.goalId, amount: Number(payment.amount),
+    })
     return
   }
 
-  await applySettledPayment(payment, goal as unknown as GoalForPayment)
+  await applySettledPayment(payment, g)
 
   logger.info('Goal payment settled via webhook', {
     paymentId: payment.id, goalId: payment.goalId, amount: Number(payment.amount),

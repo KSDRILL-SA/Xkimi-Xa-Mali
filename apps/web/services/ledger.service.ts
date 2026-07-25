@@ -103,10 +103,15 @@ export async function getLedger(opts: { page?: number; limit?: number } = {}) {
  * hook is ever missed. Safe to run on demand or on a schedule.
  */
 export async function reconcileLedger(): Promise<{ creditsPosted: number; debitsPosted: number }> {
-  const [successTx, reversedTx, goalPayments] = await Promise.all([
+  const [successTx, reversedTx, goalPayments, reversedGoalPayments] = await Promise.all([
     db.transaction.findMany({ where: SUCCESSFUL_INFLOW, select: { id: true, amount: true, contribution: { select: { userId: true } } } }),
     db.transaction.findMany({ where: { status: 'REVERSED' }, select: { id: true, amount: true, contribution: { select: { userId: true } } } }),
     db.goalPayment.findMany({ where: { status: 'SUCCESS' }, select: { id: true, amount: true, userId: true, goal: { select: { title: true } } } }),
+    // Only reversals of payments that actually cleared: processedAt is stamped
+    // by settlement and never cleared, so `not: null` means a CREDIT exists to
+    // undo. A payment that went straight from PENDING to REVERSED never credited
+    // the pool, and debiting it would drive the balance negative.
+    db.goalPayment.findMany({ where: { status: 'REVERSED', processedAt: { not: null } }, select: { id: true, amount: true, userId: true, goal: { select: { title: true } } } }),
   ])
 
   let creditsPosted = 0
@@ -125,6 +130,12 @@ export async function reconcileLedger(): Promise<{ creditsPosted: number; debits
   for (const p of goalPayments) {
     const posted = await postPoolCredit({ refType: 'GOAL_PAYMENT', refId: p.id, amount: Number(p.amount), memberId: p.userId, description: `Goal contribution: ${p.goal.title}` })
     if (posted) creditsPosted++
+  }
+  // A goal payment the bank pulled back after it cleared. The original credit
+  // stays as the immutable record of what happened; the debit undoes its effect.
+  for (const p of reversedGoalPayments) {
+    const posted = await postPoolDebit({ refType: 'GOAL_PAYMENT', refId: p.id, amount: Number(p.amount), memberId: p.userId, description: `Goal contribution reversed: ${p.goal.title}` })
+    if (posted) debitsPosted++
   }
 
   return { creditsPosted, debitsPosted }

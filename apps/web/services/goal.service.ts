@@ -213,6 +213,45 @@ export async function syncPrimaryGoalProgress(): Promise<void> {
   if (reachedTarget) await emitGoalAchieved(g.id, g.title)
 }
 
+/**
+ * Keep an additional (non-primary) goal's total in step with the money actually
+ * behind it: admin-recorded progress plus settled directed payments.
+ *
+ * Like the primary fund, the figure is DERIVED rather than accumulated. That is
+ * what makes it reversal-safe — a reversed payment leaves the SUCCESS sum, so
+ * the next sync simply reflects the smaller total. Incrementing could only ever
+ * go up, which left a reversed payment funding a goal forever.
+ *
+ * The ACHIEVED transition stays one-way on purpose. A goal that reached its
+ * target and was celebrated is not un-celebrated because a single payment later
+ * bounced; the total corrects, the milestone stands.
+ */
+export async function syncAdditionalGoalProgress(goalId: string): Promise<void> {
+  const goal = await goalRepo.findById(goalId)
+  if (!goal) return
+  const g = goal as GoalRow
+  if (g.isPrimary) return
+
+  const [progressAgg, paymentsAgg] = await Promise.all([
+    goalRepo.sumProgress(goalId),
+    goalRepo.sumSuccessfulPayments(goalId),
+  ])
+  const funded = roundZAR(
+    Number(progressAgg._sum.amount ?? 0) + Number(paymentsAgg._sum.amount ?? 0),
+  )
+
+  if (roundZAR(Number(g.currentAmount)) === funded) return
+
+  const reachedTarget = funded >= Number(g.targetAmount) && g.status === 'ACTIVE'
+  await goalRepo.update(goalId, {
+    currentAmount: funded,
+    ...(reachedTarget && { status: 'ACHIEVED' }),
+  })
+  await evictGoalsCache()
+
+  if (reachedTarget) await emitGoalAchieved(goalId, g.title)
+}
+
 // ─── Admin mutations ──────────────────────────────────────────────────────────
 
 export async function createGoal(
