@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
-import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2, Star } from 'lucide-react'
 import { getGoal } from '@/services/goal.service'
 import { getGoalEngagement } from '@/services/goal-engagement.service'
 import { GoalNotFoundError } from '@/lib/errors'
@@ -12,20 +12,10 @@ import { ProgressRing } from '@/components/goal/ProgressRing'
 import { MilestoneBar } from '@/components/goal/MilestoneBar'
 import { GoalEngagement } from '@/components/goal/GoalEngagement'
 import { GoalPayCard } from '@/components/goal/GoalPayCard'
+import { GoalHistory, type ProgressEntry } from '@/components/goal/GoalHistory'
 import { statusTheme, typeTheme, goalIcon } from '@/components/goal/goal-theme'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
-
-type ProgressEntry = { id: string; amount: number; recordedAt: string }
-
-function formatRelative(isoDate: string): string {
-  const date = new Date(isoDate)
-  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000)
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 30) return `${days} days ago`
-  return formatDate(date)
-}
 
 const MILESTONES = [0, 25, 50, 75, 100]
 
@@ -88,6 +78,11 @@ export default async function GoalDetailPage({
                 <span className={`w-1.5 h-1.5 rounded-full ${st.dot} ${goal.status === 'ACTIVE' ? 'animate-pulse' : ''}`} aria-hidden />
                 {st.label}
               </span>
+              {goal.isPrimary && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-xxm-gold/20 text-xxm-gold-dark">
+                  <Star size={10} aria-hidden /> Our fund
+                </span>
+              )}
               {goal.isLocked && (
                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
                   <Lock size={10} aria-hidden /> Locked
@@ -149,6 +144,23 @@ export default async function GoalDetailPage({
         </div>
       </Reveal>
 
+      {/* ── The fund every contribution flows into ────────────── */}
+      {goal.isPrimary && (
+        <Reveal variant="up" delay={140} className="flex items-start gap-3 rounded-2xl bg-gradient-to-r from-xxm-gold/12 to-xxm-gold/4 border border-xxm-gold/30 px-5 py-4">
+          <div className="w-10 h-10 rounded-2xl bg-xxm-gold/20 flex items-center justify-center shrink-0">
+            <Star size={18} className="text-xxm-gold-dark" aria-hidden />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-xxm-green-900">This is our fund</p>
+            <p className="text-xs text-xxm-gray-600 mt-0.5 leading-relaxed">
+              Every monthly contribution the brotherhood makes flows straight into this
+              goal — the total below fills automatically as members pay. Chip in extra
+              any time to push it along faster.
+            </p>
+          </div>
+        </Reveal>
+      )}
+
       {/* ── Status banners ────────────────────────────────────── */}
       {goal.status === 'ACHIEVED' && (
         <Reveal variant="up" delay={150} className="flex items-center gap-3 rounded-2xl bg-gradient-to-r from-xxm-green-50 to-xxm-gold/10 border border-xxm-green/15 px-5 py-4">
@@ -188,43 +200,7 @@ export default async function GoalDetailPage({
           Contribution history ({goal.progress.length})
         </h2>
 
-        {progressEntries.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm-sm p-10 text-center">
-            <div className="w-11 h-11 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-3">
-              <TrendingUp size={18} className="text-xxm-green-300" aria-hidden />
-            </div>
-            <p className="text-xxm-gray-400 text-sm font-medium">No contributions recorded yet.</p>
-            <p className="text-xxm-gray-400 text-xs mt-1">Progress will appear here as the goal grows.</p>
-          </div>
-        ) : (
-          <div className="relative pl-5">
-            {/* timeline rail */}
-            <div className="absolute left-[9px] top-2 bottom-2 w-px bg-xxm-gray-100" aria-hidden />
-            <div className="space-y-2.5">
-              {progressEntries.map((entry, idx) => {
-                const cumulative = progressEntries.slice(idx).reduce((s, p) => s + Number(p.amount), 0)
-                return (
-                  <div key={entry.id} className="relative bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm px-4 py-3 flex items-center justify-between hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-slow">
-                    <span className="absolute -left-[14px] top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-xxm-green ring-4 ring-white" aria-hidden />
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
-                        <TrendingUp size={14} className="text-xxm-green" aria-hidden />
-                      </div>
-                      <div>
-                        <p className="stat-number text-sm font-bold text-xxm-green-900">+{formatZAR(entry.amount)}</p>
-                        <p className="text-[11px] text-xxm-gray-400">{formatRelative(entry.recordedAt)}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide font-semibold">Running total</p>
-                      <p className="stat-number text-sm font-bold text-xxm-green-700">{formatZAR(cumulative)}</p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+        <GoalHistory entries={progressEntries} isPrimary={goal.isPrimary} />
       </Reveal>
     </div>
   )

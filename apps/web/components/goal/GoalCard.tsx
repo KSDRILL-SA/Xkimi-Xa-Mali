@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { formatZAR, formatDate } from '@/lib/formatters'
-import { Lock, Clock, ArrowUpRight } from 'lucide-react'
+import { Lock, Clock, ArrowUpRight, Star } from 'lucide-react'
 import { ProgressRing } from './ProgressRing'
 import { MilestoneBar } from './MilestoneBar'
 import { statusTheme, typeTheme, goalIcon } from './goal-theme'
@@ -16,6 +16,7 @@ export type GoalCardData = {
   remaining: number
   deadline: string
   lockedAt?: string | null
+  isPrimary?: boolean
 }
 
 export function GoalCard({ goal, index = 0 }: { goal: GoalCardData; index?: number }) {
@@ -30,8 +31,9 @@ export function GoalCard({ goal, index = 0 }: { goal: GoalCardData; index?: numb
     <Link
       href={`/dashboard/goals/${goal.id}`}
       style={{ animationDelay: `${index * 70}ms` }}
-      className={`group relative block overflow-hidden rounded-3xl bg-white border border-xxm-green/8 shadow-xxm-sm p-5
-        transition-all duration-slow ease-smooth hover:-translate-y-1.5 hover:shadow-xxm animate-fade-in-up ${st.glow}`}
+      className={`group relative block overflow-hidden rounded-3xl bg-white shadow-xxm-sm p-5
+        transition-all duration-slow ease-smooth hover:-translate-y-1.5 hover:shadow-xxm animate-fade-in-up ${st.glow}
+        ${goal.isPrimary ? 'border-2 border-xxm-gold/40 shadow-gold-sm' : 'border border-xxm-green/8'}`}
     >
       {/* type wash — gives each goal its own identity */}
       <div className={`pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full bg-gradient-to-br ${tt.wash} blur-2xl opacity-70 transition-opacity duration-slow group-hover:opacity-100`} aria-hidden />
@@ -43,8 +45,13 @@ export function GoalCard({ goal, index = 0 }: { goal: GoalCardData; index?: numb
             <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${tt.wash} ring-1 ring-black/5 flex items-center justify-center shrink-0 transition-transform duration-slow ease-bounce group-hover:scale-110 group-hover:-rotate-6`}>
               <Icon size={17} className={st.label === 'Achieved' ? 'text-xxm-green' : tt.accent} aria-hidden />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex items-center gap-1.5">
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${tt.chip}`}>{tt.label}</span>
+              {goal.isPrimary && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-xxm-gold/20 text-xxm-gold-dark whitespace-nowrap">
+                  <Star size={10} aria-hidden /> Our fund
+                </span>
+              )}
             </div>
             <span className={`ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold shrink-0 ${st.badge}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${st.dot} ${goal.status === 'ACTIVE' ? 'animate-pulse' : ''}`} aria-hidden />
