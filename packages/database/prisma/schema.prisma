@@ -557,6 +557,7 @@ model Notification {
   externalRef  String?
   sentAt       DateTime?
   createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt @default(now())
 
   user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   template NotificationTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
@@ -567,6 +568,9 @@ model Notification {
   @@index([status])
   @@index([channel])
   @@index([status, createdAt])
+  // Serves the stalled-'in-flight' recovery scan: WHERE status/errorMessage +
+  // updatedAt < cutoff. See notification.service.recoverStalledNotifications.
+  @@index([status, updatedAt])
   // externalRef lookups are served by a partial index (WHERE externalRef IS NOT
   // NULL) in raw SQL — lookups are always by a concrete provider ref, so the
   // partial covers them without indexing the many NULL rows.
