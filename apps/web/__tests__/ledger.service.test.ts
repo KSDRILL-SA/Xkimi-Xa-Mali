@@ -13,6 +13,7 @@ vi.mock('@/lib/db', () => ({
       findMany: vi.fn(),
     },
     transaction: { findMany: vi.fn() },
+    goalPayment: { findMany: vi.fn() },
   },
 }))
 
@@ -26,7 +27,11 @@ import {
 
 const mock = <T extends (...a: never[]) => unknown>(fn: unknown) => fn as MockedFunction<T>
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  // No directed goal payments unless a test says otherwise.
+  mock(db.goalPayment.findMany).mockResolvedValue([] as never)
+})
 
 describe('ledger posting — idempotent append-only (double-entry integrity)', () => {
   it('records a new entry and reports true', async () => {
@@ -118,5 +123,35 @@ describe('reconcileLedger — self-heals the ledger from settled transactions', 
     // be re-credited to the pool and cancel the debit of the original.
     const creditWhere = mock(db.transaction.findMany).mock.calls[0]![0] as { where: Record<string, unknown> }
     expect(creditWhere.where).toMatchObject({ status: 'SUCCESS', type: { not: 'REVERSAL' } })
+  })
+
+  it('backfills a settled goal payment whose real-time pool credit was missed', async () => {
+    mock(db.transaction.findMany)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+    mock(db.goalPayment.findMany).mockResolvedValue([
+      { id: 'gp-1', amount: 500, userId: 'u1', goal: { title: 'Braai Fund' } },
+    ] as never)
+    mock(db.ledgerEntry.create).mockResolvedValueOnce({ id: 'l1' } as never)
+
+    const res = await reconcileLedger()
+
+    expect(res.creditsPosted).toBe(1)
+    expect(db.ledgerEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ refType: 'GOAL_PAYMENT', refId: 'gp-1', amount: 500, direction: 'CREDIT' }),
+      }),
+    )
+  })
+
+  it('only backfills settled goal payments — a pending one is never credited', async () => {
+    mock(db.transaction.findMany)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+
+    await reconcileLedger()
+
+    const goalWhere = mock(db.goalPayment.findMany).mock.calls[0]![0] as { where: Record<string, unknown> }
+    expect(goalWhere.where).toMatchObject({ status: 'SUCCESS' })
   })
 })
