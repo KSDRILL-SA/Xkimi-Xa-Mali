@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { listAllGoals, createGoal, activateGoal, lockGoal, deleteGoal, recordGoalProgress } from '@/lib/services'
+import { listAllGoals, createGoal, activateGoal, lockGoal, deleteGoal, recordGoalProgress, setPrimaryGoal } from '@/lib/services'
 import { formatZAR, formatDate, MONTHS } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { Target } from 'lucide-react'
@@ -50,6 +50,17 @@ async function lockGoalAction(fd: FormData) {
   revalidatePath('/goals')
 }
 
+async function setPrimaryGoalAction(fd: FormData) {
+  'use server'
+  const goalId = fd.get('goalId') as string
+  const s = await auth()
+  if (!s?.user?.id) redirect('/login')
+  const sr = (s.user.roles as string[] | undefined) ?? []
+  if (!sr.includes('ADMIN')) redirect('/forbidden')
+  await setPrimaryGoal(s.user.id, sr, goalId)
+  revalidatePath('/goals')
+}
+
 async function recordGoalProgressAction(fd: FormData) {
   'use server'
   const goalId = fd.get('goalId') as string
@@ -77,7 +88,7 @@ export default async function GoalsPage({
 
   const { items, total } = await listAllGoals(roles, page)
 
-  type RawItem = { id: string; title: string; type: string; status: string; targetAmount: unknown; currentAmount: unknown; deadline: Date | null; lockedAt: Date | null }
+  type RawItem = { id: string; title: string; type: string; status: string; targetAmount: unknown; currentAmount: unknown; deadline: Date | null; lockedAt: Date | null; isPrimary: boolean }
 
   const rows: GoalRow[] = (items as unknown as RawItem[]).map((g) => {
     const sc       = STATUS_CONFIG[g.status] ?? { label: g.status, className: 'xxm-status-pending' }
@@ -91,6 +102,7 @@ export default async function GoalsPage({
       target: formatZAR(target), current: formatZAR(current), progress,
       deadline: g.deadline ? formatDate(g.deadline) : '—',
       locked: !!g.lockedAt,
+      isPrimary: g.isPrimary,
     }
   })
 
@@ -190,6 +202,7 @@ export default async function GoalsPage({
           deleteAction={deleteGoalAction}
           lockAction={lockGoalAction}
           progressAction={recordGoalProgressAction}
+          primaryAction={setPrimaryGoalAction}
         />
         <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/goals" className="justify-center" />
       </Reveal>
