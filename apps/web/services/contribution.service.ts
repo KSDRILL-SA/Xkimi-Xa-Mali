@@ -570,6 +570,37 @@ export async function sweepOverdueContributions(): Promise<number> {
   return result.count
 }
 
+// ─── Early-payment reminder selection ────────────────────────────────────────
+
+export type DueSoonContribution = {
+  status: string
+  dueDate: Date
+  user: { status: string }
+}
+
+/**
+ * Of the given contributions, the ones an active member should be nudged to pay
+ * early — still unpaid (PENDING/PARTIAL) and falling due within the next
+ * `leadDays`, but not yet due/overdue. A single well-timed reminder inside this
+ * window (throttled by the caller) is the whole point: encourage an early,
+ * badge-boosting payment before the automatic debit, without daily spam. Pure
+ * and side-effect free.
+ */
+export function selectDueSoonReminders<T extends DueSoonContribution>(
+  contributions: ReadonlyArray<T>,
+  now: Date,
+  leadDays: number,
+): T[] {
+  const horizon = new Date(now.getTime() + leadDays * 24 * 60 * 60 * 1000)
+  return contributions.filter(
+    (c) =>
+      (c.status === 'PENDING' || c.status === 'PARTIAL') &&
+      c.user.status === 'ACTIVE' &&
+      c.dueDate >= now &&
+      c.dueDate <= horizon,
+  )
+}
+
 // ─── Contribution summary with per-user caching ──────────────────────────
 
 function userSummaryCacheKey(userId: string): string {
