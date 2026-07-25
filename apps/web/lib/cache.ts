@@ -29,4 +29,10 @@ export const CACHE_KEYS = {
   goalsPage: (status: string, page: number, limit: number) =>
     `xxm:cache:goals:${status}:${page}:${limit}`,
   GOALS_TTL: 120,
+
+  // Per-member dashboard insights. Invalidated immediately on the member's own
+  // contribution/payment changes; the short TTL covers rarer mandate/goal
+  // changes so the dashboard stays snappy without going stale.
+  memberInsights: (userId: string) => `xxm:cache:insights:${userId}`,
+  INSIGHTS_TTL: 300,
 }

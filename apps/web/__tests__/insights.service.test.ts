@@ -9,7 +9,20 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
+vi.mock('@/lib/cache', () => ({
+  cache: {
+    get: vi.fn().mockResolvedValue(null),
+    set: vi.fn().mockResolvedValue(undefined),
+    del: vi.fn().mockResolvedValue(undefined),
+  },
+  CACHE_KEYS: {
+    memberInsights: (userId: string) => `xxm:cache:insights:${userId}`,
+    INSIGHTS_TTL: 300,
+  },
+}))
+
 import { db } from '@/lib/db'
+import { cache } from '@/lib/cache'
 import { computeStreak, pickGoalNearingTarget, getMemberInsights } from '@/services/insights.service'
 
 // Build a period row list from a status sequence (oldest first).
@@ -141,5 +154,27 @@ describe('getMemberInsights — streak surfaced as a nudge', () => {
     expect(goalNudge).toBeDefined()
     expect(goalNudge!.tone).toBe('positive')
     expect(goalNudge!.detail).toContain('85%')
+  })
+
+  it('serves from cache on a hit without touching the database', async () => {
+    const cachedInsights = { streak: { current: 9, longest: 9 }, insights: [] } as never
+    ;(cache.get as MockedFunction<typeof cache.get>).mockResolvedValueOnce(cachedInsights)
+
+    const result = await getMemberInsights('u1', 'u1', [])
+
+    expect(result).toBe(cachedInsights)
+    expect(db.contribution.findMany).not.toHaveBeenCalled()
+  })
+
+  it('caches the computed result on a miss', async () => {
+    arm(periods('PAID', 'PAID'))
+
+    await getMemberInsights('u1', 'u1', [])
+
+    expect(cache.set).toHaveBeenCalledWith(
+      'xxm:cache:insights:u1',
+      expect.objectContaining({ streak: expect.any(Object) }),
+      300,
+    )
   })
 })
