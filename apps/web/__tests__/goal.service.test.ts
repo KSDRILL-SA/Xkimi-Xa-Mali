@@ -62,6 +62,7 @@ import {
   lockGoal,
   recordProgress,
   markExpiredGoalsFailed,
+  setPrimaryGoal,
 } from '@/services/goal.service'
 
 const GoalForbiddenError = ForbiddenError
@@ -403,5 +404,45 @@ describe('progressPct', () => {
       '127.0.0.1',
     )
     expect(result.progressPct).toBe(100)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// setPrimaryGoal
+// ---------------------------------------------------------------------------
+
+describe('setPrimaryGoal', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('promotes an active goal to primary, demoting any current primary first', async () => {
+    ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue({ ...ACTIVE_GOAL, isPrimary: false } as never)
+    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 1 } as never)
+    ;(db.$transaction as MockedFunction<typeof db.$transaction>).mockImplementation((async (fn: (tx: typeof db) => Promise<unknown>) => fn(db)) as never)
+
+    const result = await setPrimaryGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')
+
+    expect(result.isPrimary).toBe(true)
+    expect(db.goal.updateMany).toHaveBeenCalledWith({ where: { isPrimary: true }, data: { isPrimary: false } })
+    expect(db.goal.updateMany).toHaveBeenCalledWith({ where: { id: 'goal-1' }, data: { isPrimary: true } })
+  })
+
+  it('is a no-op if the goal is already primary', async () => {
+    ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue({ ...ACTIVE_GOAL, isPrimary: true } as never)
+
+    const result = await setPrimaryGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')
+
+    expect(result.isPrimary).toBe(true)
+    expect(db.goal.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('refuses a non-active goal', async () => {
+    ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue({ ...DRAFT_GOAL, isPrimary: false } as never)
+    await expect(setPrimaryGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
+    expect(db.goal.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-admin before reading anything', async () => {
+    await expect(setPrimaryGoal('goal-1', 'member-1', MEMBER, '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
+    expect(db.goal.findUnique).not.toHaveBeenCalled()
   })
 })
