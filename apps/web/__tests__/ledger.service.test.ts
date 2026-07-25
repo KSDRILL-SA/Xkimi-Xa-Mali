@@ -129,9 +129,11 @@ describe('reconcileLedger — self-heals the ledger from settled transactions', 
     mock(db.transaction.findMany)
       .mockResolvedValueOnce([] as never)
       .mockResolvedValueOnce([] as never)
-    mock(db.goalPayment.findMany).mockResolvedValue([
-      { id: 'gp-1', amount: 500, userId: 'u1', goal: { title: 'Braai Fund' } },
-    ] as never)
+    mock(db.goalPayment.findMany)
+      .mockResolvedValueOnce([
+        { id: 'gp-1', amount: 500, userId: 'u1', goal: { title: 'Braai Fund' } },
+      ] as never) // SUCCESS
+      .mockResolvedValueOnce([] as never) // REVERSED
     mock(db.ledgerEntry.create).mockResolvedValueOnce({ id: 'l1' } as never)
 
     const res = await reconcileLedger()
@@ -153,5 +155,39 @@ describe('reconcileLedger — self-heals the ledger from settled transactions', 
 
     const goalWhere = mock(db.goalPayment.findMany).mock.calls[0]![0] as { where: Record<string, unknown> }
     expect(goalWhere.where).toMatchObject({ status: 'SUCCESS' })
+  })
+
+  it('debits a goal payment the bank pulled back after it cleared', async () => {
+    mock(db.transaction.findMany)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+    mock(db.goalPayment.findMany)
+      .mockResolvedValueOnce([] as never) // SUCCESS
+      .mockResolvedValueOnce([
+        { id: 'gp-9', amount: 500, userId: 'u1', goal: { title: 'Braai Fund' } },
+      ] as never) // REVERSED
+    mock(db.ledgerEntry.create).mockResolvedValueOnce({ id: 'l1' } as never)
+
+    const res = await reconcileLedger()
+
+    expect(res.debitsPosted).toBe(1)
+    expect(db.ledgerEntry.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ refType: 'GOAL_PAYMENT', refId: 'gp-9', amount: 500, direction: 'DEBIT' }),
+      }),
+    )
+  })
+
+  it('only debits reversals of payments that actually cleared', async () => {
+    // A payment that went straight from PENDING to REVERSED never credited the
+    // pool. Debiting it would drive the balance negative out of thin air.
+    mock(db.transaction.findMany)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+
+    await reconcileLedger()
+
+    const reversedWhere = mock(db.goalPayment.findMany).mock.calls[1]![0] as { where: Record<string, unknown> }
+    expect(reversedWhere.where).toMatchObject({ status: 'REVERSED', processedAt: { not: null } })
   })
 })
