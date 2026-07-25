@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { recalculateContributionStatus } from '@/services/contribution.service'
 import { reconcileLedger } from '@/services/ledger.service'
+import { SUCCESSFUL_INFLOW } from '@/repositories/transaction.repository'
 import { writeAuditLog } from '@/services/audit.service'
 
 export const ledgerReconciliation = inngest.createFunction(
@@ -19,7 +20,7 @@ export const ledgerReconciliation = inngest.createFunction(
 
       for (const c of contributions) {
         const aggr = await db.transaction.aggregate({
-          where: { contributionId: c.id, status: 'SUCCESS' },
+          where: { contributionId: c.id, ...SUCCESSFUL_INFLOW },
           _sum: { amount: true },
         })
 

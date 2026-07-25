@@ -7,6 +7,17 @@ export type TxClient = Omit<
   '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
 >
 
+// A REVERSAL row is stored with status SUCCESS (the reversal itself succeeded)
+// but represents money flowing OUT, not a contribution inflow. Every "sum of
+// successful inflows" MUST exclude it: reversing a payment marks the original
+// REVERSED (dropping it from the sum), so also counting the +amount REVERSAL row
+// nets the change to zero — leaving contributions still marked paid and the pool
+// balance overstated. Use this fragment anywhere paid amounts are summed.
+export const SUCCESSFUL_INFLOW: Prisma.TransactionWhereInput = {
+  status: 'SUCCESS',
+  type: { not: 'REVERSAL' },
+}
+
 // ─── Transaction repository ─────────────────────────────────────────────────
 // Thin wrapper around db.transaction.* — zero business logic.
 
