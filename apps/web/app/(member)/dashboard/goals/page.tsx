@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { getSession } from '@/lib/session'
 import { formatZAR } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
-import { Target, Trophy, Sparkles, TrendingUp } from 'lucide-react'
+import { Target, Trophy, Sparkles, TrendingUp, Star, ArrowRight } from 'lucide-react'
 import { getGoals, getGoalStatusCounts } from '@/services/goal.service'
 import { isAdmin } from '@/lib/authorization'
+import { primaryFundFirst } from '@/lib/goal-order'
 import { GoalCard, type GoalCardData } from '@/components/goal/GoalCard'
 
 export const metadata: Metadata = { title: 'Goals' }
@@ -35,10 +36,14 @@ export default async function GoalsPage({
     ? (params.status as GoalStatus)
     : undefined
 
-  const [{ items: goals }, { active: activeCount, achieved: achievedCount }] = await Promise.all([
+  const [{ items }, { active: activeCount, achieved: achievedCount }] = await Promise.all([
     getGoals(statusFilter, 1, 100, roles),
     getGoalStatusCounts(),
   ])
+
+  // The fund a member's monthly contribution actually flows into leads the list.
+  const goals = primaryFundFirst(items)
+  const primaryFund = goals.find((g) => g.isPrimary)
 
   // Combined momentum across active goals — the collective "how close are we".
   const activeGoals = goals.filter((g) => g.status === 'ACTIVE')
@@ -79,6 +84,31 @@ export default async function GoalsPage({
           </div>
         </div>
       </Reveal>
+
+      {/* ── The fund your contributions flow into ─────────────── */}
+      {primaryFund && (
+        <Reveal variant="up" delay={60}>
+          <Link
+            href={`/dashboard/goals/${primaryFund.id}` as Route}
+            className="group flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-gradient-to-r from-xxm-gold/12 to-xxm-gold/4 border border-xxm-gold/30 px-5 py-4 transition-all duration-slow hover:border-xxm-gold/50 hover:shadow-gold-sm"
+          >
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-xxm-gold-dark">
+              <Star size={12} aria-hidden /> Our fund
+            </span>
+            <span className="font-display text-sm font-extrabold text-xxm-green-900 min-w-0 truncate">{primaryFund.title}</span>
+            <span className="text-xs text-xxm-gray-500">
+              <span className="stat-number font-bold text-xxm-green-900">{formatZAR(primaryFund.currentAmount)}</span>
+              {' '}of {formatZAR(primaryFund.targetAmount)} · {primaryFund.progressPct}%
+            </span>
+            <span className="ml-auto inline-flex items-center gap-0.5 text-xs font-semibold text-xxm-green">
+              View <ArrowRight size={12} className="transition-transform duration-slow group-hover:translate-x-0.5" aria-hidden />
+            </span>
+            <p className="w-full text-[11px] text-xxm-gray-500">
+              Your monthly contribution lands here automatically — no extra step needed.
+            </p>
+          </Link>
+        </Reveal>
+      )}
 
       {/* ── Filter chips ──────────────────────────────────────── */}
       <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5">
