@@ -58,10 +58,12 @@ vi.mock('resend', () => ({
 
 import { db } from '@/lib/db'
 import { smsProvider } from '@/integrations/sms'
+import { emailProvider } from '@/integrations/email'
 import {
   queueNotification,
   updateSMSDeliveryStatus,
   flushQueuedNotifications,
+  recoverStalledNotifications,
 } from '@/services/notification.service'
 
 // ---------------------------------------------------------------------------
@@ -323,6 +325,81 @@ describe('flushQueuedNotifications', () => {
     )
     expect(result.failed).toBe(1)
     expect(result.sent).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// recoverStalledNotifications
+// ---------------------------------------------------------------------------
+
+describe('recoverStalledNotifications', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('requeues only in-flight rows whose claim is older than the stale window', async () => {
+    ;(db.notification.updateMany as MockedFunction<typeof db.notification.updateMany>)
+      .mockResolvedValue({ count: 2 } as never)
+
+    const recovered = await recoverStalledNotifications()
+
+    expect(recovered).toBe(2)
+    expect(db.notification.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'FAILED',
+          errorMessage: 'in-flight',
+          updatedAt: expect.objectContaining({ lt: expect.any(Date) }),
+        }),
+        data: expect.objectContaining({ status: 'QUEUED', errorMessage: null }),
+      }),
+    )
+
+    // Cutoff is ~15 minutes in the past — never "now" (which would disturb an
+    // actively-processing batch) and never in the future.
+    const call = (db.notification.updateMany as MockedFunction<typeof db.notification.updateMany>).mock.calls[0]![0] as {
+      where: { updatedAt: { lt: Date } }
+    }
+    const ageMs = Date.now() - call.where.updatedAt.lt.getTime()
+    expect(ageMs).toBeGreaterThan(10 * 60 * 1000)
+    expect(ageMs).toBeLessThan(20 * 60 * 1000)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Email dispatch idempotency
+// ---------------------------------------------------------------------------
+
+describe('email dispatch is idempotent', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('passes the notification id as the Resend idempotency key', async () => {
+    const queued = [
+      {
+        id: 'notif-email-1',
+        userId: 'user-9',
+        channel: 'EMAIL',
+        status: 'QUEUED',
+        createdAt: new Date(),
+        template: { id: 'tpl-e', slug: 'payment-success-email', channel: 'EMAIL', body: 'x' },
+        user: { email: 'member@example.com', phone: null },
+        payload: { firstName: 'Zo', amount: '500', period: '2025-01' },
+      },
+    ]
+
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-email-1' }])
+    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
+      .mockResolvedValue(queued as never)
+    ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
+      .mockResolvedValue([{ userId: 'user-9', sms: true, email: true, push: true }] as never)
+    ;(db.notification.update as MockedFunction<typeof db.notification.update>)
+      .mockResolvedValue({} as never)
+
+    await flushQueuedNotifications()
+
+    // The notification id flows through as the last arg so a recovered re-dispatch
+    // is de-duplicated by Resend instead of sending a second email.
+    expect(emailProvider.sendPaymentSuccessEmail).toHaveBeenCalledWith(
+      'member@example.com', 'Zo', '500', '2025-01', 'notif-email-1',
+    )
   })
 })
 

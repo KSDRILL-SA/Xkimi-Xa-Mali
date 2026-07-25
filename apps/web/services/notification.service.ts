@@ -98,24 +98,30 @@ async function dispatchEmail(
   const period = String(payload.period ?? payload.month ?? '')
   const dashboardUrl = String(payload.url ?? env.NEXTAUTH_URL ?? '')
 
+  // The notification id is a stable idempotency key: if this row is recovered
+  // and re-dispatched after a worker crash, Resend returns the original send
+  // instead of delivering a duplicate email.
+  const key = notificationId
+
   switch (slug) {
     case 'welcome-email':
-      await emailProvider.sendWelcomeEmail(to, firstName)
+      await emailProvider.sendWelcomeEmail(to, firstName, key)
       break
     case 'payment-success-email':
-      await emailProvider.sendPaymentSuccessEmail(to, firstName, amount, period)
+      await emailProvider.sendPaymentSuccessEmail(to, firstName, amount, period, key)
       break
     case 'payment-failed-email':
-      await emailProvider.sendPaymentFailedEmail(to, firstName, amount, period, dashboardUrl)
+      await emailProvider.sendPaymentFailedEmail(to, firstName, amount, period, dashboardUrl, key)
       break
     case 'overdue-reminder-email':
-      await emailProvider.sendOverdueReminderEmail(to, firstName, amount, period, dashboardUrl)
+      await emailProvider.sendOverdueReminderEmail(to, firstName, amount, period, dashboardUrl, key)
       break
     default:
       await emailProvider.sendGenericEmail(
         to,
         `Xkimm Xa Mali Foundation`,
         `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">${interpolate(body, payload)}</div>`,
+        key,
       )
   }
 
@@ -327,6 +333,25 @@ export async function requeueFailedNotifications(): Promise<number> {
     },
     { status: 'QUEUED' },
   )
+  return result.count
+}
+
+// ---------------------------------------------------------------------------
+// Public: recover notifications orphaned mid-flush — a worker that died between
+// the atomic claim (findReady) and the final status write leaves rows stuck
+// 'in-flight' forever, which requeueFailedNotifications deliberately skips.
+// Time-bounded so a batch actively being processed is never disturbed; a flush
+// dispatches in well under a minute, so anything 'in-flight' this long is a
+// crash orphan. Safe to requeue: email re-dispatch is idempotent (Resend key),
+// so recovery never doubles an email; SMS re-dispatch carries the same
+// userSuppliedId for provider-side correlation.
+// ---------------------------------------------------------------------------
+
+const STALE_INFLIGHT_MS = 15 * 60 * 1000
+
+export async function recoverStalledNotifications(): Promise<number> {
+  const staleBefore = new Date(Date.now() - STALE_INFLIGHT_MS)
+  const result = await notificationRepo.recoverStalled(staleBefore)
   return result.count
 }
 
