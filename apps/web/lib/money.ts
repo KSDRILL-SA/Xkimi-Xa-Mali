@@ -33,3 +33,51 @@ export function sumZAR(...amounts: number[]): number {
 export function subtractZAR(a: number, b: number): number {
   return roundZAR(a - b) || 0
 }
+
+/**
+ * A percentage of a rand amount, rounded to the cent — e.g. a fee, a penalty, or
+ * interest. `percent` is the human figure, not a fraction: percentZAR(200, 7.5)
+ * is R15.00 (7.5% of R200), not 0.075%.
+ *
+ * For a single derived charge this is all you need. If you are apportioning a
+ * whole amount across several shares that must still sum back to the original
+ * (e.g. splitting a payout), use splitZAR (equal) — a weighted variant can be
+ * added alongside it when proportional payouts arrive — so no cent is lost.
+ */
+export function percentZAR(amount: number, percent: number): number {
+  return roundZAR((amount * percent) / 100)
+}
+
+/**
+ * Split a rand amount into `parts` equal shares without losing or inventing a
+ * cent. Naive division fails here — R100 / 3 is R33.33 three times (R99.99, a
+ * cent short) or R33.34 (R100.02, a cent over). This uses penny allocation: each
+ * share gets floor(cents / parts), then the leftover cents are handed out one at
+ * a time to the earliest shares. Guarantees:
+ *   • the returned shares sum back to `amount` exactly, and
+ *   • any two shares differ by at most one cent.
+ * Works for negative amounts (e.g. a reversal) too. Order is deterministic —
+ * earlier shares carry the extra cent — so callers can assign it fairly (e.g.
+ * rotate who is "first" each period).
+ *
+ * splitZAR(100, 3) -> [33.34, 33.33, 33.33]   (sum 100.00)
+ * splitZAR(10, 4)  -> [2.5, 2.5, 2.5, 2.5]
+ */
+export function splitZAR(amount: number, parts: number): number[] {
+  if (!Number.isInteger(parts) || parts <= 0) {
+    throw new Error(`splitZAR: parts must be a positive integer, received ${parts}`)
+  }
+
+  const totalCents = Math.round(amount * 100)
+  const base = Math.trunc(totalCents / parts)
+  const remainder = totalCents - base * parts // signed leftover cents to hand out
+  const extra = Math.sign(remainder)
+  const extraCount = Math.abs(remainder)
+
+  const shares: number[] = []
+  for (let i = 0; i < parts; i++) {
+    const cents = base + (i < extraCount ? extra : 0)
+    shares.push(cents / 100)
+  }
+  return shares
+}
