@@ -577,7 +577,9 @@ function userSummaryCacheKey(userId: string): string {
 }
 
 export async function invalidateContributionSummaryCache(userId: string) {
-  await cache.del(userSummaryCacheKey(userId))
+  // Also clear the member's dashboard insights — their streak, forecast and
+  // consistency stats all move when a contribution/payment does.
+  await cache.del(userSummaryCacheKey(userId), CACHE_KEYS.memberInsights(userId))
 }
 
 // ─── Admin: generate monthly contribution records ──────────────────────────

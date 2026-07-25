@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { assertCanAccess } from '@/lib/authorization'
 import { subtractZAR } from '@/lib/money'
+import { cache, CACHE_KEYS } from '@/lib/cache'
 
 // Streak lengths worth celebrating. When a member is exactly one month short of
 // the next one, that gets a focused "almost there" nudge.
@@ -126,7 +127,12 @@ export async function getMemberInsights(
   requesterId: string,
   roles: string[],
 ): Promise<MemberInsights> {
+  // Authorization is always enforced live — never served from cache.
   assertCanAccess(userId, requesterId, roles)
+
+  const cacheKey = CACHE_KEYS.memberInsights(userId)
+  const cached = await cache.get<MemberInsights>(cacheKey)
+  if (cached) return cached
 
   const now = new Date()
   const year = now.getFullYear()
@@ -238,11 +244,14 @@ export async function getMemberInsights(
     })
   }
 
-  return {
+  const result: MemberInsights = {
     forecast: { yearToDatePaid, monthlyAmount, remainingMonths, projectedYearEnd },
     stats: { paidCount, totalCount, overdueCount, onTimeRate, atRisk },
     streak,
     nextDebitDay: activeMandate?.debitDay ?? null,
     insights,
   }
+
+  await cache.set(cacheKey, result, CACHE_KEYS.INSIGHTS_TTL)
+  return result
 }
