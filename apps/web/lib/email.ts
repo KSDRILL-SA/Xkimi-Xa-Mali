@@ -29,12 +29,19 @@ function layout(content: string): string {
 
 // ─── Retry-wrapped send ───────────────────────────────────────────────────────
 
-async function send(options: Parameters<Resend['emails']['send']>[0]): Promise<void> {
+async function send(
+  options: Parameters<Resend['emails']['send']>[0],
+  idempotencyKey?: string,
+): Promise<void> {
   if (!env.RESEND_API_KEY) throw new ExternalServiceError('Resend', 'RESEND_API_KEY not configured')
   const resend = new Resend(env.RESEND_API_KEY)
+  // An idempotency key makes both the internal retry above and a flush-worker
+  // re-dispatch (after a crash-orphaned notification is recovered) safe: Resend
+  // returns the original result instead of sending a second email.
+  const sendOptions = idempotencyKey ? { idempotencyKey } : undefined
   await withRetry(
     async () => {
-      const result = await resend.emails.send(options)
+      const result = await resend.emails.send(options, sendOptions)
       if (result.error) throw new Error(result.error.message)
     },
     { maxAttempts: 3, baseDelayMs: 1_000, label: `Email.send(${options.to})` },
@@ -78,7 +85,7 @@ export async function sendPasswordResetEmail(
   })
 }
 
-export async function sendWelcomeEmail(to: string, firstName: string): Promise<void> {
+export async function sendWelcomeEmail(to: string, firstName: string, idempotencyKey?: string): Promise<void> {
   await send({
     from: FROM, to,
     subject: `Welcome to ${APP_NAME}, ${firstName}!`,
@@ -90,11 +97,11 @@ export async function sendWelcomeEmail(to: string, firstName: string): Promise<v
         or track the group's financial goals.</p>
       <p style="${S.small}">If you have any questions, reach out to your group administrator.</p>
     `),
-  })
+  }, idempotencyKey)
 }
 
 export async function sendPaymentSuccessEmail(
-  to: string, firstName: string, amount: string, period: string,
+  to: string, firstName: string, amount: string, period: string, idempotencyKey?: string,
 ): Promise<void> {
   await send({
     from: FROM, to,
@@ -115,11 +122,11 @@ export async function sendPaymentSuccessEmail(
         </tr>
       </table>
     `),
-  })
+  }, idempotencyKey)
 }
 
 export async function sendPaymentFailedEmail(
-  to: string, firstName: string, amount: string, period: string, dashboardUrl: string,
+  to: string, firstName: string, amount: string, period: string, dashboardUrl: string, idempotencyKey?: string,
 ): Promise<void> {
   await send({
     from: FROM, to,
@@ -133,7 +140,7 @@ export async function sendPaymentFailedEmail(
       <p style="${S.small}">If you believe this is an error, contact your group administrator.
         Outstanding contributions accrue until settled.</p>
     `),
-  })
+  }, idempotencyKey)
 }
 
 export async function sendInviteEmail(
@@ -165,7 +172,7 @@ export async function sendInviteEmail(
 }
 
 export async function sendOverdueReminderEmail(
-  to: string, firstName: string, amount: string, period: string, dashboardUrl: string,
+  to: string, firstName: string, amount: string, period: string, dashboardUrl: string, idempotencyKey?: string,
 ): Promise<void> {
   await send({
     from: FROM, to,
@@ -178,9 +185,9 @@ export async function sendOverdueReminderEmail(
       <a href="${dashboardUrl}" style="${S.btn}">Pay Now</a>
       <p style="${S.small}">You can make a manual payment from your contributions page.</p>
     `),
-  })
+  }, idempotencyKey)
 }
 
-export async function sendGenericEmail(to: string, subject: string, html: string): Promise<void> {
-  await send({ from: FROM, to, subject, html })
+export async function sendGenericEmail(to: string, subject: string, html: string, idempotencyKey?: string): Promise<void> {
+  await send({ from: FROM, to, subject, html }, idempotencyKey)
 }

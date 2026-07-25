@@ -1,5 +1,9 @@
 import { inngest } from '@/lib/inngest'
-import { flushQueuedNotifications, requeueFailedNotifications } from '@/services/notification.service'
+import {
+  flushQueuedNotifications,
+  requeueFailedNotifications,
+  recoverStalledNotifications,
+} from '@/services/notification.service'
 
 export const notificationFlush = inngest.createFunction(
   {
@@ -14,7 +18,9 @@ export const notificationFlush = inngest.createFunction(
     { cron: '*/5 * * * *' }, // also poll every 5 minutes as a safety net
   ],
   async ({ step }) => {
-    // Promote eligible FAILED notifications back to QUEUED before flushing
+    // Recover any batch orphaned 'in-flight' by a previously crashed worker,
+    // then promote eligible FAILED notifications back to QUEUED, before flushing.
+    await step.run('recover-stalled', () => recoverStalledNotifications())
     await step.run('requeue-failed', () => requeueFailedNotifications())
 
     const result = await step.run('flush-queued', () =>
