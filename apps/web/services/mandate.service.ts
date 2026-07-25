@@ -36,6 +36,22 @@ type BankAccountWithUser = Prisma.BankAccountGetPayload<{
 
 // ─── Queries ───────────────────────────────────────────────────────────────
 
+/**
+ * Whether the member can be debited right now — the precondition for every
+ * member-initiated payment. Lets a page offer the payment path only when it can
+ * actually succeed, instead of letting the member fill in a form and fail at
+ * submit. Id-only lookup: no bank details are read or decrypted.
+ */
+export async function hasActiveMandate(
+  userId: string,
+  requesterId: string,
+  requesterRoles: string[],
+): Promise<boolean> {
+  assertCanAccess(userId, requesterId, requesterRoles)
+  const mandate = await mandateRepo.findActiveByUser(userId, { id: true })
+  return mandate !== null
+}
+
 export async function getMandates(userId: string, requesterId: string, requesterRoles: string[]) {
   assertCanAccess(userId, requesterId, requesterRoles)
 
