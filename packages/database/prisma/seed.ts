@@ -113,6 +113,14 @@ async function main() {
       body: 'Xkimm Xa Mali Foundation: Tonight at 20:00 we will deduct R{{amount}} for your monthly contribution.',
     },
     {
+      // Stronger, targeted variant sent to members with a recent failed debit —
+      // the ones most likely to decline again.
+      slug: 'debit-morning-warning-urgent',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali Foundation: IMPORTANT — R{{amount}} will be deducted tonight at 20:00. A recent debit failed, so please make sure funds are available today to avoid another decline.',
+    },
+    {
       slug: 'debit-tomorrow-warning',
       channel: 'SMS',
       subject: null,
