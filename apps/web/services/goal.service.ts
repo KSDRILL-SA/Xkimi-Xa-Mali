@@ -8,6 +8,9 @@ import { isAdmin, assertAdmin } from '@/lib/authorization'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { roundZAR, sumZAR, subtractZAR } from '@/lib/money'
+import { inngest, InngestEvents } from '@/lib/inngest'
+import { createInboxMessages } from './inbox.service'
+import { logger } from '@/lib/logger'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -154,6 +157,29 @@ export async function getPrimaryGoal() {
 }
 
 /**
+ * Announce that a goal reached its target. Best-effort — a hiccup emitting the
+ * celebration must never block the money flow that triggered it. Fire only on the
+ * ACTIVE→ACHIEVED transition so the group is congratulated exactly once.
+ */
+export async function emitGoalAchieved(goalId: string, title: string): Promise<void> {
+  await inngest
+    .send({ name: InngestEvents.GOAL_ACHIEVED, data: { goalId, title } })
+    .catch((err) => logger.error('Failed to emit goal.achieved', {
+      goalId, error: err instanceof Error ? err.message : String(err),
+    }))
+}
+
+/** Fan a goal-achieved celebration out to every active member's inbox. */
+export async function celebrateGoalAchieved(title: string): Promise<number> {
+  const members = await db.user.findMany({ where: { status: 'ACTIVE' }, select: { id: true } })
+  return createInboxMessages(members.map((m) => m.id), {
+    title: '🎉 Goal achieved!',
+    body: `We did it — "${title}" is fully funded. Thank you for showing up, brothers. On to the next one. 💪`,
+    category: 'GOAL',
+  })
+}
+
+/**
  * Keep the primary fund's progress in step with real contributions. Its
  * currentAmount is DERIVED — the sum of every contribution paid in the fund's
  * year — so it is always accurate and inherently reversal-safe (a reversal
@@ -183,6 +209,8 @@ export async function syncPrimaryGoalProgress(): Promise<void> {
     ...(reachedTarget && { status: 'ACHIEVED' }),
   })
   await evictGoalsCache()
+
+  if (reachedTarget) await emitGoalAchieved(g.id, g.title)
 }
 
 // ─── Admin mutations ──────────────────────────────────────────────────────────
@@ -467,12 +495,15 @@ export async function recordProgress(
     evictGoalsCache(),
   ])
 
+  const achieved = newTotal >= Number(g.targetAmount)
+  if (achieved) await emitGoalAchieved(goalId, g.title)
+
   return {
     id: progress.id,
     amount: Number(progress.amount),
     recordedAt: progress.recordedAt.toISOString(),
     newTotal,
-    achieved: newTotal >= Number(g.targetAmount),
+    achieved,
   }
 }
 
