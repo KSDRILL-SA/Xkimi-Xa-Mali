@@ -3,7 +3,9 @@ import { signOut } from '@/lib/auth'
 import { getSession } from '@/lib/session'
 import { MemberAppShell } from '@/components/layout/MemberAppShell'
 import { AppFooter } from '@/components/layout/AppFooter'
+import { getUnreadInboxCount } from '@/services/inbox.service'
 import { env } from '@/lib/env'
+import { logger } from '@/lib/logger'
 
 async function SignOutForm() {
   return (
@@ -27,6 +29,15 @@ export default async function MemberLayout({ children }: { children: React.React
   const session = await getSession()
   if (!session?.user) redirect('/login')
 
+  // Best-effort: an unavailable count must never take the whole app shell down
+  // with it — the member simply sees no badge.
+  const unreadCount = await getUnreadInboxCount(session.user.id).catch((err) => {
+    logger.error('Failed to read unread inbox count', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return 0
+  })
+
   const isAdmin = session.user.roles?.includes('ADMIN')
   const name = session.user.name ?? ''
   const initials =
@@ -45,6 +56,7 @@ export default async function MemberLayout({ children }: { children: React.React
       signOutSlot={<SignOutForm />}
       footerSlot={<AppFooter />}
       adminUrl={env.NEXT_PUBLIC_ADMIN_URL}
+      unreadCount={unreadCount}
     >
       {children}
     </MemberAppShell>

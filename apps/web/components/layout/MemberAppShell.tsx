@@ -40,6 +40,8 @@ interface MemberAppShellProps {
   signOutSlot: React.ReactNode
   footerSlot: React.ReactNode
   adminUrl: string
+  /** Unread inbox messages, shown on the header bell. */
+  unreadCount: number
 }
 
 export function MemberAppShell({
@@ -50,6 +52,7 @@ export function MemberAppShell({
   signOutSlot,
   footerSlot,
   adminUrl,
+  unreadCount,
 }: MemberAppShellProps) {
   const nav: NavItem[] = isAdmin
     ? [...memberNav, { href: adminUrl, label: 'Admin', icon: ShieldCheck }]
@@ -63,6 +66,7 @@ export function MemberAppShell({
           userInitials={userInitials}
           signOutSlot={signOutSlot}
           showBell
+          unreadCount={unreadCount}
           showSkipLink
         />
         <ScrollNav items={nav} variant="member" />
