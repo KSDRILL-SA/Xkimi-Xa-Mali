@@ -43,9 +43,11 @@ export const notificationRepo = {
    * Returns the IDs of claimed rows.
    */
   findReady(limit = 100, maxRetries = 3) {
+    // Stamp updatedAt on claim (raw SQL bypasses Prisma's @updatedAt) so a claim
+    // orphaned by a worker crash can be detected by age and recovered.
     return db.$queryRaw`
       UPDATE "notifications"
-      SET "status" = 'FAILED', "errorMessage" = 'in-flight'
+      SET "status" = 'FAILED', "errorMessage" = 'in-flight', "updatedAt" = NOW()
       WHERE "id" IN (
         SELECT "id" FROM "notifications"
         WHERE "status" = 'QUEUED' AND "retryCount" < ${maxRetries}
@@ -55,6 +57,19 @@ export const notificationRepo = {
       )
       RETURNING "id"
     `.then((rows) => (rows as Array<{ id: string }>).map((r) => r.id))
+  },
+
+  /**
+   * Requeue notifications stuck 'in-flight' — claimed by a flush run whose worker
+   * died before writing the final status. Only rows whose claim is older than
+   * `staleBefore` are touched, so a batch actively being processed is never
+   * disturbed. Returns the number recovered.
+   */
+  recoverStalled(staleBefore: Date) {
+    return db.notification.updateMany({
+      where: { status: 'FAILED', errorMessage: 'in-flight', updatedAt: { lt: staleBefore } },
+      data: { status: 'QUEUED', errorMessage: null },
+    })
   },
 
   /** Create a notification. */
