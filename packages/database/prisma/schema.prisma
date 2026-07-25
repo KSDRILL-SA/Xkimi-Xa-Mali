@@ -445,6 +445,10 @@ model Goal {
   currency      String     @default("ZAR")
   deadline      DateTime
   status        GoalStatus @default(DRAFT)
+  // The one common yearly fund every monthly contribution flows into. At most
+  // one goal may be primary at a time — enforced by a partial unique index
+  // (WHERE "isPrimary") created in raw SQL in the migration.
+  isPrimary     Boolean    @default(false)
   version       Int        @default(0)
   lockedAt      DateTime?
   lockedById    String?
