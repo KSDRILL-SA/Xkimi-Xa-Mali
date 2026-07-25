@@ -7,6 +7,7 @@ import { redis } from '@/lib/redis'
 import { paymentGateway } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
 import { recalculateContributionStatus, invalidateContributionSummaryCache } from '@/services/contribution.service'
+import { syncPrimaryGoalProgress } from '@/services/goal.service'
 import { checkBudget } from '@/services/budget.service'
 import { queueNotification } from '@/services/notification.service'
 import { cache, CACHE_KEYS } from '@/lib/cache'
@@ -155,5 +156,8 @@ export const debitRun = inngest.createFunction(
         }),
       )
     }
+
+    // One sync after the whole run — the month's debits just moved the paid total.
+    await step.run('sync-primary-goal', () => syncPrimaryGoalProgress())
   },
 )

@@ -76,6 +76,10 @@ vi.mock('@/services/ledger.service', () => ({
   postPoolDebit: vi.fn().mockResolvedValue(true),
 }))
 
+vi.mock('@/services/goal.service', () => ({
+  syncPrimaryGoalProgress: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
