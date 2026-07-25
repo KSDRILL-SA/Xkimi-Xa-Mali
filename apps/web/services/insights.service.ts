@@ -26,6 +26,15 @@ export type StreakInfo = {
   longest: number
 }
 
+export type GroupPulse = {
+  /** Total contributed by the whole group so far this month. */
+  pooledThisMonth: number
+  /** Members who have paid this month. */
+  contributorsThisMonth: number
+  /** Active members in the group. */
+  activeMembers: number
+}
+
 export type MemberInsights = {
   forecast: {
     yearToDatePaid: number
@@ -41,6 +50,7 @@ export type MemberInsights = {
     atRisk: boolean
   }
   streak: StreakInfo
+  groupPulse: GroupPulse
   nextDebitDay: number | null
   insights: MemberInsight[]
 }
@@ -118,6 +128,37 @@ export function pickGoalNearingTarget(
 }
 
 /**
+ * The group's collective "pulse" this month — total pooled, how many members
+ * have contributed, and the active membership. Identical for everyone, so it is
+ * cached once globally (short TTL) rather than recomputed on every member's
+ * dashboard. A stokvel is a shared effort; showing the whole group's momentum is
+ * a strong reason to keep turning up.
+ */
+export async function getGroupPulse(): Promise<GroupPulse> {
+  const cached = await cache.get<GroupPulse>(CACHE_KEYS.GROUP_PULSE)
+  if (cached) return cached
+
+  const now = new Date()
+  const periodYear = now.getFullYear()
+  const periodMonth = now.getMonth() + 1
+
+  const [pooledAgg, contributors, activeMembers] = await Promise.all([
+    db.contribution.aggregate({ where: { periodYear, periodMonth }, _sum: { amountPaid: true } }),
+    db.contribution.count({ where: { periodYear, periodMonth, status: 'PAID' } }),
+    db.user.count({ where: { status: 'ACTIVE' } }),
+  ])
+
+  const pulse: GroupPulse = {
+    pooledThisMonth: Number(pooledAgg._sum.amountPaid ?? 0),
+    contributorsThisMonth: contributors,
+    activeMembers,
+  }
+
+  await cache.set(CACHE_KEYS.GROUP_PULSE, pulse, CACHE_KEYS.GROUP_PULSE_TTL)
+  return pulse
+}
+
+/**
  * Member financial-health intelligence: a year-end forecast from current pace,
  * on-time consistency, a contribution streak, and risk signals — turned into a
  * few plain-language nudges. All aggregation is DB-side and parallel.
@@ -140,7 +181,7 @@ export async function getMemberInsights(
   const remainingMonths = Math.max(0, 12 - month)
   const lookback = new Date(year, month - 2, 1) // ~start of last month
 
-  const [ytdAgg, activeMandate, recentFailed, periods, activeGoals] = await Promise.all([
+  const [ytdAgg, activeMandate, recentFailed, periods, activeGoals, groupPulse] = await Promise.all([
     db.contribution.aggregate({ where: { userId, periodYear: year }, _sum: { amountPaid: true } }),
     db.paymentMandate.findFirst({ where: { userId, status: 'ACTIVE' }, select: { amount: true, debitDay: true } }),
     db.transaction.count({ where: { contribution: { userId }, status: 'FAILED', createdAt: { gte: lookback } } }),
@@ -155,6 +196,8 @@ export async function getMemberInsights(
       where: { status: 'ACTIVE' },
       select: { title: true, targetAmount: true, currentAmount: true },
     }),
+    // Group-wide momentum (globally cached, shared by every member).
+    getGroupPulse(),
   ])
 
   const yearToDatePaid = Number(ytdAgg._sum.amountPaid ?? 0)
@@ -214,6 +257,17 @@ export async function getMemberInsights(
     })
   }
 
+  // Group pulse — collective momentum, the reason a stokvel works. Only shown
+  // once there's real activity this month.
+  if (groupPulse.pooledThisMonth > 0 && groupPulse.contributorsThisMonth > 0) {
+    const members = groupPulse.contributorsThisMonth
+    insights.push({
+      code: 'GROUP_PULSE', tone: 'positive',
+      title: 'The group is moving together',
+      detail: `${members} member${members === 1 ? '' : 's'} pooled ${rands(groupPulse.pooledThisMonth)} this month. You’re part of something bigger.`,
+    })
+  }
+
   if (monthlyAmount > 0 && remainingMonths > 0) {
     insights.push({
       code: 'FORECAST', tone: 'positive',
@@ -248,6 +302,7 @@ export async function getMemberInsights(
     forecast: { yearToDatePaid, monthlyAmount, remainingMonths, projectedYearEnd },
     stats: { paidCount, totalCount, overdueCount, onTimeRate, atRisk },
     streak,
+    groupPulse,
     nextDebitDay: activeMandate?.debitDay ?? null,
     insights,
   }

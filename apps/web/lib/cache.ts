@@ -35,4 +35,9 @@ export const CACHE_KEYS = {
   // changes so the dashboard stays snappy without going stale.
   memberInsights: (userId: string) => `xxm:cache:insights:${userId}`,
   INSIGHTS_TTL: 300,
+
+  // Group-wide "pulse" — identical for every member, so cached once globally
+  // rather than recomputed per dashboard. A short TTL keeps it a live-ish vibe.
+  GROUP_PULSE: 'xxm:cache:group-pulse',
+  GROUP_PULSE_TTL: 300,
 }

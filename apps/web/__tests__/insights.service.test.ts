@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 
 vi.mock('@/lib/db', () => ({
   db: {
-    contribution: { aggregate: vi.fn(), findMany: vi.fn() },
+    contribution: { aggregate: vi.fn(), findMany: vi.fn(), count: vi.fn() },
     paymentMandate: { findFirst: vi.fn() },
     transaction: { count: vi.fn() },
     goal: { findMany: vi.fn() },
+    user: { count: vi.fn() },
   },
 }))
 
@@ -18,12 +19,14 @@ vi.mock('@/lib/cache', () => ({
   CACHE_KEYS: {
     memberInsights: (userId: string) => `xxm:cache:insights:${userId}`,
     INSIGHTS_TTL: 300,
+    GROUP_PULSE: 'xxm:cache:group-pulse',
+    GROUP_PULSE_TTL: 300,
   },
 }))
 
 import { db } from '@/lib/db'
 import { cache } from '@/lib/cache'
-import { computeStreak, pickGoalNearingTarget, getMemberInsights } from '@/services/insights.service'
+import { computeStreak, pickGoalNearingTarget, getGroupPulse, getMemberInsights } from '@/services/insights.service'
 
 // Build a period row list from a status sequence (oldest first).
 function periods(...statuses: string[]) {
@@ -96,6 +99,32 @@ describe('pickGoalNearingTarget', () => {
   })
 })
 
+describe('getGroupPulse', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('computes and caches the group pulse on a miss', async () => {
+    ;(db.contribution.aggregate as MockedFunction<typeof db.contribution.aggregate>)
+      .mockResolvedValue({ _sum: { amountPaid: 48200 } } as never)
+    ;(db.contribution.count as MockedFunction<typeof db.contribution.count>).mockResolvedValue(34 as never)
+    ;(db.user.count as MockedFunction<typeof db.user.count>).mockResolvedValue(50 as never)
+
+    const pulse = await getGroupPulse()
+
+    expect(pulse).toEqual({ pooledThisMonth: 48200, contributorsThisMonth: 34, activeMembers: 50 })
+    expect(cache.set).toHaveBeenCalledWith('xxm:cache:group-pulse', pulse, 300)
+  })
+
+  it('serves from cache without querying the database', async () => {
+    const cached = { pooledThisMonth: 1, contributorsThisMonth: 1, activeMembers: 1 }
+    ;(cache.get as MockedFunction<typeof cache.get>).mockResolvedValueOnce(cached as never)
+
+    const pulse = await getGroupPulse()
+
+    expect(pulse).toBe(cached)
+    expect(db.contribution.count).not.toHaveBeenCalled()
+  })
+})
+
 describe('getMemberInsights — streak surfaced as a nudge', () => {
   beforeEach(() => vi.clearAllMocks())
 
@@ -113,6 +142,11 @@ describe('getMemberInsights — streak surfaced as a nudge', () => {
       .mockResolvedValue(periodRows as never)
     ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>)
       .mockResolvedValue(goals as never)
+    // Group-pulse dependencies (getGroupPulse is called inside getMemberInsights).
+    ;(db.contribution.count as MockedFunction<typeof db.contribution.count>)
+      .mockResolvedValue(12 as never)
+    ;(db.user.count as MockedFunction<typeof db.user.count>)
+      .mockResolvedValue(40 as never)
   }
 
   it('includes the streak and a streak nudge when on a run', async () => {
@@ -176,5 +210,17 @@ describe('getMemberInsights — streak surfaced as a nudge', () => {
       expect.objectContaining({ streak: expect.any(Object) }),
       300,
     )
+  })
+
+  it('includes the group pulse and surfaces it as a belonging nudge', async () => {
+    arm(periods('PAID', 'PENDING'))
+
+    const result = await getMemberInsights('u1', 'u1', [])
+
+    expect(result.groupPulse).toEqual({ pooledThisMonth: 1500, contributorsThisMonth: 12, activeMembers: 40 })
+    const pulseNudge = result.insights.find((i) => i.code === 'GROUP_PULSE')
+    expect(pulseNudge).toBeDefined()
+    expect(pulseNudge!.tone).toBe('positive')
+    expect(pulseNudge!.detail).toContain('12 members')
   })
 })
