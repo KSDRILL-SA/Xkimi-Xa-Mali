@@ -4,6 +4,7 @@ import { budgetRepo } from '@/repositories/budget.repository'
 import { contributionRepo, runTransaction } from '@/repositories/contribution.repository'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
 import { BudgetNotFoundError } from '@/lib/errors'
+import { sumZAR, subtractZAR } from '@/lib/money'
 import { writeAuditLog } from './audit.service'
 import type { CreateBudgetInput } from '@/lib/validation/budget'
 
@@ -66,8 +67,8 @@ export async function checkBudget(
 
   const budgetAmount = Number(budget.amount)
   const alreadyContributed = await contributionRepo.sumPaidInPeriod(userId, budget)
-  const remaining = budgetAmount - alreadyContributed
-  const wouldTotal = alreadyContributed + amount
+  const remaining = subtractZAR(budgetAmount, alreadyContributed)
+  const wouldTotal = sumZAR(alreadyContributed, amount)
 
   if (wouldTotal <= budgetAmount) {
     return { status: 'WITHIN_BUDGET', remaining, wouldTotal }
@@ -79,7 +80,7 @@ export async function checkBudget(
     alreadyContributed,
     remaining,
     wouldTotal,
-    overage: wouldTotal - budgetAmount,
+    overage: subtractZAR(wouldTotal, budgetAmount),
   }
 }
 

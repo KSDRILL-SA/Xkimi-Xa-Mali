@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { isUniqueViolation } from '@/lib/errors'
 import { SUCCESSFUL_INFLOW } from '@/repositories/transaction.repository'
+import { subtractZAR } from '@/lib/money'
 
 type Direction = 'CREDIT' | 'DEBIT'
 
@@ -61,7 +62,7 @@ export async function getPoolBalance(): Promise<{ balance: number; credited: num
   ])
   const credited = Number(credits._sum.amount ?? 0)
   const debited = Number(debits._sum.amount ?? 0)
-  return { balance: credited - debited, credited, debited, entries }
+  return { balance: subtractZAR(credited, debited), credited, debited, entries }
 }
 
 /** Paged, newest-first ledger feed. */
