@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { paymentGateway } from '@/integrations/payment'
 import { processMandateWebhook } from '@/services/mandate.service'
 import { processTransactionWebhook } from '@/services/contribution.service'
+import { processGoalPaymentWebhook } from '@/services/goal-payment.service'
 import { claimWebhookEvent, releaseWebhookEvent, webhookEventKey } from '@/services/webhook-dedupe.service'
 import { logger } from '@/lib/logger'
 import { withApiHandler } from '@/lib/api-handler'
@@ -96,6 +97,17 @@ export const POST = withApiHandler(async (req: NextRequest) => {
           mandateId: payload.mandateId,
           amount: payload.amount,
           reason: payload.reason,
+          processedAt: payload.processedAt,
+        }),
+      )
+
+      // Directed goal payments live in their own table, so the contribution
+      // handler cannot settle them. Both handlers no-op on a reference they do
+      // not own, so exactly one of them acts on any given event.
+      jobs.push(
+        processGoalPaymentWebhook({
+          transactionRef: payload.transactionRef,
+          status: payload.status,
           processedAt: payload.processedAt,
         }),
       )

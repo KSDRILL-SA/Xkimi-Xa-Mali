@@ -167,11 +167,13 @@ export async function syncPrimaryGoalProgress(): Promise<void> {
   const g = primary as GoalRow
 
   const year = g.deadline.getFullYear()
-  const agg = await db.contribution.aggregate({
-    where: { periodYear: year },
-    _sum: { amountPaid: true },
-  })
-  const pooled = roundZAR(Number(agg._sum.amountPaid ?? 0))
+  const [agg, paymentsAgg] = await Promise.all([
+    // Monthly contributions in the fund's year...
+    db.contribution.aggregate({ where: { periodYear: year }, _sum: { amountPaid: true } }),
+    // ...plus any directed extra payments members made to the primary fund.
+    goalRepo.sumSuccessfulPayments(g.id),
+  ])
+  const pooled = roundZAR(Number(agg._sum.amountPaid ?? 0) + Number(paymentsAgg._sum.amount ?? 0))
 
   if (roundZAR(Number(g.currentAmount)) === pooled) return
 

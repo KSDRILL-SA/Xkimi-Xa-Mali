@@ -11,6 +11,7 @@ import { GoalNotFoundError } from '@/lib/errors'
 import { ProgressRing } from '@/components/goal/ProgressRing'
 import { MilestoneBar } from '@/components/goal/MilestoneBar'
 import { GoalEngagement } from '@/components/goal/GoalEngagement'
+import { GoalPayCard } from '@/components/goal/GoalPayCard'
 import { statusTheme, typeTheme, goalIcon } from '@/components/goal/goal-theme'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
@@ -166,6 +167,13 @@ export default async function GoalDetailPage({
             <Flag size={18} className="text-red-500" aria-hidden />
           </div>
           <p className="text-sm font-medium text-red-700">This goal wasn&apos;t reached by the deadline.</p>
+        </Reveal>
+      )}
+
+      {/* ── Chip in extra (real money, active goals only) ─────── */}
+      {goal.status === 'ACTIVE' && (
+        <Reveal variant="up" delay={165}>
+          <GoalPayCard goalId={id} goalTitle={goal.title} remaining={remaining} />
         </Reveal>
       )}
 

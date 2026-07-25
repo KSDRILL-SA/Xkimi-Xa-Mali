@@ -225,7 +225,7 @@ export function GoalEngagement({ goalId, initial, contributable = false }: Props
                   </button>
                 )}
                 <p className="text-[11px] text-xxm-gray-400 mt-2 leading-relaxed">
-                  A pledge is your commitment toward this goal — it rallies the brotherhood. Funds are still collected through your monthly contributions to the pool.
+                  A pledge is your commitment toward this goal — it rallies the brotherhood. To put money in right now, use <span className="font-semibold">Chip in extra</span> above.
                 </p>
               </div>
             )}

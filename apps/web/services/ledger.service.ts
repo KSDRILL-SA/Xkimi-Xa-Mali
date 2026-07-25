@@ -96,15 +96,17 @@ export async function getLedger(opts: { page?: number; limit?: number } = {}) {
 }
 
 /**
- * Rebuild any missing ledger entries from the source-of-truth transactions.
- * Idempotent — only the gaps are filled. This guarantees the immutable ledger
- * can never permanently drift from settled money, even if a real-time hook is
- * ever missed. Safe to run on demand or on a schedule.
+ * Rebuild any missing ledger entries from the source-of-truth money records —
+ * settled transactions (monthly contributions) and settled directed goal
+ * payments. Idempotent — only the gaps are filled. This guarantees the immutable
+ * ledger can never permanently drift from settled money, even if a real-time
+ * hook is ever missed. Safe to run on demand or on a schedule.
  */
 export async function reconcileLedger(): Promise<{ creditsPosted: number; debitsPosted: number }> {
-  const [successTx, reversedTx] = await Promise.all([
+  const [successTx, reversedTx, goalPayments] = await Promise.all([
     db.transaction.findMany({ where: SUCCESSFUL_INFLOW, select: { id: true, amount: true, contribution: { select: { userId: true } } } }),
     db.transaction.findMany({ where: { status: 'REVERSED' }, select: { id: true, amount: true, contribution: { select: { userId: true } } } }),
+    db.goalPayment.findMany({ where: { status: 'SUCCESS' }, select: { id: true, amount: true, userId: true, goal: { select: { title: true } } } }),
   ])
 
   let creditsPosted = 0
@@ -117,6 +119,12 @@ export async function reconcileLedger(): Promise<{ creditsPosted: number; debits
   for (const t of reversedTx) {
     const posted = await postPoolDebit({ refType: 'TRANSACTION', refId: t.id, amount: Number(t.amount), memberId: t.contribution?.userId ?? null, description: 'Contribution reversed' })
     if (posted) debitsPosted++
+  }
+  // Directed goal payments credit the pool in real time; this backstops a
+  // best-effort post that failed at settlement.
+  for (const p of goalPayments) {
+    const posted = await postPoolCredit({ refType: 'GOAL_PAYMENT', refId: p.id, amount: Number(p.amount), memberId: p.userId, description: `Goal contribution: ${p.goal.title}` })
+    if (posted) creditsPosted++
   }
 
   return { creditsPosted, debitsPosted }
