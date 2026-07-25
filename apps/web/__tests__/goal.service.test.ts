@@ -19,6 +19,7 @@ vi.mock('@/lib/db', () => ({
       findMany: vi.fn(),
       count: vi.fn(),
       create: vi.fn(),
+      aggregate: vi.fn(),
     },
     contribution: { aggregate: vi.fn() },
     goalPayment: { aggregate: vi.fn() },
@@ -80,6 +81,7 @@ import {
   markExpiredGoalsFailed,
   setPrimaryGoal,
   syncPrimaryGoalProgress,
+  syncAdditionalGoalProgress,
   celebrateGoalAchieved,
 } from '@/services/goal.service'
 import { createInboxMessages } from '@/services/inbox.service'
@@ -556,5 +558,120 @@ describe('celebrateGoalAchieved', () => {
     )
     expect(createInboxMessages.mock.calls[0]![1].body).toContain('2026 Brotherhood Fund')
     expect(notified).toBe(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// syncAdditionalGoalProgress — the same derived, reversal-safe figure as the
+// primary fund, for every other goal.
+// ---------------------------------------------------------------------------
+
+describe('syncAdditionalGoalProgress', () => {
+  const agg = (amount: number | null) => ({ _sum: { amount } })
+  const ADDITIONAL = { ...ACTIVE_GOAL, isPrimary: false, currentAmount: 600, targetAmount: 5000 }
+
+  const mockProgressSum = (n: number | null) =>
+    (db.goalProgress.aggregate as MockedFunction<typeof db.goalProgress.aggregate>).mockResolvedValue(agg(n) as never)
+  const mockPaymentSum = (n: number | null) =>
+    (db.goalPayment.aggregate as MockedFunction<typeof db.goalPayment.aggregate>).mockResolvedValue(agg(n) as never)
+  const mockGoal = (goal: unknown) =>
+    (db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(goal as never)
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    ;(db.goal.update as MockedFunction<typeof db.goal.update>).mockResolvedValue({} as never)
+  })
+
+  it('derives the total from admin progress plus settled payments', async () => {
+    mockGoal(ADDITIONAL)
+    mockProgressSum(400)
+    mockPaymentSum(1100)
+
+    await syncAdditionalGoalProgress('goal-1')
+
+    expect(db.goalPayment.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { goalId: 'goal-1', status: 'SUCCESS' } }),
+    )
+    expect(db.goal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'goal-1' }, data: expect.objectContaining({ currentAmount: 1500 }) }),
+    )
+  })
+
+  it('comes back DOWN when a settled payment is reversed out of the sum', async () => {
+    // The whole point: the reversed payment has left the SUCCESS sum, so the
+    // goal total simply reflects the smaller figure. An increment could not.
+    mockGoal({ ...ADDITIONAL, currentAmount: 1500 })
+    mockProgressSum(400)
+    mockPaymentSum(600)
+
+    await syncAdditionalGoalProgress('goal-1')
+
+    expect(db.goal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ currentAmount: 1000 }) }),
+    )
+  })
+
+  it('marks the goal ACHIEVED once the derived total reaches target', async () => {
+    mockGoal({ ...ADDITIONAL, targetAmount: 1000 })
+    mockProgressSum(400)
+    mockPaymentSum(1100)
+
+    await syncAdditionalGoalProgress('goal-1')
+
+    expect(db.goal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ currentAmount: 1500, status: 'ACHIEVED' }) }),
+    )
+  })
+
+  it('leaves an ACHIEVED goal achieved when a reversal drops it below target', async () => {
+    // A milestone the group already celebrated is not taken back.
+    mockGoal({ ...ADDITIONAL, status: 'ACHIEVED', targetAmount: 1000, currentAmount: 1500 })
+    mockProgressSum(0)
+    mockPaymentSum(600)
+
+    await syncAdditionalGoalProgress('goal-1')
+
+    const call = (db.goal.update as MockedFunction<typeof db.goal.update>).mock.calls[0]![0] as { data: Record<string, unknown> }
+    expect(call.data.currentAmount).toBe(600)
+    expect(call.data).not.toHaveProperty('status')
+  })
+
+  it('does not write when the figure has not moved', async () => {
+    mockGoal({ ...ADDITIONAL, currentAmount: 1500 })
+    mockProgressSum(400)
+    mockPaymentSum(1100)
+
+    await syncAdditionalGoalProgress('goal-1')
+
+    expect(db.goal.update).not.toHaveBeenCalled()
+  })
+
+  it('treats empty sums as zero rather than NaN', async () => {
+    mockGoal({ ...ADDITIONAL, currentAmount: 600 })
+    mockProgressSum(null)
+    mockPaymentSum(null)
+
+    await syncAdditionalGoalProgress('goal-1')
+
+    expect(db.goal.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ currentAmount: 0 }) }),
+    )
+  })
+
+  it('refuses to touch the primary fund — that figure has its own sync', async () => {
+    mockGoal({ ...ADDITIONAL, isPrimary: true })
+
+    await syncAdditionalGoalProgress('goal-1')
+
+    expect(db.goalProgress.aggregate).not.toHaveBeenCalled()
+    expect(db.goal.update).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op for a goal that no longer exists', async () => {
+    mockGoal(null)
+
+    await syncAdditionalGoalProgress('gone')
+
+    expect(db.goal.update).not.toHaveBeenCalled()
   })
 })
