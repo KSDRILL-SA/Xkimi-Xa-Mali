@@ -1,3 +1,5 @@
+import { sumZAR } from '@/lib/money'
+
 // ─── Group settlement account ──────────────────────────────────────────────────
 // Where Netcash deposits the contributions it collects from members. This is the
 // group's own bank account, nominated on the Netcash merchant profile. Shown for
@@ -22,5 +24,5 @@ export const NETCASH_FEE_BUFFER = Math.max(0, Number(process.env.NEXT_PUBLIC_NET
  * instruction carries the extra buffer.
  */
 export function debitAmountWithFee(contributionAmount: number): number {
-  return Math.round((contributionAmount + NETCASH_FEE_BUFFER) * 100) / 100
+  return sumZAR(contributionAmount, NETCASH_FEE_BUFFER)
 }

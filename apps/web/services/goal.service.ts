@@ -6,6 +6,7 @@ import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/erro
 import { isAdmin, assertAdmin } from '@/lib/authorization'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
 import { cache, CACHE_KEYS } from '@/lib/cache'
+import { sumZAR, subtractZAR } from '@/lib/money'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ function serializeGoal(goal: GoalRow) {
     progressPct: Number(goal.targetAmount) > 0
       ? Math.min(100, Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100))
       : 0,
-    remaining: Math.max(0, Number(goal.targetAmount) - Number(goal.currentAmount)),
+    remaining: Math.max(0, subtractZAR(Number(goal.targetAmount), Number(goal.currentAmount))),
     deadline: goal.deadline.toISOString(),
     status: goal.status,
     isLocked: goal.lockedAt !== null,
@@ -341,7 +342,7 @@ export async function recordProgress(
     )
   }
 
-  const newTotal = Number(g.currentAmount) + input.amount
+  const newTotal = sumZAR(Number(g.currentAmount), input.amount)
 
   const progress = await runTransaction(async (tx) => {
     const record = await goalRepo.createProgress(
