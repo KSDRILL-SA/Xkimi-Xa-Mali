@@ -5,6 +5,7 @@ import { renderContributionReportPDF } from '@/lib/pdf/contribution-report'
 import type { ContributionReportData } from '@/lib/pdf/contribution-report'
 import type { TransactionFilter } from '@/lib/validation/report'
 import { MONTHS } from '@/lib/date'
+import { roundZAR, subtractZAR } from '@/lib/money'
 import { ReportNotFoundError } from '@/lib/errors'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
 import { transactionRepo } from '@/repositories/transaction.repository'
@@ -219,11 +220,11 @@ async function buildStatementData(
       createdAt: t.createdAt.toLocaleDateString('en-ZA'),
     })),
     summary: {
-      totalDue: periodContributions.reduce((s, c) => s + Number(c.amountDue), 0),
-      totalPaid: periodContributions.reduce((s, c) => s + Number(c.amountPaid), 0),
+      totalDue: periodContributions.reduce((s, c) => roundZAR(s + Number(c.amountDue)), 0),
+      totalPaid: periodContributions.reduce((s, c) => roundZAR(s + Number(c.amountPaid)), 0),
       outstanding: periodContributions
         .filter((c) => c.status !== 'PAID' && c.status !== 'WAIVED')
-        .reduce((s, c) => s + (Number(c.amountDue) - Number(c.amountPaid)), 0),
+        .reduce((s, c) => roundZAR(s + subtractZAR(Number(c.amountDue), Number(c.amountPaid))), 0),
     },
     generatedAt: new Date().toLocaleDateString('en-ZA', {
       day: 'numeric',
@@ -368,7 +369,7 @@ export async function getAdminReport(month: number, year: number) {
         amountPaid: contrib ? Number(contrib.amountPaid) : 0,
         status: contrib?.status ?? 'NO_RECORD',
         outstanding: contrib
-          ? Math.max(0, Number(contrib.amountDue) - Number(contrib.amountPaid))
+          ? Math.max(0, subtractZAR(Number(contrib.amountDue), Number(contrib.amountPaid)))
           : 0,
       }
     }),
