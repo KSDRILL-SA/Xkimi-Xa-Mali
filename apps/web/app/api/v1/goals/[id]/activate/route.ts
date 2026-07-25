@@ -17,6 +17,6 @@ export const POST = withApiHandler<{ id: string }>(async (
 
   const { id } = await params
   const ip = getClientIP(req) ?? 'unknown'
-  const goal = await activateGoal(id, session.user.id, ip)
+  const goal = await activateGoal(id, session.user.id, roles ?? [], ip)
   return apiSuccess(goal)
 })
