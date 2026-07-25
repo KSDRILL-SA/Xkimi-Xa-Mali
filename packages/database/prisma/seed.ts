@@ -121,6 +121,14 @@ async function main() {
       body: 'Xkimm Xa Mali Foundation: IMPORTANT — R{{amount}} will be deducted tonight at 20:00. A recent debit failed, so please make sure funds are available today to avoid another decline.',
     },
     {
+      // Early-payment nudge, a few days before a contribution falls due —
+      // encourages a badge-boosting payment before the automatic debit.
+      slug: 'contribution-due-reminder',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali Foundation: R{{amount}} is due on {{date}}. Pay early in the app to boost your badge points and protect your streak — or relax, we will debit it automatically.',
+    },
+    {
       slug: 'debit-tomorrow-warning',
       channel: 'SMS',
       subject: null,

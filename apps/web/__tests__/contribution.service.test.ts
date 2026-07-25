@@ -105,6 +105,7 @@ import {
   getContributions,
   getContributionSummary,
   createReversal,
+  selectDueSoonReminders,
 } from '@/services/contribution.service'
 import { ContributionNotFoundError, ForbiddenError, ContributionConflictError, TransactionNotFoundError } from '@/lib/errors'
 
@@ -562,5 +563,42 @@ describe('createReversal', () => {
     mockFn<typeof db.transaction.findUnique>(db.transaction.findUnique).mockResolvedValue({ ...SUCCESS_TXN, reversal: { id: 'rev-x' } } as never)
     await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], '127.0.0.1')).rejects.toThrow(ContributionConflictError)
     expect(db.transaction.create).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// selectDueSoonReminders — who to nudge for an early payment
+// ---------------------------------------------------------------------------
+
+describe('selectDueSoonReminders', () => {
+  const NOW = new Date('2026-08-01T00:00:00Z')
+  const inDays = (d: number) => new Date(NOW.getTime() + d * 24 * 60 * 60 * 1000)
+  const row = (over: Partial<{ status: string; dueDate: Date; user: { status: string } }> = {}) => ({
+    status: 'PENDING',
+    dueDate: inDays(2),
+    user: { status: 'ACTIVE' },
+    ...over,
+  })
+
+  it('includes unpaid contributions falling due within the lead window', () => {
+    const rows = [row({ status: 'PENDING', dueDate: inDays(2) }), row({ status: 'PARTIAL', dueDate: inDays(3) })]
+    expect(selectDueSoonReminders(rows, NOW, 3)).toHaveLength(2)
+  })
+
+  it('excludes already-settled contributions', () => {
+    const rows = [row({ status: 'PAID' }), row({ status: 'WAIVED' })]
+    expect(selectDueSoonReminders(rows, NOW, 3)).toEqual([])
+  })
+
+  it('excludes contributions due beyond the lead window', () => {
+    expect(selectDueSoonReminders([row({ dueDate: inDays(10) })], NOW, 3)).toEqual([])
+  })
+
+  it('excludes contributions already past due (overdue territory)', () => {
+    expect(selectDueSoonReminders([row({ dueDate: inDays(-1) })], NOW, 3)).toEqual([])
+  })
+
+  it('excludes non-active members', () => {
+    expect(selectDueSoonReminders([row({ user: { status: 'SUSPENDED' } })], NOW, 3)).toEqual([])
   })
 })
