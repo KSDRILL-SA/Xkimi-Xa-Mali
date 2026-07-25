@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { roundZAR, sumZAR, subtractZAR, percentZAR, splitZAR } from '@/lib/money'
+import { roundZAR, sumZAR, subtractZAR, percentZAR, splitZAR, splitByWeightsZAR } from '@/lib/money'
 
 describe('money helpers — deterministic 2-decimal rand arithmetic (B12)', () => {
   describe('roundZAR', () => {
@@ -100,6 +100,71 @@ describe('money helpers — deterministic 2-decimal rand arithmetic (B12)', () =
       expect(() => splitZAR(100, 0)).toThrow()
       expect(() => splitZAR(100, -3)).toThrow()
       expect(() => splitZAR(100, 2.5)).toThrow()
+    })
+  })
+
+  describe('splitByWeightsZAR — penny-perfect proportional split', () => {
+    it('matches splitZAR for equal weights', () => {
+      const shares = splitByWeightsZAR(100, [1, 1, 1])
+      expect(shares).toEqual([33.34, 33.33, 33.33])
+      expect(sumZAR(...shares)).toBe(100)
+    })
+
+    it('apportions by weight and sums back exactly', () => {
+      expect(splitByWeightsZAR(100, [50, 30, 20])).toEqual([50, 30, 20])
+      expect(splitByWeightsZAR(100, [1, 2, 1])).toEqual([25, 50, 25])
+      const s = splitByWeightsZAR(10, [1, 1, 1])
+      expect(s).toEqual([3.34, 3.33, 3.33])
+      expect(sumZAR(...s)).toBe(10)
+    })
+
+    it('gives a zero-weight recipient exactly R0', () => {
+      const shares = splitByWeightsZAR(100, [1, 0, 1])
+      expect(shares).toEqual([50, 0, 50])
+      expect(sumZAR(...shares)).toBe(100)
+    })
+
+    it('splits equally when every weight is zero (cents still conserved)', () => {
+      const shares = splitByWeightsZAR(90, [0, 0, 0])
+      expect(sumZAR(...shares)).toBe(90)
+      expect(shares).toEqual([30, 30, 30])
+    })
+
+    it('conserves the total for a negative amount (reversing a distribution)', () => {
+      expect(sumZAR(...splitByWeightsZAR(-100, [50, 30, 20]))).toBe(-100)
+      expect(sumZAR(...splitByWeightsZAR(-100, [1, 1, 1]))).toBe(-100)
+    })
+
+    it('holds the invariants across many amounts and weightings', () => {
+      const cases: Array<[number, number[]]> = [
+        [100, [1, 1, 1]],
+        [999.99, [3, 5, 7, 11]],
+        [1, [1, 1, 1]],
+        [1234.56, [10, 20, 30, 40]],
+        [0.05, [1, 1]],
+        [5000, [17, 3, 80]],
+        [250.25, [1, 0, 2, 0, 3]],
+      ]
+      for (const [amount, weights] of cases) {
+        const shares = splitByWeightsZAR(amount, weights)
+        expect(shares).toHaveLength(weights.length)
+        // Sums back exactly.
+        expect(sumZAR(...shares)).toBe(roundZAR(amount))
+        // Monotonic: a larger weight never gets a smaller share.
+        for (let i = 0; i < weights.length; i++) {
+          for (let j = 0; j < weights.length; j++) {
+            if (weights[i]! > weights[j]!) {
+              expect(shares[i]!).toBeGreaterThanOrEqual(shares[j]!)
+            }
+          }
+        }
+      }
+    })
+
+    it('rejects empty or invalid weights', () => {
+      expect(() => splitByWeightsZAR(100, [])).toThrow()
+      expect(() => splitByWeightsZAR(100, [1, -1])).toThrow()
+      expect(() => splitByWeightsZAR(100, [1, NaN])).toThrow()
     })
   })
 })
