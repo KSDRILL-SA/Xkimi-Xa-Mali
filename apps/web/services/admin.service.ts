@@ -9,6 +9,7 @@ import { emailProvider } from '@/integrations/email'
 import { generateMonthlyContributions } from './contribution.service'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { tallyBy } from '@/lib/aggregate'
+import { subtractZAR } from '@/lib/money'
 import { bumpRoleVersion } from '@/lib/role-version'
 import { userRepo } from '@/repositories/user.repository'
 import { mandateRepo } from '@/repositories/mandate.repository'
@@ -551,7 +552,7 @@ export async function getDashboardStats(adminRoles: string[]) {
       thisMonthTotal: contributionSummary._count?.id ?? 0,
       thisMonthDue,
       thisMonthPaid,
-      thisMonthOutstanding: thisMonthDue - thisMonthPaid,
+      thisMonthOutstanding: subtractZAR(thisMonthDue, thisMonthPaid),
       collectionRate:
         thisMonthDue > 0 ? Math.round((thisMonthPaid / thisMonthDue) * 100) : 0,
       newThisMonth: newContributionsThisMonth,

@@ -23,6 +23,7 @@ import {
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
+import { subtractZAR } from '@/lib/money'
 import type { ManualContributionInput, GenerateContributionsInput } from '@/lib/validation/contribution'
 
 const MAX_OPTIMISTIC_RETRIES = 3
@@ -207,7 +208,7 @@ export async function submitManualPayment(
     throw new ContributionConflictError('This period is already fully paid', 'CTR_003')
   }
 
-  const remaining = Number(contribution.amountDue) - Number(contribution.amountPaid)
+  const remaining = subtractZAR(Number(contribution.amountDue), Number(contribution.amountPaid))
   if (data.amount > remaining + 0.01) {
     throw new ContributionConflictError(
       `Amount exceeds remaining balance of R${remaining.toFixed(2)}`,
