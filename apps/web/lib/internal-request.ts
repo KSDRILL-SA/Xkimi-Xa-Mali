@@ -1,7 +1,18 @@
+import { timingSafeEqual } from 'crypto'
 import type { NextRequest } from 'next/server'
 import { env } from '@/lib/env'
 
 const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000
+
+/** Constant-time secret comparison — avoids leaking the secret via timing. */
+function secretsMatch(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided)
+  const b = Buffer.from(expected)
+  // timingSafeEqual throws on length mismatch; the length check is unavoidable
+  // and only reveals length, not content.
+  if (a.length !== b.length) return false
+  return timingSafeEqual(a, b)
+}
 
 /**
  * Validates a trusted server-to-server request from the admin app.
@@ -16,7 +27,8 @@ const MAX_TIMESTAMP_DRIFT_MS = 5 * 60 * 1000
  */
 export function isValidInternalRequest(req: NextRequest): boolean {
   if (!env.ADMIN_API_SECRET) return false
-  if (req.headers.get('x-admin-secret') !== env.ADMIN_API_SECRET) return false
+  const provided = req.headers.get('x-admin-secret')
+  if (!provided || !secretsMatch(provided, env.ADMIN_API_SECRET)) return false
 
   const ts = req.headers.get('x-admin-timestamp')
   if (!ts) return false
