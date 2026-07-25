@@ -37,6 +37,7 @@ vi.mock('@/lib/db', () => {
     },
     transaction: {
       findFirst: vi.fn(),
+      findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       aggregate: vi.fn(),
@@ -70,6 +71,11 @@ vi.mock('@/services/audit.service', () => ({
   writeAuditLog: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/services/ledger.service', () => ({
+  postPoolCredit: vi.fn().mockResolvedValue(true),
+  postPoolDebit: vi.fn().mockResolvedValue(true),
+}))
+
 vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
@@ -91,14 +97,18 @@ vi.mock('@/lib/inngest', async () => {
 
 import { db } from '@/lib/db'
 import { paymentGateway } from '@/integrations/payment'
+import { postPoolDebit } from '@/services/ledger.service'
 import {
   recalculateContributionStatus,
   processTransactionWebhook,
   generateMonthlyContributions,
   getContributions,
   getContributionSummary,
+  createReversal,
 } from '@/services/contribution.service'
-import { ContributionNotFoundError, ForbiddenError } from '@/lib/errors'
+import { ContributionNotFoundError, ForbiddenError, ContributionConflictError, TransactionNotFoundError } from '@/lib/errors'
+
+const mockFn = <T extends (...a: never[]) => unknown>(fn: unknown) => fn as MockedFunction<T>
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -194,6 +204,24 @@ describe('recalculateContributionStatus', () => {
 
     expect(db.contribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'PENDING' }) }),
+    )
+  })
+
+  it('excludes REVERSAL rows from the paid-amount sum so a reversal reduces, never adds', async () => {
+    ;(db.contribution.findUnique as MockedFunction<typeof db.contribution.findUnique>)
+      .mockResolvedValue({ ...baseContribution, amountDue: 500, dueDate: PAST } as never)
+    ;(db.transaction.aggregate as MockedFunction<typeof db.transaction.aggregate>)
+      .mockResolvedValue({ _sum: { amount: 0 } } as never)
+    mockRecalculateUpdate()
+
+    await recalculateContributionStatus('ctr-1')
+
+    // The sum must be over SUCCESS *inflows* only — a REVERSAL is stored as
+    // SUCCESS but represents money out, so it must be filtered from the total.
+    expect(db.transaction.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'SUCCESS', type: { not: 'REVERSAL' } }),
+      }),
     )
   })
 
@@ -464,5 +492,75 @@ describe('getContributionSummary', () => {
 
     // Must NOT call findMany — that would be the old JS-aggregation N+1 pattern
     expect(db.contribution.findMany).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// createReversal — money is actually backed out (contribution + pool ledger)
+// ---------------------------------------------------------------------------
+
+describe('createReversal', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  const SUCCESS_TXN = {
+    id: 'txn-1',
+    status: 'SUCCESS',
+    amount: 500,
+    contributionId: 'ctr-1',
+    mandateId: 'm1',
+    reversal: null,
+    contribution: { userId: 'user-1' },
+  }
+
+  function armReversal() {
+    mockFn<typeof db.transaction.findUnique>(db.transaction.findUnique).mockResolvedValue(SUCCESS_TXN as never)
+    mockFn<typeof db.transaction.create>(db.transaction.create).mockResolvedValue({ id: 'rev-1', amount: 500, recordedAt: NOW } as never)
+    mockFn<typeof db.transaction.update>(db.transaction.update).mockResolvedValue({} as never)
+    // recalculateContributionStatus internals
+    mockFn<typeof db.contribution.findUnique>(db.contribution.findUnique).mockResolvedValue({ ...baseContribution, amountDue: 500, dueDate: PAST } as never)
+    mockFn<typeof db.transaction.aggregate>(db.transaction.aggregate).mockResolvedValue({ _sum: { amount: 0 } } as never)
+    mockRecalculateUpdate()
+  }
+
+  it('rejects a non-admin caller before reading anything', async () => {
+    await expect(createReversal('txn-1', 'member-1', ['MEMBER'], '127.0.0.1')).rejects.toThrow(ForbiddenError)
+    expect(db.transaction.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('creates a REVERSAL, flips the original to REVERSED, and debits the pool ledger', async () => {
+    armReversal()
+
+    await createReversal('txn-1', 'admin-1', ['ADMIN'], '127.0.0.1')
+
+    // A dedicated REVERSAL row linked to the original.
+    expect(db.transaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ type: 'REVERSAL', reversalOfId: 'txn-1' }),
+      }),
+    )
+    // Original flipped to REVERSED so it drops out of the paid-amount sum.
+    expect(db.transaction.update).toHaveBeenCalledWith({ where: { id: 'txn-1' }, data: { status: 'REVERSED' } })
+    // Pool ledger debited immediately for the reversed money, keyed on the original id.
+    expect(mockFn(postPoolDebit)).toHaveBeenCalledWith(
+      expect.objectContaining({ refType: 'TRANSACTION', refId: 'txn-1', amount: 500, memberId: 'user-1' }),
+    )
+  })
+
+  it('throws when the transaction does not exist', async () => {
+    mockFn<typeof db.transaction.findUnique>(db.transaction.findUnique).mockResolvedValue(null)
+    await expect(createReversal('missing', 'admin-1', ['ADMIN'], '127.0.0.1')).rejects.toThrow(TransactionNotFoundError)
+    expect(db.transaction.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to reverse a transaction that is not SUCCESS', async () => {
+    mockFn<typeof db.transaction.findUnique>(db.transaction.findUnique).mockResolvedValue({ ...SUCCESS_TXN, status: 'PENDING' } as never)
+    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], '127.0.0.1')).rejects.toThrow(ContributionConflictError)
+    expect(db.transaction.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to double-reverse a transaction that already has a reversal', async () => {
+    mockFn<typeof db.transaction.findUnique>(db.transaction.findUnique).mockResolvedValue({ ...SUCCESS_TXN, reversal: { id: 'rev-x' } } as never)
+    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], '127.0.0.1')).rejects.toThrow(ContributionConflictError)
+    expect(db.transaction.create).not.toHaveBeenCalled()
   })
 })
