@@ -103,6 +103,33 @@ export const goalRepo = {
   ) {
     return tx.goal.updateMany({ where, data })
   },
+
+  /** Atomically add to a goal's currentAmount; returns the updated goal. */
+  incrementAmount(id: string, amount: number) {
+    return db.goal.update({ where: { id }, data: { currentAmount: { increment: amount } } })
+  },
+
+  // ─── GoalPayment methods ────────────────────────────────────────────────
+
+  /** Record a directed goal payment. */
+  createPayment(data: Prisma.GoalPaymentUncheckedCreateInput) {
+    return db.goalPayment.create({ data })
+  },
+
+  /** Sum of settled (SUCCESS) directed payments toward a goal. */
+  sumSuccessfulPayments(goalId: string) {
+    return db.goalPayment.aggregate({ where: { goalId, status: 'SUCCESS' }, _sum: { amount: true } })
+  },
+
+  /** Find a directed payment by the gateway's reference (webhook settlement). */
+  findPaymentByGatewayRef(gatewayRef: string) {
+    return db.goalPayment.findFirst({ where: { gatewayRef } })
+  },
+
+  /** Update a directed payment's settlement state. */
+  updatePayment(id: string, data: Prisma.GoalPaymentUncheckedUpdateInput) {
+    return db.goalPayment.update({ where: { id }, data })
+  },
 }
 
 // ─── Thin db.$transaction wrapper ───────────────────────────────────────────

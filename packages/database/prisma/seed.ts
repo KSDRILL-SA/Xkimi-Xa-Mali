@@ -129,6 +129,13 @@ async function main() {
       body: 'Xkimm Xa Mali Foundation: R{{amount}} is due on {{date}}. Pay early in the app to boost your badge points and protect your streak — or relax, we will debit it automatically.',
     },
     {
+      // Thanks a member for a directed extra payment toward a goal.
+      slug: 'goal-payment-thanks',
+      channel: 'SMS',
+      subject: null,
+      body: 'Xkimm Xa Mali Foundation: Thank you! Your R{{amount}} toward "{{goal}}" has been received — your badge points just got a boost.',
+    },
+    {
       slug: 'debit-tomorrow-warning',
       channel: 'SMS',
       subject: null,
