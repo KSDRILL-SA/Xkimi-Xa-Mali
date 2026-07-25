@@ -21,6 +21,7 @@ vi.mock('@/lib/db', () => ({
       create: vi.fn(),
     },
     contribution: { aggregate: vi.fn() },
+    goalPayment: { aggregate: vi.fn() },
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -454,7 +455,11 @@ describe('setPrimaryGoal', () => {
 // ---------------------------------------------------------------------------
 
 describe('syncPrimaryGoalProgress', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // No directed extra payments by default — the derived total is just contributions.
+    ;(db.goalPayment.aggregate as MockedFunction<typeof db.goalPayment.aggregate>).mockResolvedValue({ _sum: { amount: 0 } } as never)
+  })
 
   const PRIMARY = { ...ACTIVE_GOAL, isPrimary: true, currentAmount: 5000, targetAmount: 120000, deadline: new Date('2026-12-31') }
 

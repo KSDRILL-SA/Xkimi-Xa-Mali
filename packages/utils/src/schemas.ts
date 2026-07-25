@@ -227,9 +227,24 @@ export const RecordProgressSchema = z.object({
   note: z.string().max(200).optional(),
 })
 
+/**
+ * The smallest directed extra payment worth collecting through the gateway —
+ * anything less costs more in fees than it adds to the fund. Shared so the
+ * schema and the service enforce the same floor.
+ */
+export const MIN_GOAL_PAYMENT = 10
+
+export const GoalPaymentSchema = z.object({
+  amount: z
+    .number({ required_error: 'Amount is required' })
+    .min(MIN_GOAL_PAYMENT, `The minimum payment toward a goal is R${MIN_GOAL_PAYMENT}`)
+    .max(50_000, 'Maximum payment is R50,000'),
+})
+
 export type CreateGoalInput      = z.infer<typeof CreateGoalSchema>
 export type UpdateGoalInput      = z.infer<typeof UpdateGoalSchema>
 export type RecordProgressInput  = z.infer<typeof RecordProgressSchema>
+export type GoalPaymentInput     = z.infer<typeof GoalPaymentSchema>
 
 // ── Report / statement schemas ─────────────────────────────────────────────────
 
