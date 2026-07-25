@@ -1,5 +1,6 @@
 import { db } from '@/lib/db'
 import { isUniqueViolation } from '@/lib/errors'
+import { SUCCESSFUL_INFLOW } from '@/repositories/transaction.repository'
 
 type Direction = 'CREDIT' | 'DEBIT'
 
@@ -101,7 +102,7 @@ export async function getLedger(opts: { page?: number; limit?: number } = {}) {
  */
 export async function reconcileLedger(): Promise<{ creditsPosted: number; debitsPosted: number }> {
   const [successTx, reversedTx] = await Promise.all([
-    db.transaction.findMany({ where: { status: 'SUCCESS' }, select: { id: true, amount: true, contribution: { select: { userId: true } } } }),
+    db.transaction.findMany({ where: SUCCESSFUL_INFLOW, select: { id: true, amount: true, contribution: { select: { userId: true } } } }),
     db.transaction.findMany({ where: { status: 'REVERSED' }, select: { id: true, amount: true, contribution: { select: { userId: true } } } }),
   ])
 

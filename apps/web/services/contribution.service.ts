@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import type { ContributionStatus, TransactionStatus } from '@prisma/client'
 import { db } from '@/lib/db'
 import { contributionRepo, runTransaction, type TxClient } from '@/repositories/contribution.repository'
-import { transactionRepo } from '@/repositories/transaction.repository'
+import { transactionRepo, SUCCESSFUL_INFLOW } from '@/repositories/transaction.repository'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { budgetRepo } from '@/repositories/budget.repository'
 import { writeAuditLog } from './audit.service'
@@ -337,7 +337,7 @@ export async function recalculateContributionStatus(
   for (let attempt = 1; attempt <= MAX_OPTIMISTIC_RETRIES; attempt++) {
     const [contribution, aggr] = await Promise.all([
       contributionRepo.findUniqueWithVersion(contributionId, tx),
-      transactionRepo.aggregate({ contributionId, status: 'SUCCESS' }, tx),
+      transactionRepo.aggregate({ contributionId, ...SUCCESSFUL_INFLOW }, tx),
     ])
 
     if (!contribution) return
@@ -481,7 +481,10 @@ export async function createReversal(
 
   const original = await transactionRepo.findById(transactionId, {
     reversal: true,
-  }) as Prisma.TransactionGetPayload<{ include: { reversal: true } }> | null
+    contribution: { select: { userId: true } },
+  }) as Prisma.TransactionGetPayload<{
+    include: { reversal: true; contribution: { select: { userId: true } } }
+  }> | null
 
   if (!original) throw new TransactionNotFoundError()
   if (original.status !== 'SUCCESS') {
@@ -514,6 +517,17 @@ export async function createReversal(
 
     return rev
   })
+
+  // Back the reversed money out of the immutable pool ledger immediately, rather
+  // than waiting for the nightly reconciler. Idempotent (unique refType+refId+
+  // direction) and best-effort — mirrors the webhook REVERSED path and keys on
+  // the original transaction id so the two never double-post.
+  await postPoolDebit({
+    refType: 'TRANSACTION', refId: original.id, amount: Number(original.amount),
+    memberId: original.contribution?.userId ?? null, description: 'Contribution reversed',
+  }).catch((err) => logger.error('Ledger debit post failed on reversal', {
+    transactionId: original.id, error: err instanceof Error ? err.message : String(err),
+  }))
 
   await cache.del(CACHE_KEYS.DASHBOARD_STATS)
 
