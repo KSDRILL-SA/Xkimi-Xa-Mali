@@ -110,7 +110,9 @@ async function main() {
       slug: 'debit-morning-warning',
       channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali Foundation: Tonight at 20:00 we will deduct R{{amount}} for your monthly contribution.',
+      // The sign-off is the brotherhood's own call — it lands harder than any
+      // reminder we could write, and it is the reason members read to the end.
+      body: "Xkimm Xa Mali Foundation: Tonight at 20:00 we will deduct R{{amount}} for your monthly contribution. Humesa Mali N'wa Mfenhe!",
     },
     {
       // Stronger, targeted variant sent to members with a recent failed debit —
@@ -118,7 +120,10 @@ async function main() {
       slug: 'debit-morning-warning-urgent',
       channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali Foundation: IMPORTANT — R{{amount}} will be deducted tonight at 20:00. A recent debit failed, so please make sure funds are available today to avoid another decline.',
+      // Plain hyphen, not an em dash: any character outside the GSM-7 alphabet
+      // forces the whole message into UCS-2, which cuts a segment from 160
+      // characters to 70. That one dash was costing three segments per send.
+      body: "Xkimm Xa Mali Foundation: IMPORTANT - R{{amount}} will be deducted tonight at 20:00. A recent debit failed, so please make sure funds are available today to avoid another decline. Humesa Mali N'wa Mfenhe!",
     },
     {
       // Early-payment nudge, a few days before a contribution falls due —
