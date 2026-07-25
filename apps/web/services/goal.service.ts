@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client'
+import { db } from '@/lib/db'
 import { goalRepo, runTransaction } from '@/repositories/goal.repository'
 import { env } from '@/lib/env'
 import { writeAuditLog } from './audit.service'
@@ -6,7 +7,7 @@ import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/erro
 import { isAdmin, assertAdmin } from '@/lib/authorization'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
 import { cache, CACHE_KEYS } from '@/lib/cache'
-import { sumZAR, subtractZAR } from '@/lib/money'
+import { roundZAR, sumZAR, subtractZAR } from '@/lib/money'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,36 @@ export async function getPrimaryGoal() {
   const goals = await goalRepo.findMany({ isPrimary: true }, { take: 1 })
   const goal = goals[0]
   return goal ? serializeGoal(goal as GoalRow) : null
+}
+
+/**
+ * Keep the primary fund's progress in step with real contributions. Its
+ * currentAmount is DERIVED — the sum of every contribution paid in the fund's
+ * year — so it is always accurate and inherently reversal-safe (a reversal
+ * lowers the sum, and the next sync reflects it). Best-effort and idempotent:
+ * only writes when the figure actually moved, and marks the fund ACHIEVED when
+ * it reaches target. A no-op when no primary goal is designated.
+ */
+export async function syncPrimaryGoalProgress(): Promise<void> {
+  const [primary] = await goalRepo.findMany({ isPrimary: true }, { take: 1 })
+  if (!primary) return
+  const g = primary as GoalRow
+
+  const year = g.deadline.getFullYear()
+  const agg = await db.contribution.aggregate({
+    where: { periodYear: year },
+    _sum: { amountPaid: true },
+  })
+  const pooled = roundZAR(Number(agg._sum.amountPaid ?? 0))
+
+  if (roundZAR(Number(g.currentAmount)) === pooled) return
+
+  const reachedTarget = pooled >= Number(g.targetAmount) && g.status === 'ACTIVE'
+  await goalRepo.update(g.id, {
+    currentAmount: pooled,
+    ...(reachedTarget && { status: 'ACHIEVED' }),
+  })
+  await evictGoalsCache()
 }
 
 // ─── Admin mutations ──────────────────────────────────────────────────────────
@@ -383,6 +414,12 @@ export async function recordProgress(
     throw new GoalConflictError(
       'Progress can only be recorded on ACTIVE goals',
       'GOL_009',
+    )
+  }
+  if (g.isPrimary) {
+    throw new GoalConflictError(
+      'The primary fund fills automatically from contributions and cannot be adjusted manually',
+      'GOL_011',
     )
   }
 

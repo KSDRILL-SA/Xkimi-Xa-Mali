@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { recalculateContributionStatus } from '@/services/contribution.service'
 import { reconcileLedger } from '@/services/ledger.service'
+import { syncPrimaryGoalProgress } from '@/services/goal.service'
 import { SUCCESSFUL_INFLOW } from '@/repositories/transaction.repository'
 import { writeAuditLog } from '@/services/audit.service'
 
@@ -65,6 +66,9 @@ export const ledgerReconciliation = inngest.createFunction(
 
     // Backfill any missing immutable-ledger entries from settled transactions.
     const ledger = await step.run('reconcile-ledger', () => reconcileLedger())
+
+    // Re-derive the primary fund's progress from the (now-reconciled) contributions.
+    await step.run('sync-primary-goal', () => syncPrimaryGoalProgress())
 
     return {
       checked: drifted.length + corrected,
