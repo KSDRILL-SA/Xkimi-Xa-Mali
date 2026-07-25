@@ -351,6 +351,44 @@ export async function processMandateWebhook(event: WebhookEvent) {
   })
 }
 
+// ─── Debit warning planning ──────────────────────────────────────────────────
+
+export type DebitWarningTarget = {
+  mandateId: string
+  userId: string
+  amount: number
+  atRisk: boolean
+}
+
+/**
+ * Decide which of today's active mandates should get a pre-debit warning.
+ *
+ * A member whose contribution for the period is already settled (paid manually
+ * or waived) is skipped — the debit run will not touch them, so a "R{amount}
+ * will be debited today" SMS would be wrong and just noise. A member with a
+ * recent failed debit is flagged `atRisk` so the caller can prioritise them (the
+ * ones most likely to fail again and most in need of the heads-up). Pure and
+ * side-effect free for straightforward testing.
+ */
+export function planDebitWarnings(
+  mandates: ReadonlyArray<{ id: string; userId: string; amount: number; userStatus: string }>,
+  settledUserIds: ReadonlySet<string>,
+  atRiskUserIds: ReadonlySet<string>,
+): DebitWarningTarget[] {
+  const targets: DebitWarningTarget[] = []
+  for (const m of mandates) {
+    if (m.userStatus !== 'ACTIVE') continue
+    if (settledUserIds.has(m.userId)) continue
+    targets.push({
+      mandateId: m.id,
+      userId: m.userId,
+      amount: m.amount,
+      atRisk: atRiskUserIds.has(m.userId),
+    })
+  }
+  return targets
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function maskBankAccount(encrypted: string): string {
