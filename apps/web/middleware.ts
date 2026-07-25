@@ -19,6 +19,19 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 const REDIS_CONFIGURED = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
 
+// Constant-time string comparison for the shared admin secret. node:crypto's
+// timingSafeEqual is unavailable in the Edge runtime, so compare manually — a
+// plain === leaks the secret through response timing. Length is compared first
+// (only reveals length); equal-length inputs are compared in constant time.
+function constantTimeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let mismatch = 0
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  }
+  return mismatch === 0
+}
+
 let _redis: Redis | null = null
 function getRedis(): Redis {
   if (!_redis) {
@@ -100,7 +113,8 @@ export default auth(async (req) => {
   // Trusted internal calls from admin app — bypass session and CSRF checks
   if (pathname.startsWith('/api/v1/admin')) {
     const expectedSecret = process.env.ADMIN_API_SECRET
-    if (expectedSecret && req.headers.get('x-admin-secret') === expectedSecret) {
+    const providedSecret = req.headers.get('x-admin-secret')
+    if (expectedSecret && providedSecret && constantTimeEqual(providedSecret, expectedSecret)) {
       const response = NextResponse.next()
       response.headers.set('x-trace-id', traceId)
       return response
