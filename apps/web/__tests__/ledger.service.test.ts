@@ -106,4 +106,17 @@ describe('reconcileLedger — self-heals the ledger from settled transactions', 
     expect(res).toEqual({ creditsPosted: 2, debitsPosted: 0 })
     expect(db.ledgerEntry.create).toHaveBeenCalledTimes(3)
   })
+
+  it('credits only genuine inflows — REVERSAL rows (stored as SUCCESS) are excluded', async () => {
+    mock(db.transaction.findMany)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([] as never)
+
+    await reconcileLedger()
+
+    // The credit query must filter out REVERSAL rows, otherwise a reversal would
+    // be re-credited to the pool and cancel the debit of the original.
+    const creditWhere = mock(db.transaction.findMany).mock.calls[0]![0] as { where: Record<string, unknown> }
+    expect(creditWhere.where).toMatchObject({ status: 'SUCCESS', type: { not: 'REVERSAL' } })
+  })
 })

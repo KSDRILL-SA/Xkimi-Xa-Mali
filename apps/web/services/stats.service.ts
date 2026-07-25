@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { SUCCESSFUL_INFLOW } from '@/repositories/transaction.repository'
 
 export type PublicStats = {
   members: number
@@ -15,7 +16,7 @@ export async function getPublicStats(): Promise<PublicStats> {
   const [memberCount, txAggregate, firstContribution] = await Promise.all([
     db.user.count({ where: { status: 'ACTIVE' } }),
     db.transaction.aggregate({
-      where: { status: 'SUCCESS' },
+      where: SUCCESSFUL_INFLOW,
       _sum: { amount: true },
     }),
     db.contribution.findFirst({
