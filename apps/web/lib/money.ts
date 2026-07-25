@@ -41,8 +41,8 @@ export function subtractZAR(a: number, b: number): number {
  *
  * For a single derived charge this is all you need. If you are apportioning a
  * whole amount across several shares that must still sum back to the original
- * (e.g. splitting a payout), use splitZAR (equal) — a weighted variant can be
- * added alongside it when proportional payouts arrive — so no cent is lost.
+ * (e.g. splitting a payout), use splitZAR (equal shares) or splitByWeightsZAR
+ * (proportional shares) so no cent is lost or invented.
  */
 export function percentZAR(amount: number, percent: number): number {
   return roundZAR((amount * percent) / 100)
@@ -80,4 +80,57 @@ export function splitZAR(amount: number, parts: number): number[] {
     shares.push(cents / 100)
   }
   return shares
+}
+
+/**
+ * Apportion a rand amount across recipients by weight, without losing or
+ * inventing a cent — the proportional generalisation of splitZAR (equal weights
+ * give the same result). This is the building block for a payout / dividend
+ * split: weight each member by their contribution share and the pot is divided
+ * exactly, to the cent.
+ *
+ * Largest-remainder (Hamilton) allocation: each recipient first gets the floor
+ * of its exact proportional cents; the leftover cents are then handed out one at
+ * a time to the recipients with the largest fractional remainders (ties broken
+ * by position, so the result is deterministic). Guarantees:
+ *   • the returned shares sum back to `amount` exactly,
+ *   • a larger weight never receives a smaller share, and
+ *   • a zero weight receives R0.00.
+ * Works for negative amounts (e.g. reversing a distribution).
+ *
+ * splitByWeightsZAR(100, [1, 1, 1])   -> [33.34, 33.33, 33.33]  (sum 100.00)
+ * splitByWeightsZAR(100, [50, 30, 20]) -> [50, 30, 20]
+ * splitByWeightsZAR(100, [1, 0, 1])    -> [50, 0, 50]
+ *
+ * If every weight is zero there is no basis to apportion by, so the amount is
+ * split equally rather than dropped — cents are always conserved.
+ */
+export function splitByWeightsZAR(amount: number, weights: number[]): number[] {
+  if (weights.length === 0) {
+    throw new Error('splitByWeightsZAR: weights must not be empty')
+  }
+  if (weights.some((w) => !Number.isFinite(w) || w < 0)) {
+    throw new Error('splitByWeightsZAR: weights must be non-negative finite numbers')
+  }
+
+  const totalWeight = weights.reduce((sum, w) => sum + w, 0)
+  if (totalWeight === 0) return splitZAR(amount, weights.length)
+
+  const totalCents = Math.round(amount * 100)
+  const exact = weights.map((w) => (totalCents * w) / totalWeight)
+  const cents = exact.map((c) => Math.floor(c))
+  let leftover = totalCents - cents.reduce((sum, c) => sum + c, 0)
+
+  // Rank by fractional remainder (desc), ties broken by original position, and
+  // give the leftover cents to the top `leftover` recipients.
+  const ranked = exact
+    .map((c, i) => ({ i, frac: c - Math.floor(c) }))
+    .sort((a, b) => b.frac - a.frac || a.i - b.i)
+
+  for (let k = 0; k < ranked.length && leftover > 0; k++) {
+    cents[ranked[k]!.i]! += 1
+    leftover--
+  }
+
+  return cents.map((c) => c / 100)
 }
