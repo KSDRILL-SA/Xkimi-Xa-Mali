@@ -23,7 +23,10 @@ vi.mock('@/lib/group-account', () => ({ debitAmountWithFee: (n: number) => n + 1
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/services/ledger.service', () => ({ postPoolCredit: vi.fn().mockResolvedValue(true) }))
 vi.mock('@/services/notification.service', () => ({ queueNotification: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/services/goal.service', () => ({ syncPrimaryGoalProgress: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/services/goal.service', () => ({
+  syncPrimaryGoalProgress: vi.fn().mockResolvedValue(undefined),
+  emitGoalAchieved: vi.fn().mockResolvedValue(undefined),
+}))
 vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
 
 import { goalRepo } from '@/repositories/goal.repository'

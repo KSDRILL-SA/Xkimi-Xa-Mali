@@ -23,6 +23,7 @@ type XXMEvents = {
   'xxm/contribution.status.changed': {
     data: { userId: string; contributionId: string; status: string }
   }
+  'xxm/goal.achieved': { data: { goalId: string; title: string } }
 }
 
 export const inngest = new Inngest({
@@ -44,4 +45,5 @@ export const InngestEvents = {
   MANDATE_STATUS_SYNC: 'xxm/mandate.status-sync',
   INVITE_EXPIRY: 'xxm/invite.expiry',
   CONTRIBUTION_STATUS_CHANGED: 'xxm/contribution.status.changed',
+  GOAL_ACHIEVED: 'xxm/goal.achieved',
 } as const

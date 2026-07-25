@@ -22,6 +22,7 @@ vi.mock('@/lib/db', () => ({
     },
     contribution: { aggregate: vi.fn() },
     goalPayment: { aggregate: vi.fn() },
+    user: { findMany: vi.fn() },
     auditLog: { create: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -49,6 +50,19 @@ vi.mock('@/services/audit.service', () => ({
   writeAuditLog: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/inngest', () => ({
+  inngest: { send: vi.fn().mockResolvedValue(undefined) },
+  InngestEvents: { GOAL_ACHIEVED: 'xxm/goal.achieved' },
+}))
+
+vi.mock('@/services/inbox.service', () => ({
+  createInboxMessages: vi.fn().mockResolvedValue(0),
+}))
+
+vi.mock('@/lib/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}))
+
 // ---------------------------------------------------------------------------
 // Imports after mocks
 // ---------------------------------------------------------------------------
@@ -66,7 +80,9 @@ import {
   markExpiredGoalsFailed,
   setPrimaryGoal,
   syncPrimaryGoalProgress,
+  celebrateGoalAchieved,
 } from '@/services/goal.service'
+import { createInboxMessages } from '@/services/inbox.service'
 
 const GoalForbiddenError = ForbiddenError
 const mockWriteAuditLog = writeAuditLog as ReturnType<typeof vi.fn>
@@ -517,5 +533,28 @@ describe('recordProgress on the primary fund', () => {
 
     await expect(recordProgress('goal-1', { amount: 500 }, 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
     expect(db.$transaction).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// celebrateGoalAchieved
+// ---------------------------------------------------------------------------
+
+describe('celebrateGoalAchieved', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('writes a celebration into every active member’s inbox', async () => {
+    ;(db.user.findMany as MockedFunction<typeof db.user.findMany>).mockResolvedValue([{ id: 'u1' }, { id: 'u2' }] as never)
+    ;(createInboxMessages as MockedFunction<typeof createInboxMessages>).mockResolvedValue(2 as never)
+
+    const notified = await celebrateGoalAchieved('2026 Brotherhood Fund')
+
+    expect(db.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { status: 'ACTIVE' } }))
+    expect(createInboxMessages).toHaveBeenCalledWith(
+      ['u1', 'u2'],
+      expect.objectContaining({ category: 'GOAL' }),
+    )
+    expect(createInboxMessages.mock.calls[0]![1].body).toContain('2026 Brotherhood Fund')
+    expect(notified).toBe(2)
   })
 })
