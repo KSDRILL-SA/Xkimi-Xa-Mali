@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import { Megaphone, Info, Wallet, Target, Trash2, CheckCheck, Inbox as InboxIcon, Loader2 } from 'lucide-react'
 
@@ -37,31 +38,48 @@ function relative(iso: string): string {
 }
 
 export function InboxList({ initial }: Props) {
+  const router = useRouter()
   const [items, setItems] = useState<InboxItem[]>(initial.items)
   const [unread, setUnread] = useState(initial.unreadCount)
   const [cursor, setCursor] = useState<string | null>(initial.nextCursor)
   const [loadingMore, setLoadingMore] = useState(false)
 
+  // The header bell's badge is rendered by the server layout, so anything that
+  // changes the unread count here has to ask for a re-render — otherwise the
+  // badge keeps claiming unread messages the member has just dealt with.
   async function markRead(item: InboxItem) {
     if (item.read) return
     setItems((prev) => prev.map((m) => (m.id === item.id ? { ...m, read: true } : m)))
     setUnread((u) => Math.max(0, u - 1))
-    try { await api.patch(`/api/v1/inbox/${item.id}`) } catch { /* best-effort */ }
+    try {
+      await api.patch(`/api/v1/inbox/${item.id}`)
+      router.refresh()
+    } catch { /* best-effort */ }
   }
 
   async function markAll() {
     if (unread === 0) return
     setItems((prev) => prev.map((m) => ({ ...m, read: true })))
     setUnread(0)
-    try { await api.post('/api/v1/inbox/read-all') } catch { /* best-effort */ }
+    try {
+      await api.post('/api/v1/inbox/read-all')
+      router.refresh()
+    } catch { /* best-effort */ }
   }
 
   async function remove(item: InboxItem, e: React.MouseEvent) {
     e.stopPropagation()
     const prev = items
+    const wasUnread = !item.read
     setItems((c) => c.filter((x) => x.id !== item.id))
-    if (!item.read) setUnread((u) => Math.max(0, u - 1))
-    try { await api.delete(`/api/v1/inbox/${item.id}`) } catch { setItems(prev) }
+    if (wasUnread) setUnread((u) => Math.max(0, u - 1))
+    try {
+      await api.delete(`/api/v1/inbox/${item.id}`)
+      if (wasUnread) router.refresh()
+    } catch {
+      setItems(prev)
+      if (wasUnread) setUnread((u) => u + 1)
+    }
   }
 
   async function loadMore() {
