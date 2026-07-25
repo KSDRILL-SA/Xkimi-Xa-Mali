@@ -44,7 +44,7 @@ export const PATCH = withApiHandler<{ id: string }>(async (
 
   const { id } = await params
   const ip = getClientIP(req) ?? 'unknown'
-  const goal = await updateGoal(id, parsed.data, session.user.id, ip)
+  const goal = await updateGoal(id, parsed.data, session.user.id, roles ?? [], ip)
   return apiSuccess(goal)
 })
 
@@ -60,6 +60,6 @@ export const DELETE = withApiHandler<{ id: string }>(async (
 
   const { id } = await params
   const ip = getClientIP(req) ?? 'unknown'
-  await deleteGoal(id, session.user.id, ip)
+  await deleteGoal(id, session.user.id, roles ?? [], ip)
   return apiSuccess({ deleted: true })
 })
