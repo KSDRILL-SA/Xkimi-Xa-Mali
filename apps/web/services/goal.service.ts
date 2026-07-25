@@ -3,7 +3,7 @@ import { goalRepo, runTransaction } from '@/repositories/goal.repository'
 import { env } from '@/lib/env'
 import { writeAuditLog } from './audit.service'
 import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/errors'
-import { isAdmin } from '@/lib/authorization'
+import { isAdmin, assertAdmin } from '@/lib/authorization'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 
@@ -147,8 +147,11 @@ export async function getGoalStatusCounts(): Promise<{ active: number; achieved:
 export async function createGoal(
   input: CreateGoalInput,
   adminUserId: string,
+  roles: string[],
   ip: string,
 ) {
+  assertAdmin(roles)
+
   const goal = await goalRepo.create({
     title: input.title,
     description: input.description ?? null,
@@ -179,8 +182,11 @@ export async function updateGoal(
   id: string,
   input: UpdateGoalInput,
   adminUserId: string,
+  roles: string[],
   ip: string,
 ) {
+  assertAdmin(roles)
+
   const existing = await goalRepo.findById(id)
   if (!existing) throw new GoalNotFoundError()
 
@@ -218,7 +224,9 @@ export async function updateGoal(
   return serializeGoal(updated as GoalRow)
 }
 
-export async function deleteGoal(id: string, adminUserId: string, ip: string) {
+export async function deleteGoal(id: string, adminUserId: string, roles: string[], ip: string) {
+  assertAdmin(roles)
+
   const existing = await goalRepo.findById(id)
   if (!existing) throw new GoalNotFoundError()
 
@@ -245,7 +253,9 @@ export async function deleteGoal(id: string, adminUserId: string, ip: string) {
   ])
 }
 
-export async function activateGoal(id: string, adminUserId: string, ip: string) {
+export async function activateGoal(id: string, adminUserId: string, roles: string[], ip: string) {
+  assertAdmin(roles)
+
   const existing = await goalRepo.findById(id)
   if (!existing) throw new GoalNotFoundError()
 
@@ -274,7 +284,9 @@ export async function activateGoal(id: string, adminUserId: string, ip: string) 
   return serializeGoal(updated as GoalRow)
 }
 
-export async function lockGoal(id: string, adminUserId: string, ip: string) {
+export async function lockGoal(id: string, adminUserId: string, roles: string[], ip: string) {
+  assertAdmin(roles)
+
   if (!env.ENABLE_GOAL_LOCKING) {
     throw new ForbiddenError('Goal locking is disabled in this environment')
   }
@@ -313,8 +325,11 @@ export async function recordProgress(
   goalId: string,
   input: RecordProgressInput,
   adminUserId: string,
+  roles: string[],
   ip: string,
 ) {
+  assertAdmin(roles)
+
   const existing = await goalRepo.findById(goalId)
   if (!existing) throw new GoalNotFoundError()
 

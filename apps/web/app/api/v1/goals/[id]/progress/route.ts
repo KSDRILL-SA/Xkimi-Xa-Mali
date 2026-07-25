@@ -57,6 +57,6 @@ export const POST = withApiHandler<{ id: string }>(async (
 
   const { id } = await params
   const ip = getClientIP(req) ?? 'unknown'
-  const result = await recordProgress(id, parsed.data, session.user.id, ip)
+  const result = await recordProgress(id, parsed.data, session.user.id, roles ?? [], ip)
   return apiSuccess(result, 201)
 })

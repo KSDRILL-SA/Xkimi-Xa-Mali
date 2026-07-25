@@ -46,6 +46,6 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
   const ip = getClientIP(req) ?? 'unknown'
-  const goal = await createGoal(parsed.data, session.user.id, ip)
+  const goal = await createGoal(parsed.data, session.user.id, roles ?? [], ip)
   return apiSuccess(goal, 201)
 })
