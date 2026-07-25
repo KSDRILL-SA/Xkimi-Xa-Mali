@@ -38,6 +38,7 @@ import {
   createMandate,
   cancelMandate,
   processMandateWebhook,
+  planDebitWarnings,
 } from '@/services/mandate.service'
 import { MandateConflictError } from '@/lib/errors'
 
@@ -158,5 +159,43 @@ describe('cancelMandate', () => {
 
     expect(mandateRepo.update).toHaveBeenCalledWith('m1', { status: 'CANCELLED' })
     expect(paymentGateway.cancelMandate).toHaveBeenCalledWith('nc-1')
+  })
+})
+
+describe('planDebitWarnings', () => {
+  const mandate = (id: string, userId: string, userStatus = 'ACTIVE') => ({ id, userId, amount: 500, userStatus })
+
+  it('warns active, unsettled members and flags at-risk ones', () => {
+    const targets = planDebitWarnings(
+      [mandate('m1', 'u1'), mandate('m2', 'u2')],
+      new Set<string>(),
+      new Set(['u2']),
+    )
+    expect(targets).toEqual([
+      { mandateId: 'm1', userId: 'u1', amount: 500, atRisk: false },
+      { mandateId: 'm2', userId: 'u2', amount: 500, atRisk: true },
+    ])
+  })
+
+  it('skips a member already settled for the period (no debit will run)', () => {
+    const targets = planDebitWarnings(
+      [mandate('m1', 'u1'), mandate('m2', 'u2')],
+      new Set(['u1']),
+      new Set<string>(),
+    )
+    expect(targets.map((t) => t.userId)).toEqual(['u2'])
+  })
+
+  it('skips a suspended member', () => {
+    const targets = planDebitWarnings(
+      [mandate('m1', 'u1', 'SUSPENDED')],
+      new Set<string>(),
+      new Set<string>(),
+    )
+    expect(targets).toEqual([])
+  })
+
+  it('returns nothing when there are no mandates', () => {
+    expect(planDebitWarnings([], new Set<string>(), new Set<string>())).toEqual([])
   })
 })
