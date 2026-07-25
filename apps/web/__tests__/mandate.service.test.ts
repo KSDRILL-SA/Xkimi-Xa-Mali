@@ -25,7 +25,7 @@ vi.mock('@/integrations/payment', () => ({
   },
 }))
 vi.mock('@/repositories/mandate.repository', () => ({
-  mandateRepo: { findFirst: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn() },
+  mandateRepo: { findFirst: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn(), findActiveByUser: vi.fn() },
 }))
 vi.mock('@/repositories/bank-account.repository', () => ({
   bankAccountRepo: { findById: vi.fn() },
@@ -39,6 +39,7 @@ import {
   cancelMandate,
   processMandateWebhook,
   planDebitWarnings,
+  hasActiveMandate,
 } from '@/services/mandate.service'
 import { MandateConflictError } from '@/lib/errors'
 
@@ -197,5 +198,28 @@ describe('planDebitWarnings', () => {
 
   it('returns nothing when there are no mandates', () => {
     expect(planDebitWarnings([], new Set<string>(), new Set<string>())).toEqual([])
+  })
+})
+
+describe('hasActiveMandate — the precondition for member-initiated payments', () => {
+  it('is true when the member has an active mandate', async () => {
+    mock(mandateRepo.findActiveByUser).mockResolvedValue({ id: 'm1' } as never)
+    await expect(hasActiveMandate(OWNER, OWNER, ['MEMBER'])).resolves.toBe(true)
+  })
+
+  it('is false when the member has none', async () => {
+    mock(mandateRepo.findActiveByUser).mockResolvedValue(null as never)
+    await expect(hasActiveMandate(OWNER, OWNER, ['MEMBER'])).resolves.toBe(false)
+  })
+
+  it('reads only the id — no bank details are loaded or decrypted', async () => {
+    mock(mandateRepo.findActiveByUser).mockResolvedValue({ id: 'm1' } as never)
+    await hasActiveMandate(OWNER, OWNER, ['MEMBER'])
+    expect(mandateRepo.findActiveByUser).toHaveBeenCalledWith(OWNER, { id: true })
+  })
+
+  it('refuses to answer for another member', async () => {
+    await expect(hasActiveMandate(OWNER, 'someone-else', ['MEMBER'])).rejects.toThrow()
+    expect(mandateRepo.findActiveByUser).not.toHaveBeenCalled()
   })
 })
