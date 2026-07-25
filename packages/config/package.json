@@ -2,6 +2,7 @@
   "name": "@xxm/config",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "description": "Shared configuration \u2014 tsconfig, tailwind, eslint",
   "exports": {
     "./tsconfig/base": "./tsconfig/base.json",
