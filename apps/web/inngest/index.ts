@@ -1,6 +1,7 @@
 export { debitMorningWarning } from './functions/debit-morning-warning'
 export { debitRun } from './functions/debit-run'
 export { debitOverdueReminder } from './functions/debit-overdue-reminder'
+export { contributionDueReminder } from './functions/contribution-due-reminder'
 export { contributionMonthRollover } from './functions/contribution-month-rollover'
 export { contributionOverdueSweep } from './functions/contribution-overdue-sweep'
 export { ledgerReconciliation } from './functions/ledger-reconciliation'
