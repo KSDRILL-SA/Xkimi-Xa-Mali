@@ -67,6 +67,11 @@ import {
 const GoalForbiddenError = ForbiddenError
 const mockWriteAuditLog = writeAuditLog as ReturnType<typeof vi.fn>
 
+// Every goal write is admin-only; callers pass the requester's roles so the
+// service self-enforces authorization (defence-in-depth behind the route guard).
+const ADMIN = ['ADMIN']
+const MEMBER = ['MEMBER']
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -116,6 +121,7 @@ describe('createGoal', () => {
     const result = await createGoal(
       { title: 'End-of-year fund', type: 'YEARLY', targetAmount: 50000, deadline: '2026-12-31' },
       'admin-1',
+      ADMIN,
       '127.0.0.1',
     )
 
@@ -144,18 +150,18 @@ describe('updateGoal', () => {
     ;(db.goal.update as MockedFunction<typeof db.goal.update>).mockResolvedValue(updated as never)
     ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
-    const result = await updateGoal('goal-1', { title: 'New title' }, 'admin-1', '127.0.0.1')
+    const result = await updateGoal('goal-1', { title: 'New title' }, 'admin-1', ADMIN, '127.0.0.1')
     expect(result.title).toBe('New title')
   })
 
   it('throws GoalNotFoundError when goal does not exist', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(null)
-    await expect(updateGoal('bad-id', {}, 'admin-1', '127.0.0.1')).rejects.toThrow(GoalNotFoundError)
+    await expect(updateGoal('bad-id', {}, 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalNotFoundError)
   })
 
   it('throws GoalConflictError when goal is not DRAFT', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(ACTIVE_GOAL as never)
-    await expect(updateGoal('goal-1', { title: 'X' }, 'admin-1', '127.0.0.1')).rejects.toThrow(GoalConflictError)
+    await expect(updateGoal('goal-1', { title: 'X' }, 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
   })
 
   it('throws GoalForbiddenError when goal is locked', async () => {
@@ -163,7 +169,7 @@ describe('updateGoal', () => {
       ...DRAFT_GOAL,
       lockedAt: new Date(),
     } as never)
-    await expect(updateGoal('goal-1', { title: 'X' }, 'admin-1', '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
+    await expect(updateGoal('goal-1', { title: 'X' }, 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
   })
 })
 
@@ -179,13 +185,13 @@ describe('deleteGoal', () => {
     ;(db.goal.delete as MockedFunction<typeof db.goal.delete>).mockResolvedValue({} as never)
     ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
-    await expect(deleteGoal('goal-1', 'admin-1', '127.0.0.1')).resolves.toBeUndefined()
+    await expect(deleteGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')).resolves.toBeUndefined()
     expect(db.goal.delete).toHaveBeenCalledWith({ where: { id: 'goal-1' } })
   })
 
   it('throws GoalConflictError when trying to delete an ACTIVE goal', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(ACTIVE_GOAL as never)
-    await expect(deleteGoal('goal-1', 'admin-1', '127.0.0.1')).rejects.toThrow(GoalConflictError)
+    await expect(deleteGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
     expect(db.goal.delete).not.toHaveBeenCalled()
   })
 })
@@ -205,7 +211,7 @@ describe('activateGoal', () => {
     } as never)
     ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
-    const result = await activateGoal('goal-1', 'admin-1', '127.0.0.1')
+    const result = await activateGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')
     expect(result.status).toBe('ACTIVE')
     expect(db.goal.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { status: 'ACTIVE' } }),
@@ -214,7 +220,7 @@ describe('activateGoal', () => {
 
   it('throws GoalConflictError when already ACTIVE', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(ACTIVE_GOAL as never)
-    await expect(activateGoal('goal-1', 'admin-1', '127.0.0.1')).rejects.toThrow(GoalConflictError)
+    await expect(activateGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
   })
 })
 
@@ -229,7 +235,7 @@ describe('lockGoal', () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(ACTIVE_GOAL as never)
     ;(db.goal.update as MockedFunction<typeof db.goal.update>).mockResolvedValue(LOCKED_GOAL as never)
 
-    const result = await lockGoal('goal-1', 'admin-1', '127.0.0.1')
+    const result = await lockGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')
     expect(result.isLocked).toBe(true)
     expect(mockWriteAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'GOAL_LOCKED' }),
@@ -238,12 +244,12 @@ describe('lockGoal', () => {
 
   it('throws GoalConflictError when already locked', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(LOCKED_GOAL as never)
-    await expect(lockGoal('goal-1', 'admin-1', '127.0.0.1')).rejects.toThrow(GoalConflictError)
+    await expect(lockGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
   })
 
   it('throws GoalConflictError when locking a DRAFT goal', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(DRAFT_GOAL as never)
-    await expect(lockGoal('goal-1', 'admin-1', '127.0.0.1')).rejects.toThrow(GoalConflictError)
+    await expect(lockGoal('goal-1', 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
   })
 })
 
@@ -260,7 +266,7 @@ describe('recordProgress', () => {
     mockGoalTransaction(newProgress)
     ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
-    const result = await recordProgress('goal-1', { amount: 5000 }, 'admin-1', '127.0.0.1')
+    const result = await recordProgress('goal-1', { amount: 5000 }, 'admin-1', ADMIN, '127.0.0.1')
 
     expect(db.$transaction).toHaveBeenCalledOnce()
     expect(result.amount).toBe(5000)
@@ -275,19 +281,64 @@ describe('recordProgress', () => {
     mockGoalTransaction(newProgress)
     ;(db.auditLog.create as MockedFunction<typeof db.auditLog.create>).mockResolvedValue({} as never)
 
-    const result = await recordProgress('goal-1', { amount: 500 }, 'admin-1', '127.0.0.1')
+    const result = await recordProgress('goal-1', { amount: 500 }, 'admin-1', ADMIN, '127.0.0.1')
     expect(result.achieved).toBe(true)
     expect(result.newTotal).toBe(50000)
   })
 
   it('throws GoalConflictError on non-ACTIVE goal', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(DRAFT_GOAL as never)
-    await expect(recordProgress('goal-1', { amount: 100 }, 'admin-1', '127.0.0.1')).rejects.toThrow(GoalConflictError)
+    await expect(recordProgress('goal-1', { amount: 100 }, 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalConflictError)
   })
 
   it('throws GoalNotFoundError when goal does not exist', async () => {
     ;(db.goal.findUnique as MockedFunction<typeof db.goal.findUnique>).mockResolvedValue(null)
-    await expect(recordProgress('bad-id', { amount: 100 }, 'admin-1', '127.0.0.1')).rejects.toThrow(GoalNotFoundError)
+    await expect(recordProgress('bad-id', { amount: 100 }, 'admin-1', ADMIN, '127.0.0.1')).rejects.toThrow(GoalNotFoundError)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Service-layer authorization (defence-in-depth behind the route guard)
+// ---------------------------------------------------------------------------
+
+describe('goal writes reject non-admin callers at the service layer', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('createGoal throws ForbiddenError and never writes for a non-admin', async () => {
+    await expect(
+      createGoal({ title: 'X', type: 'CUSTOM', targetAmount: 100, deadline: '2026-12-31' }, 'member-1', MEMBER, '127.0.0.1'),
+    ).rejects.toThrow(GoalForbiddenError)
+    expect(db.goal.create).not.toHaveBeenCalled()
+  })
+
+  it('updateGoal throws ForbiddenError and never reads or writes for a non-admin', async () => {
+    await expect(updateGoal('goal-1', { title: 'X' }, 'member-1', MEMBER, '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
+    expect(db.goal.findUnique).not.toHaveBeenCalled()
+    expect(db.goal.update).not.toHaveBeenCalled()
+  })
+
+  it('deleteGoal throws ForbiddenError and never deletes for a non-admin', async () => {
+    await expect(deleteGoal('goal-1', 'member-1', MEMBER, '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
+    expect(db.goal.delete).not.toHaveBeenCalled()
+  })
+
+  it('activateGoal throws ForbiddenError for a non-admin', async () => {
+    await expect(activateGoal('goal-1', 'member-1', MEMBER, '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
+    expect(db.goal.update).not.toHaveBeenCalled()
+  })
+
+  it('lockGoal throws ForbiddenError for a non-admin', async () => {
+    await expect(lockGoal('goal-1', 'member-1', MEMBER, '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
+    expect(db.goal.update).not.toHaveBeenCalled()
+  })
+
+  it('recordProgress throws ForbiddenError and never opens a transaction for a non-admin', async () => {
+    await expect(recordProgress('goal-1', { amount: 100 }, 'member-1', MEMBER, '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
+    expect(db.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('empty roles are treated as non-admin', async () => {
+    await expect(activateGoal('goal-1', 'nobody', [], '127.0.0.1')).rejects.toThrow(GoalForbiddenError)
   })
 })
 
@@ -334,6 +385,7 @@ describe('progressPct', () => {
     const result = await createGoal(
       { title: 'Test', type: 'CUSTOM', targetAmount: 10000, deadline: '2026-12-31' },
       'admin-1',
+      ADMIN,
       '127.0.0.1',
     )
     expect(result.progressPct).toBe(0)
@@ -347,6 +399,7 @@ describe('progressPct', () => {
     const result = await createGoal(
       { title: 'Over', type: 'CUSTOM', targetAmount: 50000, deadline: '2026-12-31' },
       'admin-1',
+      ADMIN,
       '127.0.0.1',
     )
     expect(result.progressPct).toBe(100)
