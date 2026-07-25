@@ -5,8 +5,10 @@ import { getSession } from '@/lib/session'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
 import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2, Star } from 'lucide-react'
+import { env } from '@/lib/env'
 import { getGoal } from '@/services/goal.service'
 import { getGoalEngagement } from '@/services/goal-engagement.service'
+import { hasActiveMandate } from '@/services/mandate.service'
 import { GoalNotFoundError } from '@/lib/errors'
 import { ProgressRing } from '@/components/goal/ProgressRing'
 import { MilestoneBar } from '@/components/goal/MilestoneBar'
@@ -36,7 +38,15 @@ export default async function GoalDetailPage({
     throw err
   }
 
-  const engagement = await getGoalEngagement(id, session!.user.id, roles)
+  // Only offer the payment path when it can actually succeed: the kill switch
+  // is on and the member has a debit order to charge. Otherwise the card would
+  // invite a member into a form that fails at submit.
+  const canPay = env.ENABLE_MANUAL_PAYMENTS && goal.status === 'ACTIVE'
+
+  const [engagement, memberHasMandate] = await Promise.all([
+    getGoalEngagement(id, session!.user.id, roles),
+    canPay ? hasActiveMandate(session!.user.id, session!.user.id, roles) : Promise.resolve(false),
+  ])
 
   const st = statusTheme(goal.status)
   const tt = typeTheme(goal.type)
@@ -183,9 +193,9 @@ export default async function GoalDetailPage({
       )}
 
       {/* ── Chip in extra (real money, active goals only) ─────── */}
-      {goal.status === 'ACTIVE' && (
+      {canPay && (
         <Reveal variant="up" delay={165}>
-          <GoalPayCard goalId={id} goalTitle={goal.title} remaining={remaining} />
+          <GoalPayCard goalId={id} goalTitle={goal.title} remaining={remaining} hasActiveMandate={memberHasMandate} />
         </Reveal>
       )}
 

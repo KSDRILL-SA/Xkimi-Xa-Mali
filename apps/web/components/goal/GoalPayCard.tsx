@@ -1,13 +1,20 @@
 'use client'
 
 import { useState } from 'react'
-import { HandCoins, Zap } from 'lucide-react'
+import Link from 'next/link'
+import { HandCoins, Zap, ArrowRight } from 'lucide-react'
 import { GoalPayModal } from './GoalPayModal'
 
 interface Props {
   goalId: string
   goalTitle: string
   remaining: number
+  /**
+   * Whether the member has a debit order to charge. Without one the payment
+   * cannot be taken, so the card sends them to set one up rather than opening a
+   * form that fails on submit.
+   */
+  hasActiveMandate: boolean
 }
 
 /**
@@ -15,7 +22,7 @@ interface Props {
  * something they can move. A pledge is a promise; this collects real money
  * through the member's debit order, on top of their monthly contribution.
  */
-export function GoalPayCard({ goalId, goalTitle, remaining }: Props) {
+export function GoalPayCard({ goalId, goalTitle, remaining, hasActiveMandate }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -29,21 +36,31 @@ export function GoalPayCard({ goalId, goalTitle, remaining }: Props) {
           <div className="flex-1 min-w-0">
             <p className="font-display text-lg font-black text-white leading-tight">Chip in extra</p>
             <p className="text-xs text-white/70 mt-1 leading-relaxed">
-              Pay any amount straight into this goal — over and above your monthly
-              contribution. It lands immediately and boosts your badge points.
+              {hasActiveMandate
+                ? 'Pay any amount straight into this goal — over and above your monthly contribution. It lands immediately and boosts your badge points.'
+                : 'Extra payments are taken through your debit order. Set one up and you can chip into any goal, any time.'}
             </p>
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-xxm-gold text-xxm-green-900 text-sm font-bold hover:bg-xxm-gold-light hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-gold-sm"
-            >
-              <HandCoins size={15} aria-hidden /> Contribute now
-            </button>
+            {hasActiveMandate ? (
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-xxm-gold text-xxm-green-900 text-sm font-bold hover:bg-xxm-gold-light hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-gold-sm"
+              >
+                <HandCoins size={15} aria-hidden /> Contribute now
+              </button>
+            ) : (
+              <Link
+                href="/dashboard/mandates"
+                className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/15 ring-1 ring-white/30 text-white text-sm font-bold hover:bg-white/25 hover:-translate-y-0.5 transition-all duration-fast ease-smooth"
+              >
+                Set up your debit order <ArrowRight size={15} aria-hidden />
+              </Link>
+            )}
           </div>
         </div>
       </div>
 
-      {open && (
+      {open && hasActiveMandate && (
         <GoalPayModal
           goalId={goalId}
           goalTitle={goalTitle}
