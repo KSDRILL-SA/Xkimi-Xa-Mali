@@ -72,7 +72,8 @@ export const debitMorningWarning = inngest.createFunction(
       await step.run(`notify-${target.mandateId}`, () =>
         queueNotification({
           userId: target.userId,
-          templateSlug: 'debit-morning-warning',
+          // At-risk members (a recent debit failed) get the stronger reminder.
+          templateSlug: target.atRisk ? 'debit-morning-warning-urgent' : 'debit-morning-warning',
           channel: 'SMS',
           payload: {
             mandateId: target.mandateId,
