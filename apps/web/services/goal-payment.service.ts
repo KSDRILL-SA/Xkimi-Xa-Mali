@@ -11,7 +11,7 @@ import { roundZAR } from '@/lib/money'
 import { writeAuditLog } from './audit.service'
 import { postPoolCredit } from './ledger.service'
 import { queueNotification } from './notification.service'
-import { syncPrimaryGoalProgress } from './goal.service'
+import { syncPrimaryGoalProgress, emitGoalAchieved } from './goal.service'
 import { logger } from '@/lib/logger'
 
 type GoalForPayment = {
@@ -34,6 +34,7 @@ async function reflectAdditionalGoalPayment(goalId: string, amount: number): Pro
   const updated = await goalRepo.incrementAmount(goalId, amount)
   if (Number(updated.currentAmount) >= Number(updated.targetAmount) && updated.status === 'ACTIVE') {
     await goalRepo.update(goalId, { status: 'ACHIEVED' })
+    await emitGoalAchieved(goalId, updated.title)
   }
 }
 
