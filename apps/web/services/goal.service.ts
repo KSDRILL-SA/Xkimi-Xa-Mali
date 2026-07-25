@@ -21,6 +21,7 @@ type GoalRow = {
   currentAmount: unknown
   deadline: Date
   status: string
+  isPrimary: boolean
   version: number
   lockedAt: Date | null
   lockedById: string | null
@@ -44,6 +45,7 @@ function serializeGoal(goal: GoalRow) {
     remaining: Math.max(0, subtractZAR(Number(goal.targetAmount), Number(goal.currentAmount))),
     deadline: goal.deadline.toISOString(),
     status: goal.status,
+    isPrimary: goal.isPrimary,
     isLocked: goal.lockedAt !== null,
     lockedAt: goal.lockedAt?.toISOString() ?? null,
     createdAt: goal.createdAt.toISOString(),
@@ -141,6 +143,13 @@ export async function getGoalStatusCounts(): Promise<{ active: number; achieved:
   ])
 
   return { active, achieved }
+}
+
+/** The one primary yearly fund, if a goal has been designated — else null. */
+export async function getPrimaryGoal() {
+  const goals = await goalRepo.findMany({ isPrimary: true }, { take: 1 })
+  const goal = goals[0]
+  return goal ? serializeGoal(goal as GoalRow) : null
 }
 
 // ─── Admin mutations ──────────────────────────────────────────────────────────
@@ -318,6 +327,41 @@ export async function lockGoal(id: string, adminUserId: string, roles: string[],
   ])
 
   return serializeGoal(updated as GoalRow)
+}
+
+export async function setPrimaryGoal(id: string, adminUserId: string, roles: string[], ip: string) {
+  assertAdmin(roles)
+
+  const existing = await goalRepo.findById(id)
+  if (!existing) throw new GoalNotFoundError()
+
+  const g = existing as GoalRow
+  if (g.status !== 'ACTIVE') {
+    throw new GoalConflictError('Only an active goal can be set as the primary fund', 'GOL_010')
+  }
+  if (g.isPrimary) {
+    return serializeGoal(g)
+  }
+
+  await runTransaction(async (tx) => {
+    // At most one primary (partial unique index) — demote the current one first.
+    await goalRepo.updateGoalInTx({ isPrimary: true }, { isPrimary: false }, tx)
+    await goalRepo.updateGoalInTx({ id }, { isPrimary: true }, tx)
+  })
+
+  await Promise.all([
+    writeAuditLog({
+      userId: adminUserId,
+      action: 'GOAL_SET_PRIMARY',
+      entity: 'Goal',
+      entityId: id,
+      payload: { title: g.title },
+      ipAddress: ip,
+    }),
+    evictGoalsCache(),
+  ])
+
+  return serializeGoal({ ...g, isPrimary: true })
 }
 
 // ─── Progress recording ───────────────────────────────────────────────────────
