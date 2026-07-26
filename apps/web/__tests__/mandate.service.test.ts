@@ -40,6 +40,7 @@ import {
   processMandateWebhook,
   planDebitWarnings,
   hasActiveMandate,
+  requestDelay,
 } from '@/services/mandate.service'
 import { MandateConflictError } from '@/lib/errors'
 
@@ -221,5 +222,74 @@ describe('hasActiveMandate — the precondition for member-initiated payments', 
   it('refuses to answer for another member', async () => {
     await expect(hasActiveMandate(OWNER, 'someone-else', ['MEMBER'])).rejects.toThrow()
     expect(mandateRepo.findActiveByUser).not.toHaveBeenCalled()
+  })
+})
+
+describe('a delay the member asked for is honoured', () => {
+  const m = (over: Record<string, unknown> = {}) => ({
+    id: 'm1', userId: 'u1', amount: 500, userStatus: 'ACTIVE', ...over,
+  })
+  const NOW = new Date('2026-08-25T18:00:00.000Z')
+  const none = new Set<string>()
+
+  it('skips a mandate moved to a future date', async () => {
+    // Previously this lived in a Redis key, so with no cache configured the
+    // delay was invisible and the member was debited on the original date.
+    const targets = planDebitWarnings(
+      [m({ delayedUntil: new Date('2026-09-05T00:00:00.000Z') })], none, none, NOW,
+    )
+    expect(targets).toEqual([])
+  })
+
+  it('accepts the date as a string, which is how it crosses a step boundary', () => {
+    // Inngest serialises step results to JSON, so a Date arrives as a string.
+    const targets = planDebitWarnings([m({ delayedUntil: '2026-09-05T00:00:00.000Z' })], none, none, NOW)
+    expect(targets).toEqual([])
+  })
+
+  it('warns again once the delay date has passed', () => {
+    const targets = planDebitWarnings(
+      [m({ delayedUntil: new Date('2026-08-01T00:00:00.000Z') })], none, none, NOW,
+    )
+    expect(targets).toHaveLength(1)
+  })
+
+  it('warns a member who never asked for a delay', () => {
+    expect(planDebitWarnings([m({ delayedUntil: null })], none, none, NOW)).toHaveLength(1)
+    expect(planDebitWarnings([m()], none, none, NOW)).toHaveLength(1)
+  })
+
+  it('still skips a settled member regardless of any delay', () => {
+    expect(planDebitWarnings([m()], new Set(['u1']), none, NOW)).toEqual([])
+  })
+})
+
+describe('requestDelay writes the delay where it cannot be lost', () => {
+  const FUTURE = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10)
+
+  beforeEach(() => {
+    mock(mandateRepo.findById).mockResolvedValue({
+      id: 'm1', userId: OWNER, status: 'ACTIVE', debitDay: 25, netcashMandateId: 'nc-1',
+    } as never)
+    mock(mandateRepo.update).mockResolvedValue({} as never)
+  })
+
+  it('persists the new date on the mandate', async () => {
+    await requestDelay('m1', { newDate: FUTURE }, OWNER, ['MEMBER'])
+
+    expect(mandateRepo.update).toHaveBeenCalledWith(
+      'm1',
+      expect.objectContaining({ delayedUntil: new Date(FUTURE) }),
+    )
+  })
+
+  it('tells the gateway as well as recording it', async () => {
+    await requestDelay('m1', { newDate: FUTURE }, OWNER, ['MEMBER'])
+    expect(paymentGateway.delayMandate).toHaveBeenCalledWith('nc-1', FUTURE)
+  })
+
+  it('refuses a date in the past, before touching anything', async () => {
+    await expect(requestDelay('m1', { newDate: '2020-01-01' }, OWNER, ['MEMBER'])).rejects.toThrow()
+    expect(mandateRepo.update).not.toHaveBeenCalled()
   })
 })
