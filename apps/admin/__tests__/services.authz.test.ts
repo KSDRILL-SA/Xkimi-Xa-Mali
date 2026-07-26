@@ -55,6 +55,7 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['getMemberLoginHistory',    (r) => services.getMemberLoginHistory(r, 'm1')],
   ['getDashboardStats',        (r) => services.getDashboardStats(r)],
   ['getMonthlyReportSummary',  (r) => services.getMonthlyReportSummary(r, 1, 2026)],
+  ['getNudgeOutcomes',         (r) => services.getNudgeOutcomes(r, 1, 2026)],
   ['getContributionsForExport',(r) => services.getContributionsForExport(r, 1, 2026)],
   ['listAllBadges',            (r) => services.listAllBadges(r)],
   ['getSignatureMetadata',     (r) => services.getSignatureMetadata('a1', r)],
