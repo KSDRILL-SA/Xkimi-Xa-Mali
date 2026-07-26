@@ -1,6 +1,34 @@
 import { createEnv } from '@t3-oss/env-nextjs'
 import { z } from 'zod'
 
+/**
+ * A Netcash credential: optional everywhere except a production deploy that
+ * talks to the real gateway, where it is required.
+ *
+ * Neither is optional in any meaningful sense once real money is involved, and
+ * both fail late and quietly if they are missing:
+ *
+ * - No `NETCASH_SERVICE_KEY` and every debit submission throws
+ *   (`lib/netcash.ts`) — nothing is collected, on debit night.
+ * - No `NETCASH_WEBHOOK_SECRET` and `verifyWebhookSignature` returns false for
+ *   every callback, so each one is rejected. This is the worse of the two: the
+ *   debits still go out and the money still moves, but nothing records it.
+ *   Transactions stay pending, contributions stay unpaid, and the ledger
+ *   silently disagrees with the bank.
+ *
+ * Both are invisible until the money is already in flight, so they are caught
+ * here instead — on deploy, where the fix is to paste in a key.
+ *
+ * The mock gateway is exempt because it needs no credentials. That is not a way
+ * around this check: `integrations/payment` refuses to start when the mock is
+ * selected in a production build, so there is no configuration in which a live
+ * deploy runs without these set.
+ */
+const netcashCredential = () =>
+  process.env.NODE_ENV === 'production' && process.env.PAYMENT_GATEWAY !== 'mock'
+    ? z.string().min(1)
+    : z.string().min(1).optional()
+
 export const env = createEnv({
   emptyStringAsUndefined: true,
   server: {
@@ -10,8 +38,8 @@ export const env = createEnv({
     NEXTAUTH_URL: z.string().url().optional(),
     FOUNDER_EMAIL: z.string().email().optional(),
     ENCRYPTION_KEY: z.string().length(64),
-    NETCASH_SERVICE_KEY: z.string().min(1).optional(),
-    NETCASH_WEBHOOK_SECRET: z.string().min(1).optional(),
+    NETCASH_SERVICE_KEY: netcashCredential(),
+    NETCASH_WEBHOOK_SECRET: netcashCredential(),
     NETCASH_API_URL: z.string().url().default('https://ws.netcash.co.za/NSWSSX/NetcashTest.asmx'),
     BULKSMS_USERNAME: z.string().min(1).optional(),
     BULKSMS_PASSWORD: z.string().min(1).optional(),

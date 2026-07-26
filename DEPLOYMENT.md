@@ -44,8 +44,8 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 | `ADMIN_API_SECRET` | 32+ chars. Must be **identical** on web + admin (admin→web internal calls). |
 | `WEB_INTERNAL_URL` | (admin) the web app's prod URL, e.g. `https://app.xkimmxamali.co.za`. |
 | `NEXTAUTH_URL` | each app's own prod URL. |
-| `NETCASH_SERVICE_KEY` | **production** service key. |
-| `NETCASH_WEBHOOK_SECRET` | production webhook signing secret. |
+| `NETCASH_SERVICE_KEY` | **production** service key. The build **fails without it** — no silent start. |
+| `NETCASH_WEBHOOK_SECRET` | production webhook signing secret. Also **build-enforced**: without it every callback fails its signature check, so debits collect and nothing records them. |
 | `NETCASH_API_URL` | ⚠️ **defaults to the TEST gateway** — you MUST set the **production** Netcash URL or no real debits happen. |
 | `BULKSMS_USERNAME` / `_PASSWORD` | live SMS sending. |
 | `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | verified sending domain. |
