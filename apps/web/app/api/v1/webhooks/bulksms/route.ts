@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { updateSMSDeliveryStatus } from '@/services/notification.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 // BulkSMS documented IP ranges for delivery receipts. Overridable via
 // BULKSMS_WEBHOOK_IPS (comma-separated prefixes) for local/preview testing,
@@ -30,7 +31,10 @@ type DeliveryReceiptEntry = {
 }
 
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
+  // Through the shared trust model, not the raw header. Signature
+  // verification above is the primary control; this allowlist is the second
+  // lock, and a second lock a caller can pick themselves is not one.
+  const clientIp = getClientIP(req) ?? ''
 
   // Delivery receipts are authenticated by source IP only (BulkSMS does not sign
   // them). Enforced in every environment — an empty/unknown IP is rejected.

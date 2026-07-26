@@ -27,66 +27,6 @@ function generateToken(): string {
   return randomBytes(32).toString('hex')
 }
 
-export async function registerUser(
-  input: RegisterInput,
-  baseUrl: string,
-  ipAddress?: string,
-) {
-  const existing = await userRepo.findByEmailOrPhone(input.email, input.phone)
-
-  if (existing) {
-    const field = existing.email === input.email ? 'email' : 'phone'
-    throw new UserAlreadyExistsError(field as 'email' | 'phone')
-  }
-
-  const [passwordHash, memberRole] = await Promise.all([
-    bcrypt.hash(input.password, BCRYPT_ROUNDS),
-    userRepo.findRoleOrThrow('MEMBER'),
-  ])
-
-  const adminRole = await userRepo.findRole('ADMIN')
-  const founderEmail = env.FOUNDER_EMAIL
-  const isFounder = founderEmail && input.email.toLowerCase() === founderEmail.toLowerCase()
-
-  const roleConnections = [{ roleId: memberRole.id }]
-  if (isFounder && adminRole) roleConnections.push({ roleId: adminRole.id })
-
-  const user = await userRepo.create({
-    email: input.email,
-    phone: input.phone,
-    firstName: input.firstName,
-    lastName: input.lastName,
-    idNumber: input.idNumber ? encrypt(input.idNumber) : null,
-    password: passwordHash,
-    popiaConsentAt: input.consentToPopia ? new Date() : null,
-    status: 'PENDING',
-    roles: { create: roleConnections },
-  })
-
-  // Issue email verification token
-  const rawToken = generateToken()
-  const tokenHash = hashToken(rawToken)
-
-  await authTokenRepo.createVerificationToken({
-    userId: user.id,
-    tokenHash,
-    expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
-  })
-
-  await emailProvider.sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
-
-  await writeAuditLog({
-    userId: user.id,
-    action: 'REGISTER',
-    entity: 'User',
-    entityId: user.id,
-    payload: { email: user.email, isFounder: Boolean(isFounder) },
-    ipAddress,
-  })
-
-  return { id: user.id, email: user.email }
-}
-
 export async function verifyEmail(rawToken: string, ipAddress?: string) {
   const tokenHash = hashToken(rawToken)
 

@@ -59,6 +59,7 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 | `INNGEST_EVENT_KEY` / `INNGEST_SIGNING_KEY` | prod Inngest app. |
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | error monitoring. |
 | `WHATSAPP_GROUP_LINK` / `NEXT_PUBLIC_WHATSAPP_GROUP_LINK` | the group invite link. |
+| `TRUSTED_PROXY` | `vercel` unless a CDN/WAF is genuinely in front. Decides which forwarded-IP header is believed — get it wrong and per-IP rate limiting can be bypassed by sending the header yourself. |
 
 ## 3. Database (Neon, production)
 
