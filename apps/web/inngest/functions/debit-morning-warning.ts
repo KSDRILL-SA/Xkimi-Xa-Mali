@@ -3,7 +3,6 @@ import { db } from '@/lib/db'
 import { assessMemberRisks, needsUrgentWarning, needsHumanOutreach } from '@/services/risk.service'
 import { notifyAdmins } from '@/services/inbox.service'
 import { todaySAST } from '@/lib/date'
-import { redis } from '@/lib/redis'
 import { logger } from '@xxm/observability'
 import { queueNotification } from '@/services/notification.service'
 import { planDebitWarnings } from '@/services/mandate.service'
@@ -21,7 +20,6 @@ export const debitMorningWarning = inngest.createFunction(
     const dayOfMonth = parseInt(dayStr, 10)
     const periodYear = parseInt(year, 10)
     const periodMonth = parseInt(month, 10)
-    const periodKey = `${year}-${month}`
 
     const mandates = await step.run('find-mandates', () =>
       db.paymentMandate.findMany({
@@ -60,18 +58,16 @@ export const debitMorningWarning = inngest.createFunction(
     })
 
     const targets = planDebitWarnings(
-      mandates.map((m) => ({ id: m.id, userId: m.userId, amount: Number(m.amount), userStatus: m.user.status })),
+      mandates.map((m) => ({
+        id: m.id, userId: m.userId, amount: Number(m.amount),
+        userStatus: m.user.status, delayedUntil: m.delayedUntil,
+      })),
       new Set(context.settled),
       new Set(context.atRisk),
     )
 
     let warned = 0
     for (const target of targets) {
-      const delayed = await step.run(`check-delay-${target.mandateId}`, () =>
-        redis.get(`xxm:delay:${target.mandateId}:${periodKey}`),
-      )
-      if (delayed) continue
-
       await step.run(`notify-${target.mandateId}`, () =>
         queueNotification({
           userId: target.userId,
