@@ -131,20 +131,20 @@ async function main() {
       slug: 'contribution-due-reminder',
       channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali Foundation: R{{amount}} is due on {{date}}. Pay early in the app to boost your badge points and protect your streak — or relax, we will debit it automatically.',
+      body: 'Xkimm Xa Mali Foundation: R{{amount}} is due on {{date}}. Pay early in the app to boost your badge points and protect your streak - or relax, we will debit it automatically.',
     },
     {
       // Thanks a member for a directed extra payment toward a goal.
       slug: 'goal-payment-thanks',
       channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali Foundation: Thank you! Your R{{amount}} toward "{{goal}}" has been received — your badge points just got a boost.',
+      body: 'Xkimm Xa Mali Foundation: Thank you! Your R{{amount}} toward "{{goal}}" has been received - your badge points just got a boost.',
     },
     {
       slug: 'debit-tomorrow-warning',
       channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali Foundation: Reminder — your delayed debit of R{{amount}} will run tomorrow ({{newDate}}). Ensure funds are available.',
+      body: 'Xkimm Xa Mali Foundation: Reminder - your delayed debit of R{{amount}} will run tomorrow ({{newDate}}). Ensure funds are available.',
     },
     {
       slug: 'debit-success',
@@ -217,7 +217,7 @@ async function main() {
       slug: 'goal-activated',
       channel: 'SMS',
       subject: null,
-      body: 'Xkimm Xa Mali Foundation: New goal activated — {{title}}. Target: R{{targetAmount}} by {{endDate}}.',
+      body: 'Xkimm Xa Mali Foundation: New goal activated - {{title}}. Target: R{{targetAmount}} by {{endDate}}.',
     },
     {
       slug: 'goal-achieved',
