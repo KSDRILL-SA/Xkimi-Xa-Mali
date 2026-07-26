@@ -3,9 +3,12 @@
 import { useEffect } from 'react'
 import { Button } from '@xxm/ui'
 import { AlertCircle } from 'lucide-react'
+import { logger } from '@xxm/observability'
 
 export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => { console.error(error) }, [error])
+  useEffect(() => {
+    logger.error('Admin app error boundary', { err: error, digest: error.digest })
+  }, [error])
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-4">
