@@ -18,6 +18,16 @@ export const SUCCESSFUL_INFLOW: Prisma.TransactionWhereInput = {
   type: { not: 'REVERSAL' },
 }
 
+/**
+ * The same rule, spelled for raw SQL, where the Prisma filter above cannot
+ * reach — a grouped aggregate compared against a column on the grouped row.
+ *
+ * These two must always say the same thing. They are deliberately adjacent so a
+ * change to one is made staring at the other, and a test asserts they select the
+ * same rows against a real database. `t` is the required table alias.
+ */
+export const SUCCESSFUL_INFLOW_SQL = `t.status = 'SUCCESS' AND t.type <> 'REVERSAL'`
+
 // ─── Transaction repository ─────────────────────────────────────────────────
 // Thin wrapper around db.transaction.* — zero business logic.
 
