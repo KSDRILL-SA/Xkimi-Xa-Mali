@@ -20,7 +20,7 @@ export interface Founder {
 
 export const FOUNDERS: readonly Founder[] = [
   {
-    photo: '/founders/maluleke-kurhula-success.jpg',
+    photo: '/founders/maluleke-kurhula-success.png',
     name: 'Maluleke Kurhula Success',
     title: 'Founder & Chairman',
     bio: 'The visionary behind Xkimm Xa Mali Foundation. Kurhula identified the need for a disciplined, technology-powered approach to communal savings and built the platform from the ground up.',
@@ -37,7 +37,7 @@ export const FOUNDERS: readonly Founder[] = [
   },
   {
     photo: '/founders/maluleke-risima-blessing.png',
-    name: 'Malulele Risima Blessing',
+    name: 'Maluleke Risima Blessing',
     title: 'Co-Founder & Treasurer',
     bio: 'The financial custodian of the collective. Risima oversees financial integrity, ensures every contribution is accounted for, and guards the pool with unwavering discipline.',
     ring: 'ring-xxm-canopy/25',
