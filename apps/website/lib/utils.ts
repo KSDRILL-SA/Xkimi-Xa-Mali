@@ -21,6 +21,9 @@ export const NAV_LINKS = [
   { label: 'Features',     href: '/#features',     sectionId: 'features' },
   { label: 'How It Works', href: '/#how-it-works', sectionId: 'how-it-works' },
   { label: 'The Mission',  href: '/#mission',      sectionId: 'mission' },
-  { label: 'Brotherhood',  href: '/#founders',     sectionId: 'founders' },
+  // The founders live on /about, not on the home page. sectionId must stay null:
+  // a non-null value makes the Navbar render a scroll button instead of a link,
+  // and scrollToSection silently does nothing when the element is on another page.
+  { label: 'Brotherhood',  href: '/about#founders', sectionId: null },
   { label: 'About',        href: '/about',         sectionId: null },
 ] as const
