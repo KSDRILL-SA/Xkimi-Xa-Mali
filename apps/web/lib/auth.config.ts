@@ -9,7 +9,19 @@ import { env } from './env'
 export const authConfig = {
   secret: env.AUTH_SECRET,
   trustHost: true,
-  session: { strategy: 'jwt' },
+  // A week, where the NextAuth default is thirty days. Members visit this app
+  // once or twice a month, so a week is still generous, and it bounds how long
+  // a session lifted from an unattended phone stays useful.
+  //
+  // This is an idle window, not a hard expiry: maxAge is measured from the last
+  // refresh and updateAge controls how often that happens, so anyone using the
+  // app regularly is never signed out mid-use. The admin portal, which can move
+  // money, holds itself to a single day.
+  session: {
+    strategy: 'jwt',
+    maxAge: 7 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
+  },
   pages: {
     signIn: '/login',
     error: '/login',
