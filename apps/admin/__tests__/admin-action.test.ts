@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { auth, redirect, defaultLimit, bulkLimit, warn } = vi.hoisted(() => ({
+const { auth, redirect, defaultLimit, bulkLimit, warn, isStale } = vi.hoisted(() => ({
   auth: vi.fn(),
+  isStale: vi.fn(),
   // The real redirect throws to unwind; mirroring that is what proves the guard
   // stops rather than falls through to the action.
   redirect: vi.fn((to: string) => { throw new Error(`REDIRECT:${to}`) }),
@@ -20,6 +21,9 @@ vi.mock('@/lib/rate-limit', () => ({
   adminActionRatelimit: { limit: defaultLimit },
   adminBulkActionRatelimit: { limit: bulkLimit },
 }))
+// The revocation lookup itself is covered in role-revocation.test.ts; here it is
+// stubbed so these cases stay about the guard's flow.
+vi.mock('@/lib/role-version', () => ({ isSessionRoleStale: isStale }))
 
 import { requireAdmin } from '@/lib/admin-action'
 
@@ -30,6 +34,34 @@ beforeEach(() => {
   auth.mockResolvedValue(ADMIN_SESSION)
   defaultLimit.mockResolvedValue({ success: true })
   bulkLimit.mockResolvedValue({ success: true })
+  isStale.mockResolvedValue(false)
+})
+
+describe('requireAdmin — revoked roles', () => {
+  // The roles on the session come from the JWT, which only knows what was true
+  // when it was issued. Without this check, removing someone's ADMIN role left
+  // them able to approve mandates and reverse transactions until the token
+  // expired, up to a day later.
+  it('refuses an action when the session roles are out of date', async () => {
+    isStale.mockResolvedValue(true)
+    await expect(requireAdmin('transaction.reverse')).rejects.toThrow('REDIRECT:/login')
+  })
+
+  it('checks the stored version against the one in the token', async () => {
+    auth.mockResolvedValue({ user: { id: 'admin-1', roles: ['ADMIN'], roleVersion: 4 } })
+    await requireAdmin('goal.update')
+    expect(isStale).toHaveBeenCalledWith('admin-1', 4)
+  })
+
+  it('treats a token with no version at all as version 0', async () => {
+    await requireAdmin('goal.update')
+    expect(isStale).toHaveBeenCalledWith('admin-1', 0)
+  })
+
+  it('lets a current session through', async () => {
+    const ctx = await requireAdmin('goal.update')
+    expect(ctx.userId).toBe('admin-1')
+  })
 })
 
 describe('requireAdmin — authorization', () => {
