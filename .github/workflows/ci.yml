@@ -27,7 +27,13 @@ jobs:
           --health-retries 5
 
     env:
+      # This is a build check, not a deployment. Without it the production-only
+      # config rules apply and the build demands a dozen real credentials.
+      DEPLOY_ENV: ci
       DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
+      # Migrations run over the unpooled endpoint. The CI Postgres has no pooler,
+      # so it is the same address; on Neon these differ.
+      DIRECT_DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
       AUTH_SECRET: test_secret_32_chars_minimum_here_x
       NEXTAUTH_SECRET: test_secret_32_chars_minimum_here
       # Throwaway CI-only key (32 bytes / 64 hex chars). Not a real secret.

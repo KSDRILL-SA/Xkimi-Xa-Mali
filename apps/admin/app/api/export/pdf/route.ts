@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { WEB_BASE_URL } from '@/lib/env'
 
 /**
  * Streams the monthly contribution report PDF.
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse('Missing or invalid month or year', { status: 400 })
   }
 
-  const base   = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000'
+  const base   = WEB_BASE_URL
   const secret = process.env['ADMIN_API_SECRET']
   if (!secret) {
     return new NextResponse('Report service is not configured (ADMIN_API_SECRET missing).', { status: 500 })

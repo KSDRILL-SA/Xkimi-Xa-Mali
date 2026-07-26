@@ -12,7 +12,8 @@
     "./constants": "./src/constants.ts",
     "./banks": "./src/banks.ts",
     "./schemas": "./src/schemas.ts",
-    "./sms": "./src/sms.ts"
+    "./sms": "./src/sms.ts",
+    "./deployment": "./src/deployment.ts"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",

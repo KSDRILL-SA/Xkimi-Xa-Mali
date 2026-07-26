@@ -118,7 +118,7 @@ export default function SupportPage() {
               </a>
 
               <a
-                href="mailto:support@xkimmxamali.co.za"
+                href={`mailto:${env.SUPPORT_EMAIL}`}
                 className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 flex items-start gap-4 hover:border-xxm-gold/30 hover:shadow-xxm transition-all group"
               >
                 <div className="w-11 h-11 rounded-xl bg-xxm-champagne-200 flex items-center justify-center shrink-0 group-hover:bg-xxm-champagne-300 transition-colors">
