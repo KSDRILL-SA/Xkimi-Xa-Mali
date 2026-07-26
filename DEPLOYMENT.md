@@ -58,8 +58,9 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 ## 3. Database (Neon, production)
 
 ```bash
-# from packages/database, with prod DATABASE_URL exported
-npx prisma migrate deploy   # applies ALL 29 migrations (incl. ledger, inbox, webhook-dedupe, goal engagement, pledges)
+# from packages/database, with prod DATABASE_URL *and* DIRECT_DATABASE_URL exported
+# (migrations run over the unpooled endpoint — see .env.example)
+npx prisma migrate deploy   # applies ALL 28 migrations (incl. ledger, inbox, webhook-dedupe, goal engagement, pledges)
 npm run db:seed             # roles + founder accounts
 ```
 
