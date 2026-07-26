@@ -13,6 +13,25 @@ const playfairDisplay = Playfair_Display({
   display: 'swap',
 })
 
+/**
+ * Every page renders per request.
+ *
+ * This is the cost of the nonce-based CSP, and it is not optional. The nonce in
+ * `Content-Security-Policy` changes on every request, so Next can only stamp it
+ * onto its inline bootstrap script while rendering that request. A page
+ * prerendered at build time has HTML fixed long before the nonce exists — its
+ * inline scripts carry no nonce, the browser refuses them, React never hydrates,
+ * and the page renders blank. Which is exactly what happened here: thirteen
+ * public pages, `/login` among them, came back as an empty document.
+ *
+ * Ninety-five of this app's routes were already dynamic — it is an
+ * authenticated dashboard behind a session. The thirteen that were not are the
+ * public pages, and serving those per request is a far smaller price than
+ * leaving `script-src 'unsafe-inline'` on the page where members type their
+ * password.
+ */
+export const dynamic = 'force-dynamic'
+
 export const viewport: Viewport = {
   themeColor: '#1B4332',
   width: 'device-width',

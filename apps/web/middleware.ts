@@ -87,9 +87,76 @@ async function checkRoleVersion(userId: string, tokenVersion: number): Promise<R
   }
 }
 
+/**
+ * The Content-Security-Policy, built fresh per request around a one-time nonce.
+ *
+ * It lives here rather than in next.config because a nonce cannot be static.
+ * The policy previously carried `script-src 'unsafe-inline'`, which is the one
+ * directive that decides whether a CSP stops an XSS or merely documents that
+ * one happened: with it, an injected `<script>` executes like any other. Next
+ * needs *some* way to run its own inline bootstrap, and a per-request nonce is
+ * the only alternative to blanket-allowing every inline script.
+ *
+ * The nonce also causes browsers to ignore `'unsafe-inline'` entirely, so the
+ * keyword is simply gone rather than overridden.
+ *
+ * Cost, stated plainly: a per-request value means these pages can no longer be
+ * prerendered at build time. Thirteen public pages move from static to dynamic.
+ * That is a real price, and a small one against an app that moves money.
+ */
+function buildCsp(nonce: string): string {
+  const dev = process.env.NODE_ENV === 'development'
+  return [
+    "default-src 'self'",
+    // base-uri and form-action have NO default-src fallback — without them a
+    // <base> injection could hijack relative URLs and forms could post to
+    // arbitrary origins. Lock both to same-origin.
+    "base-uri 'self'",
+    "form-action 'self'",
+    "object-src 'none'",
+    // 'unsafe-eval' stays development-only: the dev bundler needs it, and it is
+    // never worth shipping.
+    `script-src 'self' 'nonce-${nonce}' https://browser.sentry-cdn.com${dev ? " 'unsafe-eval'" : ''}`,
+    // Styles keep 'unsafe-inline'. Next and Tailwind emit inline style
+    // attributes that no nonce can cover, and an injected stylesheet cannot
+    // execute — the exposure is defacement and data inference, not code.
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
+    "font-src 'self'",
+    "connect-src 'self' https://*.vercel.app https://*.upstash.io https://o*.ingest.sentry.io https://*.public.blob.vercel-storage.com https://api.inngest.com",
+    "worker-src 'self' blob:",
+    "frame-ancestors 'none'",
+  ].join('; ')
+}
+
 export default auth(async (req) => {
+  const nonceCtx = { value: '' }
+  const response = await handleRequest(req, nonceCtx)
+  // Set once, on every path out. Eleven return points is ten too many places to
+  // remember a security header.
+  response.headers.set('Content-Security-Policy', buildCsp(nonceCtx.value))
+  return response
+})
+
+async function handleRequest(
+  req: Parameters<Parameters<typeof auth>[0]>[0],
+  nonceCtx: { value: string },
+): Promise<NextResponse> {
   const { pathname } = req.nextUrl
   const traceId = req.headers.get('x-trace-id') ?? crypto.randomUUID()
+
+  const nonce = crypto.randomUUID().replace(/-/g, '')
+  nonceCtx.value = nonce
+  const csp = buildCsp(nonce)
+
+  // Next reads the nonce off the *request* CSP header to stamp its own inline
+  // bootstrap script. Both headers have to be forwarded, and only on responses
+  // that will actually render React — a redirect or a JSON error has no
+  // document to nonce.
+  const requestHeaders = new Headers(req.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('Content-Security-Policy', csp)
+  const passThrough = () => NextResponse.next({ request: { headers: requestHeaders } })
 
   // Always allow: health, webhooks (self-verifying), NextAuth internals, SW + offline
   if (
@@ -99,7 +166,7 @@ export default auth(async (req) => {
     pathname.startsWith(WEBHOOK_PREFIX) ||
     pathname.startsWith(AUTH_PREFIX)
   ) {
-    return NextResponse.next()
+    return passThrough()
   }
 
   const session = req.auth
@@ -130,7 +197,7 @@ export default auth(async (req) => {
     if (session && (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password')) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
-    return NextResponse.next()
+    return passThrough()
   }
 
   // Trusted internal calls from admin app — bypass session and CSRF checks
@@ -138,7 +205,7 @@ export default auth(async (req) => {
     const expectedSecret = process.env.ADMIN_API_SECRET
     const providedSecret = req.headers.get('x-admin-secret')
     if (expectedSecret && providedSecret && constantTimeEqual(providedSecret, expectedSecret)) {
-      const response = NextResponse.next()
+      const response = passThrough()
       response.headers.set('x-trace-id', traceId)
       return response
     }
@@ -206,10 +273,10 @@ export default auth(async (req) => {
     }
   }
 
-  const response = NextResponse.next()
+  const response = passThrough()
   response.headers.set('x-trace-id', traceId)
   return response
-})
+}
 
 export const config = {
   // Exclude Next internals and any static asset in /public. The trailing
