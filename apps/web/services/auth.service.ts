@@ -1,22 +1,17 @@
 import bcrypt from 'bcryptjs'
 import { createHash, randomBytes } from 'crypto'
-import { env } from '@/lib/env'
-import { encrypt } from '@/lib/encryption'
 import { emailProvider } from '@/integrations/email'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@xxm/observability'
 import { userRepo, runTransaction } from '@/repositories/user.repository'
 import { authTokenRepo } from '@/repositories/auth-token.repository'
 import {
-  UserAlreadyExistsError,
   InvalidTokenError,
   InvalidCredentialsError,
 } from '@/lib/errors'
 import { bumpRoleVersion } from '@/lib/role-version'
-import type { RegisterInput } from '@/lib/validation/auth'
 
 const BCRYPT_ROUNDS = 12
-const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
 const RESET_TTL_MS = 60 * 60 * 1000
 
 function hashToken(token: string): string {
