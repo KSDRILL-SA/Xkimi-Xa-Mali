@@ -32,27 +32,11 @@ const nextConfig: NextConfig = {
             key: 'Strict-Transport-Security',
             value: 'max-age=31536000; includeSubDomains',
           },
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              // base-uri and form-action have NO default-src fallback — without
-              // them a <base> injection could hijack relative URLs and forms
-              // could post to arbitrary origins. Lock both to same-origin.
-              "base-uri 'self'",
-              "form-action 'self'",
-              "object-src 'none'",
-              `script-src 'self' 'unsafe-inline' https://browser.sentry-cdn.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
-              "style-src 'self' 'unsafe-inline'",
-              // Vercel Blob CDN uses the project's public blob store subdomain
-              "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
-              "font-src 'self'",
-              // blob store, Inngest Cloud API, Upstash Redis, Sentry ingestion
-              "connect-src 'self' https://*.vercel.app https://*.upstash.io https://o*.ingest.sentry.io https://*.public.blob.vercel-storage.com https://api.inngest.com",
-              "worker-src 'self' blob:",
-              "frame-ancestors 'none'",
-            ].join('; '),
-          },
+          // Content-Security-Policy is NOT here. It carries a per-request nonce so
+          // that inline scripts do not need 'unsafe-inline', and a nonce cannot be
+          // expressed in static config — middleware.ts builds and sets it. Adding a
+          // second CSP header here would not relax that one, it would intersect
+          // with it, and the nonced scripts would be blocked.
         ],
       },
     ]
