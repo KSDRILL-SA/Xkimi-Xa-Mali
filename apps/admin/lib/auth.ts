@@ -24,7 +24,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: env.AUTH_SECRET,
   trustHost: true,
   adapter: PrismaAdapter(db),
-  session: { strategy: 'jwt' },
+  // One day, against the member portal's seven and the NextAuth default of
+  // thirty. This session can grant admin rights, approve mandates and suspend
+  // members, so it is worth far more to an attacker than a member's and should
+  // survive for correspondingly less time.
+  //
+  // An idle window rather than a hard expiry: refreshed hourly, so an admin
+  // working through the day is never interrupted, while a session left open on
+  // an unattended machine overnight is gone by morning.
+  session: {
+    strategy: 'jwt',
+    maxAge: 24 * 60 * 60,
+    updateAge: 60 * 60,
+  },
   pages: {
     signIn: '/login',
     error:  '/login',

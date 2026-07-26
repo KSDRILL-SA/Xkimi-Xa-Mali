@@ -97,7 +97,7 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
         htmlFor="password"
         required
         error={errors.password?.message}
-        hint="Min. 8 characters, 1 uppercase, 1 number"
+        hint="At least 12 characters. A short phrase you will remember works well."
       >
         <Input
           id="password"
