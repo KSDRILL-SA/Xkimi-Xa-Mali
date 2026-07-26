@@ -16,6 +16,7 @@ import { Breadcrumb, PageHeader, Reveal, Alert } from '@xxm/ui'
 import { PenLine } from 'lucide-react'
 import { SignaturePadCard } from './SignaturePadCard'
 import { logger } from '@xxm/observability'
+import { requireAdmin } from '@/lib/admin-action'
 
 export const metadata: Metadata = { title: 'Settings' }
 
@@ -29,10 +30,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 
 async function saveSignatureAction(fd: FormData) {
   'use server'
-  const session = await auth()
-  if (!session?.user?.id) redirect('/login')
-  const roles = (session.user.roles as string[] | undefined) ?? []
-  if (!roles.includes('ADMIN')) redirect('/forbidden')
+  const { userId, roles: roles } = await requireAdmin('settings.saveSignature')
 
   const file = fd.get('signature')
   const displayName = (fd.get('displayName') as string | null)?.trim()
@@ -53,9 +51,9 @@ async function saveSignatureAction(fd: FormData) {
 
   try {
     if (mode === 'update') {
-      await updateSignature(session.user.id, roles, buffer, displayName)
+      await updateSignature(userId, roles, buffer, displayName)
     } else {
-      await createSignature(session.user.id, roles, buffer, displayName)
+      await createSignature(userId, roles, buffer, displayName)
     }
   } catch (err) {
     if (err instanceof SignatureLockError) errorCode = 'locked'
@@ -77,18 +75,18 @@ export default async function SettingsPage({
   searchParams: Promise<{ saved?: string; error?: string }>
 }) {
   const session = await auth()
-  if (!session?.user?.id) redirect('/login')
-  const roles = (session.user.roles as string[] | undefined) ?? []
+  const roles   = (session?.user?.roles as string[] | undefined) ?? []
   if (!roles.includes('ADMIN')) redirect('/forbidden')
+  const userId  = session!.user!.id!
 
   const params = await searchParams
   const saved = params.saved === '1'
   const errorMessage = params.error ? ERROR_MESSAGES[params.error] : undefined
 
   const [signature, lockStatus, history] = await Promise.all([
-    getSignatureMetadata(session.user.id, roles),
-    getLockStatus(session.user.id, roles),
-    getSignatureHistory(session.user.id, roles),
+    getSignatureMetadata(userId, roles),
+    getLockStatus(userId, roles),
+    getSignatureHistory(userId, roles),
   ])
 
   return (
