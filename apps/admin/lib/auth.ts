@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs'
 import { db } from './db'
 import { env } from './env'
 import { LoginSchema } from '@xxm/utils/schemas'
+import { seedRoleVersion } from './role-version'
 
 const MAX_LOGIN_ATTEMPTS = env.MAX_LOGIN_ATTEMPTS
 const LOCKOUT_DURATION_MS = env.LOCKOUT_DURATION_MINUTES * 60 * 1000
@@ -99,6 +100,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         await recordLoginHistory(user.id, true)
+
+        // Publish the version alongside the token that carries it. The Edge
+        // middleware can only read Redis, and it treats a missing key as "no
+        // change" — so without this an admin who never signs into the member app
+        // has no key, and their page views cannot be revoked at all. Actions are
+        // still caught either way, by the database check in requireAdmin.
+        await seedRoleVersion(user.id, user.roleVersion)
 
         return {
           id:    user.id,
