@@ -1,9 +1,14 @@
 # Deployment & Launch Runbook — Xkimm Xa Mali Foundation
 
 A practical go-live guide for the three apps. The **code is production-build
-verified** (web 75/75, admin 18/18, website 8/8 static pages compile). What's
+verified** (web 75/75, admin 19/19, website 8/8 static pages compile). What's
 left is **config, infra, and external integrations** — work through this in
 order.
+
+> **Setting up the environments for the first time?** Start with
+> [`docs/environment-setup-plan.md`](./docs/environment-setup-plan.md) — which
+> accounts to open, in what order, what has lead time, and which secrets must
+> match each other. Come back here once they exist.
 
 ---
 
