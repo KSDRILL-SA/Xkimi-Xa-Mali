@@ -1,7 +1,7 @@
-import Image from 'next/image'
 import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
 import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
+import { FoundersBackdrop } from './FoundersBackdrop'
 
 export async function HeroSection() {
   const { members } = await getPublicStats()
@@ -12,23 +12,11 @@ export async function HeroSection() {
       className="relative min-h-screen flex flex-col overflow-hidden"
       aria-labelledby="hero-headline"
     >
-      {/* ── Background image ──────────────────────────────────────── */}
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1920&q=80"
-          alt=""
-          fill
-          priority
-          quality={90}
-          className="object-cover object-center"
-          sizes="100vw"
-        />
+      {/* ── Background: the four founders, rotating ───────────────── */}
+      <FoundersBackdrop />
 
-        {/* layered overlays for depth */}
-        <div className="absolute inset-0 bg-xxm-green-950/75" />
-        <div className="absolute inset-0 bg-gradient-to-b from-xxm-green-950/30 via-transparent to-xxm-green-950/90" />
-        <div className="absolute inset-0 bg-gradient-to-r from-xxm-green-950/60 via-transparent to-xxm-green-950/40" />
-
+      {/* ── Ambient light + grain, above the portraits ────────────── */}
+      <div className="absolute inset-0 z-0 pointer-events-none">
         {/* animated light orbs */}
         <div
           className="absolute top-1/4 right-1/4 w-[600px] h-[600px] rounded-full opacity-10 animate-orb-drift-1 pointer-events-none"
