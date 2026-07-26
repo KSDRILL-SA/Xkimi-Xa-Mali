@@ -9,6 +9,8 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 vi.mock('@/lib/env', () => ({
   env: {
     ENCRYPTION_KEY: '0'.repeat(64),
+    // The PDF chrome prints the site's hostname in its footer.
+    NEXT_PUBLIC_SITE_URL: 'https://example.invalid',
   },
 }))
 

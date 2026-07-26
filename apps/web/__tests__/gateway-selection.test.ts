@@ -14,10 +14,17 @@ vi.mock('@/lib/env', () => ({
 /**
  * Selection happens at module load, so each case needs a fresh module registry
  * with the environment already in place.
+ *
+ * DEPLOY_ENV and VERCEL_ENV are cleared first because they outrank NODE_ENV when
+ * deciding whether this is the live deployment, and both are set in environments
+ * these tests run in — CI sets DEPLOY_ENV at job level. Leaving either in place
+ * would quietly turn every "in production" case below into a non-production one.
  */
 async function loadGateway(env: Record<string, string | undefined>) {
   vi.resetModules()
   const previous = { ...process.env }
+  delete process.env.DEPLOY_ENV
+  delete process.env.VERCEL_ENV
   Object.assign(process.env, env)
   try {
     return await import('@/integrations/payment')
