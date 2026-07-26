@@ -280,8 +280,13 @@ export default async function AboutPage() {
           </div>
         </section>
 
-        {/* ── Founders ──────────────────────────────────────────────── */}
-        <section className="py-20 md:py-32 px-4 bg-xxm-champagne">
+        {/* ── Founders ────────────────────────────────────────────────
+            id + scroll-margin are what the "Brotherhood" nav link lands on;
+            without the margin the heading sits under the fixed navbar.    */}
+        <section
+          id="founders"
+          className="py-20 md:py-32 px-4 bg-xxm-champagne scroll-mt-[var(--nav-height)]"
+        >
           <div className="max-w-screen-xl mx-auto">
             <div className="flex flex-col items-center text-center mb-16 gap-3">
               <span className="inline-flex items-center gap-2 bg-xxm-gold/10 border border-xxm-gold/20 rounded-full px-4 py-1.5 text-xxm-gold-dark text-xs font-bold tracking-widest uppercase">
