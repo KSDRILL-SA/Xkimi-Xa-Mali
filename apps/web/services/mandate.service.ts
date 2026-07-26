@@ -1,4 +1,6 @@
-import { decrypt } from '@/lib/encryption'
+// `decrypt` is used where the plaintext is submitted to the payment gateway and
+// must fail loudly; `maskStoredSecret` where it is only displayed.
+import { decrypt, maskStoredSecret } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
 import {
   MandateNotFoundError,
@@ -64,7 +66,7 @@ export async function getMandates(userId: string, requesterId: string, requester
     ...m,
     bankAccount: {
       ...m.bankAccount,
-      accountNumberMasked: maskBankAccount(m.bankAccount.accountNumber),
+      accountNumberMasked: maskBankAccount(m.bankAccount.accountNumber, m.bankAccountId),
       accountNumber: undefined,
     },
   }))
@@ -80,7 +82,7 @@ export async function getMandate(mandateId: string, requesterId: string, request
     ...mandate,
     bankAccount: {
       ...mandate.bankAccount,
-      accountNumberMasked: maskBankAccount(mandate.bankAccount.accountNumber),
+      accountNumberMasked: maskBankAccount(mandate.bankAccount.accountNumber, mandate.bankAccountId),
       accountNumber: undefined,
     },
   }
@@ -421,9 +423,8 @@ export function planDebitWarnings(
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function maskBankAccount(encrypted: string): string {
-  const plain = decrypt(encrypted)
-  return plain.slice(-4).padStart(plain.length, '*')
+function maskBankAccount(encrypted: string, bankAccountId: string): string {
+  return maskStoredSecret(encrypted, { field: 'bankAccount.accountNumber', bankAccountId })
 }
 
 function mapAccountType(type: AccountType): GatewayAccountType {
