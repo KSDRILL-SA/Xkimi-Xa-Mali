@@ -10,7 +10,7 @@ const links = {
     { label: 'Features',      href: '/#features' },
     { label: 'How It Works',  href: '/#how-it-works' },
     { label: 'The Mission',   href: '/#mission' },
-    { label: 'Brotherhood',   href: '/#founders' },
+    { label: 'Brotherhood',   href: '/about#founders' },
   ],
   Account: [
     { label: 'Sign In',       href: `${APP_URL}/login` },
