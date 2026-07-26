@@ -8,6 +8,7 @@ import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { CreditCard } from 'lucide-react'
 import { MandatesTable, type MandateRow } from './MandatesTable'
 import Link from 'next/link'
+import { requireAdmin } from '@/lib/admin-action'
 
 export const metadata: Metadata = { title: 'Mandates' }
 
@@ -21,22 +22,16 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 async function approveMandateAction(fd: FormData) {
   'use server'
   const mandateId = fd.get('mandateId') as string
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
-  await approveMandate(s.user.id, sr, mandateId)
+  const { userId, roles: sr } = await requireAdmin('mandate.approve')
+  await approveMandate(userId, sr, mandateId)
   revalidatePath('/mandates')
 }
 
 async function rejectMandateAction(fd: FormData) {
   'use server'
   const mandateId = fd.get('mandateId') as string
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
-  await rejectMandate(s.user.id, sr, mandateId)
+  const { userId, roles: sr } = await requireAdmin('mandate.reject')
+  await rejectMandate(userId, sr, mandateId)
   revalidatePath('/mandates')
 }
 

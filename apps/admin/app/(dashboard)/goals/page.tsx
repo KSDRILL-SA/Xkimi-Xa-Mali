@@ -7,6 +7,7 @@ import { formatZAR, formatDate, MONTHS } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { Target } from 'lucide-react'
 import { GoalsTable, type GoalRow } from './GoalsTable'
+import { requireAdmin } from '@/lib/admin-action'
 
 export const metadata: Metadata = { title: 'Goals' }
 
@@ -20,57 +21,42 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 async function activateGoalAction(fd: FormData) {
   'use server'
   const goalId = fd.get('goalId') as string
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
-  await activateGoal(s.user.id, sr, goalId)
+  const { userId, roles: sr } = await requireAdmin('goal.activate')
+  await activateGoal(userId, sr, goalId)
   revalidatePath('/goals')
 }
 
 async function deleteGoalAction(fd: FormData) {
   'use server'
   const goalId = fd.get('goalId') as string
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
-  await deleteGoal(s.user.id, sr, goalId)
+  const { userId, roles: sr } = await requireAdmin('goal.delete')
+  await deleteGoal(userId, sr, goalId)
   revalidatePath('/goals')
 }
 
 async function lockGoalAction(fd: FormData) {
   'use server'
   const goalId = fd.get('goalId') as string
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
-  await lockGoal(s.user.id, sr, goalId)
+  const { userId, roles: sr } = await requireAdmin('goal.lock')
+  await lockGoal(userId, sr, goalId)
   revalidatePath('/goals')
 }
 
 async function setPrimaryGoalAction(fd: FormData) {
   'use server'
   const goalId = fd.get('goalId') as string
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
-  await setPrimaryGoal(s.user.id, sr, goalId)
+  const { userId, roles: sr } = await requireAdmin('goal.setPrimary')
+  await setPrimaryGoal(userId, sr, goalId)
   revalidatePath('/goals')
 }
 
 async function recordGoalProgressAction(fd: FormData) {
   'use server'
   const goalId = fd.get('goalId') as string
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
+  const { userId, roles: sr } = await requireAdmin('goal.recordProgress')
   const amount = Number(fd.get('amount'))
   if (!amount || amount <= 0) return
-  await recordGoalProgress(s.user.id, sr, goalId, amount)
+  await recordGoalProgress(userId, sr, goalId, amount)
   revalidatePath('/goals')
 }
 
@@ -112,10 +98,7 @@ export default async function GoalsPage({
 
   async function handleCreate(fd: FormData) {
     'use server'
-    const s = await auth()
-    if (!s?.user?.id) redirect('/login')
-    const r = (s.user.roles as string[] | undefined) ?? []
-    if (!r.includes('ADMIN')) redirect('/forbidden')
+    const { userId, roles: r } = await requireAdmin('goal.create')
     const title         = (fd.get('title') as string)?.trim()
     const description   = (fd.get('description') as string)?.trim() || undefined
     const type          = fd.get('type') as string
@@ -126,7 +109,7 @@ export default async function GoalsPage({
 
     if (!title || !type || !targetAmount || isNaN(targetAmount)) return
 
-    await createGoal(s.user.id, r, { title, description, type, targetAmount, deadline })
+    await createGoal(userId, r, { title, description, type, targetAmount, deadline })
     redirect('/goals?created=1')
   }
 

@@ -5,6 +5,7 @@ import { listAllContributions, generateContributions } from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
 import { Alert, Reveal, RouterPagination } from '@xxm/ui'
 import { Wallet, ChevronDown, Zap } from 'lucide-react'
+import { requireAdmin } from '@/lib/admin-action'
 
 export const metadata: Metadata = { title: 'Contributions' }
 
@@ -57,14 +58,11 @@ export default async function ContributionsPage({
 
   async function generate(fd: FormData) {
     'use server'
-    const s = await auth()
-    if (!s?.user?.id) redirect('/login')
-    const r = (s.user.roles as string[] | undefined) ?? []
-    if (!r.includes('ADMIN')) redirect('/forbidden')
+    const { userId, roles: r } = await requireAdmin('contributions.generate', { bulk: true })
     const m = parseInt(fd.get('month') as string, 10)
     const y = parseInt(fd.get('year')  as string, 10)
 
-    const result = await generateContributions(s.user.id, r, m, y)
+    const result = await generateContributions(userId, r, m, y)
     redirect(`/contributions?month=${m}&year=${y}&generated=1&created=${result.created}&skipped=${result.skipped}&total=${result.total}`)
   }
 

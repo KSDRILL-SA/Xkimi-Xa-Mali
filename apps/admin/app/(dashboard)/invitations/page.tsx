@@ -9,16 +9,14 @@ import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { Mail } from 'lucide-react'
 import { CreateInviteModal } from '@/components/admin/CreateInviteModal'
 import { InvitationsTable, type InviteRow } from './InvitationsTable'
+import { requireAdmin } from '@/lib/admin-action'
 
 type CreatedInvite = { code: string; firstName: string; lastName: string; email: string }
 type InviteState   = { data?: CreatedInvite; error?: string }
 
 async function createInvite(_prev: InviteState, fd: FormData): Promise<InviteState> {
   'use server'
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
+  const { userId } = await requireAdmin('invitation.create')
 
   const result = await internalAdminPost<CreatedInvite>(
     '/api/v1/admin/invitations',
@@ -29,7 +27,7 @@ async function createInvite(_prev: InviteState, fd: FormData): Promise<InviteSta
       phone:          fd.get('phone'),
       minimumAmount:  Number(fd.get('minimumAmount')),
     },
-    { adminUserId: s.user.id },
+    { adminUserId: userId },
   )
 
   if (!result.ok)   return { error: result.error?.message ?? 'Failed to create invitation' }
@@ -50,11 +48,8 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 async function revokeInvitationAction(fd: FormData) {
   'use server'
   const id = fd.get('id') as string
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const sr = (s.user.roles as string[] | undefined) ?? []
-  if (!sr.includes('ADMIN')) redirect('/forbidden')
-  await revokeInvitation(s.user.id, sr, id)
+  const { userId, roles: sr } = await requireAdmin('invitation.revoke')
+  await revokeInvitation(userId, sr, id)
   revalidatePath('/invitations')
 }
 

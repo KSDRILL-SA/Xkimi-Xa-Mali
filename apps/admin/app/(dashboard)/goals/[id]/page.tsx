@@ -13,23 +13,9 @@ import { GoalOverview } from './GoalOverview'
 import { GoalFundingPanel } from './GoalFundingPanel'
 import { GoalEditForm } from './GoalEditForm'
 import { GoalProgressHistory } from './GoalProgressHistory'
+import { requireAdmin } from '@/lib/admin-action'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
-
-/**
- * Re-establish the admin identity inside a server action. Every action must do
- * this itself rather than trust anything captured from the render — a server
- * action is a public endpoint. Declared at module scope on purpose: a
- * `'use server'` function may not close over a helper defined in the component
- * body (functions aren't serialisable as bound args).
- */
-async function requireAdmin(): Promise<{ userId: string; roles: string[] }> {
-  const s = await auth()
-  if (!s?.user?.id) redirect('/login')
-  const roles = (s.user.roles as string[] | undefined) ?? []
-  if (!roles.includes('ADMIN')) redirect('/forbidden')
-  return { userId: s.user.id, roles }
-}
 
 export default async function AdminGoalDetailPage({
   params, searchParams,
@@ -59,7 +45,7 @@ export default async function AdminGoalDetailPage({
   // ── Server actions ──────────────────────────────────────────────
   async function updateAction(fd: FormData) {
     'use server'
-    const { userId, roles: r } = await requireAdmin()
+    const { userId, roles: r } = await requireAdmin('goal.update')
 
     const title       = (fd.get('title') as string)?.trim()
     const description = (fd.get('description') as string)?.trim() || null
@@ -81,7 +67,7 @@ export default async function AdminGoalDetailPage({
 
   async function activateAction() {
     'use server'
-    const { userId, roles: r } = await requireAdmin()
+    const { userId, roles: r } = await requireAdmin('goal.activate')
     try {
       await activateGoal(userId, r, id)
     } catch (e) {
@@ -94,7 +80,7 @@ export default async function AdminGoalDetailPage({
 
   async function lockAction() {
     'use server'
-    const { userId, roles: r } = await requireAdmin()
+    const { userId, roles: r } = await requireAdmin('goal.lock')
     try {
       await lockGoal(userId, r, id)
     } catch (e) {
@@ -107,7 +93,7 @@ export default async function AdminGoalDetailPage({
 
   async function deleteAction() {
     'use server'
-    const { userId, roles: r } = await requireAdmin()
+    const { userId, roles: r } = await requireAdmin('goal.delete')
     await deleteGoal(userId, r, id)
     revalidatePath('/goals')
     redirect('/goals')
@@ -115,7 +101,7 @@ export default async function AdminGoalDetailPage({
 
   async function progressAction(fd: FormData) {
     'use server'
-    const { userId, roles: r } = await requireAdmin()
+    const { userId, roles: r } = await requireAdmin('goal.recordProgress')
     const amount = Number(fd.get('amount'))
     const note   = (fd.get('note') as string)?.trim() || undefined
     if (!amount || amount <= 0) redirect(`/goals/${id}?error=progress`)
@@ -131,7 +117,7 @@ export default async function AdminGoalDetailPage({
 
   async function primaryAction() {
     'use server'
-    const { userId, roles: r } = await requireAdmin()
+    const { userId, roles: r } = await requireAdmin('goal.setPrimary')
     try {
       await setPrimaryGoal(userId, r, id)
     } catch (e) {
