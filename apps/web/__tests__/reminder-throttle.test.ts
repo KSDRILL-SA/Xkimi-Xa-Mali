@@ -11,7 +11,7 @@ vi.mock('@xxm/observability', () => ({
 }))
 
 import { db } from '@/lib/db'
-import { findRemindedContributionIds } from '@/services/contribution.service'
+import { findRemindedContributionIds, findNotifiedContributionIds } from '@/services/contribution.service'
 
 const mock = <T extends (...a: never[]) => unknown>(fn: unknown) => fn as MockedFunction<T>
 
@@ -49,5 +49,30 @@ describe('the early-payment reminder is throttled on evidence, not on a cache', 
     // would be the shape #253 removed from the nightly reconciliation.
     await findRemindedContributionIds(Array.from({ length: 400 }, (_, i) => `c${i}`))
     expect(db.$queryRaw).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('findNotifiedContributionIds — a window for messages that repeat', () => {
+  it('looks at all time when no window is given, for a once-ever message', async () => {
+    await findNotifiedContributionIds('contribution-due-reminder', ['c1'])
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1)
+  })
+
+  it('honours a window, so an overdue member hears from us daily and not hourly', async () => {
+    // A contribution stays overdue until it is paid. Without a window, a member
+    // already behind on money would be sent the same SMS on every single run.
+    const since = new Date(Date.now() - 86_400_000)
+    await findNotifiedContributionIds('overdue-reminder', ['c1'], since)
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns what the database matched', async () => {
+    mock(db.$queryRaw).mockResolvedValue([{ contributionId: 'c2' }] as never)
+    expect(await findNotifiedContributionIds('overdue-reminder', ['c1', 'c2'])).toEqual(['c2'])
+  })
+
+  it('asks nothing for an empty batch', async () => {
+    expect(await findNotifiedContributionIds('overdue-reminder', [])).toEqual([])
+    expect(db.$queryRaw).not.toHaveBeenCalled()
   })
 })

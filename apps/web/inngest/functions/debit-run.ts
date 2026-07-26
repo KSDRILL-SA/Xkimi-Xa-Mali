@@ -37,10 +37,12 @@ export const debitRun = inngest.createFunction(
       if (mandate.user.status !== 'ACTIVE') continue
       if (!mandate.netcashMandateId) continue
 
-      const delayed = await step.run(`check-delay-${mandate.id}`, () =>
-        redis.get(`xxm:delay:${mandate.id}:${periodKey}`),
-      )
-      if (delayed) continue
+      // A delay the member asked for, read from the mandate rather than a cache.
+      // A date still in the future means they have moved this debit, and the
+      // delay handler will charge them on the day they chose. Previously this
+      // was a Redis key, so with no cache configured the delay was invisible and
+      // the debit went ahead on the original date regardless.
+      if (mandate.delayedUntil && new Date(mandate.delayedUntil) > new Date()) continue
 
       const idempotencyKey = `debit:run:${mandate.id}:${periodKey}`
       const alreadyRan = await step.run(`check-idempotency-${mandate.id}`, async () => {

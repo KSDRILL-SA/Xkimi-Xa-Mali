@@ -15,7 +15,6 @@ import {
 import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '@/lib/validation/mandate'
 import type { MandateStatus, AccountType, Prisma } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
-import { redis } from '@/lib/redis'
 import { logger } from '@xxm/observability'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
@@ -298,15 +297,18 @@ export async function requestDelay(
     await paymentGateway.delayMandate(mandate.netcashMandateId, data.newDate)
   }
 
-  // Mark this period's debit as delayed so the nightly debit-run skips it.
-  // Key derived from getNextDebitDate so it matches what debit-run checks.
-  const nextDebit = paymentGateway.getNextDebitDate(mandate.debitDay)
-  const [periodYear, periodMonth] = nextDebit.split('-')
-  await redis.set(
-    `xxm:delay:${mandateId}:${periodYear}-${periodMonth}`,
-    '1',
-    { ex: 60 * 60 * 24 * 90 },
-  )
+  // Record the delay on the mandate itself so the nightly debit-run skips it.
+  //
+  // This used to be a Redis key. The cache client is a no-op shim whenever
+  // Upstash is not configured — its set() discards and its get() returns null —
+  // so the delay was never written and never read, and the member was debited on
+  // the original date despite having asked not to be. Money leaving someone's
+  // account on a day they said they could not afford is not something to leave
+  // resting on a cache.
+  //
+  // delayedUntil already existed on the model, and was indexed, and no code had
+  // ever written to or read from it.
+  await mandateRepo.update(mandateId, { delayedUntil: newDate })
 
   // Emit event so mandate-delay-handler sleeps until the new date and charges then.
   await inngest.send({
@@ -387,14 +389,26 @@ export type DebitWarningTarget = {
  * side-effect free for straightforward testing.
  */
 export function planDebitWarnings(
-  mandates: ReadonlyArray<{ id: string; userId: string; amount: number; userStatus: string }>,
+  mandates: ReadonlyArray<{
+    id: string
+    userId: string
+    amount: number
+    userStatus: string
+    /** A date the member moved this debit to. Serialised as a string across an
+     *  Inngest step boundary, so both shapes are accepted. */
+    delayedUntil?: Date | string | null
+  }>,
   settledUserIds: ReadonlySet<string>,
   atRiskUserIds: ReadonlySet<string>,
+  now: Date = new Date(),
 ): DebitWarningTarget[] {
   const targets: DebitWarningTarget[] = []
   for (const m of mandates) {
     if (m.userStatus !== 'ACTIVE') continue
     if (settledUserIds.has(m.userId)) continue
+    // No point warning someone about a debit that will not run: they have moved
+    // it, and the delay handler charges them on the day they chose.
+    if (m.delayedUntil && new Date(m.delayedUntil) > now) continue
     targets.push({
       mandateId: m.id,
       userId: m.userId,
