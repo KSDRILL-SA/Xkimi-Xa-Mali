@@ -15,6 +15,7 @@ import {
 import { Breadcrumb, PageHeader, Reveal, Alert } from '@xxm/ui'
 import { PenLine } from 'lucide-react'
 import { SignaturePadCard } from './SignaturePadCard'
+import { logger } from '@xxm/observability'
 
 export const metadata: Metadata = { title: 'Settings' }
 
@@ -61,7 +62,7 @@ async function saveSignatureAction(fd: FormData) {
     else if (err instanceof AdminConflictError) errorCode = 'conflict'
     else if (err instanceof AdminNotFoundError) errorCode = 'not_found'
     else {
-      console.error('Signature save failed', err)
+      logger.error('Signature save failed', { err })
       errorCode = 'failed'
     }
   }
