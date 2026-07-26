@@ -6,6 +6,7 @@ import { db } from './db'
 import { env } from './env'
 import { authConfig } from './auth.config'
 import { LoginSchema } from './validation/auth'
+import { seedRoleVersion } from './role-version'
 import { logger } from '@xxm/observability'
 
 const MAX_LOGIN_ATTEMPTS = env.MAX_LOGIN_ATTEMPTS
@@ -86,6 +87,13 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
   }
 
   await recordLoginHistory(user.id, true)
+
+  // Publish the authoritative version alongside the token that carries it, so
+  // every live session has a stored counterpart. Without this a user whose role
+  // has never changed has no key, and the middleware cannot tell that absence
+  // apart from a key that was evicted — which is the difference between "no
+  // revocation has happened" and "a revocation may have been lost".
+  await seedRoleVersion(user.id, user.roleVersion)
 
   return {
     id: user.id,

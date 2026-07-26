@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { logger } from '@xxm/observability'
+import { clientIpFromHeaders } from '@xxm/utils/client-ip'
 import { auth } from '@/lib/auth'
 import { adminActionRatelimit, adminBulkActionRatelimit } from '@/lib/rate-limit'
 
@@ -19,14 +20,16 @@ export interface AdminActionOptions {
   bulk?: boolean
 }
 
-/** First forwarded hop, matching how the member app derives a client IP. */
+/**
+ * The client IP, via the same trust model the member app uses.
+ *
+ * This used to read `cf-connecting-ip` first. That header is authoritative
+ * behind Cloudflare and attacker-controlled anywhere else, and this value ends
+ * up in the audit trail for every admin action — so a caller could have chosen
+ * what got recorded about them.
+ */
 async function clientIp(): Promise<string> {
-  const h = await headers()
-  return (
-    h.get('cf-connecting-ip') ??
-    h.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    'unknown'
-  )
+  return clientIpFromHeaders(await headers()) ?? 'unknown'
 }
 
 /**
