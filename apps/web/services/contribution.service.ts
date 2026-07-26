@@ -690,3 +690,37 @@ export async function generateMonthlyContributions(
 
   return { created, skipped, total: eligible.length }
 }
+
+/**
+ * Of the given contributions, those that already have an early-payment reminder
+ * on record.
+ *
+ * The notification row is the evidence a reminder was sent, so it is what the
+ * job throttles on. Previously that was a Redis key, which failed open whenever
+ * Upstash was not configured — the no-op cache always reads as "nothing here",
+ * so the same member was reminded on every run of the window.
+ *
+ * One query for the whole batch: the reminder job runs over everyone falling due
+ * that day, so a per-contribution lookup would be the shape #253 removed.
+ */
+export async function findRemindedContributionIds(
+  contributionIds: readonly string[],
+): Promise<string[]> {
+  if (contributionIds.length === 0) return []
+
+  // Matched against the given ids inside the database rather than fetching every
+  // reminder ever sent and filtering here — that would be the unbounded shape
+  // #253 removed from the nightly job, growing with history forever.
+  //
+  // Raw SQL because Prisma can compare a JSON path to one value but not to a
+  // list, and the list is the whole point.
+  const rows = await db.$queryRaw<Array<{ contributionId: string }>>`
+    SELECT DISTINCT n.payload->>'contributionId' AS "contributionId"
+    FROM notifications n
+    JOIN notification_templates t ON t.id = n."templateId"
+    WHERE t.slug = 'contribution-due-reminder'
+      AND n.payload->>'contributionId' = ANY(${contributionIds as string[]})
+  `
+
+  return rows.map((r) => r.contributionId)
+}
