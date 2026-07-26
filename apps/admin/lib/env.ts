@@ -11,6 +11,12 @@ const schema = z.object({
   // Shared secret for internal admin→web API authentication
   ADMIN_API_SECRET: z.string().min(32).optional(),
 
+  // Shared with the member app. Optional: without them the admin action limiter
+  // allows everything through rather than refusing to boot, which matches how
+  // the member app degrades.
+  UPSTASH_REDIS_REST_URL:   z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+
   MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
   LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
 

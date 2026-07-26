@@ -4,6 +4,7 @@ import { auth } from '@/lib/auth'
 import { internalAdminPost } from '@/lib/api'
 import { Alert, Reveal } from '@xxm/ui'
 import { Megaphone, MessageSquare, Mail, Layers, Inbox, Users, UserCheck, Clock, Ban, Send } from 'lucide-react'
+import { requireAdmin } from '@/lib/admin-action'
 
 export const metadata: Metadata = { title: 'Broadcast' }
 
@@ -25,10 +26,7 @@ export default async function NotificationsPage({
 
   async function broadcast(fd: FormData) {
     'use server'
-    const s = await auth()
-    if (!s?.user?.id) redirect('/login')
-    const r = (s?.user?.roles as string[] | undefined) ?? []
-    if (!r.includes('ADMIN')) redirect('/forbidden')
+    await requireAdmin('notifications.broadcast', { bulk: true })
 
     const message = (fd.get('message') as string)?.trim()
     const channel = fd.get('channel') as Channel

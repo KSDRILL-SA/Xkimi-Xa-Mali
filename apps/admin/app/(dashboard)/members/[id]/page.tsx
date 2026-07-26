@@ -7,6 +7,7 @@ import { Breadcrumb, Card, CardHeader, CardBody, PageHeader, Reveal } from '@xxm
 import { UserCircle } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
 import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
+import { requireAdmin } from '@/lib/admin-action'
 
 export const metadata: Metadata = { title: 'Member Detail' }
 
@@ -35,42 +36,30 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
   async function handleStatusChange(fd: FormData) {
     'use server'
-    const s = await auth()
-    if (!s?.user?.id) redirect('/login')
-    const r = (s.user.roles as string[] | undefined) ?? []
-    if (!r.includes('ADMIN')) redirect('/forbidden')
-    await setMemberStatus(s.user.id, r, id, fd.get('status') as string)
+    const { userId, roles: r } = await requireAdmin('member.changeStatus')
+    await setMemberStatus(userId, r, id, fd.get('status') as string)
     revalidatePath(`/members/${id}`)
     revalidatePath('/members')
   }
 
   async function handleUnlock() {
     'use server'
-    const s = await auth()
-    if (!s?.user?.id) redirect('/login')
-    const r = (s.user.roles as string[] | undefined) ?? []
-    if (!r.includes('ADMIN')) redirect('/forbidden')
-    await unlockMember(s.user.id, r, id)
+    const { userId, roles: r } = await requireAdmin('member.unlock')
+    await unlockMember(userId, r, id)
     revalidatePath(`/members/${id}`)
   }
 
   async function handlePromoteAdmin() {
     'use server'
-    const s = await auth()
-    if (!s?.user?.id) redirect('/login')
-    const r = (s.user.roles as string[] | undefined) ?? []
-    if (!r.includes('ADMIN')) redirect('/forbidden')
-    await setMemberRole(s.user.id, r, id, 'ADMIN', true)
+    const { userId, roles: r } = await requireAdmin('member.grantAdmin')
+    await setMemberRole(userId, r, id, 'ADMIN', true)
     revalidatePath(`/members/${id}`)
   }
 
   async function handleRemoveAdmin() {
     'use server'
-    const s = await auth()
-    if (!s?.user?.id) redirect('/login')
-    const r = (s.user.roles as string[] | undefined) ?? []
-    if (!r.includes('ADMIN')) redirect('/forbidden')
-    await setMemberRole(s.user.id, r, id, 'ADMIN', false)
+    const { userId, roles: r } = await requireAdmin('member.removeAdmin')
+    await setMemberRole(userId, r, id, 'ADMIN', false)
     revalidatePath(`/members/${id}`)
   }
 
