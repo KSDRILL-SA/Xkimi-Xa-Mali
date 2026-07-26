@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getMonthlyReportSummary } from '@/lib/services'
+import { getMonthlyReportSummary, getNudgeOutcomes } from '@/lib/services'
+import { NudgeOutcomes } from './NudgeOutcomes'
 import { formatZAR, formatMonth, MONTHS } from '@xxm/utils'
 import { ProgressBar, Reveal } from '@xxm/ui'
 import { Download, FileText, TrendingUp, Users, Wallet, BarChart3, ChevronDown, CheckCircle2 } from 'lucide-react'
@@ -31,7 +32,10 @@ export default async function ReportsPage({
   const month = Math.min(12, Math.max(1, parseInt(params.month ?? String(now.getMonth() + 1), 10)))
   const year  = Math.max(2024, parseInt(params.year ?? String(now.getFullYear()), 10))
 
-  const summary = await getMonthlyReportSummary(roles, month, year)
+  const [summary, nudgeOutcomes] = await Promise.all([
+    getMonthlyReportSummary(roles, month, year),
+    getNudgeOutcomes(roles, month, year),
+  ])
 
   const yearOpts = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
 
@@ -178,6 +182,9 @@ export default async function ReportsPage({
           </div>
         </Reveal>
       )}
+
+      {/* ── Did the reminders land? ───────────────────────────────── */}
+      <NudgeOutcomes outcomes={nudgeOutcomes} />
 
     </div>
   )
