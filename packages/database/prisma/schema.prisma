@@ -792,6 +792,14 @@ model CommunityMessage {
   @@index([createdAt])
   @@index([userId, createdAt])
   @@index([isPinned])
+  // Two PARTIAL indexes serve the board itself and live in raw SQL, because
+  // @@index cannot express a WHERE clause:
+  //   community_messages_board_idx    (isPinned DESC, createdAt DESC)
+  //                                   WHERE isDeleted = false AND replyToId IS NULL
+  //   community_messages_replies_idx  (replyToId, createdAt) WHERE isDeleted = false
+  // A plain composite on the same columns was measured and the planner ignored
+  // it; restricting each index to the rows its query wants is what made the
+  // board page 37x faster. See the 20260726140000 migration.
   @@map("community_messages")
 }
 
