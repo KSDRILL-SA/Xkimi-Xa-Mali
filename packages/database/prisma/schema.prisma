@@ -4,7 +4,12 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  // The app runs through Neon's pooled endpoint. Migrations cannot: a connection
+  // pooler multiplexes statements across backends, so the advisory lock and
+  // session state `prisma migrate` relies on do not survive. DIRECT_DATABASE_URL
+  // points at the unpooled endpoint and is used for migrations only.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ─── Enums ────────────────────────────────────────────────────────────────────

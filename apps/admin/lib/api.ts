@@ -1,3 +1,5 @@
+import { WEB_BASE_URL } from './env'
+
 export class ApiClientError extends Error {
   constructor(public code: string, message: string, public status: number) {
     super(message)
@@ -9,7 +11,7 @@ type ApiEnvelope<T> = { data: T; meta: unknown }
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const isServer = typeof window === 'undefined'
   const base = isServer
-    ? (process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000')
+    ? WEB_BASE_URL
     : ''
 
   const headers: Record<string, string> = {}
@@ -59,7 +61,7 @@ export async function internalAdminPost<T = unknown>(
   body: unknown,
   opts: { adminUserId?: string } = {},
 ): Promise<InternalResult<T>> {
-  const base   = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000'
+  const base   = WEB_BASE_URL
   const secret = process.env['ADMIN_API_SECRET']
   if (!secret) return { ok: false, status: 500, data: null, error: { message: 'ADMIN_API_SECRET not configured' } }
 

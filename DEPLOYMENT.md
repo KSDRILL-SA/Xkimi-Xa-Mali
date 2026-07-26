@@ -23,9 +23,9 @@ Create one Vercel project per app, all from this monorepo:
 
 | App | Root directory | Port (dev) | Domain |
 |-----|----------------|------------|--------|
-| Member portal | `apps/web` | 3000 | `app.xkimmxamali.co.za` |
-| Admin | `apps/admin` | 3002 | `admin.xkimmxamali.co.za` |
-| Marketing | `apps/website` | 3001 | `xkimmxamali.co.za` |
+| Member portal | `apps/web` | 3000 | `app.<your-domain>` |
+| Admin | `apps/admin` | 3002 | `admin.<your-domain>` |
+| Marketing | `apps/website` | 3001 | `<your-domain>` |
 
 - Framework preset: **Next.js**. Build command: default (`next build`).
 - Install command: `npm ci` at the repo root (monorepo).
@@ -42,11 +42,11 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 | `AUTH_SECRET` | 32+ chars, unique per environment. Set on **web + admin**. |
 | `ENCRYPTION_KEY` | **64 hex chars. SET ONCE, NEVER CHANGE.** It decrypts stored bank/ID numbers — rotating it makes existing encrypted data unreadable. |
 | `ADMIN_API_SECRET` | 32+ chars. Must be **identical** on web + admin (admin→web internal calls). |
-| `WEB_INTERNAL_URL` | (admin) the web app's prod URL, e.g. `https://app.xkimmxamali.co.za`. |
+| `WEB_INTERNAL_URL` | (admin) the web app's prod URL, e.g. `https://app.<your-domain>`. |
 | `NEXTAUTH_URL` | each app's own prod URL. |
 | `NETCASH_SERVICE_KEY` | **production** service key. The build **fails without it** — no silent start. |
 | `NETCASH_WEBHOOK_SECRET` | production webhook signing secret. Also **build-enforced**: without it every callback fails its signature check, so debits collect and nothing records them. |
-| `NETCASH_API_URL` | ⚠️ **defaults to the TEST gateway** — you MUST set the **production** Netcash URL or no real debits happen. |
+| `NETCASH_API_URL` | The **production** Netcash URL. It no longer defaults to the test gateway — the build fails without it, rather than silently submitting debits that move no money. |
 | `BULKSMS_USERNAME` / `_PASSWORD` | live SMS sending. |
 | `RESEND_API_KEY` / `RESEND_FROM_EMAIL` | verified sending domain. |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | prod Redis (rate-limit + cache). |
@@ -59,7 +59,7 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 
 ```bash
 # from packages/database, with prod DATABASE_URL exported
-npx prisma migrate deploy   # applies ALL 14 migrations (incl. ledger, inbox, webhook-dedupe, goal engagement, pledges)
+npx prisma migrate deploy   # applies ALL 29 migrations (incl. ledger, inbox, webhook-dedupe, goal engagement, pledges)
 npm run db:seed             # roles + founder accounts
 ```
 
@@ -71,7 +71,7 @@ npm run db:seed             # roles + founder accounts
 ## 4. Inngest (durable jobs)
 
 - Register the prod app's serve endpoint with Inngest cloud:
-  `https://app.xkimmxamali.co.za/api/v1/webhooks/inngest`
+  `https://app.<your-domain>/api/v1/webhooks/inngest`
 - Set `INNGEST_EVENT_KEY` + `INNGEST_SIGNING_KEY`. Without this, the cron jobs
   **do not fire**: debit runs, ledger + contribution reconciliation, badge
   recalc, **financial anomaly watch**, **monthly statement notice**, invite
@@ -80,7 +80,7 @@ npm run db:seed             # roles + founder accounts
 ## 5. Netcash DebiCheck (the money gate)
 
 1. Obtain **production** service key + webhook secret from Netcash.
-2. Register the webhook URL: `https://app.xkimmxamali.co.za/api/v1/webhooks/netcash`.
+2. Register the webhook URL: `https://app.<your-domain>/api/v1/webhooks/netcash`.
 3. Confirm Netcash's source IPs match the app's IP allowlist (the webhook
    verifies signature **and** IP).
 4. Set `NETCASH_API_URL` to the **production** endpoint.

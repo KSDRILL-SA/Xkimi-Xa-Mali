@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Playfair_Display } from 'next/font/google'
+import { siteEnv } from '@/lib/env'
 import './globals.css'
 
 const playfairDisplay = Playfair_Display({
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
   },
   description:
     'Xkimm Xa Mali Foundation is a private, invite-only collective financial platform built on trust, brotherhood, and shared wealth — powered by the African wisdom of ubuntu.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://xkimimamali.co.za'),
+  metadataBase: new URL(siteEnv.SITE_URL),
   keywords: ['savings group', 'stokvel', 'collective savings', 'South Africa', 'financial platform'],
   authors: [{ name: 'KSDRILL-SA' }],
   openGraph: {

@@ -2,6 +2,7 @@ import type { Route } from 'next'
 import Link from 'next/link'
 import { Shield, FileText, HelpCircle, Info, MessageCircle } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
+import { env } from '@/lib/env'
 
 const legal = [
   { icon: Info,       label: 'About',          href: '/about' },
@@ -15,9 +16,13 @@ interface AppFooterProps {
   whatsappGroupName?: string
 }
 
+// Every call site renders <AppFooter /> with no props, so these defaults are
+// what members actually see. They used to be a literal invite link and name,
+// which meant the group link in the footer could only be changed by editing and
+// redeploying — and quietly went stale the moment the group was recreated.
 export function AppFooter({
-  whatsappGroupLink = 'https://chat.whatsapp.com/EMFpa8pjiiCLHhO8Eg8pCb',
-  whatsappGroupName = 'Xkimm Xa Mali Foundation',
+  whatsappGroupLink = env.WHATSAPP_GROUP_LINK,
+  whatsappGroupName = env.WHATSAPP_GROUP_NAME,
 }: AppFooterProps = {}) {
   const year = new Date().getFullYear()
 

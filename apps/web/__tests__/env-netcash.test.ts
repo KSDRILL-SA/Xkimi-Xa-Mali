@@ -6,13 +6,32 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
  * module registry with the environment already in place.
  */
 
-// Everything lib/env demands regardless of gateway, so a failure in these tests
-// is always about the Netcash credentials and never about missing scaffolding.
+// Everything lib/env demands on a live deployment *apart from* the Netcash
+// credentials, so a failure in these tests is always about those and never about
+// missing scaffolding. Kept complete deliberately: if a new live-required
+// variable is added and this list is not updated, these tests fail loudly rather
+// than passing for the wrong reason.
 const BASE_ENV = {
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
   AUTH_SECRET: 'a'.repeat(32),
   ENCRYPTION_KEY: '0'.repeat(64),
   WHATSAPP_GROUP_LINK: 'https://chat.whatsapp.com/test',
+  NEXTAUTH_URL: 'https://app.example.invalid',
+  BULKSMS_USERNAME: 'sms-user',
+  BULKSMS_PASSWORD: 'sms-pass',
+  RESEND_API_KEY: 'resend-key',
+  RESEND_FROM_EMAIL: 'noreply@example.invalid',
+  INNGEST_EVENT_KEY: 'inngest-event',
+  INNGEST_SIGNING_KEY: 'inngest-signing',
+  UPSTASH_REDIS_REST_URL: 'https://redis.example.invalid',
+  UPSTASH_REDIS_REST_TOKEN: 'redis-token',
+  BLOB_READ_WRITE_TOKEN: 'blob-token',
+  ADMIN_API_SECRET: 'b'.repeat(32),
+  NETCASH_API_URL: 'https://netcash.example.invalid',
+  ADMIN_WHATSAPP_NUMBER: '27000000000',
+  SUPPORT_EMAIL: 'support@example.invalid',
+  NEXT_PUBLIC_ADMIN_URL: 'https://admin.example.invalid',
+  NEXT_PUBLIC_SITE_URL: 'https://example.invalid',
 }
 
 const NETCASH_ENV = {
@@ -20,20 +39,39 @@ const NETCASH_ENV = {
   NETCASH_WEBHOOK_SECRET: 'webhook-secret',
 }
 
-async function loadEnv(overrides: Record<string, string | undefined>) {
-  vi.resetModules()
-  const previous = process.env
-  process.env = { ...BASE_ENV, ...overrides } as NodeJS.ProcessEnv
-  try {
-    return await import('@/lib/env')
-  } finally {
-    process.env = previous
+// Every variable that can change the outcome, cleared before each case is set
+// up. The ambient environment is not neutral — CI sets DEPLOY_ENV, the Netcash
+// keys and several others at job level — so without this a test could pass or
+// fail for a reason that has nothing to do with what it claims to check.
+const CONTROLLED = [
+  ...Object.keys(BASE_ENV),
+  'NETCASH_SERVICE_KEY',
+  'NETCASH_WEBHOOK_SECRET',
+  'NEXTAUTH_SECRET',
+  'PAYMENT_GATEWAY',
+  'DEPLOY_ENV',
+  'VERCEL_ENV',
+  'NODE_ENV',
+]
+
+function applyEnv(vars: Record<string, string | undefined>) {
+  // stubEnv mutates keys in place and is undone by unstubAllEnvs. Replacing
+  // process.env wholesale would leak into any file sharing this worker, and
+  // would strip the object of the behaviour Node gives it.
+  for (const key of CONTROLLED) vi.stubEnv(key, undefined as unknown as string)
+  for (const [key, value] of Object.entries(vars)) {
+    if (value !== undefined) vi.stubEnv(key, value)
   }
 }
 
-const ORIGINAL = { ...process.env }
+async function loadEnv(overrides: Record<string, string | undefined>) {
+  vi.resetModules()
+  applyEnv({ ...BASE_ENV, ...overrides })
+  return await import('@/lib/env')
+}
+
 beforeEach(() => vi.resetModules())
-afterEach(() => { process.env = { ...ORIGINAL } })
+afterEach(() => vi.unstubAllEnvs())
 
 describe('Netcash credentials outside production', () => {
   it('are optional in development, so a local run needs no real keys', async () => {
@@ -86,6 +124,31 @@ describe('Netcash credentials in a production deploy', () => {
   })
 })
 
+describe('staging is not production', () => {
+  // The whole reason the rule is not NODE_ENV: Vercel builds preview and staging
+  // deploys with NODE_ENV=production too. Keying on it meant staging demanded
+  // the same credentials as production — so a staging environment could not
+  // exist until the production credentials did, which is backwards.
+  it('lets a preview deploy build without Netcash credentials', async () => {
+    const mod = await loadEnv({ NODE_ENV: 'production', VERCEL_ENV: 'preview' })
+    expect(mod.env.NETCASH_SERVICE_KEY).toBeUndefined()
+  })
+
+  it('still requires them when VERCEL_ENV says production', async () => {
+    await expect(
+      loadEnv({ NODE_ENV: 'production', VERCEL_ENV: 'production' }),
+    ).rejects.toThrow(/NETCASH_SERVICE_KEY|Invalid environment variables/i)
+  })
+
+  it('treats a production build with no VERCEL_ENV as live', async () => {
+    // Off Vercel there is no VERCEL_ENV, so NODE_ENV is the only signal left.
+    // Erring towards "live" keeps a self-hosted deploy protected.
+    await expect(loadEnv({ NODE_ENV: 'production' })).rejects.toThrow(
+      /NETCASH_SERVICE_KEY|Invalid environment variables/i,
+    )
+  })
+})
+
 describe('the mock gateway exemption', () => {
   it('does not require credentials the mock never uses', async () => {
     const mod = await loadEnv({ NODE_ENV: 'development', PAYMENT_GATEWAY: 'mock' })
@@ -97,13 +160,8 @@ describe('the mock gateway exemption', () => {
     // integrations/payment refuses to start with the mock selected there, so the
     // deploy fails either way. This asserts that second gate still holds, so the
     // exemption cannot quietly become a loophole.
-    const previous = process.env
-    process.env = { ...BASE_ENV, NODE_ENV: 'production', PAYMENT_GATEWAY: 'mock' } as NodeJS.ProcessEnv
     vi.resetModules()
-    try {
-      await expect(import('@/integrations/payment')).rejects.toThrow(/Refusing to start/)
-    } finally {
-      process.env = previous
-    }
+    applyEnv({ ...BASE_ENV, ...NETCASH_ENV, NODE_ENV: 'production', PAYMENT_GATEWAY: 'mock' })
+    await expect(import('@/integrations/payment')).rejects.toThrow(/Refusing to start/)
   })
 })

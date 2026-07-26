@@ -1,5 +1,11 @@
 import React from 'react'
 import { View, Text, Svg, Path, Circle, Line, StyleSheet } from '@react-pdf/renderer'
+import { env } from '@/lib/env'
+
+// Printed on every generated document. Derived from the configured site URL
+// rather than written in, so a statement can never carry a domain the
+// foundation no longer owns.
+const SITE_HOST = new URL(env.NEXT_PUBLIC_SITE_URL).host
 
 // ─── Shared design tokens for all Xkimm Xa Mali Foundation PDF documents ──────────────────
 
@@ -177,7 +183,7 @@ export function PageFooter({ docRef }: { docRef: string }) {
       <Text style={chrome.fCenter} render={({ pageNumber, totalPages }) => (
         `Confidential · ${docRef} · Page ${pageNumber} of ${totalPages}`
       )} />
-      <Text style={chrome.fRight}>xkimimamali.co.za</Text>
+      <Text style={chrome.fRight}>{SITE_HOST}</Text>
     </View>
   )
 }
