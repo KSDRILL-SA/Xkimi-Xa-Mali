@@ -1,7 +1,9 @@
 'use client'
 
+import { useEffect } from 'react'
 import { Button } from '@xxm/ui'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { logger } from '@xxm/observability'
 
 export default function AdminDashboardError({
   error,
@@ -10,6 +12,12 @@ export default function AdminDashboardError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  // This boundary showed the admin a message and reported the failure nowhere —
+  // not to Sentry, not even to the console.
+  useEffect(() => {
+    logger.error('Admin dashboard error boundary', { err: error, digest: error.digest })
+  }, [error])
+
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
       <div className="rounded-2xl bg-xxm-champagne-200 border border-red-200 p-4">

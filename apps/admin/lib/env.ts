@@ -14,7 +14,11 @@ const schema = z.object({
   MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
   LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
 
-  NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
+  // Server-side DSN, falling back to the public one. Both optional: error
+  // reporting is off in development and in any environment that has not been
+  // given a DSN, which must not stop the app from booting.
+  SENTRY_DSN:             z.string().url().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
   SENTRY_AUTH_TOKEN:      z.string().optional(),
   SENTRY_ORG:             z.string().optional(),
   SENTRY_PROJECT:         z.string().optional(),
@@ -23,6 +27,9 @@ const schema = z.object({
 const parsed = schema.safeParse(process.env)
 
 if (!parsed.success) {
+  // console, not the logger: this runs while the module graph is still loading,
+  // before instrumentation has initialised Sentry, and the process throws on the
+  // next line regardless. Anything cleverer here would just fail silently.
   console.error('❌  Invalid admin environment variables:')
   console.error(parsed.error.flatten().fieldErrors)
   throw new Error('Invalid environment configuration')
