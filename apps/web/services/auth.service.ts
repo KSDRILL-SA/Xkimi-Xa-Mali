@@ -4,7 +4,7 @@ import { env } from '@/lib/env'
 import { encrypt } from '@/lib/encryption'
 import { emailProvider } from '@/integrations/email'
 import { writeAuditLog } from './audit.service'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { userRepo, runTransaction } from '@/repositories/user.repository'
 import { authTokenRepo } from '@/repositories/auth-token.repository'
 import {

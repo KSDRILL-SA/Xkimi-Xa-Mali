@@ -1,6 +1,6 @@
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 
 export const monthlyStatementNotice = inngest.createFunction(
   { id: 'monthly-statement-notice', name: 'Monthly Statement Notice' },

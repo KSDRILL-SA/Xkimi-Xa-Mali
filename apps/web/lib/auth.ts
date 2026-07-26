@@ -6,7 +6,7 @@ import { db } from './db'
 import { env } from './env'
 import { authConfig } from './auth.config'
 import { LoginSchema } from './validation/auth'
-import { logger } from './logger'
+import { logger } from '@xxm/observability'
 
 const MAX_LOGIN_ATTEMPTS = env.MAX_LOGIN_ATTEMPTS
 const LOCKOUT_DURATION_MS = env.LOCKOUT_DURATION_MINUTES * 60 * 1000

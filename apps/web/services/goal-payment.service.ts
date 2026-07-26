@@ -12,7 +12,7 @@ import { writeAuditLog } from './audit.service'
 import { postPoolCredit, postPoolDebit } from './ledger.service'
 import { queueNotification } from './notification.service'
 import { syncPrimaryGoalProgress, syncAdditionalGoalProgress } from './goal.service'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 
 type GoalForPayment = {
   id: string

@@ -1,7 +1,7 @@
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
 import { redis } from '@/lib/redis'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { queueNotification } from '@/services/notification.service'
 import { selectDueSoonReminders } from '@/services/contribution.service'
 
