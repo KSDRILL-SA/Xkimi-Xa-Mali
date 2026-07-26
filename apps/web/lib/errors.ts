@@ -6,6 +6,22 @@ export function isUniqueViolation(e: unknown): boolean {
   return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'P2002'
 }
 
+/**
+ * True when an error is a Prisma foreign-key violation (P2003), optionally for
+ * one named constraint.
+ *
+ * A restricted foreign key is a rule the database enforces whether or not the
+ * service remembered to check for it. Reaching one is a conflict the caller can
+ * be told about, not a server fault, so it should never surface as a 500.
+ */
+export function isForeignKeyViolation(e: unknown, constraint?: string): boolean {
+  if (typeof e !== 'object' || e === null) return false
+  if ((e as { code?: unknown }).code !== 'P2003') return false
+  if (!constraint) return true
+  const meta = (e as { meta?: { constraint?: unknown } }).meta
+  return meta?.constraint === constraint
+}
+
 export class AppError extends Error {
   constructor(
     message: string,
