@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { logger } from '@xxm/observability'
 import { clientIpFromHeaders } from '@xxm/utils/client-ip'
+import { isSessionRoleStale } from '@/lib/role-version'
 import { auth } from '@/lib/auth'
 import { adminActionRatelimit, adminBulkActionRatelimit } from '@/lib/rate-limit'
 
@@ -65,6 +66,23 @@ export async function requireAdmin(
   if (!roles.includes('ADMIN')) {
     logger.warn('Non-admin attempted an admin action', { action, userId: session.user.id })
     redirect('/forbidden')
+  }
+
+  // The roles above come from the JWT, which states what was true when it was
+  // issued — not what is true now. Without this, revoking someone's ADMIN role
+  // did not end their session here: they kept every power in the token until it
+  // expired, in the console that approves mandates and reverses transactions.
+  //
+  // Checked against the database rather than the token, and per action rather
+  // than per request, because this is the gate in front of money.
+  const tokenVersion = (session.user as { roleVersion?: number }).roleVersion ?? 0
+  if (await isSessionRoleStale(session.user.id, tokenVersion)) {
+    logger.warn('Admin action refused — session roles are out of date', {
+      action,
+      userId: session.user.id,
+      tokenVersion,
+    })
+    redirect('/login?reason=session_expired')
   }
 
   const limiter = options.bulk ? adminBulkActionRatelimit : adminActionRatelimit
