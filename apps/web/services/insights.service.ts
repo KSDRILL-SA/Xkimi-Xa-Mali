@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { assessFromCounts } from '@/services/risk.service'
 import { assertCanAccess } from '@/lib/authorization'
 import { subtractZAR } from '@/lib/money'
 import { cache, CACHE_KEYS } from '@/lib/cache'
@@ -212,7 +213,11 @@ export async function getMemberInsights(
   }
   const totalCount = periods.length
   const onTimeRate = totalCount > 0 ? Math.round((paidCount / totalCount) * 100) : 100
-  const atRisk = recentFailed > 0 || overdueCount > 0
+  // The same rule the debit-day job applies, from the same module — these two
+  // used different windows before, so the app and the SMS could disagree about
+  // whether a member was in trouble.
+  const risk = assessFromCounts(userId, recentFailed, overdueCount)
+  const atRisk = risk.tier !== 'STEADY'
   const streak = computeStreak(periods)
 
   const insights: MemberInsight[] = []

@@ -1,7 +1,7 @@
 import { inngest } from '@/lib/inngest'
-import { db } from '@/lib/db'
 import { logger } from '@xxm/observability'
 import { detectFinancialAnomalies } from '@/services/monitoring.service'
+import { notifyAdmins } from '@/services/inbox.service'
 import { writeAuditLog } from '@/services/audit.service'
 
 export const financialAnomalyWatch = inngest.createFunction(
@@ -15,24 +15,15 @@ export const financialAnomalyWatch = inngest.createFunction(
     }
 
     await step.run('alert-admins', async () => {
-      const admins = await db.user.findMany({
-        where: { roles: { some: { role: { name: 'ADMIN' } } } },
-        select: { id: true },
-      })
-
       const critical = anomalies.some((a) => a.severity === 'critical')
-      const body = anomalies.map((a) => `• ${a.title} — ${a.detail}`).join('\n')
 
-      if (admins.length > 0) {
-        await db.inboxMessage.createMany({
-          data: admins.map((a) => ({
-            userId: a.id,
-            title: `${critical ? '🔴' : '⚠️'} ${anomalies.length} financial alert${anomalies.length === 1 ? '' : 's'}`,
-            body,
-            category: 'SYSTEM',
-          })),
-        })
-      }
+      // Through the shared helper, which also settles a question this job used to
+      // answer differently: it alerted every account holding the ADMIN role,
+      // including any since suspended.
+      await notifyAdmins({
+        title: `${critical ? '🔴' : '⚠️'} ${anomalies.length} financial alert${anomalies.length === 1 ? '' : 's'}`,
+        body: anomalies.map((a) => `• ${a.title} — ${a.detail}`).join('\n'),
+      })
 
       await writeAuditLog({
         action: 'FINANCIAL_ANOMALY_DETECTED',

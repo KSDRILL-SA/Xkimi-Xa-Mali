@@ -88,3 +88,32 @@ export async function createInboxMessages(
   })
   return res.count
 }
+
+/**
+ * Reach the people who run the platform.
+ *
+ * One definition of "who is an admin, and are they still someone we should be
+ * telling things to". This was written out separately in each job that needed
+ * it, and the copies had already drifted: the anomaly watch alerted every
+ * account holding the ADMIN role, including any that had since been suspended.
+ * A suspended admin should not be receiving the group's financial alerts.
+ *
+ * Returns how many people were reached, which is zero when there are no active
+ * admins — a state worth knowing about rather than a silent no-op.
+ */
+export async function notifyAdmins(msg: {
+  title: string
+  body: string
+  category?: InboxCategoryKey
+}): Promise<number> {
+  const admins = await db.user.findMany({
+    where: { status: 'ACTIVE', roles: { some: { role: { name: 'ADMIN' } } } },
+    select: { id: true },
+  })
+
+  return createInboxMessages(admins.map((a) => a.id), {
+    title: msg.title,
+    body: msg.body,
+    category: msg.category ?? 'SYSTEM',
+  })
+}
