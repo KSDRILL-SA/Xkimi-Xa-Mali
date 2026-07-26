@@ -8,6 +8,7 @@ vi.mock('@/lib/db', () => ({
   db: {
     ledgerEntry: {
       create: vi.fn(),
+      createMany: vi.fn(),
       aggregate: vi.fn(),
       count: vi.fn(),
       findMany: vi.fn(),
@@ -90,104 +91,140 @@ describe('getPoolBalance', () => {
   })
 })
 
-describe('reconcileLedger — self-heals the ledger from settled transactions', () => {
-  it('credits every SUCCESS and debits every REVERSED transaction, counting only new posts', async () => {
+describe('reconcileLedger — self-heals the ledger, in bounded work', () => {
+  const noTransactions = () =>
+    mock(db.transaction.findMany).mockResolvedValueOnce([] as never).mockResolvedValueOnce([] as never)
+
+  const noGoalPayments = () =>
+    mock(db.goalPayment.findMany).mockResolvedValueOnce([] as never).mockResolvedValueOnce([] as never)
+
+  const written = (n: number) => mock(db.ledgerEntry.createMany).mockResolvedValue({ count: n } as never)
+
+  it('writes the whole backfill in one statement per direction, not one per row', async () => {
+    // The property that matters: the cost of a nightly reconcile is a function
+    // of the number of directions, not of every transaction ever settled.
     mock(db.transaction.findMany)
-      .mockResolvedValueOnce([
-        { id: 's1', amount: 100, contribution: { userId: 'u1' } },
-        { id: 's2', amount: 200, contribution: { userId: 'u2' } },
-      ] as never) // SUCCESS
-      .mockResolvedValueOnce([
-        { id: 'r1', amount: 50, contribution: { userId: 'u1' } },
-      ] as never) // REVERSED
-    // First two credits are new; the third (a debit) was already posted (no-op).
-    mock(db.ledgerEntry.create)
-      .mockResolvedValueOnce({ id: 'l1' } as never)
-      .mockResolvedValueOnce({ id: 'l2' } as never)
-      .mockRejectedValueOnce({ code: 'P2002' } as never)
-
-    const res = await reconcileLedger()
-
-    expect(res).toEqual({ creditsPosted: 2, debitsPosted: 0 })
-    expect(db.ledgerEntry.create).toHaveBeenCalledTimes(3)
-  })
-
-  it('credits only genuine inflows — REVERSAL rows (stored as SUCCESS) are excluded', async () => {
-    mock(db.transaction.findMany)
-      .mockResolvedValueOnce([] as never)
-      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce(
+        Array.from({ length: 250 }, (_, i) => ({ id: `s${i}`, amount: 100, contribution: { userId: 'u1' } })) as never,
+      )
+      .mockResolvedValueOnce(
+        Array.from({ length: 40 }, (_, i) => ({ id: `r${i}`, amount: 50, contribution: { userId: 'u1' } })) as never,
+      )
+    noGoalPayments()
+    written(0)
 
     await reconcileLedger()
 
-    // The credit query must filter out REVERSAL rows, otherwise a reversal would
-    // be re-credited to the pool and cancel the debit of the original.
+    expect(db.ledgerEntry.createMany).toHaveBeenCalledTimes(2)
+    expect(db.ledgerEntry.create).not.toHaveBeenCalled()
+  })
+
+  it('reports the rows that were genuinely new, not the rows it attempted', async () => {
+    mock(db.transaction.findMany)
+      .mockResolvedValueOnce([{ id: 's1', amount: 100, contribution: { userId: 'u1' } }] as never)
+      .mockResolvedValueOnce([{ id: 'r1', amount: 50, contribution: { userId: 'u1' } }] as never)
+    noGoalPayments()
+    // The debit was already on record, so the statement inserts nothing for it.
+    mock(db.ledgerEntry.createMany).mockImplementation(
+      (async ({ data }: { data: Array<{ direction: string }> }) =>
+        ({ count: data[0]?.direction === 'CREDIT' ? 1 : 0 })) as never,
+    )
+
+    expect(await reconcileLedger()).toEqual({ creditsPosted: 1, debitsPosted: 0 })
+  })
+
+  it('skips duplicates rather than failing on the ones already posted', async () => {
+    // Idempotency moves from catching a unique violation per row to the
+    // statement itself; without this flag a single existing entry would abort
+    // the whole backfill.
+    mock(db.transaction.findMany)
+      .mockResolvedValueOnce([{ id: 's1', amount: 100, contribution: { userId: 'u1' } }] as never)
+      .mockResolvedValueOnce([] as never)
+    noGoalPayments()
+    written(1)
+
+    await reconcileLedger()
+
+    expect(db.ledgerEntry.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skipDuplicates: true }),
+    )
+  })
+
+  it('chunks a large backfill instead of sending one enormous statement', async () => {
+    mock(db.transaction.findMany)
+      .mockResolvedValueOnce(
+        Array.from({ length: 2500 }, (_, i) => ({ id: `s${i}`, amount: 100, contribution: { userId: 'u1' } })) as never,
+      )
+      .mockResolvedValueOnce([] as never)
+    noGoalPayments()
+    written(1000)
+
+    await reconcileLedger()
+
+    // 2500 credits -> three chunks, plus one empty call for the debit side.
+    const creditCalls = mock(db.ledgerEntry.createMany).mock.calls.filter(
+      (c) => (c[0] as { data: Array<{ direction: string }> }).data[0]?.direction === 'CREDIT',
+    )
+    expect(creditCalls).toHaveLength(3)
+    expect((creditCalls[0]![0] as { data: unknown[] }).data).toHaveLength(1000)
+  })
+
+  it('credits only genuine inflows — REVERSAL rows are stored SUCCESS but are money out', async () => {
+    noTransactions()
+    noGoalPayments()
+    written(0)
+
+    await reconcileLedger()
+
     const creditWhere = mock(db.transaction.findMany).mock.calls[0]![0] as { where: Record<string, unknown> }
     expect(creditWhere.where).toMatchObject({ status: 'SUCCESS', type: { not: 'REVERSAL' } })
   })
 
-  it('backfills a settled goal payment whose real-time pool credit was missed', async () => {
-    mock(db.transaction.findMany)
-      .mockResolvedValueOnce([] as never)
-      .mockResolvedValueOnce([] as never)
+  it('backfills settled goal payments alongside contributions', async () => {
+    noTransactions()
     mock(db.goalPayment.findMany)
-      .mockResolvedValueOnce([
-        { id: 'gp-1', amount: 500, userId: 'u1', goal: { title: 'Braai Fund' } },
-      ] as never) // SUCCESS
-      .mockResolvedValueOnce([] as never) // REVERSED
-    mock(db.ledgerEntry.create).mockResolvedValueOnce({ id: 'l1' } as never)
-
-    const res = await reconcileLedger()
-
-    expect(res.creditsPosted).toBe(1)
-    expect(db.ledgerEntry.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ refType: 'GOAL_PAYMENT', refId: 'gp-1', amount: 500, direction: 'CREDIT' }),
-      }),
-    )
-  })
-
-  it('only backfills settled goal payments — a pending one is never credited', async () => {
-    mock(db.transaction.findMany)
+      .mockResolvedValueOnce([{ id: 'gp-1', amount: 500, userId: 'u1', goal: { title: 'Braai Fund' } }] as never)
       .mockResolvedValueOnce([] as never)
-      .mockResolvedValueOnce([] as never)
+    written(1)
 
-    await reconcileLedger()
-
-    const goalWhere = mock(db.goalPayment.findMany).mock.calls[0]![0] as { where: Record<string, unknown> }
-    expect(goalWhere.where).toMatchObject({ status: 'SUCCESS' })
+    expect((await reconcileLedger()).creditsPosted).toBe(1)
+    const [arg] = mock(db.ledgerEntry.createMany).mock.calls[0] as unknown as [{ data: Array<Record<string, unknown>> }]
+    expect(arg.data[0]).toMatchObject({ refType: 'GOAL_PAYMENT', refId: 'gp-1', amount: 500, direction: 'CREDIT' })
   })
 
   it('debits a goal payment the bank pulled back after it cleared', async () => {
-    mock(db.transaction.findMany)
-      .mockResolvedValueOnce([] as never)
-      .mockResolvedValueOnce([] as never)
+    noTransactions()
     mock(db.goalPayment.findMany)
-      .mockResolvedValueOnce([] as never) // SUCCESS
-      .mockResolvedValueOnce([
-        { id: 'gp-9', amount: 500, userId: 'u1', goal: { title: 'Braai Fund' } },
-      ] as never) // REVERSED
-    mock(db.ledgerEntry.create).mockResolvedValueOnce({ id: 'l1' } as never)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce([{ id: 'gp-9', amount: 500, userId: 'u1', goal: { title: 'Braai Fund' } }] as never)
+    // Keyed on the rows rather than call order: the two directions are written
+    // concurrently, and an empty side issues no statement at all.
+    mock(db.ledgerEntry.createMany).mockImplementation(
+      (async ({ data }: { data: unknown[] }) => ({ count: data.length })) as never,
+    )
 
     const res = await reconcileLedger()
-
-    expect(res.debitsPosted).toBe(1)
-    expect(db.ledgerEntry.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ refType: 'GOAL_PAYMENT', refId: 'gp-9', amount: 500, direction: 'DEBIT' }),
-      }),
-    )
+    expect(res).toEqual({ creditsPosted: 0, debitsPosted: 1 })
   })
 
   it('only debits reversals of payments that actually cleared', async () => {
     // A payment that went straight from PENDING to REVERSED never credited the
-    // pool. Debiting it would drive the balance negative out of thin air.
-    mock(db.transaction.findMany)
-      .mockResolvedValueOnce([] as never)
-      .mockResolvedValueOnce([] as never)
+    // pool, so debiting it would drive the balance negative out of nothing.
+    noTransactions()
+    noGoalPayments()
+    written(0)
 
     await reconcileLedger()
 
     const reversedWhere = mock(db.goalPayment.findMany).mock.calls[1]![0] as { where: Record<string, unknown> }
     expect(reversedWhere.where).toMatchObject({ status: 'REVERSED', processedAt: { not: null } })
+  })
+
+  it('writes nothing at all when there is nothing to backfill', async () => {
+    noTransactions()
+    noGoalPayments()
+    written(0)
+
+    expect(await reconcileLedger()).toEqual({ creditsPosted: 0, debitsPosted: 0 })
   })
 })
