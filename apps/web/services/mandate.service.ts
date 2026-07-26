@@ -16,7 +16,7 @@ import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '
 import type { MandateStatus, AccountType, Prisma } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { redis } from '@/lib/redis'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
 

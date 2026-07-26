@@ -1,5 +1,5 @@
 import { inngest } from '@/lib/inngest'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { celebrateGoalAchieved } from '@/services/goal.service'
 
 // When a goal reaches its target, congratulate the whole group in their inbox —

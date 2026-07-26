@@ -1,7 +1,7 @@
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
 import { paymentGateway } from '@/integrations/payment'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { writeAuditLog } from '@/services/audit.service'
 import type { MandateStatus } from '@prisma/client'
 

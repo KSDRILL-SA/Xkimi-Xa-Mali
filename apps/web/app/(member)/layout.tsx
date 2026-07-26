@@ -5,7 +5,7 @@ import { MemberAppShell } from '@/components/layout/MemberAppShell'
 import { AppFooter } from '@/components/layout/AppFooter'
 import { getUnreadInboxCount } from '@/services/inbox.service'
 import { env } from '@/lib/env'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 
 async function SignOutForm() {
   return (

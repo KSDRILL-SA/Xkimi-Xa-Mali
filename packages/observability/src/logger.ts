@@ -31,6 +31,14 @@ function formatMeta(meta: LogMeta): LogMeta {
   )
 }
 
+/** Everything except the error itself — Sentry shows the exception separately. */
+function extrasWithoutError(formatted: LogMeta | undefined): Record<string, unknown> | undefined {
+  if (!formatted) return undefined
+  return Object.fromEntries(
+    Object.entries(formatted).filter(([k]) => k !== 'err' && k !== 'error'),
+  )
+}
+
 function write(level: LogLevel, message: string, meta?: LogMeta): void {
   const formatted = meta ? formatMeta(meta) : undefined
 
@@ -49,18 +57,18 @@ function write(level: LogLevel, message: string, meta?: LogMeta): void {
     fn(JSON.stringify(entry))
   }
 
+  // Every error reaches Sentry, with or without metadata. An earlier version
+  // only reported when meta was present, so `logger.error('payment failed')`
+  // on its own was written to the console and then silently dropped — the exact
+  // shape of call a developer reaches for in a hurry.
   if (level === 'error') {
     const err = meta?.err ?? meta?.error
     if (err instanceof Error) {
-      Sentry.captureException(err, {
-        extra: formatted ? Object.fromEntries(
-          Object.entries(formatted).filter(([k]) => k !== 'err' && k !== 'error')
-        ) : undefined,
-      })
-    } else if (formatted) {
+      Sentry.captureException(err, { extra: extrasWithoutError(formatted) })
+    } else {
       Sentry.captureMessage(message, {
         level: 'error',
-        extra: formatted as Record<string, unknown>,
+        ...(formatted && { extra: formatted as Record<string, unknown> }),
       })
     }
   }
@@ -70,13 +78,24 @@ function write(level: LogLevel, message: string, meta?: LogMeta): void {
   }
 }
 
+/**
+ * Structured logging for the authenticated apps.
+ *
+ * Human-readable in development, one JSON object per line in production so a log
+ * drain can parse it. Errors and warnings additionally reach Sentry — errors as
+ * an exception (or a message when there is no Error to attach), warnings as a
+ * breadcrumb, so the trail leading up to a failure survives with it.
+ *
+ * Pass the error under `err` or `error` in the metadata and it is reported as a
+ * real exception with a stack, rather than a flat string.
+ */
 export const logger = {
   debug: (message: string, meta?: LogMeta): void => write('debug', message, meta),
   info:  (message: string, meta?: LogMeta): void => write('info',  message, meta),
   warn:  (message: string, meta?: LogMeta): void => write('warn',  message, meta),
   error: (message: string, meta?: LogMeta): void => write('error', message, meta),
 
-  // Convenience: time an async operation and log duration
+  /** Time an async operation, logging its duration — and its failure, if it fails. */
   async timed<T>(label: string, fn: () => Promise<T>, meta?: LogMeta): Promise<T> {
     const start = Date.now()
     try {
