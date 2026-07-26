@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { ContributionStatus, MandateStatus, UserStatus, BadgeTier, type AdminSignature } from '@prisma/client'
+import { logger } from '@xxm/observability'
 import { db, Prisma } from '@/lib/db'
 import { storeSignaturePng } from '@/lib/signature-storage'
 
@@ -60,7 +61,7 @@ async function notifyInbox(opts: {
       },
     })
   } catch (err) {
-    console.error('Inbox notify failed', err)
+    logger.error('Inbox notify failed', { err, userId: opts.userId })
   }
 }
 
@@ -522,7 +523,7 @@ export async function setPrimaryGoal(adminId: string, adminRoles: string[], goal
   try {
     await derivePrimaryFundTotal(updated)
   } catch (err) {
-    console.error('Primary fund initial sync failed', err)
+    logger.error('Primary fund initial sync failed', { err, goalId })
   }
 
   return updated
@@ -588,7 +589,7 @@ export async function recordGoalProgress(
         })
       }
     } catch (err) {
-      console.error('Goal-achieved inbox fan-out failed', err)
+      logger.error('Goal-achieved inbox fan-out failed', { err, goalId })
     }
   }
 
