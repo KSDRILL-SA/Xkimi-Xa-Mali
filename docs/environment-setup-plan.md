@@ -51,7 +51,7 @@ Only one item cannot be compressed. Everything else is a day's work.
 
 | Item | Lead time | Blocks |
 |---|---|---|
-| **Netcash DebiCheck onboarding** | **Weeks.** Needs a registered entity, a business bank account and FICA documents | Live money only |
+| **Netcash DebiCheck onboarding** | **Weeks.** Needs a registered entity, a business bank account and FICA documents | Live money only — and the adapter needs rebuilding, see §2.5 of the [completion guide](./completion-guide.md) |
 | Domain registration (`.co.za`) | Hours | DNS, email verification, webhook URL, every app URL |
 | Resend domain verification | Minutes to 48h after DNS records | Email delivery |
 | BulkSMS account + sender ID | Days, if sender ID approval is needed | SMS delivery |
@@ -71,6 +71,32 @@ Order of use: **mock** (build everything) → **Netcash test** (dry run, §6 of
 `DEPLOYMENT.md`) → **Netcash live** (production).
 
 ---
+
+### Applying to Netcash — what to walk away with
+
+Onboarding runs a credit check on the business **and on every director or
+member**, alongside FICA documents and proof of identity. Registering the entity
+and opening its bank account is the real bottleneck, not the application form.
+
+Apply through [netcash.co.za](https://netcash.co.za/services/debicheck/); they
+route you to a payment advisor rather than a self-serve signup. Ask for DebiCheck
+collections with integration access, and for **sandbox credentials first**.
+
+Ask for each of these by name, and do not consider onboarding finished without
+them:
+
+| What to ask for | Maps to |
+|---|---|
+| Merchant Account ID | — |
+| **Debit Order Service Key** | `NETCASH_SERVICE_KEY` |
+| Account Service Key | — |
+| NetConnector access | where the postback URL is configured |
+| Sandbox credentials, separate from live | staging |
+| **The current webhook source IP list** | `NETCASH_WEBHOOK_IPS` |
+| **The API specification for your account** | decides how much of `lib/netcash.ts` is rewritten |
+
+Also ask what your mandate limits are, the collection-day cut-offs, and
+settlement timing — those three drive the debit-run schedule.
 
 ## 3. Accounts to open
 

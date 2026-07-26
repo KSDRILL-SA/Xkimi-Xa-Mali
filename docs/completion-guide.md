@@ -24,7 +24,7 @@ long Netcash takes.**
 | Where deployment **starts** | Registering a domain and beginning Netcash DebiCheck onboarding |
 | Where deployment **ends** | The four founders using the live system for one full debit cycle |
 | The long pole | **Netcash onboarding — weeks.** Everything else is days |
-| Biggest risk | The money path has never touched a real gateway |
+| Biggest risk | **The Netcash adapter is built against the wrong API shape — see §2.5** |
 
 ---
 
@@ -74,6 +74,48 @@ authorization, all 20 member routes with an id scope to the session user, no
 secrets in the browser bundle, AES-256-GCM with per-operation IVs, bcrypt cost
 12 with user-enumeration defences, and password-reset tokens hashed at rest and
 single-use.
+
+---
+
+## 2.5 The Netcash integration needs rebuilding, not configuring
+
+**Read this before planning the launch.** It is the one place where "the code is
+finished" is not true, and it was found by checking the vendor's documentation
+rather than the code — which is why it survived a full security audit and a
+green test suite.
+
+`lib/netcash.ts` is written against a JSON/REST API. Netcash's documented
+DebiCheck service is SOAP.
+
+| | This codebase | Netcash's documented API |
+|---|---|---|
+| Protocol | JSON `POST` | **SOAP** |
+| Endpoint | `{base}/mandate/create`, `/debit/once-off` | `https://ws.netcash.co.za/NIWS/niws_nif.svc` |
+| Operations | REST-style paths | `BatchFileUpload`, `RequestFileUploadReport` |
+| Service key | `X-Service-Key` header | A **SOAP method parameter** |
+| Callbacks | HMAC-SHA256 over the body, `x-netcash-signature` | Postback URL configured in NetConnector — **no documented signature scheme** |
+
+The configured default URL, `.../NSWSSX/NetcashTest.asmx`, is a SOAP endpoint
+with REST paths appended to it. That cannot resolve.
+
+**What follows from this:**
+
+- The Netcash leg is a **build task**, not a configuration task. Budget for
+  rewriting the adapter once sandbox credentials and the account's real spec are
+  in hand. Everything behind the `IPaymentGateway` interface — mandates,
+  contributions, the ledger, reconciliation, reversals — is unaffected and has
+  been exercised against the stand-in gateway. The interface is the seam, and it
+  is the right seam.
+- Netcash's model appears to be **batch file upload**, not per-transaction calls.
+  If so, the debit run submits a file and polls for a report, which is a
+  different shape from what `submitScheduledDebit` assumes.
+- **The webhook signature check may be verifying something Netcash never sends.**
+  If postbacks are unsigned, the source IP allowlist is not a second lock — it is
+  the *only* lock, which makes `NETCASH_WEBHOOK_IPS` more critical still.
+
+**Confirm with Netcash which API your account is provisioned for** before
+rewriting anything. This was established from public documentation, not from an
+account, and Netcash may offer a newer interface than the page consulted.
 
 ---
 
