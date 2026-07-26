@@ -5,6 +5,7 @@ import {
   MemberNotFoundError,
   BankAccountNotFoundError,
   BankAccountConflictError,
+  isForeignKeyViolation,
 } from '@/lib/errors'
 import { assertCanAccess } from '@/lib/authorization'
 import { tallyBy } from '@/lib/aggregate'
@@ -367,22 +368,48 @@ export async function updateBankAccount(
 }
 
 export async function removeBankAccount(accountId: string, userId: string, ipAddress?: string) {
+  // Every mandate, not only the live ones. The foreign key from payment_mandates
+  // is ON DELETE RESTRICT, so a cancelled mandate blocks the delete just as
+  // firmly as an active one. Checking only for active mandates told a member to
+  // cancel theirs and then failed the delete anyway, on a raw constraint error.
   const account = (await bankAccountRepo.findByIdAndUser(accountId, userId, {
-    mandates: { where: { status: { in: ['PENDING', 'ACTIVE'] } } },
+    mandates: true,
   })) as Prisma.BankAccountGetPayload<{ include: { mandates: true } }> | null
   if (!account) throw new BankAccountNotFoundError()
 
-  if (account.mandates.length > 0) {
+  const live = account.mandates.filter((m) => m.status === 'PENDING' || m.status === 'ACTIVE')
+  if (live.length > 0) {
+    // Actionable: cancelling really does move this forward.
     throw new BankAccountConflictError('Cannot remove an account with an active mandate', 'BNK_004')
   }
+  if (account.mandates.length > 0) {
+    // Not actionable, so it must not read like it is. The mandate is over, but
+    // it is a financial record that names this account and is kept.
+    throw new BankAccountConflictError(
+      'This account is attached to a past debit order and is kept as part of your payment records. It cannot be removed.',
+      'BNK_006',
+    )
+  }
 
-  await runTransaction(async (tx) => {
-    await bankAccountRepo.delete(accountId, tx)
-    if (account.isPrimary) {
-      const next = await bankAccountRepo.findFirst({ userId }, { createdAt: 'asc' }, tx)
-      if (next) await bankAccountRepo.update(next.id, { isPrimary: true }, tx)
+  try {
+    await runTransaction(async (tx) => {
+      await bankAccountRepo.delete(accountId, tx)
+      if (account.isPrimary) {
+        const next = await bankAccountRepo.findFirst({ userId }, { createdAt: 'asc' }, tx)
+        if (next) await bankAccountRepo.update(next.id, { isPrimary: true }, tx)
+      }
+    })
+  } catch (err) {
+    // A mandate created between the check above and the delete lands here. The
+    // database is right and the member should be told so, not shown a 500.
+    if (isForeignKeyViolation(err, 'payment_mandates_bankAccountId_fkey')) {
+      throw new BankAccountConflictError(
+        'This account is attached to a debit order and cannot be removed.',
+        'BNK_006',
+      )
     }
-  })
+    throw err
+  }
 
   await writeAuditLog({
     userId,
