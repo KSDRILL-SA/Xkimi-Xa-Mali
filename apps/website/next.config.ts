@@ -4,13 +4,9 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/config', 'geist'],
   images: {
     formats: ['image/avif', 'image/webp'],
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        pathname: '/**',
-      },
-    ],
+    // No remotePatterns: every image the site renders is now served from its own
+    // /public. The hero was the last third-party fetch (a stock photo from
+    // Unsplash) and it is now the founders' own portraits.
   },
   async headers() {
     return [
@@ -35,7 +31,7 @@ const nextConfig: NextConfig = {
               "object-src 'none'",
               "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob: https://images.unsplash.com",
+              "img-src 'self' data: blob:",
               "font-src 'self'",
               "connect-src 'self'",
               "frame-ancestors 'none'",
