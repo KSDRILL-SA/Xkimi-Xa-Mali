@@ -12,7 +12,16 @@ flowchart TD
     BUILD["building on it?"] --> CONST["constitutions/<br/>non-negotiable coding rules"]
     BUILD --> ADR["adr/<br/>why these technologies"]
     RUN["running it?"] --> RB["runbook.md · ../DEPLOYMENT.md"]
+    DEPLOY["deploying it?"] --> DONE["completion-guide.md<br/>what's done, what's left,<br/>start to end"]
+    DONE --> ENVPLAN["environment-setup-plan.md<br/>which accounts, in what order"]
 ```
+
+---
+
+## Picking this up after a break?
+
+Read **[completion-guide.md](./completion-guide.md)** first — where the system
+stands, what only a human can finish, and the order to do it in.
 
 ---
 
