@@ -213,6 +213,51 @@ describe('removeBankAccount', () => {
     expect(bankAccountRepo.delete).toHaveBeenCalledWith('ba-1', expect.anything())
   })
 
+  // The foreign key from payment_mandates is ON DELETE RESTRICT, so a cancelled
+  // mandate blocks the delete exactly as an active one does. Checking only for
+  // live mandates sent the member to cancel theirs and then failed anyway, on a
+  // raw constraint error surfaced as a 500.
+  it('refuses an account whose only mandate is already cancelled', async () => {
+    mock(bankAccountRepo.findByIdAndUser).mockResolvedValue(
+      stored({ mandates: [{ id: 'm1', status: 'CANCELLED' }] }) as never,
+    )
+    await expect(removeBankAccount('ba-1', OWNER)).rejects.toBeInstanceOf(BankAccountConflictError)
+    expect(bankAccountRepo.delete).not.toHaveBeenCalled()
+  })
+
+  it('does not tell the member to cancel a mandate that is already cancelled', async () => {
+    // The live-mandate message is actionable; this one is not, and must not
+    // pretend to be, or the member repeats an action that cannot help.
+    mock(bankAccountRepo.findByIdAndUser).mockResolvedValue(
+      stored({ mandates: [{ id: 'm1', status: 'CANCELLED' }] }) as never,
+    )
+    await expect(removeBankAccount('ba-1', OWNER)).rejects.toThrow(/payment records|cannot be removed/i)
+
+    mock(bankAccountRepo.findByIdAndUser).mockResolvedValue(
+      stored({ mandates: [{ id: 'm2', status: 'ACTIVE' }] }) as never,
+    )
+    await expect(removeBankAccount('ba-1', OWNER)).rejects.toThrow(/active mandate/i)
+  })
+
+  it('reports a conflict, not a server error, if the constraint fires anyway', async () => {
+    // A mandate created between the check and the delete. The database is right;
+    // the member should be told, not shown a 500.
+    mock(bankAccountRepo.findByIdAndUser).mockResolvedValue(stored() as never)
+    mock(runTransaction).mockRejectedValueOnce(
+      Object.assign(new Error('FK'), {
+        code: 'P2003',
+        meta: { constraint: 'payment_mandates_bankAccountId_fkey' },
+      }) as never,
+    )
+    await expect(removeBankAccount('ba-1', OWNER)).rejects.toBeInstanceOf(BankAccountConflictError)
+  })
+
+  it('does not disguise an unrelated database failure as a conflict', async () => {
+    mock(bankAccountRepo.findByIdAndUser).mockResolvedValue(stored() as never)
+    mock(runTransaction).mockRejectedValueOnce(new Error('connection lost') as never)
+    await expect(removeBankAccount('ba-1', OWNER)).rejects.toThrow(/connection lost/)
+  })
+
   it('promotes the next oldest account when the primary is removed', async () => {
     // Otherwise the member is left with accounts but no primary, and nothing to
     // debit against.
