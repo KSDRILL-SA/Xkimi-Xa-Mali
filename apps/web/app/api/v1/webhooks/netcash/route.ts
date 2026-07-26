@@ -7,6 +7,7 @@ import { processGoalPaymentWebhook } from '@/services/goal-payment.service'
 import { claimWebhookEvent, releaseWebhookEvent, webhookEventKey } from '@/services/webhook-dedupe.service'
 import { logger } from '@xxm/observability'
 import { withApiHandler } from '@/lib/api-handler'
+import { getClientIP } from '@/lib/request'
 
 const MANDATE_STATUSES = [
   'PENDING', 'AUTHORIZED', 'ACTIVE', 'SUSPENDED', 'CANCELLED', 'REJECTED',
@@ -40,7 +41,10 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? ''
+  // Through the shared trust model, not the raw header. Signature
+  // verification above is the primary control; this allowlist is the second
+  // lock, and a second lock a caller can pick themselves is not one.
+  const clientIp = getClientIP(req) ?? ''
   if (!paymentGateway.isAllowedWebhookIp(clientIp)) {
     logger.warn('Webhook from disallowed IP', { clientIp })
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

@@ -3,10 +3,15 @@ import { NextRequest } from 'next/server'
 
 // ---------------------------------------------------------------------------
 // Unauthenticated auth endpoints have no session to key on, so they rate-limit
-// by client IP. That IP must be derived through getClientIP (first XFF hop,
-// cf-connecting-ip preferred) — NOT the raw `x-forwarded-for` header, which the
-// client fully controls. Keying on the raw header lets an attacker mint a fresh
-// bucket per request by appending junk hops, defeating brute-force protection.
+// by client IP. That IP must be derived through getClientIP — NOT the raw
+// `x-forwarded-for` header, which the client fully controls. Keying on the raw
+// header lets an attacker mint a fresh bucket per request by appending junk
+// hops, defeating brute-force protection.
+//
+// Which header getClientIP is allowed to believe depends on what sits in front
+// of the deployment; that trust model and its edge cases are covered in
+// client-ip-trust.test.ts. This file is about the route wiring: that the
+// limiter is keyed on the derived value and cannot be shifted by the caller.
 // ---------------------------------------------------------------------------
 
 vi.mock('@/lib/redis', () => ({
@@ -44,16 +49,20 @@ beforeEach(() => {
 })
 
 describe('getClientIP — trustworthy client-IP derivation', () => {
-  it('prefers cf-connecting-ip (set by the edge, not client-spoofable)', () => {
-    expect(getClientIP(req('1.1.1.1', '203.0.113.5'))).toBe('203.0.113.5')
-  })
-
   it('takes and trims the first hop of x-forwarded-for', () => {
     expect(getClientIP(req('203.0.113.9, 10.0.0.1, 10.0.0.2'))).toBe('203.0.113.9')
   })
 
   it('is undefined when no forwarding headers are present', () => {
     expect(getClientIP(req(null))).toBeUndefined()
+  })
+
+  it('ignores cf-connecting-ip on the default (Vercel) deployment', () => {
+    // This assertion used to be the exact opposite, on the belief that
+    // cf-connecting-ip is "set by the edge, not client-spoofable". True behind
+    // Cloudflare; false on Vercel, where nothing sets or strips it — so any
+    // client could send one and be handed a fresh rate-limit bucket per request.
+    expect(getClientIP(req('203.0.113.9', '1.1.1.1'))).toBe('203.0.113.9')
   })
 })
 
