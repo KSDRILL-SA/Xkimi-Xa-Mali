@@ -7,9 +7,14 @@
 //
 // This module-level Map lives in the Edge Runtime V8 isolate scope, so it
 // persists across requests handled by the same warm instance. A cache hit costs
-// a Map lookup instead of a network call. The 60-second TTL bounds the lag
-// between an admin changing a user's role and the middleware enforcing it —
-// identical to the Redis key TTL set by bumpRoleVersion.
+// a Map lookup instead of a network call.
+//
+// The 60-second TTL is the whole revocation lag: it bounds how long a warm
+// isolate can keep serving a session whose roles changed a moment ago. It is
+// deliberately short, and it is now the ONLY such window — the stored key it
+// caches no longer expires at all. (It previously carried a 300-second TTL,
+// which was worse than a lag: once the key vanished, the middleware read the
+// absence as version 0 and the revocation lapsed entirely.)
 
 const CACHE_TTL_MS = 60_000
 

@@ -2,6 +2,7 @@ import NextAuth from 'next-auth'
 import { authConfig } from '@/lib/auth.config'
 import { verifyCsrfOrigin } from '@/lib/csrf-origin'
 import { getCachedRoleVersion, setCachedRoleVersion } from '@/lib/role-version-cache'
+import { mustReauthenticate, type RoleVersionVerdict } from '@/lib/role-version-policy'
 import { NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
 
@@ -43,24 +44,46 @@ function getRedis(): Redis {
   return _redis
 }
 
-async function isRoleVersionStale(userId: string, tokenVersion: number): Promise<boolean> {
-  if (!REDIS_CONFIGURED) return false
+/**
+ * Whether the session's roles are out of date and it must be re-established.
+ *
+ * This is the only thing standing between a suspended member and the rest of
+ * their JWT's lifetime, so the failure modes matter as much as the happy path.
+ *
+ * Redis is the only store reachable from here — the Edge runtime cannot load
+ * Prisma — which means "cannot reach Redis" and "role has not changed" are
+ * genuinely indistinguishable at this layer. Rather than pick one answer for
+ * everybody, the caller is told which case it is and decides based on what the
+ * session can do: a member reading their balance is not the same risk as an
+ * admin who can reverse a transaction.
+ */
+async function checkRoleVersion(userId: string, tokenVersion: number): Promise<RoleVersionVerdict> {
+  if (!REDIS_CONFIGURED) return 'unverifiable'
 
   // Check the in-process cache first — avoids a Redis round-trip on every
   // request for the common case where the role hasn't changed.
   const inProcess = getCachedRoleVersion(userId)
   if (inProcess !== null) {
-    return inProcess > tokenVersion
+    return inProcess > tokenVersion ? 'stale' : 'fresh'
   }
 
-  // Cache miss: fetch from Redis, populate cache, then evaluate.
   try {
     const stored = await getRedis().get<string>(`${ROLE_VERSION_PREFIX}${userId}`)
-    const version = stored === null ? 0 : Number(stored)
+
+    // A missing key is NOT "version 0". Keys are written without expiry and
+    // seeded at login, so absence means eviction or data loss — not that the
+    // role was never changed. Reading it as 0 is what previously let a
+    // revocation lapse: 0 is never greater than the version in the token, so
+    // once the old 300-second TTL expired the session quietly came back to life.
+    if (stored === null) return 'unverifiable'
+
+    const version = Number(stored)
+    if (!Number.isFinite(version)) return 'unverifiable'
+
     setCachedRoleVersion(userId, version)
-    return version > tokenVersion
+    return version > tokenVersion ? 'stale' : 'fresh'
   } catch {
-    return false
+    return 'unverifiable'
   }
 }
 
@@ -136,7 +159,20 @@ export default auth(async (req) => {
 
   // Role version check — force re-auth if roles/status changed since JWT was issued
   const tokenVersion = (session.user as { roleVersion?: number }).roleVersion ?? 0
-  if (session.user?.id && await isRoleVersionStale(session.user.id, tokenVersion)) {
+  const sessionRoles = Array.isArray(session.user?.roles) ? (session.user.roles as string[]) : []
+  const isPrivileged = sessionRoles.includes('ADMIN')
+
+  const verdict = session.user?.id
+    ? await checkRoleVersion(session.user.id, tokenVersion)
+    : 'unverifiable'
+
+  const mustReauth = mustReauthenticate(verdict, isPrivileged)
+
+  if (verdict === 'unverifiable' && isPrivileged) {
+    console.warn('[auth] admin role version unverifiable — forcing re-auth', { traceId })
+  }
+
+  if (mustReauth) {
     if (pathname.startsWith('/api/')) {
       return NextResponse.json(
         { error: { code: 'SYS_006', message: 'Session expired — please sign in again', traceId } },
