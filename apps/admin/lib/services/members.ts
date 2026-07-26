@@ -21,9 +21,16 @@ export async function listMembers(
     ],
   } : {}
 
+  // Soft-deleted members are excluded, matching what both login paths and
+  // findAllActiveUserIds already do. Nothing sets User.deletedAt today — there
+  // is no erasure feature yet — so this changes no current behaviour. It is here
+  // because the day one is added, a member who asked to be forgotten would
+  // otherwise still appear by name, email and phone in this list and be counted
+  // in the totals beneath it, which is precisely the request they made.
   const where: Prisma.UserWhereInput = {
     ...searchFilter,
     ...(status && { status: status as UserStatus }),
+    deletedAt: null,
   }
 
   const [items, total, statusGroups] = await Promise.all([
@@ -38,7 +45,10 @@ export async function listMembers(
       },
     }),
     db.user.count({ where }),
-    db.user.groupBy({ by: ['status'], where: searchFilter, _count: true }),
+    // searchFilter rather than `where`, so the tallies span every status rather
+    // than only the one being filtered on — but still excluding deleted members,
+    // or the counts above the list would disagree with the list itself.
+    db.user.groupBy({ by: ['status'], where: { ...searchFilter, deletedAt: null }, _count: true }),
   ])
 
   const statusCounts: Record<UserStatus, number> = { ACTIVE: 0, PENDING: 0, SUSPENDED: 0 }
