@@ -4,6 +4,10 @@ vi.mock('@/lib/encryption', () => ({
   encrypt: vi.fn((v: string) => `enc:${v}`),
   decrypt: vi.fn((v: string) => v.replace(/^enc:/, '')),
   maskAccountNumber: vi.fn((v: string) => `****${v.slice(-4)}`),
+  // Readable here; the degrade path has its own suite in encryption-degrade.
+  tryDecrypt: vi.fn((v: string) => v.replace(/^enc:/, '')),
+  maskStoredSecret: vi.fn((v: string) => `****${v.replace(/^enc:/, '').slice(-4)}`),
+  UNREADABLE_SECRET: 'unavailable',
 }))
 vi.mock('@/repositories/bank-account.repository', () => ({
   bankAccountRepo: {
