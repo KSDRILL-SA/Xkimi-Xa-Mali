@@ -4,7 +4,13 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 // Mocks
 // ---------------------------------------------------------------------------
 
-vi.mock('@/lib/encryption', () => ({ decrypt: vi.fn((v: string) => v.replace(/^enc:/, '')) }))
+vi.mock('@/lib/encryption', () => ({
+  decrypt: vi.fn((v: string) => v.replace(/^enc:/, '')),
+  maskStoredSecret: vi.fn((v: string) => {
+    const plain = v.replace(/^enc:/, '')
+    return plain.slice(-4).padStart(plain.length, '*')
+  }),
+}))
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },

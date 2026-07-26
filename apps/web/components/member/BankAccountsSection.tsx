@@ -123,7 +123,14 @@ export function BankAccountsSection({ initial }: { initial: BankAccount[] }) {
       <ConfirmModal
         open={Boolean(deleteTarget)}
         title="Remove bank account"
-        message={`Remove your ${deleteTarget?.bankName} account ending ${deleteTarget?.accountNumberMasked.slice(-4)}? This cannot be undone.`}
+        message={
+          deleteTarget && /\d{4}$/.test(deleteTarget.accountNumberMasked)
+            // Only quote the last four when they are actually digits — an account
+            // whose number could not be decrypted has no digits to quote, and this
+            // is the very flow used to remove one.
+            ? `Remove your ${deleteTarget.bankName} account ending ${deleteTarget.accountNumberMasked.slice(-4)}? This cannot be undone.`
+            : `Remove your ${deleteTarget?.bankName} account? This cannot be undone.`
+        }
         confirmLabel="Remove"
         loading={deleting}
         onConfirm={handleDelete}
