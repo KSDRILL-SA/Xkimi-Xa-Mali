@@ -4,6 +4,8 @@ import { db } from '@/lib/db'
 import { notificationRepo } from '@/repositories/notification.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { smsProvider } from '@/integrations/sms'
+import { smsCost } from '@xxm/utils/sms'
+import { logger } from '@xxm/observability'
 import { emailProvider } from '@/integrations/email'
 
 // Defined locally to avoid dependency on Prisma client generation state
@@ -141,6 +143,22 @@ async function dispatchSMS(
 ): Promise<void> {
   const text = interpolate(body, payload)
   const normalised = smsProvider.normalisePhone(phone)
+
+  // Seeded templates are held to GSM-7 by a test, but an admin broadcast and a
+  // rendered placeholder are neither seeded nor reviewed. One character outside
+  // the alphabet drops a segment from 160 characters to 70, so an unremarkable
+  // em dash can more than double what the send costs. Report it rather than pay
+  // it quietly.
+  const cost = smsCost(text)
+  if (cost.encoding === 'UCS-2') {
+    logger.warn('SMS forced into UCS-2, halving what fits per segment', {
+      slug,
+      segments: cost.segments,
+      offendingCharacters: cost.offendingCharacters,
+    })
+  } else if (cost.segments > 2) {
+    logger.warn('SMS will be billed as several segments', { slug, segments: cost.segments, units: cost.units })
+  }
 
   const [message] = await smsProvider.send({
     to: normalised,

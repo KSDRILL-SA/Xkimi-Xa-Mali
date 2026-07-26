@@ -9,13 +9,15 @@
     "db:push": "prisma db push",
     "db:seed": "node --env-file=../../apps/web/.env.local --import tsx/esm prisma/seed.ts",
     "db:studio": "prisma studio",
-    "test": "exit 0"
+    "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.19.3"
+    "@prisma/client": "^6.19.3",
+    "@xxm/utils": "*"
   },
   "devDependencies": {
     "prisma": "^6.1.0",
-    "tsx": "^4.19.2"
+    "tsx": "^4.19.2",
+    "vitest": "^4.1.10"
   }
 }
