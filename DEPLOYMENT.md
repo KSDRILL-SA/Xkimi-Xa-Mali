@@ -5,7 +5,11 @@ verified** (web 75/75, admin 19/19, website 8/8 static pages compile). What's
 left is **config, infra, and external integrations** — work through this in
 order.
 
-> **Setting up the environments for the first time?** Start with
+> **Coming back to this project?** Start with
+> [`docs/completion-guide.md`](./docs/completion-guide.md) — where the system
+> stands, everything still outstanding, and where deployment begins and ends.
+>
+> **Setting up the environments for the first time?** Then
 > [`docs/environment-setup-plan.md`](./docs/environment-setup-plan.md) — which
 > accounts to open, in what order, what has lead time, and which secrets must
 > match each other. Come back here once they exist.
