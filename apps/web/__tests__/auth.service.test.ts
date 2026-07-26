@@ -10,7 +10,7 @@ vi.mock('bcryptjs', () => ({
 
 vi.mock('@/lib/env', () => ({ env: { FOUNDER_EMAIL: 'founder@example.com' } }))
 vi.mock('@/lib/encryption', () => ({ encrypt: vi.fn((v: string) => `enc:${v}`) }))
-vi.mock('@/lib/logger', () => ({
+vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 vi.mock('@/integrations/email', () => ({

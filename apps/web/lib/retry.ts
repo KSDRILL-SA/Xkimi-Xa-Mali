@@ -1,4 +1,4 @@
-import { logger } from './logger'
+import { logger } from '@xxm/observability'
 
 export type RetryOptions = {
   maxAttempts: number

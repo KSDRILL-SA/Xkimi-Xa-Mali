@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'crypto'
 import { emailProvider } from '@/integrations/email'
 import { smsProvider } from '@/integrations/sms'
 import { writeAuditLog } from './audit.service'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { encrypt } from '@/lib/encryption'
 import {
   ForbiddenError,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { AppError } from '@/lib/errors'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { apiRatelimit } from '@/lib/redis'
 import { getClientIP } from '@/lib/request'
 

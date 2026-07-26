@@ -1,6 +1,6 @@
 import { db } from './db'
 import { redis } from './redis'
-import { logger } from './logger'
+import { logger } from '@xxm/observability'
 
 const ROLE_VERSION_PREFIX = 'xxm:role-version:'
 const ROLE_VERSION_TTL = 300

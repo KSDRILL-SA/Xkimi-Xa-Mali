@@ -10,7 +10,7 @@ import { cache, CACHE_KEYS } from '@/lib/cache'
 import { roundZAR, sumZAR, subtractZAR } from '@/lib/money'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { createInboxMessages } from './inbox.service'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

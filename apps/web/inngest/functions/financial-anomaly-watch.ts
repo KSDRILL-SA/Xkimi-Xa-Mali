@@ -1,6 +1,6 @@
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { detectFinancialAnomalies } from '@/services/monitoring.service'
 import { writeAuditLog } from '@/services/audit.service'
 
