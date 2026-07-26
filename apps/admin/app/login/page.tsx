@@ -99,6 +99,8 @@ export default function AdminLoginPage() {
           <p className="text-center text-[11px] text-xxm-gray-400 animate-fade-in delay-300">
             Not an administrator?{' '}
             <a
+              // A live build cannot get here without the variable — lib/env
+              // requires it — so this fallback only ever applies in development.
               href={process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'}
               className="text-xxm-green font-semibold hover:underline"
             >

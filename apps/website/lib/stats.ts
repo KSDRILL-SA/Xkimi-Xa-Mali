@@ -1,3 +1,5 @@
+import { siteEnv } from './env'
+
 export type PublicStats = {
   members: number
   totalPooled: number
@@ -7,7 +9,7 @@ export type PublicStats = {
 export const FALLBACK_STATS: PublicStats = { members: 4, totalPooled: 0, monthsActive: 0 }
 
 export async function getPublicStats(): Promise<PublicStats> {
-  const webUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const webUrl = siteEnv.APP_URL
 
   try {
     const res = await fetch(`${webUrl}/api/v1/stats/public`, {
