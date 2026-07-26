@@ -703,24 +703,53 @@ export async function generateMonthlyContributions(
  * One query for the whole batch: the reminder job runs over everyone falling due
  * that day, so a per-contribution lookup would be the shape #253 removed.
  */
-export async function findRemindedContributionIds(
+/**
+ * Of the given contributions, those already notified with `slug` — optionally
+ * only counting notifications sent since `since`.
+ *
+ * The notification row is the evidence a message went out, so it is what the
+ * reminder jobs throttle on. Both of them previously used a Redis key, and the
+ * cache client is a no-op shim whenever Upstash is not configured: its get()
+ * always returns null, so every run read "not sent yet" and sent again.
+ *
+ * Omit `since` for a message that should go out once ever, as with the
+ * early-payment reminder. Pass it for one that should repeat on a cadence, as
+ * with the overdue reminder — a contribution stays overdue until it is paid, and
+ * without a window a member already behind would be messaged every single day.
+ *
+ * One query for the whole batch, matched inside the database rather than
+ * fetching every notification ever sent and filtering here.
+ */
+export async function findNotifiedContributionIds(
+  slug: string,
   contributionIds: readonly string[],
+  since?: Date,
 ): Promise<string[]> {
   if (contributionIds.length === 0) return []
 
-  // Matched against the given ids inside the database rather than fetching every
-  // reminder ever sent and filtering here — that would be the unbounded shape
-  // #253 removed from the nightly job, growing with history forever.
-  //
-  // Raw SQL because Prisma can compare a JSON path to one value but not to a
-  // list, and the list is the whole point.
-  const rows = await db.$queryRaw<Array<{ contributionId: string }>>`
-    SELECT DISTINCT n.payload->>'contributionId' AS "contributionId"
-    FROM notifications n
-    JOIN notification_templates t ON t.id = n."templateId"
-    WHERE t.slug = 'contribution-due-reminder'
-      AND n.payload->>'contributionId' = ANY(${contributionIds as string[]})
-  `
+  const rows = since
+    ? await db.$queryRaw<Array<{ contributionId: string }>>`
+        SELECT DISTINCT n.payload->>'contributionId' AS "contributionId"
+        FROM notifications n
+        JOIN notification_templates t ON t.id = n."templateId"
+        WHERE t.slug = ${slug}
+          AND n."createdAt" >= ${since}
+          AND n.payload->>'contributionId' = ANY(${contributionIds as string[]})
+      `
+    : await db.$queryRaw<Array<{ contributionId: string }>>`
+        SELECT DISTINCT n.payload->>'contributionId' AS "contributionId"
+        FROM notifications n
+        JOIN notification_templates t ON t.id = n."templateId"
+        WHERE t.slug = ${slug}
+          AND n.payload->>'contributionId' = ANY(${contributionIds as string[]})
+      `
 
   return rows.map((r) => r.contributionId)
+}
+
+/** Contributions that already had their one early-payment reminder. */
+export async function findRemindedContributionIds(
+  contributionIds: readonly string[],
+): Promise<string[]> {
+  return findNotifiedContributionIds('contribution-due-reminder', contributionIds)
 }
