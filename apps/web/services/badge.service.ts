@@ -2,7 +2,7 @@ import type { BadgeTier, Contribution } from '@prisma/client'
 import { badgeRepo } from '@/repositories/badge.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { queueNotification } from './notification.service'
 
 // ─── Constants ────────────────────────────────────────────────────────────────

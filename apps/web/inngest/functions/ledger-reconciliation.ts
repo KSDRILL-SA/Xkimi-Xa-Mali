@@ -1,6 +1,6 @@
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { recalculateContributionStatus } from '@/services/contribution.service'
 import { reconcileLedger } from '@/services/ledger.service'
 import { syncPrimaryGoalProgress } from '@/services/goal.service'

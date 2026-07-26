@@ -1,6 +1,6 @@
 import { encrypt, decrypt, maskAccountNumber } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import {
   MemberNotFoundError,
   BankAccountNotFoundError,

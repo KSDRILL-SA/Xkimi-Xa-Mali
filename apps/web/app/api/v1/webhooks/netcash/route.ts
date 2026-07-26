@@ -5,7 +5,7 @@ import { processMandateWebhook } from '@/services/mandate.service'
 import { processTransactionWebhook } from '@/services/contribution.service'
 import { processGoalPaymentWebhook } from '@/services/goal-payment.service'
 import { claimWebhookEvent, releaseWebhookEvent, webhookEventKey } from '@/services/webhook-dedupe.service'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { withApiHandler } from '@/lib/api-handler'
 
 const MANDATE_STATUSES = [

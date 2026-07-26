@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 
 vi.mock('@/lib/encryption', () => ({ decrypt: vi.fn((v: string) => v.replace(/^enc:/, '')) }))
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/logger', () => ({
+vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 vi.mock('@/lib/redis', () => ({ redis: { set: vi.fn().mockResolvedValue('OK') } }))

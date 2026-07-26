@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 vi.mock('@/lib/redis', () => ({ apiRatelimit: { limit: vi.fn() } }))
 vi.mock('@/lib/request', () => ({ getClientIP: vi.fn().mockReturnValue('1.2.3.4') }))
-vi.mock('@/lib/logger', () => ({
+vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 

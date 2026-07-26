@@ -2,7 +2,7 @@ import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
 import { todaySAST } from '@/lib/date'
 import { redis } from '@/lib/redis'
-import { logger } from '@/lib/logger'
+import { logger } from '@xxm/observability'
 import { queueNotification } from '@/services/notification.service'
 import { planDebitWarnings } from '@/services/mandate.service'
 

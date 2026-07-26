@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { AppError } from './errors'
-import { logger } from './logger'
+import { logger } from '@xxm/observability'
 
 export type PaginationMeta = {
   page: number

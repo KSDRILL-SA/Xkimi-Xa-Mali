@@ -29,7 +29,7 @@ vi.mock('@/services/goal.service', () => ({
   syncPrimaryGoalProgress: vi.fn().mockResolvedValue(undefined),
   syncAdditionalGoalProgress: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
+vi.mock('@xxm/observability', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }))
 
 import { goalRepo } from '@/repositories/goal.repository'
 import { mandateRepo } from '@/repositories/mandate.repository'

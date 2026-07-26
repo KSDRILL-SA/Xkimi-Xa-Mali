@@ -24,6 +24,7 @@
     "@vercel/blob": "^2.6.1",
     "@xxm/config": "*",
     "@xxm/database": "*",
+    "@xxm/observability": "*",
     "@xxm/types": "*",
     "@xxm/ui": "*",
     "@xxm/utils": "*",
