@@ -12,7 +12,7 @@ import { transactionRepo } from '@/repositories/transaction.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
-import { decrypt, maskAccountNumber } from '@/lib/encryption'
+import { maskStoredSecret } from '@/lib/encryption'
 import { embedSignatureInPdf, verifySignatureExists } from './signature.service'
 
 function titleCase(value: string): string {
@@ -178,7 +178,11 @@ async function buildStatementData(
   const banking = primaryAccount
     ? {
         bankName:            primaryAccount.bankName,
-        accountNumberMasked: maskAccountNumber(decrypt(primaryAccount.accountNumber)),
+        accountNumberMasked: maskStoredSecret(primaryAccount.accountNumber, {
+          field: 'bankAccount.accountNumber',
+          bankAccountId: primaryAccount.id,
+          userId,
+        }),
         accountType:         titleCase(primaryAccount.accountType),
         branchCode:          primaryAccount.branchCode,
         verified:            primaryAccount.verifiedAt !== null,

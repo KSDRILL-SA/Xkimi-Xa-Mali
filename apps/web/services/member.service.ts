@@ -1,4 +1,4 @@
-import { encrypt, decrypt, maskAccountNumber } from '@/lib/encryption'
+import { encrypt, tryDecrypt, maskAccountNumber, maskStoredSecret, UNREADABLE_SECRET } from '@/lib/encryption'
 import { writeAuditLog } from './audit.service'
 import { logger } from '@xxm/observability'
 import {
@@ -22,10 +22,9 @@ import { runTransaction } from '@/repositories/user.repository'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { notificationRepo } from '@/repositories/notification.repository'
 
-function maskIdNumber(encrypted: string | null): string | null {
+function maskIdNumber(encrypted: string | null, userId: string): string | null {
   if (!encrypted) return null
-  const plain = decrypt(encrypted)
-  return plain.slice(-4).padStart(plain.length, '*')
+  return maskStoredSecret(encrypted, { field: 'idNumber', userId })
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
@@ -75,7 +74,7 @@ export async function getMemberProfile(
 
   return {
     ...user,
-    idNumberMasked: maskIdNumber(user.idNumber),
+    idNumberMasked: maskIdNumber(user.idNumber, user.id),
     idNumber: undefined,
     roles: user.roles.map((r) => r.role.name),
   }
@@ -208,7 +207,9 @@ export async function exportMemberData(
       phone: user.phone,
       firstName: user.firstName,
       lastName: user.lastName,
-      idNumber: user.idNumber ? decrypt(user.idNumber) : null,
+      // A field we cannot read is reported as such. The member has a right to
+      // the export, so one unreadable column must not deny them the rest of it.
+      idNumber: user.idNumber ? tryDecrypt(user.idNumber, { field: 'idNumber', userId: user.id }) : null,
       address: user.address,
       status: user.status,
       popiaConsentAt: user.popiaConsentAt,
@@ -217,7 +218,11 @@ export async function exportMemberData(
     },
     bankAccounts: user.bankAccounts.map((a) => ({
       bankName: a.bankName,
-      accountNumber: decrypt(a.accountNumber),
+      accountNumber: tryDecrypt(a.accountNumber, {
+        field: 'bankAccount.accountNumber',
+        bankAccountId: a.id,
+        userId: user.id,
+      }) ?? UNREADABLE_SECRET,
       accountType: a.accountType,
       branchCode: a.branchCode,
       isPrimary: a.isPrimary,
@@ -258,7 +263,11 @@ export async function listBankAccounts(userId: string) {
   return accounts.map((a) => ({
     id: a.id,
     bankName: a.bankName,
-    accountNumberMasked: maskAccountNumber(decrypt(a.accountNumber)),
+    accountNumberMasked: maskStoredSecret(a.accountNumber, {
+      field: 'bankAccount.accountNumber',
+      bankAccountId: a.id,
+      userId,
+    }),
     accountType: a.accountType,
     branchCode: a.branchCode,
     isPrimary: a.isPrimary,
@@ -273,7 +282,18 @@ export async function addBankAccount(
   ipAddress?: string,
 ) {
   const existing = await bankAccountRepo.findByUser(userId)
-  if (existing.some((a) => decrypt(a.accountNumber) === input.accountNumber)) {
+  // An existing row we cannot read is skipped rather than thrown on: it cannot be
+  // compared, and letting it throw here would leave a member whose old account is
+  // undecryptable unable to add the replacement that fixes the problem.
+  const isDuplicate = existing.some((a) => {
+    const plain = tryDecrypt(a.accountNumber, {
+      field: 'bankAccount.accountNumber',
+      bankAccountId: a.id,
+      userId,
+    })
+    return plain !== null && plain === input.accountNumber
+  })
+  if (isDuplicate) {
     throw new BankAccountConflictError('This bank account number is already registered', 'BNK_005')
   }
   const makePrimary = input.isPrimary || existing.length === 0
