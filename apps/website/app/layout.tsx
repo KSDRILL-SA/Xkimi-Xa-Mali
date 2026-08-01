@@ -1,13 +1,16 @@
 import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
-import { Playfair_Display } from 'next/font/google'
+import localFont from 'next/font/local'
 import { siteEnv } from '@/lib/env'
 import './globals.css'
 
-const playfairDisplay = Playfair_Display({
-  subsets: ['latin'],
-  weight: ['700', '800', '900'],
+const playfairDisplay = localFont({
+  src: [
+    { path: '../../../node_modules/@fontsource/playfair-display/files/playfair-display-latin-700-normal.woff2', weight: '700', style: 'normal' },
+    { path: '../../../node_modules/@fontsource/playfair-display/files/playfair-display-latin-800-normal.woff2', weight: '800', style: 'normal' },
+    { path: '../../../node_modules/@fontsource/playfair-display/files/playfair-display-latin-900-normal.woff2', weight: '900', style: 'normal' },
+  ],
   variable: '--font-display',
   display: 'swap',
 })
