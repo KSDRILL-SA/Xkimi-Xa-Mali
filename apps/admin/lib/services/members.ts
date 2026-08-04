@@ -1,5 +1,6 @@
 import { UserStatus } from '@prisma/client'
 import { db, Prisma } from '@/lib/db'
+import { publishRoleVersion } from '@/lib/role-version'
 import { assertAdmin, notifyInbox, writeAuditLog, AdminNotFoundError, AdminConflictError } from './shared'
 
 // ─── Members ──────────────────────────────────────────────────────────────────
@@ -97,8 +98,13 @@ export async function setMemberStatus(
   const updated = await db.user.update({
     where: { id: memberId },
     data: { status: newStatus as 'ACTIVE' | 'PENDING' | 'SUSPENDED', roleVersion: { increment: 1 } },
-    select: { id: true, status: true, firstName: true, lastName: true },
+    select: { id: true, status: true, firstName: true, lastName: true, roleVersion: true },
   })
+
+  // The member portal's Edge middleware reads this value from Redis. Publishing
+  // after the database write makes suspension/reactivation invalidate an
+  // already-issued JWT rather than waiting for its normal expiry.
+  await publishRoleVersion(updated.id, updated.roleVersion)
 
   await writeAuditLog({
     userId: adminId, action: 'ADMIN_MEMBER_STATUS_CHANGED',
