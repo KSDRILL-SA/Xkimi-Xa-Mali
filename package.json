@@ -22,16 +22,21 @@
     "db:studio": "cd packages/database && npx prisma studio"
   },
   "devDependencies": {
-    "turbo": "^2.3.3",
+    "@types/node": "^22.0.0",
     "prettier": "^3.4.2",
-    "@types/node": "^22.0.0"
+    "turbo": "^2.3.3"
   },
   "overrides": {
-    "postcss": "^8.5.22",
-    "sharp": "^0.35.3"
+    "postcss": "^8.5.24",
+    "sharp": "^0.35.3",
+    "undici": "^6.28.0",
+    "brace-expansion": "^2.1.4"
   },
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
+  },
+  "dependencies": {
+    "@vercel/blob": "2.6.1"
   }
 }
