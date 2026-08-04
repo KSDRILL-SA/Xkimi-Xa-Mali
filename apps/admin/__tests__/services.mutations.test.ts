@@ -19,8 +19,12 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/signature-storage', () => ({
   storeSignaturePng: vi.fn().mockResolvedValue('https://blob/sig.png'),
 }))
+vi.mock('@/lib/role-version', () => ({
+  publishRoleVersion: vi.fn().mockResolvedValue(undefined),
+}))
 
 import { db } from '@/lib/db'
+import { publishRoleVersion } from '@/lib/role-version'
 import {
   setMemberStatus,
   setMemberRole,
@@ -39,6 +43,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mock(db.inboxMessage.create).mockResolvedValue({} as never)
   mock(db.auditLog.create).mockResolvedValue({} as never)
+  mock(publishRoleVersion).mockResolvedValue(undefined)
 })
 
 // ---------------------------------------------------------------------------
@@ -50,7 +55,7 @@ describe('setMemberStatus', () => {
     // Suspending someone whose session stays valid suspends nothing. The version
     // bump is what invalidates the token they are already holding.
     mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE' } as never)
-    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'SUSPENDED' } as never)
+    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'SUSPENDED', roleVersion: 2 } as never)
 
     await setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED', '41.0.0.1')
 
@@ -59,6 +64,7 @@ describe('setMemberStatus', () => {
         data: expect.objectContaining({ status: 'SUSPENDED', roleVersion: { increment: 1 } }),
       }),
     )
+    expect(publishRoleVersion).toHaveBeenCalledWith('m1', 2)
   })
 
   it('refuses a change that changes nothing', async () => {
@@ -74,16 +80,17 @@ describe('setMemberStatus', () => {
 
   it('welcomes a member on activation', async () => {
     mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING' } as never)
-    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'ACTIVE' } as never)
+    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roleVersion: 3 } as never)
 
     await setMemberStatus('a1', ADMIN, 'm1', 'ACTIVE')
 
     expect(db.inboxMessage.create).toHaveBeenCalled()
+    expect(publishRoleVersion).toHaveBeenCalledWith('m1', 3)
   })
 
   it('does not welcome anyone on suspension', async () => {
     mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE' } as never)
-    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'SUSPENDED' } as never)
+    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'SUSPENDED', roleVersion: 2 } as never)
 
     await setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED')
 
@@ -92,7 +99,7 @@ describe('setMemberStatus', () => {
 
   it('records the transition it made, both ends of it', async () => {
     mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING' } as never)
-    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'ACTIVE' } as never)
+    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roleVersion: 3 } as never)
 
     await setMemberStatus('a1', ADMIN, 'm1', 'ACTIVE', '41.0.0.1')
 
@@ -116,7 +123,7 @@ describe('setMemberRole', () => {
   beforeEach(() => {
     mock(db.role.findUnique).mockResolvedValue({ id: 'role-admin', name: 'ADMIN' } as never)
     mock(db.user.findUnique).mockResolvedValue({ id: 'm1' } as never)
-    mock(db.user.update).mockResolvedValue({} as never)
+    mock(db.user.update).mockResolvedValue({ id: 'm1', roleVersion: 2 } as never)
     mock(db.userRole.upsert).mockResolvedValue({} as never)
     mock(db.userRole.deleteMany).mockResolvedValue({ count: 1 } as never)
   })
@@ -138,6 +145,15 @@ describe('setMemberRole', () => {
     expect(db.user.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: { roleVersion: { increment: 1 } } }),
     )
+    expect(publishRoleVersion).toHaveBeenCalledWith('m1', 2)
+  })
+
+  it('publishes the new version when assigning admin', async () => {
+    mock(db.user.update).mockResolvedValue({ id: 'm1', roleVersion: 3 } as never)
+
+    await setMemberRole('a1', ADMIN, 'm1', 'ADMIN', true)
+
+    expect(publishRoleVersion).toHaveBeenCalledWith('m1', 3)
   })
 
   it('throws when the role does not exist, before touching the member', async () => {

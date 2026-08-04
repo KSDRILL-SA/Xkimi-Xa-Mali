@@ -1,6 +1,5 @@
 import { db } from './db'
 import { Redis } from '@upstash/redis'
-import { env } from './env'
 import { logger } from '@xxm/observability'
 
 /**
@@ -22,15 +21,21 @@ import { logger } from '@xxm/observability'
 
 const ROLE_VERSION_PREFIX = 'xxm:role-version:'
 
-const REDIS_CONFIGURED = !!(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
+// Do not import the strict environment module here. This helper is imported by
+// service code in unit tests, while production startup still validates these
+// variables through lib/env. Reading the two values directly keeps the helper
+// usable in isolated tests without weakening production configuration checks.
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
+const REDIS_CONFIGURED = !!(REDIS_URL && REDIS_TOKEN)
 
 let _redis: Redis | null = null
 function getRedis(): Redis | null {
   if (!REDIS_CONFIGURED) return null
   if (!_redis) {
     _redis = new Redis({
-      url: env.UPSTASH_REDIS_REST_URL!,
-      token: env.UPSTASH_REDIS_REST_TOKEN!,
+      url: REDIS_URL!,
+      token: REDIS_TOKEN!,
     })
   }
   return _redis
@@ -43,18 +48,21 @@ function getRedis(): Redis | null {
  * authoritative check in {@link isSessionRoleStale} reads the database and does
  * not depend on this succeeding.
  */
-export async function seedRoleVersion(userId: string, version: number): Promise<void> {
+export async function publishRoleVersion(userId: string, version: number): Promise<void> {
   const redis = getRedis()
   if (!redis) return
   try {
     await redis.set(`${ROLE_VERSION_PREFIX}${userId}`, String(version))
   } catch (err) {
-    logger.warn('Could not publish role version to Redis at login', {
+    logger.warn('Could not publish role version to Redis', {
       userId,
       reason: err instanceof Error ? err.message : String(err),
     })
   }
 }
+
+/** Seed the role-version cache when a session is established. */
+export const seedRoleVersion = publishRoleVersion
 
 /** The authoritative current role version, preferring Redis but never trusting a miss. */
 export async function currentRoleVersion(userId: string): Promise<number> {
