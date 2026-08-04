@@ -109,7 +109,7 @@ npm run dev          # all three apps in parallel
 
 Local runs against a **Neon dev branch — no Docker required**. A `docker-compose.yml` is provided if you prefer local Postgres/Redis. For Inngest jobs locally, run the [Inngest dev server](https://www.inngest.com/docs/local-development) alongside the web app. Visual DB browser: `npm run db:studio`.
 
-Set `FOUNDER_EMAIL`, `FOUNDER_PHONE`, `FOUNDER_PASSWORD` in `apps/web/.env.local` before seeding — that creates your admin login.
+Set `FOUNDER_EMAIL`, `FOUNDER_PHONE`, `FOUNDER_PASSWORD` in `apps/web/.env.local` before local seeding — that creates your admin login. The seed command loads that file when present; in CI and deployment environments it uses the variables supplied by the environment and does not require a developer-local file.
 
 ---
 
