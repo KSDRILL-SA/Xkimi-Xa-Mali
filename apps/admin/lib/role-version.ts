@@ -2,6 +2,14 @@ import { db } from './db'
 import { Redis } from '@upstash/redis'
 import { logger } from '@xxm/observability'
 
+// Do not import the strict environment module here. This helper is imported by
+// service code in unit tests, while production startup still validates these
+// variables through lib/env. Reading the two values directly keeps the helper
+// usable in isolated tests without weakening production configuration checks.
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
+const REDIS_CONFIGURED = !!(REDIS_URL && REDIS_TOKEN)
+
 /**
  * Has this admin's session outlived the roles it was issued with?
  *
@@ -20,14 +28,6 @@ import { logger } from '@xxm/observability'
  */
 
 const ROLE_VERSION_PREFIX = 'xxm:role-version:'
-
-// Do not import the strict environment module here. This helper is imported by
-// service code in unit tests, while production startup still validates these
-// variables through lib/env. Reading the two values directly keeps the helper
-// usable in isolated tests without weakening production configuration checks.
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
-const REDIS_CONFIGURED = !!(REDIS_URL && REDIS_TOKEN)
 
 let _redis: Redis | null = null
 function getRedis(): Redis | null {
