@@ -7,7 +7,7 @@
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:push": "prisma db push",
-    "db:seed": "node --env-file-if-exists=../../apps/web/.env.local --import tsx/esm prisma/seed.ts",
+    "db:seed": "node --env-file-if-exists=../../apps/web/.env.local --env-file-if-exists=../../apps/admin/.env.local --env-file-if-exists=../../apps/website/.env.local --import tsx/esm prisma/seed.ts",
     "db:studio": "prisma studio",
     "test": "vitest run --config vitest.config.ts"
   },
