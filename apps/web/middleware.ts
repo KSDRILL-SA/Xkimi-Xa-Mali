@@ -20,6 +20,11 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 const REDIS_CONFIGURED = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
 
+function getRedisClient(): Redis | null {
+  if (!REDIS_CONFIGURED) return null
+  return getRedis()
+}
+
 // Constant-time string comparison for the shared admin secret. node:crypto's
 // timingSafeEqual is unavailable in the Edge runtime, so compare manually — a
 // plain === leaks the secret through response timing. Length is compared first
@@ -58,7 +63,8 @@ function getRedis(): Redis {
  * admin who can reverse a transaction.
  */
 async function checkRoleVersion(userId: string, tokenVersion: number): Promise<RoleVersionVerdict> {
-  if (!REDIS_CONFIGURED) return 'unverifiable'
+  const redisClient = getRedisClient()
+  if (!redisClient) return 'unverifiable'
 
   // Check the in-process cache first — avoids a Redis round-trip on every
   // request for the common case where the role hasn't changed.
@@ -68,7 +74,7 @@ async function checkRoleVersion(userId: string, tokenVersion: number): Promise<R
   }
 
   try {
-    const stored = await getRedis().get<string>(`${ROLE_VERSION_PREFIX}${userId}`)
+    const stored = await redisClient.get<string>(`${ROLE_VERSION_PREFIX}${userId}`)
 
     // A missing key is NOT "version 0". Keys are written without expiry and
     // seeded at login, so absence means eviction or data loss — not that the

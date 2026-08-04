@@ -87,3 +87,7 @@ export async function bumpRoleVersion(userId: string): Promise<void> {
 export async function invalidateRoleVersionCache(userId: string): Promise<void> {
   await redis.del(key(userId)).catch(() => {})
 }
+
+export async function clearRoleVersionCache(userId: string): Promise<void> {
+  await invalidateRoleVersionCache(userId)
+}

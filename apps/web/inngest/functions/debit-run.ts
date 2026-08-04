@@ -12,6 +12,26 @@ import { checkBudget } from '@/services/budget.service'
 import { queueNotification } from '@/services/notification.service'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 
+export async function processMandateBatch<T>(
+  mandates: T[],
+  processor: (mandate: T) => Promise<unknown> | unknown,
+): Promise<{ succeeded: number; failed: number }> {
+  let succeeded = 0
+  let failed = 0
+
+  for (const mandate of mandates) {
+    try {
+      await processor(mandate)
+      succeeded += 1
+    } catch (err) {
+      failed += 1
+      console.error('debit-run: mandate processing failed', { err })
+    }
+  }
+
+  return { succeeded, failed }
+}
+
 export const debitRun = inngest.createFunction(
   { id: 'debit-run', name: 'Monthly Debit Run' },
   { cron: '0 16 * * *' }, // 18:00 SAST (UTC+2)
@@ -33,16 +53,15 @@ export const debitRun = inngest.createFunction(
       }),
     )
 
-    for (const mandate of mandates) {
-      if (mandate.user.status !== 'ACTIVE') continue
-      if (!mandate.netcashMandateId) continue
+    const processableMandates = mandates.filter((mandate) => mandate.user.status === 'ACTIVE' && !!mandate.netcashMandateId)
 
+    await processMandateBatch(processableMandates, async (mandate) => {
       // A delay the member asked for, read from the mandate rather than a cache.
       // A date still in the future means they have moved this debit, and the
       // delay handler will charge them on the day they chose. Previously this
       // was a Redis key, so with no cache configured the delay was invisible and
       // the debit went ahead on the original date regardless.
-      if (mandate.delayedUntil && new Date(mandate.delayedUntil) > new Date()) continue
+      if (mandate.delayedUntil && new Date(mandate.delayedUntil) > new Date()) return
 
       const idempotencyKey = `debit:run:${mandate.id}:${periodKey}`
       const alreadyRan = await step.run(`check-idempotency-${mandate.id}`, async () => {
@@ -54,7 +73,7 @@ export const debitRun = inngest.createFunction(
         })
         return !!dbCheck
       })
-      if (alreadyRan) continue
+      if (alreadyRan) return
 
       await step.run(`claim-${mandate.id}`, () =>
         redis.set(idempotencyKey, '1', { ex: 60 * 60 * 72 }),
@@ -86,7 +105,7 @@ export const debitRun = inngest.createFunction(
         })
       })
 
-      if (contribution.status === 'PAID') continue
+      if (contribution.status === 'PAID') return
 
       const gatewayRes = await step.run(`submit-debit-${mandate.id}`, () =>
         paymentGateway.submitScheduledDebit({
@@ -157,7 +176,7 @@ export const debitRun = inngest.createFunction(
           },
         }),
       )
-    }
+    })
 
     // One sync after the whole run — the month's debits just moved the paid total.
     await step.run('sync-primary-goal', () => syncPrimaryGoalProgress())
