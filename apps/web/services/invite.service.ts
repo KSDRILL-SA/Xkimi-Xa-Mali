@@ -76,6 +76,56 @@ function hashToken(token: string): string {
 }
 
 
+// ─── The invitation that brought a member in ─────────────────────────────────
+
+/**
+ * The single invitation this member accepted, for their own read-only view.
+ *
+ * Scoped by construction: the query keys on `acceptedById`, and that column is
+ * unique, so a member can only ever be handed their own — there is no id
+ * parameter here for a caller to get wrong.
+ *
+ * The code itself is deliberately absent. Only `codeHash` is stored, which is
+ * the point: the raw code was shown once, at issue. What comes back is the
+ * four-character prefix, which is enough to recognise the invitation without
+ * being enough to reuse it.
+ */
+export async function getMyInvitation(userId: string) {
+  const invite = await invitationRepo.findMany(
+    { acceptedById: userId },
+    {
+      take: 1,
+      select: {
+        id: true, codePrefix: true, firstName: true, lastName: true,
+        email: true, phone: true, minimumAmount: true,
+        acceptedAt: true, createdAt: true,
+        invitedBy: { select: { firstName: true, lastName: true } },
+      },
+    },
+  )
+
+  const row = (invite as unknown as Array<{
+    id: string; codePrefix: string; firstName: string; lastName: string
+    email: string; phone: string; minimumAmount: unknown
+    acceptedAt: Date | null; createdAt: Date
+    invitedBy: { firstName: string; lastName: string } | null
+  }>)[0]
+
+  if (!row) return null
+
+  return {
+    id: row.id,
+    codePrefix: row.codePrefix,
+    name: `${row.firstName} ${row.lastName}`,
+    email: row.email,
+    phone: row.phone,
+    minimumAmount: Number(row.minimumAmount),
+    invitedBy: row.invitedBy ? `${row.invitedBy.firstName} ${row.invitedBy.lastName}` : null,
+    acceptedAt: row.acceptedAt,
+    invitedAt: row.createdAt,
+  }
+}
+
 // ─── The fifty-member cap ─────────────────────────────────────────────────────
 
 /**

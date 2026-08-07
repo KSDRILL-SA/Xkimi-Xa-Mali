@@ -413,7 +413,28 @@ no check, no configuration.
 
 ---
 
-### GAP-7 — No "Invitations" tile on the member dashboard (LOW)
+### GAP-7 — No "Invitations" tile on the member dashboard (LOW) — ✅ CLOSED 2026-08-07
+
+Built read-only, as the plan below directs. The member sees who invited them,
+when it was issued and accepted, and the minimum it was issued at.
+
+Two things worth knowing:
+
+- **The code cannot be shown, and the page says so.** Only `codeHash` is stored
+  — the raw code was displayed once, at issue, and is not recoverable. The page
+  shows `XKM-ABCD-••••`: enough to recognise the invitation, not enough to reuse
+  it. A test asserts nothing code-shaped leaks into the response.
+- **Founding members have no invitation.** The four co-founders predate the
+  invite system, so the page has an empty state that says that rather than
+  looking broken.
+
+`getMyInvitation` is scoped by construction: it keys on `acceptedById`, which is
+unique, so there is no id parameter for a caller to get wrong. The nav is now
+the twelve tiles the guide lists.
+
+<details>
+<summary>Original GAP-7 text</summary>
+
 
 **The guide** lists twelve tiles for the member dashboard, including:
 
@@ -430,6 +451,8 @@ member in: who invited them, when they accepted, and the reminder that the link
 is theirs alone. If the founders also want members to *issue* invitations,
 that is a different feature and a decision for them — the guide says invitations
 come from leadership, so build the read-only view unless told otherwise.
+
+</details>
 
 ---
 
