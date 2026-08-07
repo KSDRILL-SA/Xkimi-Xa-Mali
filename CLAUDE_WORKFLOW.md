@@ -232,8 +232,8 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 | # | Finding | Current status | Evidence |
 |---|---|---|---|
 | H-1 | **Debit-run isolation** — one failing mandate aborted the whole run | ✅ **Fixed** (2026-08-07) | Isolation kept; the silence removed. The catch now sits *outside* `step.run`, so Inngest still retries a blip itself and only an exhausted retry is recorded — as a `FAILED` transaction, which is what the daily `transaction-retry-failed` job queries. Also found and fixed in the same pass: the gateway's three outcomes (`SUCCESS`/`PENDING`/`FAILED`) were collapsed into two, so a **decline was filed as PENDING** — invisible to the retry job, waiting on a webhook that was never coming, and the member told "pending". The `debit-declined` template had been seeded since the templates were written and **never once sent**. Mapping now goes through `toTransactionStatus()`, which a test holds to it |
-| H-2 | **Dependency tree cleanup** | 🔴 **Open — root cause found, fix specified in §4.4.** `npm ls` exits 1; `js-yaml` GHSA-5p4m-2wfm-xmqj still open; `eslint-config-next@15` lints Next 16 code. The postcss "mismatch" is a symptom of M-8, not a version problem — see there before attempting a version bump | `npm ls`, `npm audit`, `npm explain postcss` |
-| H-3 | **CI reliability** | ✅ **Build fixed** (2026-08-07) — `npm run build` exits 0, 3/3 apps. CI itself is **still not green**: the dependency-health gate cannot be added until H-2/M-8 land, and per `DEPLOYMENT.md` §8 GitHub Actions minutes are exhausted on the free tier, so the workflow is not executing at all | `npm run build` → exit 0 |
+| H-2 | **Dependency tree cleanup** | ✅ **Fixed** (2026-08-07). `npm audit` 1 high → **0**. `js-yaml` 4.3.1, `brace-expansion` 2.1.4, `eslint-config-next` 16.3.0 (was linting Next 16 with the Next 15 config), postcss dropped from the apps and nested correctly under Next, root `@vercel/blob` pin removed. Root cause was M-8, not a version mismatch. Two `npm ls` complaints remain and are upstream — see §4.4 | `npm audit` → 0 |
+| H-3 | **CI reliability** | ⚠️ **Build fixed, CI still not verifying.** `npm run build` exits 0 (3/3) and an `npm audit --audit-level=high` gate is now in the workflow. But per `DEPLOYMENT.md` §8 GitHub Actions minutes are exhausted on the free tier, so **the workflow is not executing at all** — every fix in this table was verified locally and nothing automated is checking them | `npm run build` → exit 0 |
 | H-4 | **Seed-flow reliability** — seed required a developer-local env file, breaking CI | ✅ **Fixed** | `packages/database/package.json` chains `--env-file-if-exists` for all three apps; `prisma/seed.ts:22-27` skips the founder block with a log line when `FOUNDER_*` is absent |
 | H-5 | **Encryption key rotation strategy** | ⚠️ **Mitigated, not solved.** `tryDecrypt`/`maskStoredSecret` degrade unreadable ciphertext instead of taking the page down. Rotation itself does not exist: one key, no key identifier in the envelope, no previous-key fallback. Tracked as **P2 · BEFORE REAL DEBITS** in `SECURITY-HARDENING.md:10` | `web/lib/encryption.ts:9-35` |
 
@@ -248,21 +248,41 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 | M-5 | **Web display font silently removed** | ✅ **Fixed** (2026-08-07). Loader restored; build green with it. The stub had been introduced on the assumption Google Fonts could not be fetched at build time — that assumption was wrong, so the regression bought nothing |
 | M-6 | **Admin `role-version.ts` bypasses validated config** | ✅ **Fixed** (2026-08-07). Reads through `lib/env` again. The stated reason for the bypass — that the strict module broke isolated tests — had a counter-example in the same directory: `role-revocation.test.ts` was already mocking `@/lib/env`. Four suites that reach the module transitively now do the same |
 | M-7 | **Crypto envelope doc/code drift** | ✅ **Fixed** (2026-08-07). Both diagrams now describe `base64(iv ‖ authTag ‖ ciphertext)` with a 16-byte IV, matching `lib/encryption.ts` |
-| M-8 | **`overrides` in `package.json` is entirely inert** | 🔴 **Open — diagnosed, fix proven, not landed.** Next pins `postcss` to an *exact* version. An override demanding anything else is unsatisfiable, and npm's response is to silently drop **every** override in the block. `brace-expansion` (`^2.1.4` → 1.1.18/5.0.9) and `js-yaml` (`^4.3.1` → 4.3.0, the vulnerable one) are unprotected; `sharp` and `undici` only look right because their natural resolution happens to match. **Any past remediation credited to an override needs re-verification against the installed tree** — including the 63→0 dependency-hardening result. The fix is recorded in §4.4; it was verified working in a partial tree (js-yaml → 4.3.1, brace-expansion → 2.1.4) but could not be completed in-session. Never add an override that fights a framework's exact pin — the failure is silent |
+| M-8 | **`overrides` added after a tree exists are silently ignored** | ✅ **Fixed** (2026-08-07). `overrides` apply during *resolution*, but with `node_modules` present npm reports `up to date` and rebuilds the lockfile **from the tree** instead of re-resolving — so `brace-expansion` (`^2.1.4` → 1.1.18/5.0.9) and `js-yaml` (`^4.3.1` → 4.3.0, the vulnerable one) were never applied; `sharp` and `undici` only looked right because their natural resolution matched. Fixed by regenerating the lock with `node_modules` absent. **Consequence worth acting on: any past remediation credited to an override needs re-verification against the installed tree, including the 63→0 dependency-hardening result** — `npm audit` reads the tree, so a clean report is real, but the mechanism credited for it was not working. Adding an override is not the same as applying one; confirm with `npm ls <pkg>` |
 
-### 4.4 The dependency fix (H-2 / M-8) — specified, verified, not landed
+### 4.4 The dependency fix (H-2 / M-8) — landed 2026-08-07
 
-Attempted 2026-08-07. Every step below was proven correct in a partial tree; the
-work could not be committed because a full `npm install` on this machine takes
-7+ minutes and every attempt was terminated early. **Run this where an install
-can complete.** It is a manifest change plus a lockfile regeneration — no source
-code is involved.
+**Outcome: `npm audit` went from one high-severity advisory to zero.** Verified
+with typecheck 0, test 0 (788), build 0 (3/3). Kept here because the mechanism
+is non-obvious and will catch the next person who edits `overrides`.
 
-**Why the obvious fix is wrong.** Do not bump `overrides.postcss` to a newer
-version. `npm explain postcss` shows `postcss@"8.5.23" from next@16.3.0` — an
-*exact* pin. Any override that disagrees is unsatisfiable, and npm's response is
-to drop the entire block, which is what left `js-yaml` and `brace-expansion`
-unpatched. The fix is to stop competing with Next.
+**The actual cause — and it is not what it looks like.** `overrides` are applied
+during *dependency resolution*. When `node_modules` already exists, `npm install`
+(and `npm install --package-lock-only`) treat the materialised tree as
+authoritative — they report `up to date` and rebuild the lockfile *from the
+tree*, never re-resolving. So an override added to `package.json` after a tree
+exists is silently ignored, for that package, forever. The original lockfile was
+generated in exactly that state, and every install since inherited it.
+
+**The single step that matters: regenerate the lock with `node_modules` absent.**
+
+```bash
+mv node_modules node_modules.bak      # or delete it
+rm -f package-lock.json
+npm install --package-lock-only       # true resolve, writes no tree, ~3 min
+```
+
+Verify in the regenerated lock *before* installing anything: `js-yaml` must be
+`4.3.1` and `brace-expansion` a single `2.1.4`. If they are not, the resolve did
+not happen — check that `node_modules` was really gone.
+
+A tempting wrong turn, recorded so it is not retried: `npm explain postcss` shows
+`postcss@"8.5.23" from next@16.3.0`, an *exact* pin, which looks like an
+unsatisfiable-override problem. It is not. On a true resolve npm simply nests —
+`node_modules/postcss@8.5.26` for Tailwind/autoprefixer and
+`node_modules/next/node_modules/postcss@8.5.23` for Next. Removing the postcss
+override (step 1) is still correct because it is genuinely redundant, but it is
+**not** what unblocks the others.
 
 1. **Remove `postcss` from `overrides`** in the root `package.json`.
 2. **Remove `postcss` from `devDependencies`** in all three apps. Nothing imports
@@ -281,9 +301,43 @@ unpatched. The fix is to stop competing with Next.
    `js-yaml` resolves to 4.3.1 and `brace-expansion` to 2.1.4 (both were confirmed
    in the partial tree), then `typecheck` / `test` / `build` all exit 0. Confirm
    the Tailwind/PostCSS pipeline still works — step 2 is the one with real risk.
-8. **Then, and only then, add the CI gate:** `npm ls --all` and
-   `npm audit --audit-level=high` as steps after `npm ci` in
-   `.github/workflows/ci.yml`. Adding it before this lands guarantees red CI.
+8. **CI gate:** `npm audit --audit-level=high` after `npm ci`. **Do not gate on
+   `npm ls --all`** — it exits 1 on upstream conflicts this repo cannot fix, and
+   a gate nobody can satisfy is a gate that gets disabled.
+
+**Two `npm ls` complaints are expected and are not regressions:**
+
+- `brace-expansion@2.1.4 invalid` — `minimatch` wants `^1.1.7`, `glob/minimatch`
+  wants `^5.0.8`. No single version satisfies both, so this override was *always*
+  wrong; it only looked harmless while it was inert. Left in place because 2.x is
+  API-compatible here and `npm audit` is clean with it applied. Removing it needs
+  a full re-resolve and risks reopening the advisory it was added for — do not
+  touch it casually.
+- `magicast@0.5.4 invalid` — via `@prisma/config`'s nested `c12`. Upstream,
+  pre-existing, present before any of this work.
+
+### 4.5 A process trap that cost an afternoon
+
+**A "killed" background task does not kill the `npm` process underneath it.**
+The task wrapper stops; npm keeps reifying `node_modules`.
+
+Every install launched after an apparent kill therefore races a survivor, and
+the symptom is `ENOTEMPTY: directory not empty, rmdir ...` — which reads exactly
+like antivirus interference or a slow disk, and is neither. Five installs failed
+this way before the cause was found; killing the orphan made the very next
+attempt succeed.
+
+Before launching any install, check:
+
+```bash
+# PowerShell — look for npm-cli.js with a CreationDate you did not start
+Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+  Select-Object ProcessId, CreationDate, CommandLine
+```
+
+Kill stale npm processes for *this* repo before retrying. Do not kill unrelated
+global installs. And prefer chaining install → verify in a single command over
+launching them separately, so nothing can overlap.
 
 ---
 
