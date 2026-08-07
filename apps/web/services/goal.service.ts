@@ -29,6 +29,9 @@ type GoalRow = {
   version: number
   lockedAt: Date | null
   lockedById: string | null
+  outcomeNote: string | null
+  outcomeProofUrl: string | null
+  outcomeRecordedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -57,6 +60,12 @@ function serializeGoal(goal: GoalRow) {
     isPrimary: goal.isPrimary,
     isLocked: goal.lockedAt !== null,
     lockedAt: goal.lockedAt?.toISOString() ?? null,
+    // Step 6 of the Goal flow: what the money actually bought. Null until
+    // leadership documents it, and on every goal achieved before outcomes were
+    // recorded at all — which is the honest answer for those, not a blank.
+    outcomeNote: goal.outcomeNote ?? null,
+    outcomeProofUrl: goal.outcomeProofUrl ?? null,
+    outcomeRecordedAt: goal.outcomeRecordedAt?.toISOString() ?? null,
     createdAt: goal.createdAt.toISOString(),
     updatedAt: goal.updatedAt.toISOString(),
   }

@@ -158,7 +158,34 @@ founders rather than deciding it in code.
 
 ---
 
-### GAP-3 — A Goal's outcome is never documented (HIGH)
+### GAP-3 — A Goal's outcome is never documented (HIGH) — ✅ CLOSED 2026-08-07
+
+**Founders' decision, taken 2026-08-07: the written note is REQUIRED, the photo
+or receipt is OPTIONAL.** A written account of what the money did must never be
+blocked because a receipt cannot be found months later — a goal that can never
+be closed out helps nobody.
+
+Built as planned (migration `20260807160000`, additive; the Vercel Blob adapter
+reused via `admin/lib/outcome-storage.ts`, mirroring `signature-storage.ts` so
+there is one story about uploaded files rather than two that drift).
+
+Three rules the plan did not state, each with a test:
+
+- **Only on an ACHIEVED goal.** Documenting a purchase for a goal that was never
+  reached describes something that did not happen.
+- **Once only.** A second outcome would overwrite what the circle was already
+  shown, which is the quiet replacement the guide rules out. The console shows
+  the recorded outcome instead of offering the form again.
+- **Every active member is told, not only the pledgers.** The guide says
+  *everyone* sees what their money did, and every member's contributions flow
+  into the pool.
+
+Unlike a signature, a proof is never re-captured against the same path — each is
+a distinct record — so the upload uses `addRandomSuffix` with overwriting off.
+
+<details>
+<summary>Original GAP-3 text</summary>
+
 
 **The guide:**
 
@@ -187,6 +214,8 @@ proof, receipt or photograph. There is no upload, no display, no admin action.
 4. Display the outcome on the member Goal detail page. This is the part the
    members actually see, and it is the point of the feature.
 5. Notify the circle when an outcome is recorded.
+
+</details>
 
 ---
 

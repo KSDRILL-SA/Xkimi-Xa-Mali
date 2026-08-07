@@ -148,6 +148,7 @@ model User {
   loginHistory           LoginHistory[]
   lockedGoals            Goal[]                  @relation("GoalLocker")
   createdGoals           Goal[]                  @relation("GoalCreator")
+  documentedGoals        Goal[]                  @relation("GoalOutcomeRecorder")
   recordedProgress       GoalProgress[]          @relation("ProgressRecorder")
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
@@ -459,11 +460,19 @@ model Goal {
   lockedAt      DateTime?
   lockedById    String?
   createdById   String?
+  /// Step 6 of the Goal flow: what the money actually bought, shown back to the
+  /// circle. The note is the account; the proof is a photo or receipt and is
+  /// optional, so a missing receipt can never make a goal impossible to close.
+  outcomeNote         String?
+  outcomeProofUrl     String?
+  outcomeRecordedAt   DateTime?
+  outcomeRecordedById String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
   locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
   creator  User?          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  outcomeRecorder User?   @relation("GoalOutcomeRecorder", fields: [outcomeRecordedById], references: [id], onDelete: SetNull)
   progress GoalProgress[]
   cheers   GoalCheer[]
   comments GoalComment[]
@@ -472,6 +481,7 @@ model Goal {
 
   @@index([lockedById])
   @@index([createdById])
+  @@index([outcomeRecordedById])
   @@index([status])
   @@index([status, deadline])
   @@map("goals")

@@ -48,6 +48,7 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['createGoal',               (r) => services.createGoal('a1', r, { title: 'x', type: 'CUSTOM', targetAmount: 100, deadline: '2026-12-01' })],
   ['activateGoal',             (r) => services.activateGoal('a1', r, 'g1')],
   ['lockGoal',                 (r) => services.lockGoal('a1', r, 'g1')],
+  ['recordGoalOutcome',        (r) => services.recordGoalOutcome('a1', r, 'g1', 'Bought the catering equipment')],
   ['setPrimaryGoal',           (r) => services.setPrimaryGoal('a1', r, 'g1')],
   ['deleteGoal',               (r) => services.deleteGoal('a1', r, 'g1')],
   ['recordGoalProgress',       (r) => services.recordGoalProgress('a1', r, 'g1', 100)],
