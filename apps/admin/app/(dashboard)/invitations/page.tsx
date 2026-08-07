@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { internalAdminPost } from '@/lib/api'
-import { listInvitations, revokeInvitation } from '@/lib/services'
+import { listInvitations, revokeInvitation, getMemberPlaces } from '@/lib/services'
 import { formatDate, formatZAR } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { Mail } from 'lucide-react'
@@ -65,7 +65,10 @@ export default async function InvitationsPage({
   const page    = Math.max(1, parseInt(params.page ?? '1', 10))
   const revoked = params.revoked === '1'
 
-  const { items, total } = await listInvitations(roles, page)
+  const [{ items, total }, places] = await Promise.all([
+    listInvitations(roles, page),
+    getMemberPlaces(roles),
+  ])
 
   type RawItem = { id: string; firstName: string; lastName: string; email: string; phone: string; status: string; minimumAmount: unknown; expiresAt: Date | null; acceptedAt: Date | null }
 
@@ -86,6 +89,34 @@ export default async function InvitationsPage({
       <Breadcrumb items={[{ label: 'Admin', href: '/' }, { label: 'Invitations' }]} />
       <Reveal variant="up">
         <PageHeader title="Invitations" subtitle={`${total} total`} icon={<Mail size={22} className="text-xxm-green" aria-hidden />} action={<CreateInviteModal createAction={createInvite} />} />
+      </Reveal>
+
+      {/* The headroom, before inviting rather than after being refused. The cap
+          is a deliberate design decision, so it is stated plainly rather than
+          surfacing only as an error at the moment it bites. */}
+      <Reveal variant="up" delay={50}>
+        <div className={`rounded-2xl border px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-1 ${
+          places.isFull
+            ? 'bg-amber-50 border-amber-200'
+            : 'bg-white border-xxm-green/10 shadow-xxm-sm'
+        }`}>
+          <span className="stat-number text-xl font-black text-xxm-green-900">
+            {places.taken} of {places.cap}
+          </span>
+          <span className="text-sm text-xxm-gray-500">
+            places taken — {places.members} member{places.members === 1 ? '' : 's'}
+            {places.pendingInvites > 0 && `, ${places.pendingInvites} invitation${places.pendingInvites === 1 ? '' : 's'} outstanding`}
+          </span>
+          {places.isFull ? (
+            <span className="text-sm font-semibold text-amber-800 w-full sm:w-auto">
+              The circle is full. No further invitations can be issued.
+            </span>
+          ) : (
+            <span className="text-sm font-semibold text-xxm-green-700 ml-auto">
+              {places.remaining} remaining
+            </span>
+          )}
+        </div>
       </Reveal>
 
       {revoked && (
