@@ -25,10 +25,17 @@ type PrefilledData = {
 export function RegisterForm() {
   const router      = useRouter()
   const searchParams = useSearchParams()
+  // A code arriving on the link (?code=XKM-...) is known at first render, so
+  // both the field and the spinner start from it rather than being assigned
+  // from an effect. Setting them there rendered the empty form first, then
+  // immediately re-rendered it filled — a visible flash, and a cascading
+  // render that `react-hooks/set-state-in-effect` flags.
+  const urlCode = searchParams.get('code')?.trim().toUpperCase() ?? ''
+
   const [step, setStep]         = useState<1 | 2>(1)
-  const [inviteCode, setInviteCode] = useState('')
+  const [inviteCode, setInviteCode] = useState(urlCode)
   const [prefilled, setPrefilled]   = useState<PrefilledData | null>(null)
-  const [loading, setLoading]   = useState(false)
+  const [loading, setLoading]   = useState(Boolean(urlCode))
   const [error, setError]       = useState('')
   const [success, setSuccess]   = useState(false)
 
@@ -37,14 +44,12 @@ export function RegisterForm() {
     defaultValues: { consentToPopia: false },
   })
 
-  // Auto-validate when code arrives via email/SMS link (?code=XKM-...)
+  // Auto-validate the code that arrived on the link. Only the network call
+  // lives here now; everything it sets is set from a resolved promise, not
+  // synchronously during the effect.
   useEffect(() => {
-    const urlCode = searchParams.get('code')
     if (!urlCode) return
-    const formatted = urlCode.trim().toUpperCase()
-    setInviteCode(formatted)
-    setLoading(true)
-    api.post<PrefilledData>('/api/v1/auth/invitations/validate', { code: formatted })
+    api.post<PrefilledData>('/api/v1/auth/invitations/validate', { code: urlCode })
       .then((data) => {
         setPrefilled(data)
         setStep(2)
@@ -53,9 +58,7 @@ export function RegisterForm() {
         setError(err instanceof ApiClientError ? err.message : 'This invite link is invalid or has expired.')
       })
       .finally(() => setLoading(false))
-  // Only run once on mount
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [urlCode])
 
   // ─── Step 1 — validate invite code ─────────────────────────────────────────
 

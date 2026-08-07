@@ -1,14 +1,14 @@
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { FlatCompat } from '@eslint/eslintrc'
+// eslint-config-next 16 ships native flat config. Running it through
+// FlatCompat — which is how this was written for v15 — makes ESLint throw
+// "Converting circular structure to JSON" before it lints a single file.
+import nextCoreWebVitals from 'eslint-config-next/core-web-vitals'
+import nextTypescript from 'eslint-config-next/typescript'
 import baseConfig from '@xxm/config/eslint'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const compat = new FlatCompat({ baseDirectory: __dirname })
 
 const config = [
   { ignores: ['.next/**', 'node_modules/**', 'next-env.d.ts'] },
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   ...baseConfig,
 ]
 

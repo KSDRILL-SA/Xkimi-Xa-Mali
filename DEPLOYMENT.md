@@ -1,9 +1,24 @@
 # Deployment & Launch Runbook — Xkimm Xa Mali Foundation
 
-A practical go-live guide for the three apps. The **code is production-build
-verified** (web 75/75, admin 19/19, website 8/8 static pages compile). What's
-left is **config, infra, and external integrations** — work through this in
-order.
+A practical go-live guide for the three apps. What's left is **config, infra, and
+external integrations** — work through this in order.
+
+> [!NOTE]
+> **Build status, 2026-08-07: green.** `npm run build` exits 0 for all three
+> apps; `typecheck`, `lint` and `test` (800) also pass. The admin app had been failing
+> since the move to Next 16 — an `@import` placed after the `@tailwind`
+> directives, which Turbopack rejects — and this page's older claim of
+> "production-build verified (web 75/75, admin 19/19, website 8/8)" had been
+> false for that whole period. Per-app page counts are deliberately not restored
+> here: they go stale silently, and a number nobody re-checks is what caused the
+> problem the first time.
+>
+> **Two things are still not clear before deploying:**
+> - `npm ls` exits 1 and one high-severity advisory (`js-yaml`) is open. The
+>   cause is not a version mismatch — the `overrides` block is inert. Fix recipe
+>   in [`ENGINEERING_WORKFLOW.md`](./ENGINEERING_WORKFLOW.md) §4.4.
+> - CI is not executing at all (§8 below — Actions minutes exhausted), so nothing
+>   is verifying any of this except a local run.
 
 > **Coming back to this project?** Start with
 > [`docs/completion-guide.md`](./docs/completion-guide.md) — where the system
