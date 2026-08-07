@@ -232,12 +232,25 @@ export function mapNetcashTransactionStatus(raw: string): 'SUCCESS' | 'FAILED' |
   return map[raw.toUpperCase()] ?? null
 }
 
-export function mapNetcashStatus(raw: string): 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED' {
+/**
+ * A Netcash mandate status, or null if we do not recognise it.
+ *
+ * Null rather than a guess. This used to fall back to SUSPENDED, and the mock
+ * fell back to PENDING — two different answers to the same unknown, in code
+ * carrying a comment saying the rules were shared on purpose. Either way an
+ * unrecognised response moved the mandate out of ACTIVE, and the debit run only
+ * collects from ACTIVE mandates: one unfamiliar status code and a member simply
+ * stopped being debited, with nothing said to them or to an admin.
+ *
+ * A status we cannot read is not a status change. Callers leave the mandate
+ * alone and say so loudly, exactly as `mapTransactionStatus` already does.
+ */
+export function mapNetcashStatus(raw: string): 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED' | null {
   const map: Record<string, 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED'> = {
     PENDING: 'PENDING', AUTHORIZED: 'ACTIVE', ACTIVE: 'ACTIVE',
     SUSPENDED: 'SUSPENDED', REJECTED: 'SUSPENDED', CANCELLED: 'CANCELLED',
   }
-  return map[raw.toUpperCase()] ?? 'SUSPENDED'
+  return map[raw.toUpperCase()] ?? null
 }
 
 // ─── Webhook security ─────────────────────────────────────────────────────────
