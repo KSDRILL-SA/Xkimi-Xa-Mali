@@ -75,6 +75,9 @@ enum GoalStatus {
   ACTIVE
   ACHIEVED
   FAILED
+  /// A proposal leadership reviewed and refused. Kept rather than deleted: the
+  /// member who proposed it can see it was answered, and read why.
+  REJECTED
 }
 
 enum NotifChannel {
@@ -153,6 +156,8 @@ model User {
   loginHistory           LoginHistory[]
   lockedGoals            Goal[]                  @relation("GoalLocker")
   createdGoals           Goal[]                  @relation("GoalCreator")
+  documentedGoals        Goal[]                  @relation("GoalOutcomeRecorder")
+  reviewedGoals          Goal[]                  @relation("GoalReviewer")
   recordedProgress       GoalProgress[]          @relation("ProgressRecorder")
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
@@ -380,6 +385,11 @@ model Transaction {
   idempotencyKey  String            @unique
   retryCount      Int               @default(0)
   failureReason   String?
+  /// Why leadership reversed this transaction. Set on the REVERSAL row, never on
+  /// the original — the original is evidence and is not edited. Null on rows
+  /// written before the reason was required, and on everything that is not a
+  /// reversal. Distinct from failureReason, which is the gateway refusing.
+  reversalReason  String?
   reversalOfId    String?           @unique
   processedAt     DateTime?
   createdAt       DateTime          @default(now())
@@ -463,12 +473,30 @@ model Goal {
   version       Int        @default(0)
   lockedAt      DateTime?
   lockedById    String?
+  /// Who proposed or created this goal. A member for a proposal, an admin for
+  /// one leadership raised itself — the two paths are told apart by the roles
+  /// of this user, not by a separate column.
   createdById   String?
+  /// Step 6 of the Goal flow: what the money actually bought, shown back to the
+  /// circle. The note is the account; the proof is a photo or receipt and is
+  /// optional, so a missing receipt can never make a goal impossible to close.
+  outcomeNote         String?
+  outcomeProofUrl     String?
+  outcomeRecordedAt   DateTime?
+  outcomeRecordedById String?
+  /// Why leadership refused a proposal. Set only alongside status REJECTED.
+  rejectionReason String?
+  /// Which leader reviewed the proposal, and when. Empty on every goal created
+  /// before proposals existed, which is the honest answer for them.
+  reviewedById  String?
+  reviewedAt    DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
   locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
   creator  User?          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  outcomeRecorder User?   @relation("GoalOutcomeRecorder", fields: [outcomeRecordedById], references: [id], onDelete: SetNull)
+  reviewer User?          @relation("GoalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   progress GoalProgress[]
   cheers   GoalCheer[]
   comments GoalComment[]
@@ -477,6 +505,8 @@ model Goal {
 
   @@index([lockedById])
   @@index([createdById])
+  @@index([outcomeRecordedById])
+  @@index([reviewedById])
   @@index([status])
   @@index([status, deadline])
   @@map("goals")
