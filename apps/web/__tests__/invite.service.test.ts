@@ -53,6 +53,7 @@ import { ForbiddenError, InviteNotFoundError, InviteUsedError, InviteRevokedErro
 import {
   generateInvite, listInvitations, revokeInvitation,
   validateInviteCode, acceptInviteRegistration, setMemberRole,
+  getMyInvitation,
 } from '@/services/invite.service'
 
 const InviteForbiddenError = ForbiddenError
@@ -149,6 +150,64 @@ describe('generateInvite', () => {
     )
     expect(result.code).toMatch(/^XKM-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/)
     expect(result.codePrefix).toHaveLength(4)
+  })
+})
+
+// ─── getMyInvitation ──────────────────────────────────────────────────────────
+
+describe('getMyInvitation', () => {
+  const ROW = {
+    id: 'inv1',
+    codePrefix: 'ABCD',
+    firstName: 'Kurhula', lastName: 'Maluleke',
+    email: 'k@x.co.za', phone: '+27821234567',
+    minimumAmount: 200,
+    acceptedAt: new Date('2026-02-01'),
+    createdAt: new Date('2026-01-25'),
+    invitedBy: { firstName: 'Tinyiko', lastName: 'Maluleke' },
+  }
+
+  it('returns only the invitation this member accepted', async () => {
+    mockDb.invitation.findMany.mockResolvedValue([ROW] as never)
+
+    const result = await getMyInvitation('u1')
+
+    // Scoped by construction: the query keys on acceptedById, which is unique,
+    // so there is no id parameter for a caller to get wrong.
+    expect(mockDb.invitation.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { acceptedById: 'u1' } }),
+    )
+    expect(result).toMatchObject({
+      name: 'Kurhula Maluleke',
+      invitedBy: 'Tinyiko Maluleke',
+      minimumAmount: 200,
+    })
+  })
+
+  it('never returns anything that could be used as an invite code', async () => {
+    mockDb.invitation.findMany.mockResolvedValue([ROW] as never)
+
+    const result = await getMyInvitation('u1')
+
+    // Only codeHash is stored, and that is the point — the raw code was shown
+    // once, at issue. The prefix is enough to recognise the invitation and not
+    // enough to reuse it.
+    expect(result).not.toHaveProperty('codeHash')
+    expect(result!.codePrefix).toBe('ABCD')
+    expect(JSON.stringify(result)).not.toContain('XKM-ABCD-')
+  })
+
+  it('returns null for a founder who joined before invitations existed', async () => {
+    mockDb.invitation.findMany.mockResolvedValue([] as never)
+    await expect(getMyInvitation('founder-1')).resolves.toBeNull()
+  })
+
+  it('survives an inviter whose account has since been erased', async () => {
+    mockDb.invitation.findMany.mockResolvedValue([{ ...ROW, invitedBy: null }] as never)
+
+    const result = await getMyInvitation('u1')
+
+    expect(result!.invitedBy).toBeNull()
   })
 })
 
