@@ -20,6 +20,8 @@ export const TYPE_LABELS: Record<string, string> = {
 }
 
 export const ERRORS: Record<string, string> = {
+  outcome: 'The outcome could not be documented. A goal must be achieved, and can only be documented once.',
+  proof:   'That file could not be accepted. Use a PNG, JPEG, WebP or PDF of 8 MB or less.',
   update:   'Could not update the goal. Only draft goals can be edited.',
   activate: 'Could not activate the goal.',
   lock:     'Could not lock the goal.',

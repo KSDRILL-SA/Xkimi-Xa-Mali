@@ -4,6 +4,7 @@ import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import {
   getGoalById, updateGoal, activateGoal, lockGoal, deleteGoal, recordGoalProgress, setPrimaryGoal,
+  recordGoalOutcome,
   AdminNotFoundError, AdminConflictError,
 } from '@/lib/services'
 import { Breadcrumb, Reveal, PageHeader, Alert } from '@xxm/ui'
@@ -14,6 +15,8 @@ import { GoalFundingPanel } from './GoalFundingPanel'
 import { GoalEditForm } from './GoalEditForm'
 import { GoalProgressHistory } from './GoalProgressHistory'
 import { requireAdmin } from '@/lib/admin-action'
+import { storeGoalOutcomeProof, OutcomeProofError } from '@/lib/outcome-storage'
+import { GoalOutcomePanel } from './GoalOutcomePanel'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
 
@@ -113,6 +116,39 @@ export default async function AdminGoalDetailPage({
     }
     revalidatePath(`/goals/${id}`)
     redirect(`/goals/${id}?progress=1`)
+  }
+
+  async function outcomeAction(fd: FormData) {
+    'use server'
+    const { userId, roles: r, ip } = await requireAdmin('goal.recordOutcome')
+
+    const note  = String(fd.get('outcomeNote') ?? '')
+    const proof = fd.get('proof')
+
+    // The note is required; the proof is not. A written account of what the
+    // money did must never be blocked because a receipt cannot be found months
+    // later — a goal that can never be closed out helps nobody.
+    let proofUrl: string | null = null
+    if (proof instanceof File && proof.size > 0) {
+      try {
+        proofUrl = await storeGoalOutcomeProof(id, {
+          buffer: Buffer.from(await proof.arrayBuffer()),
+          contentType: proof.type,
+        })
+      } catch (e) {
+        if (e instanceof OutcomeProofError) redirect(`/goals/${id}?error=proof`)
+        throw e
+      }
+    }
+
+    try {
+      await recordGoalOutcome(userId, r, id, note, proofUrl, ip)
+    } catch (e) {
+      if (e instanceof AdminConflictError || e instanceof AdminNotFoundError) redirect(`/goals/${id}?error=outcome`)
+      throw e
+    }
+    revalidatePath(`/goals/${id}`)
+    redirect(`/goals/${id}?outcome=1`)
   }
 
   async function primaryAction() {
@@ -228,6 +264,15 @@ export default async function AdminGoalDetailPage({
           <Lock size={11} aria-hidden /> Goals can only be edited while in draft. This goal is {cfg.label.toLowerCase()}.
         </p>
       )}
+
+      <GoalOutcomePanel
+        status={goal.status}
+        outcomeNote={goal.outcomeNote}
+        outcomeProofUrl={goal.outcomeProofUrl}
+        outcomeRecordedAt={goal.outcomeRecordedAt}
+        recordedBy={goal.outcomeRecorder ? `${goal.outcomeRecorder.firstName} ${goal.outcomeRecorder.lastName}` : null}
+        action={outcomeAction}
+      />
 
       <GoalProgressHistory entries={goal.progress} />
     </div>

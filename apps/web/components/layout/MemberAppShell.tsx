@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Trophy,
   Users,
+  Ticket,
 } from 'lucide-react'
 
 const memberNav: NavItem[] = [
@@ -30,6 +31,10 @@ const memberNav: NavItem[] = [
   { href: '/dashboard/notifications', label: 'Notifications', icon: Bell },
   { href: '/dashboard/whatsapp', label: 'WhatsApp', icon: MessageCircle },
   { href: '/dashboard/profile', label: 'Profile', icon: UserCircle },
+  // The twelfth tile the guide lists. Read-only: invitations come from
+  // leadership, so this shows a member the one that brought them in without
+  // offering to issue another.
+  { href: '/dashboard/invitations', label: 'Invitations', icon: Ticket },
 ]
 
 interface MemberAppShellProps {

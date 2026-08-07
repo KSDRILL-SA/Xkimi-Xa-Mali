@@ -442,6 +442,46 @@ previous body, and a targeted `notificationTemplate.update` was required.
 - Removing a template from `templates.ts` leaves an inert row behind. Harmless
   while nothing references the slug, but it will not disappear on its own.
 
+### 4.9 A finished feature nobody could reach
+
+**Transaction reversal — the guide's one leadership capability that no caller
+could invoke.** Landed 2026-08-07.
+
+`createReversal` had been complete and tested for months: it wrapped both writes
+in a transaction, left the original row's amount untouched, linked the reversing
+entry through `reversalOfId`, recalculated the contribution and debited the pool
+ledger. The route in front of it existed too. **Neither had ever run.**
+
+The route called `auth()` and refused anything without a session cookie. The
+admin console never holds one for the member app — it calls server-to-server
+through `internalAdminPost` with the shared secret — so every reversal it could
+have issued came back **401**, and the member app has no admin UI to issue one
+from. The capability was unreachable from both ends, and nothing failed, because
+nothing called it.
+
+Four things worth carrying forward:
+
+- **Unit-tested is not reachable.** Five service tests passed against a function
+  no caller could invoke. Coverage measured the service and said nothing about
+  whether the system could perform the act. For a capability, the test that
+  matters starts at the entry point the real caller uses.
+- **A cross-app seam needs a test on the seam.** `broadcast/route.ts` had solved
+  the same problem with `isValidInternalRequest`; this route simply never
+  adopted it. The fix was already in the tree, one directory away. This is the
+  §9 failure mode again — a pattern applied in one place and not its sibling —
+  and it will keep recurring until something in CI checks for it.
+- **"No implementation exists" is a claim, not an observation** — the same
+  lesson as §4.5, in a new costume. The gap analysis that scheduled this work
+  concluded the service, route and UI were all absent, from a tree-wide grep for
+  `revers` that returned only labels and comments. Three of the four parts were
+  already built. Open the files a document names before trusting its list of
+  what is missing.
+- **Silence is a defect on the money path.** The reversal moved a member's money
+  back, recalculated what they owed, and told them nothing — the only written
+  trace was an audit entry no member can read. Both new templates went into
+  `MANDATORY_SLUGS`, because the `debit-declined` pair (§4.8) was seeded, left
+  out of that set, and consequently never delivered once.
+
 ### 4.10 "Blocked on credentials" was blocked on reading the documentation
 
 **The Netcash adapter was rebuilt against the real contract on 2026-08-07,
