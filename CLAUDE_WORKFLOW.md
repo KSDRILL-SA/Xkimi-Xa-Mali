@@ -231,9 +231,9 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 
 | # | Finding | Current status | Evidence |
 |---|---|---|---|
-| H-1 | **Debit-run isolation** — one failing mandate aborted the whole run | ⚠️ **Partially fixed — regression introduced.** Isolation works, but failures are now silent | `processMandateBatch` (`debit-run.ts:15-33`) catches and continues, but the `{succeeded, failed}` result is discarded at `:58`, it logs via `console.error` (the only one in `web/{lib,services,inngest}` — bypasses the error tracker), and the idempotency claim at `:78-80` precedes submission at `:110`, so a failed mandate is skipped for the whole month with Inngest reporting success |
-| H-2 | **Dependency tree cleanup** | 🔴 **Open.** `overrides.postcss: "^8.5.24"` vs installed `8.5.23`; `npm ls` exits 1 after both `npm install` and `npm ci`. One high-severity advisory (`js-yaml`, GHSA-5p4m-2wfm-xmqj) still open. `eslint-config-next@15` linting Next 16 code | `npm ls`, `npm audit` |
-| H-3 | **CI reliability** | 🔴 **Open — CI is red.** `npm run build` fails on `@xxm/admin`: `apps/admin/app/globals.css:5` places `@import` after `@tailwind`, which Turbopack rejects. The identical fix was applied to `apps/web` and not to admin. Note `DEPLOYMENT.md:3` still claims "production-build verified" — that claim is stale | `npm run build` → exit 1 |
+| H-1 | **Debit-run isolation** — one failing mandate aborted the whole run | ✅ **Fixed** (2026-08-07) | Isolation kept; the silence removed. The catch now sits *outside* `step.run`, so Inngest still retries a blip itself and only an exhausted retry is recorded — as a `FAILED` transaction, which is what the daily `transaction-retry-failed` job queries. Also found and fixed in the same pass: the gateway's three outcomes (`SUCCESS`/`PENDING`/`FAILED`) were collapsed into two, so a **decline was filed as PENDING** — invisible to the retry job, waiting on a webhook that was never coming, and the member told "pending". The `debit-declined` template had been seeded since the templates were written and **never once sent**. Mapping now goes through `toTransactionStatus()`, which a test holds to it |
+| H-2 | **Dependency tree cleanup** | 🔴 **Open — root cause found, fix specified in §4.4.** `npm ls` exits 1; `js-yaml` GHSA-5p4m-2wfm-xmqj still open; `eslint-config-next@15` lints Next 16 code. The postcss "mismatch" is a symptom of M-8, not a version problem — see there before attempting a version bump | `npm ls`, `npm audit`, `npm explain postcss` |
+| H-3 | **CI reliability** | ✅ **Build fixed** (2026-08-07) — `npm run build` exits 0, 3/3 apps. CI itself is **still not green**: the dependency-health gate cannot be added until H-2/M-8 land, and per `DEPLOYMENT.md` §8 GitHub Actions minutes are exhausted on the free tier, so the workflow is not executing at all | `npm run build` → exit 0 |
 | H-4 | **Seed-flow reliability** — seed required a developer-local env file, breaking CI | ✅ **Fixed** | `packages/database/package.json` chains `--env-file-if-exists` for all three apps; `prisma/seed.ts:22-27` skips the founder block with a log line when `FOUNDER_*` is absent |
 | H-5 | **Encryption key rotation strategy** | ⚠️ **Mitigated, not solved.** `tryDecrypt`/`maskStoredSecret` degrade unreadable ciphertext instead of taking the page down. Rotation itself does not exist: one key, no key identifier in the envelope, no previous-key fallback. Tracked as **P2 · BEFORE REAL DEBITS** in `SECURITY-HARDENING.md:10` | `web/lib/encryption.ts:9-35` |
 
@@ -245,9 +245,45 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 | M-2 | **POPIA compliance planning** | 🟡 Partial. Right-to-erasure honoured in member listings; consent captured at registration. Retention policy and DSAR process not yet formalised |
 | M-3 | **Monitoring improvements** | 🟡 Partial. `@xxm/observability` + Sentry wired across apps. Gaps: no alert on failed debit collections (see H-1), no dependency-health gate in CI, `SECURITY-HARDENING.md` tracks "CI security gate" as P2 |
 | M-4 | **Integration testing expansion** | 🟡 Partial. 786 unit tests across 51 files, all passing. No test exercises the debit run end-to-end through Inngest, which is why H-1's regression was not caught |
-| M-5 | **Web display font silently removed** | 🔴 Open. `web/app/layout.tsx:8-10` replaced the `Playfair_Display()` loader with a bare object literal, so `--font-display` is never defined and every `font-display` heading falls back to Georgia. `apps/admin` still loads the real font — the two apps have diverged |
-| M-6 | **Admin `role-version.ts` bypasses validated config** | 🔴 Open. Reads raw `process.env` at module scope instead of `lib/env`, so it sits outside `requiredWhenLive` validation. Bounded in practice (`lib/env` still loads via `lib/auth`), but it is weakened defence in depth |
-| M-7 | **Crypto envelope doc/code drift** | 🔴 Open. `docs/database/01-erd.md:176` documents `iv:authTag:ciphertext`; the code emits concatenated base64 with fixed offsets. `docs/security/01-security-architecture.md:42` documents a 12-byte IV; the code uses 16. Matters because rotation work (H-5) will be written against these docs |
+| M-5 | **Web display font silently removed** | ✅ **Fixed** (2026-08-07). Loader restored; build green with it. The stub had been introduced on the assumption Google Fonts could not be fetched at build time — that assumption was wrong, so the regression bought nothing |
+| M-6 | **Admin `role-version.ts` bypasses validated config** | ✅ **Fixed** (2026-08-07). Reads through `lib/env` again. The stated reason for the bypass — that the strict module broke isolated tests — had a counter-example in the same directory: `role-revocation.test.ts` was already mocking `@/lib/env`. Four suites that reach the module transitively now do the same |
+| M-7 | **Crypto envelope doc/code drift** | ✅ **Fixed** (2026-08-07). Both diagrams now describe `base64(iv ‖ authTag ‖ ciphertext)` with a 16-byte IV, matching `lib/encryption.ts` |
+| M-8 | **`overrides` in `package.json` is entirely inert** | 🔴 **Open — diagnosed, fix proven, not landed.** Next pins `postcss` to an *exact* version. An override demanding anything else is unsatisfiable, and npm's response is to silently drop **every** override in the block. `brace-expansion` (`^2.1.4` → 1.1.18/5.0.9) and `js-yaml` (`^4.3.1` → 4.3.0, the vulnerable one) are unprotected; `sharp` and `undici` only look right because their natural resolution happens to match. **Any past remediation credited to an override needs re-verification against the installed tree** — including the 63→0 dependency-hardening result. The fix is recorded in §4.4; it was verified working in a partial tree (js-yaml → 4.3.1, brace-expansion → 2.1.4) but could not be completed in-session. Never add an override that fights a framework's exact pin — the failure is silent |
+
+### 4.4 The dependency fix (H-2 / M-8) — specified, verified, not landed
+
+Attempted 2026-08-07. Every step below was proven correct in a partial tree; the
+work could not be committed because a full `npm install` on this machine takes
+7+ minutes and every attempt was terminated early. **Run this where an install
+can complete.** It is a manifest change plus a lockfile regeneration — no source
+code is involved.
+
+**Why the obvious fix is wrong.** Do not bump `overrides.postcss` to a newer
+version. `npm explain postcss` shows `postcss@"8.5.23" from next@16.3.0` — an
+*exact* pin. Any override that disagrees is unsatisfiable, and npm's response is
+to drop the entire block, which is what left `js-yaml` and `brace-expansion`
+unpatched. The fix is to stop competing with Next.
+
+1. **Remove `postcss` from `overrides`** in the root `package.json`.
+2. **Remove `postcss` from `devDependencies`** in all three apps. Nothing imports
+   it — the `postcss.config.js` files only name plugins, and `autoprefixer` takes
+   it as a peer (`^8.1.0`, which Next's 8.5.23 satisfies). Next owns it.
+3. **Add `"js-yaml": "^4.3.1"`** to `overrides` (4.3.1 is the patch for
+   GHSA-5p4m-2wfm-xmqj; `@eslint/eslintrc` accepts `^4.3.0`).
+4. **Bump `eslint-config-next` to `^16.3.0`** in all three apps — it currently
+   sits at 15.x while `next` is 16.3.0, so Next 16's own lint rules never run.
+5. **Remove the root `dependencies: { "@vercel/blob": "2.6.1" }`** — a hoisting
+   workaround. Both real consumers (`apps/web`, `apps/admin`) declare `^2.6.1`
+   themselves; the root entry only pins the tree to exactly 2.6.1.
+6. **Delete `package-lock.json` and `node_modules`, then `npm install`.** The
+   lock must be regenerated — an in-place install will not re-resolve.
+7. **Verify:** `npm ls --all` exits 0, `npm audit` reports no high severity,
+   `js-yaml` resolves to 4.3.1 and `brace-expansion` to 2.1.4 (both were confirmed
+   in the partial tree), then `typecheck` / `test` / `build` all exit 0. Confirm
+   the Tailwind/PostCSS pipeline still works — step 2 is the one with real risk.
+8. **Then, and only then, add the CI gate:** `npm ls --all` and
+   `npm audit --audit-level=high` as steps after `npm ci` in
+   `.github/workflows/ci.yml`. Adding it before this lands guarantees red CI.
 
 ---
 
