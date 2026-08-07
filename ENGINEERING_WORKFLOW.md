@@ -558,15 +558,25 @@ it. Nothing is wrong with the code.
 ### 5.1 Every new session must
 
 1. **Read this file.**
-2. **Read open issues** — §4 above, plus `docs/completion-guide.md`.
-3. **Read the remediation roadmap** — `SECURITY-HARDENING.md` (P1/P2/P3 bands) and
+2. **Read `docs/session-handoff.md`** — the state the last session left, what is
+   outstanding, and the traps that will cost you an hour each if you meet them
+   cold. Start there before §4.
+3. **Read open issues** — §4 above, plus `docs/completion-guide.md`.
+4. **Read the remediation roadmap** — `SECURITY-HARDENING.md` (P1/P2/P3 bands) and
    `docs/environment-setup-plan.md`.
-4. **Verify current branch** — `git status && git branch --show-current`.
-   Work branches from `Dev`. PRs target `Dev`. Never commit directly to `main`.
-5. **Verify build status** — `npm run build`.
-6. **Verify test status** — `npm run test`.
+5. **Verify current branch** — `git status && git branch --show-current`.
+   Work branches from `Dev`. PRs target `Dev`. `main` is the release branch and
+   is updated by merging `Dev` into it, never by committing to it directly.
+   **Note that this is convention, not enforcement:** branch protection requires
+   GitHub Pro or a public repository, and this repo is private on the free tier,
+   so nothing mechanically stops a push to `main`. Behave as though something
+   does.
+6. **Regenerate the Prisma client** — `npm run db:generate`. It is not
+   per-branch; see §4.11 before you lose an hour to it.
+7. **Verify build status** — `npm run build`.
+8. **Verify test status** — `npm run test`.
 
-Steps 5 and 6 establish the baseline. **A failure you did not cause is not
+Steps 7 and 8 establish the baseline. **A failure you did not cause is not
 yours to silently inherit** — record it, then state clearly in your final report
 which failures pre-existed your change.
 
