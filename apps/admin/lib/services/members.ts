@@ -52,7 +52,9 @@ export async function listMembers(
     db.user.groupBy({ by: ['status'], where: { ...searchFilter, deletedAt: null }, _count: true }),
   ])
 
-  const statusCounts: Record<UserStatus, number> = { ACTIVE: 0, PENDING: 0, SUSPENDED: 0 }
+  // Typed as a total Record on purpose: adding a UserStatus without counting it
+  // is a compile error rather than a tally that silently omits a whole group.
+  const statusCounts: Record<UserStatus, number> = { ACTIVE: 0, PENDING: 0, SUSPENDED: 0, RESIGNED: 0 }
   for (const g of statusGroups) statusCounts[g.status] = g._count
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit), statusCounts }

@@ -31,8 +31,13 @@ vi.mock('@/integrations/payment', () => ({
   },
 }))
 vi.mock('@/repositories/mandate.repository', () => ({
-  mandateRepo: { findFirst: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn(), findActiveByUser: vi.fn() },
+  mandateRepo: { findFirst: vi.fn(), findById: vi.fn(), create: vi.fn(), update: vi.fn(), findActiveByUser: vi.fn(), findMany: vi.fn() },
 }))
+vi.mock('@/repositories/user.repository', () => ({
+  userRepo: { findById: vi.fn(), update: vi.fn() },
+}))
+vi.mock('@/lib/role-version', () => ({ bumpRoleVersion: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/services/inbox.service', () => ({ notifyAdmins: vi.fn().mockResolvedValue(0) }))
 vi.mock('@/repositories/bank-account.repository', () => ({
   bankAccountRepo: { findById: vi.fn() },
 }))
@@ -40,9 +45,13 @@ vi.mock('@/repositories/bank-account.repository', () => ({
 import { paymentGateway } from '@/integrations/payment'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
+import { userRepo } from '@/repositories/user.repository'
+import { bumpRoleVersion } from '@/lib/role-version'
+import { notifyAdmins } from '@/services/inbox.service'
 import {
   createMandate,
   cancelMandate,
+  leaveFoundation,
   processMandateWebhook,
   planDebitWarnings,
   hasActiveMandate,
@@ -297,5 +306,96 @@ describe('requestDelay writes the delay where it cannot be lost', () => {
   it('refuses a date in the past, before touching anything', async () => {
     await expect(requestDelay('m1', { newDate: '2020-01-01' }, OWNER, ['MEMBER'])).rejects.toThrow()
     expect(mandateRepo.update).not.toHaveBeenCalled()
+  })
+})
+
+
+// ---------------------------------------------------------------------------
+// leaveFoundation — "Leave the Foundation at any time, with your history intact"
+// ---------------------------------------------------------------------------
+
+describe('leaveFoundation', () => {
+  const member = (over: Record<string, unknown> = {}) => ({
+    id: 'u1', status: 'ACTIVE', firstName: 'Thabo', lastName: 'Mahlangu', ...over,
+  })
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mock(userRepo.findById).mockResolvedValue(member() as never)
+    mock(userRepo.update).mockResolvedValue({ id: 'u1', firstName: 'Thabo', lastName: 'Mahlangu' } as never)
+    mock(mandateRepo.findMany).mockResolvedValue([] as never)
+  })
+
+  it('moves the member out of ACTIVE and stamps when they left', async () => {
+    const result = await leaveFoundation('u1', '127.0.0.1')
+
+    // Every collection path filters on ACTIVE, so moving out of it is what
+    // stops future debits. That is the existing mechanism, not a new one.
+    expect(userRepo.update).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ status: 'RESIGNED', resignedAt: expect.any(Date) }),
+      expect.anything(),
+    )
+    expect(result.resignedAt).toBeTruthy()
+  })
+
+  it('cancels every live mandate at the gateway', async () => {
+    mock(mandateRepo.findMany).mockResolvedValue([
+      { id: 'm1', userId: 'u1', status: 'ACTIVE', netcashMandateId: 'nc1' },
+      { id: 'm2', userId: 'u1', status: 'PENDING', netcashMandateId: null },
+    ] as never)
+    mock(mandateRepo.findById).mockImplementation((async (id: string) => ({
+      id, userId: 'u1', status: 'ACTIVE', netcashMandateId: id === 'm1' ? 'nc1' : null,
+    })) as never)
+    mock(mandateRepo.update).mockResolvedValue({} as never)
+
+    const result = await leaveFoundation('u1', '127.0.0.1')
+
+    expect(result.mandatesCancelled).toBe(2)
+    expect(mock(paymentGateway.cancelMandate)).toHaveBeenCalledWith('nc1')
+  })
+
+  it('leaves anyway when the gateway will not co-operate', async () => {
+    mock(mandateRepo.findMany).mockResolvedValue([
+      { id: 'm1', userId: 'u1', status: 'ACTIVE', netcashMandateId: 'nc1' },
+    ] as never)
+    mock(mandateRepo.findById).mockRejectedValue(new Error('gateway down'))
+
+    // The member said they are leaving. A gateway outage must not hold them in.
+    await expect(leaveFoundation('u1', '127.0.0.1')).resolves.toBeDefined()
+    expect(userRepo.update).toHaveBeenCalled()
+  })
+
+  it('ends the session by invalidating the role version', async () => {
+    await leaveFoundation('u1', '127.0.0.1')
+
+    // Their token was issued while they were still active.
+    expect(mock(bumpRoleVersion)).toHaveBeenCalledWith('u1')
+  })
+
+  it('tells leadership after the fact rather than asking first', async () => {
+    await leaveFoundation('u1', '127.0.0.1')
+
+    // The guide says "at any time". Making it conditional on a leader reading
+    // an inbox would make that untrue.
+    expect(mock(notifyAdmins)).toHaveBeenCalled()
+    const msg = mock(notifyAdmins).mock.calls[0]![0] as { body: string }
+    expect(msg.body).toMatch(/history remains on record/i)
+  })
+
+  it('refuses a member who has already left', async () => {
+    mock(userRepo.findById).mockResolvedValue(member({ status: 'RESIGNED' }) as never)
+
+    await expect(leaveFoundation('u1', '127.0.0.1')).rejects.toBeInstanceOf(MandateConflictError)
+    expect(userRepo.update).not.toHaveBeenCalled()
+  })
+
+  it('deletes nothing', async () => {
+    await leaveFoundation('u1', '127.0.0.1')
+
+    // The guide is explicit: history stays and contributions already made are
+    // not refunded. Nothing in this path removes a row.
+    const data = mock(userRepo.update).mock.calls[0]![1] as Record<string, unknown>
+    expect(data).not.toHaveProperty('deletedAt')
   })
 })
