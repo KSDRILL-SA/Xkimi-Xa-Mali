@@ -47,6 +47,15 @@ export const NOTIFICATION_TEMPLATES: Array<{
     body: 'Xkimm Xa Mali Foundation: Thank you! Your R{{amount}} toward "{{goal}}" has been received - your badge points just got a boost.',
   },
   {
+    // Sent when the monthly statement is ready. Not a mandatory slug: this is
+    // an invitation to look, not money moving, so a member who has switched a
+    // channel off is not overridden. The in-app copy reaches them regardless.
+    slug: 'statement-ready-sms',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimm Xa Mali Foundation: {{firstName}}, your {{period}} statement is ready to download: {{url}}',
+  },
+  {
     // Sent to the members who pledged toward a Goal that lapsed without
     // reaching target. Plain hyphen, not an em dash: outside GSM-7 the whole
     // message is billed as UCS-2 and halves the character budget.
@@ -218,6 +227,12 @@ export const NOTIFICATION_TEMPLATES: Array<{
     channel: 'EMAIL',
     subject: 'Payment failed — Xkimm Xa Mali Foundation',
     body: 'Hi {{firstName}}, your R{{amount}} debit for {{period}} was declined. Log in to resolve: {{url}}',
+  },
+  {
+    slug: 'statement-ready-email',
+    channel: 'EMAIL',
+    subject: 'Your {{period}} statement is ready — Xkimm Xa Mali Foundation',
+    body: 'Hi {{firstName}}, your contribution statement for {{period}} is ready to download from the Statements page: {{url}}',
   },
   {
     // The reversing entry, explained. Says plainly that nothing was deleted —
