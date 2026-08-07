@@ -110,7 +110,10 @@ export const mockGateway: IPaymentGateway = {
       PENDING: 'PENDING', AUTHORIZED: 'ACTIVE', ACTIVE: 'ACTIVE',
       SUSPENDED: 'SUSPENDED', REJECTED: 'SUSPENDED', CANCELLED: 'CANCELLED',
     }
-    return map[raw.toUpperCase()] ?? 'PENDING'
+    // Null on an unknown status, as the real adapter does. These two fell back
+    // differently — SUSPENDED there, PENDING here — which is the exact divergence
+    // the note above says this block exists to avoid.
+    return map[raw.toUpperCase()] ?? null
   },
 
   /**

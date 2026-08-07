@@ -81,7 +81,8 @@ export interface IPaymentGateway {
   submitOnceOffDebit(payload: DebitPayload): Promise<DebitResponse>
   submitScheduledDebit(payload: DebitPayload): Promise<DebitResponse>
   mapTransactionStatus(raw: string): 'SUCCESS' | 'FAILED' | 'REVERSED' | null
-  mapMandateStatus(raw: string): 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED'
+  /** Null when the status is not recognised — see `mapNetcashStatus`. */
+  mapMandateStatus(raw: string): 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'CANCELLED' | null
   verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean
   isAllowedWebhookIp(ip: string): boolean
   getNextDebitDate(debitDay: number): string
