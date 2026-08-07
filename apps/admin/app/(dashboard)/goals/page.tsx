@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { listAllGoals, createGoal, activateGoal, lockGoal, deleteGoal, recordGoalProgress, setPrimaryGoal } from '@/lib/services'
+import { listAllGoals, createGoal, activateGoal, rejectGoal, lockGoal, deleteGoal, recordGoalProgress, setPrimaryGoal } from '@/lib/services'
 import { formatZAR, formatDate, MONTHS } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { Target } from 'lucide-react'
@@ -16,6 +16,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   ACTIVE:   { label: 'Active',   className: 'xxm-status-success' },
   ACHIEVED: { label: 'Achieved', className: 'xxm-status-success' },
   FAILED:   { label: 'Failed',   className: 'xxm-status-danger'  },
+  REJECTED: { label: 'Declined', className: 'xxm-status-danger'  },
 }
 
 async function activateGoalAction(fd: FormData) {
@@ -23,6 +24,15 @@ async function activateGoalAction(fd: FormData) {
   const goalId = fd.get('goalId') as string
   const { userId, roles: sr } = await requireAdmin('goal.activate')
   await activateGoal(userId, sr, goalId)
+  revalidatePath('/goals')
+}
+
+async function rejectGoalAction(fd: FormData) {
+  'use server'
+  const goalId = fd.get('goalId') as string
+  const reason = String(fd.get('reason') ?? '')
+  const { userId, roles: sr, ip } = await requireAdmin('goal.reject')
+  await rejectGoal(userId, sr, goalId, reason, ip)
   revalidatePath('/goals')
 }
 
@@ -74,7 +84,16 @@ export default async function GoalsPage({
 
   const { items, total } = await listAllGoals(roles, page)
 
-  type RawItem = { id: string; title: string; type: string; status: string; targetAmount: unknown; currentAmount: unknown; deadline: Date | null; lockedAt: Date | null; isPrimary: boolean }
+  type RawItem = {
+    id: string; title: string; type: string; status: string
+    targetAmount: unknown; currentAmount: unknown
+    deadline: Date | null; lockedAt: Date | null; isPrimary: boolean
+    rejectionReason: string | null
+    creator: {
+      firstName: string; lastName: string
+      roles: { role: { name: string } }[]
+    } | null
+  }
 
   const rows: GoalRow[] = (items as unknown as RawItem[]).map((g) => {
     const sc       = STATUS_CONFIG[g.status] ?? { label: g.status, className: 'xxm-status-pending' }
@@ -89,6 +108,12 @@ export default async function GoalsPage({
       deadline: g.deadline ? formatDate(g.deadline) : '—',
       locked: !!g.lockedAt,
       isPrimary: g.isPrimary,
+      // Only label it a proposal when a non-admin raised it. A leader's own
+      // draft is not awaiting anybody's review.
+      proposedBy:
+        g.creator && !g.creator.roles.some((r) => r.role.name === 'ADMIN')
+          ? `${g.creator.firstName} ${g.creator.lastName}`
+          : null,
     }
   })
 
@@ -182,6 +207,7 @@ export default async function GoalsPage({
         <GoalsTable
           rows={rows}
           activateAction={activateGoalAction}
+          rejectAction={rejectGoalAction}
           deleteAction={deleteGoalAction}
           lockAction={lockGoalAction}
           progressAction={recordGoalProgressAction}

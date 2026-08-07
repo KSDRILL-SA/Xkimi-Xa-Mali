@@ -9,7 +9,7 @@ import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/li
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { roundZAR, sumZAR, subtractZAR } from '@/lib/money'
 import { inngest, InngestEvents } from '@/lib/inngest'
-import { createInboxMessages } from './inbox.service'
+import { createInboxMessages, notifyAdmins } from './inbox.service'
 import { logger } from '@xxm/observability'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -255,6 +255,79 @@ export async function syncAdditionalGoalProgress(goalId: string): Promise<void> 
   await evictGoalsCache()
 
   if (reachedTarget) await emitGoalAchieved(goalId, g.title)
+}
+
+// ─── Member proposals ─────────────────────────────────────────────────────────
+
+/**
+ * A member proposes a Goal.
+ *
+ * The guide's six-step flow opens with "1 A member proposes it — with a clear
+ * purpose and an amount", then "2 Leadership reviews it". Only leadership could
+ * create a Goal, so the flow began with something a member could not do.
+ *
+ * Almost nothing new was needed. `DRAFT` already means "proposed but not
+ * approved" and `activateGoal` already means "leadership approved"; what was
+ * missing was a door a member could walk through. This is that door, and it is
+ * deliberately the *same* `DRAFT` state the admin path creates — one review
+ * queue, not two.
+ *
+ * `createGoal` is left exactly as it was. It is the leadership path and still
+ * asserts admin.
+ *
+ * A proposal is told apart from a leadership draft by the roles of
+ * `createdById`, not by a separate column — the existing relation already
+ * carries who, which is what leadership needs to see.
+ */
+export async function proposeGoal(
+  input: CreateGoalInput,
+  userId: string,
+  ip: string,
+) {
+  const goal = await goalRepo.create({
+    title: input.title,
+    description: input.description ?? null,
+    type: input.type,
+    targetAmount: input.targetAmount,
+    currentAmount: 0,
+    deadline: new Date(input.deadline),
+    status: 'DRAFT',
+    createdById: userId,
+  })
+
+  await writeAuditLog({
+    userId,
+    action: 'GOAL_PROPOSED',
+    entity: 'Goal',
+    entityId: goal.id,
+    payload: { title: input.title, targetAmount: input.targetAmount, type: input.type },
+    ipAddress: ip,
+  })
+
+  // Leadership has to know there is something to review, or step 2 never
+  // happens and the member is left waiting on a queue nobody is watching.
+  // Best-effort: a proposal that was recorded must not be lost because an
+  // inbox write failed.
+  await notifyAdmins({
+    title: 'A member has proposed a Goal',
+    body:
+      `A new Goal has been proposed for review: "${input.title}", ` +
+      `target ${formatProposalAmount(input.targetAmount)}. ` +
+      `Open Goals in the console to approve or decline it.`,
+    category: 'GOAL',
+  }).catch((err) => logger.error('Failed to notify leadership of a goal proposal', {
+    goalId: goal.id,
+    error: err instanceof Error ? err.message : String(err),
+  }))
+
+  await evictGoalsCache()
+
+  return serializeGoal(goal as GoalRow)
+}
+
+/** Rands, plainly, for a message body. */
+function formatProposalAmount(amount: number): string {
+  return `R${amount.toLocaleString('en-ZA')}`
 }
 
 // ─── Admin mutations ──────────────────────────────────────────────────────────

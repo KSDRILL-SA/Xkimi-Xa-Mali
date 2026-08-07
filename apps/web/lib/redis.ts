@@ -41,6 +41,10 @@ export const forgotPasswordRatelimit  = makeRatelimit('xxm:ratelimit:forgot-pass
 export const verifyEmailRatelimit     = makeRatelimit('xxm:ratelimit:verify-email',    Ratelimit.slidingWindow(10, '15 m'))
 export const mandateCreateRatelimit   = makeRatelimit('xxm:ratelimit:mandate-create',  Ratelimit.slidingWindow(10, '1 h'))
 export const mandateDelayRatelimit    = makeRatelimit('xxm:ratelimit:mandate-delay',   Ratelimit.slidingWindow(5,  '1 h'))
+// A proposal reaches every leader's inbox, so an unbounded one is a way to
+// shout at leadership. Three an hour is generous for a real intention and
+// useless as a megaphone.
+export const goalProposalRatelimit    = makeRatelimit('xxm:ratelimit:goal-propose',    Ratelimit.slidingWindow(3,  '1 h'))
 export const adminInviteRatelimit     = makeRatelimit('xxm:ratelimit:admin-invite',    Ratelimit.slidingWindow(20, '1 h'))
 export const adminBroadcastRatelimit  = makeRatelimit('xxm:ratelimit:admin-broadcast', Ratelimit.slidingWindow(5,  '1 h'))
 export const adminBulkRatelimit       = makeRatelimit('xxm:ratelimit:admin-bulk',      Ratelimit.slidingWindow(3,  '1 h'))

@@ -118,7 +118,33 @@ session is refused; an already-REVERSED transaction cannot be reversed twice.
 
 ---
 
-### GAP-2 — A member cannot propose a Goal (HIGH)
+### GAP-2 — A member cannot propose a Goal (HIGH) — ✅ CLOSED 2026-08-07
+
+**Founders' decision, taken 2026-08-07: a rejected proposal is KEPT, as a fifth
+`GoalStatus` value `REJECTED`** — not deleted. On the guide's own principle that
+nothing is quietly removed: the member who proposed it can see it was considered
+and answered, and read why. Migration `20260807150000`, additive.
+
+Built as planned, with three things the plan left open now settled:
+
+- **No new draft state, and no parallel queue.** `proposeGoal` creates the same
+  `DRAFT` the admin path creates, so `activateGoal` — which already means
+  "leadership approved" — keeps meaning exactly that. One review queue.
+- **`createdById` was sufficient**, as the plan suspected. A proposal is told
+  apart from a leadership draft by the *roles* of that user, not by a new
+  column. The console shows a "proposed by" chip only when a non-admin raised
+  it, because a leader's own draft is not awaiting anyone's review.
+- **Declining requires a reason** (≥10 chars), for the same reason a reversal
+  does: an answer with no cause tells the member nothing.
+
+Both directions notify the proposer — approval and refusal — and neither sends
+a leader an inbox message about their own draft. Rate-limited to three proposals
+per hour per member (`goalProposalRatelimit`): a proposal reaches every leader's
+inbox, so an unbounded one is a megaphone.
+
+<details>
+<summary>Original GAP-2 text</summary>
+
 
 **The guide:**
 
@@ -155,6 +181,8 @@ entry point.
 `REJECTED` state. The guide's transparency principle argues for keeping it —
 but that is a fifth `GoalStatus` value and a migration, so raise it with the
 founders rather than deciding it in code.
+
+</details>
 
 ---
 
