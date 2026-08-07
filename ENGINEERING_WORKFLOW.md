@@ -244,7 +244,7 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 | M-1 | **CSP hardening** | ✅ **Fixed.** Per-request nonce; `script-src 'unsafe-inline'` removed; `base-uri` and `form-action` locked. Cost — 13 public pages became dynamic — is documented in `web/app/layout.tsx` and accepted |
 | M-2 | **POPIA compliance planning** | 🟡 Partial. Right-to-erasure honoured in member listings; consent captured at registration. Retention policy and DSAR process not yet formalised |
 | M-3 | **Monitoring improvements** | 🟡 Partial. `@xxm/observability` + Sentry wired across apps. Gaps: no alert on failed debit collections (see H-1), no dependency-health gate in CI, `SECURITY-HARDENING.md` tracks "CI security gate" as P2 |
-| M-4 | **Integration testing expansion** | 🟡 **Improved** (2026-08-07): 820 tests. **All three money-touching jobs are covered end to end** — `executeDebitRun`, `executeTransactionRetry` and `executeLedgerReconciliation` each take the step runner as a parameter, so a stub drives them without an Inngest server. 33 cases. **Every one of the three had a defect no existing test could reach**, and each was demonstrated failing before it was fixed — see §4.6. `ledger-reconciliation` additionally needs a *memoising* stub: the always-run stub passes with its bug in place. **Still partial**: the other 15 jobs have no seam, though none of them move money directly |
+| M-4 | **Integration testing expansion** | 🟡 **Improved** (2026-08-07): 840 tests. **All five money-touching jobs are covered end to end** — `debit-run`, `transaction-retry-failed`, `ledger-reconciliation`, `mandate-delay-handler` and `mandate-status-sync` each take the step runner as a parameter, so a stub drives them without an Inngest server. 61 cases. **Every one of the five had a defect no existing test could reach**, and each was demonstrated failing before it was fixed — see §4.6. `ledger-reconciliation` additionally needs a *memoising* stub; the always-run stub passes with its bug in place. **Deliberately stopped there**: the remaining 12 jobs score zero on money-touching surface — badges, reminders, statements, invite expiry — where the worst case is a message not sent |
 | M-5 | **Web display font silently removed** | ✅ **Fixed** (2026-08-07). Loader restored; build green with it. The stub had been introduced on the assumption Google Fonts could not be fetched at build time — that assumption was wrong, so the regression bought nothing |
 | M-6 | **Admin `role-version.ts` bypasses validated config** | ✅ **Fixed** (2026-08-07). Reads through `lib/env` again. The stated reason for the bypass — that the strict module broke isolated tests — had a counter-example in the same directory: `role-revocation.test.ts` was already mocking `@/lib/env`. Four suites that reach the module transitively now do the same |
 | M-7 | **Crypto envelope doc/code drift** | ✅ **Fixed** (2026-08-07). Both diagrams now describe `base64(iv ‖ authTag ‖ ciphertext)` with a 16-byte IV, matching `lib/encryption.ts` |
@@ -337,7 +337,7 @@ result was reported from `package.json` rather than from the installed tree.
 Verify a dependency claim with `npm audit` and `npm ls <pkg>`, never by reading
 a manifest.
 
-### 4.6 The same mistake in two places, and what found it
+### 4.6 One defect per job, five for five
 
 The debit run and the retry job both mapped the gateway's three answers onto
 two, writing every non-success as `PENDING`. Fixing it in one did not fix the
@@ -373,6 +373,31 @@ returned, having corrected everything. That one adds a fourth lesson:
   stub that memoises completed steps — which is what Inngest does on re-entry —
   makes it visible. A seam is only as honest as what you drive it with.
 
+**Two more jobs, two more defects — five for five.** The claim that the
+remaining jobs did not move money was made without checking; ranking them by
+money-touching surface put two at the top, and both were wrong:
+
+- `mandate-delay-handler` held the **third** copy of the `FAILED`→`PENDING`
+  collapse. The worst-reading of the three: a member moved their debit *because
+  they could not afford the original date*, was told the new date was set, then
+  told their payment was on its way when the bank had refused it.
+- `mandate-status-sync` was the soundest job structurally — counters already
+  outside `step.run`, try/catch correctly placed — and its defect was in the
+  mapping it trusted. Both adapters guessed at an unrecognised status and
+  guessed *differently*: `SUSPENDED` in the real one, `PENDING` in the mock,
+  three lines under a comment saying the rules were shared on purpose so a test
+  would not exercise different rules from production. Either answer moves the
+  mandate out of `ACTIVE`, and the debit run collects only from `ACTIVE`.
+
+A fifth lesson, from the pattern rather than any one job:
+
+- **"It doesn't touch money" is a claim, not an observation.** Say it only after
+  grepping for the gateway, the transaction writes and the mandate writes. Five
+  jobs were given a seam because they scored above zero on that; five had a
+  defect. The twelve that scored zero were left alone deliberately — the hit
+  rate came from money-path invariants with no reachable tests, and that
+  condition does not hold for a badge recalculation.
+
 ### 4.7 A process trap that cost an afternoon
 
 **A "killed" background task does not kill the `npm` process underneath it.**
@@ -395,6 +420,27 @@ Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
 Kill stale npm processes for *this* repo before retrying. Do not kill unrelated
 global installs. And prefer chaining install → verify in a single command over
 launching them separately, so nothing can overlap.
+
+### 4.8 A template change in code does not reach a database
+
+`prisma/seed.ts` upserts notification templates with `update: {}` — create-only,
+so an admin editing a body in the database is never clobbered. That is a
+deliberate and correct decision, and it has a consequence worth knowing before
+you rely on it:
+
+**Editing a template body in `templates.ts` changes nothing for any database
+that already has that slug.** Running `npm run db:seed` will not update it. A
+fresh database gets the new text; every existing one keeps the old.
+
+Verified rather than assumed: after seeding, `payment-failed-sms` still held its
+previous body, and a targeted `notificationTemplate.update` was required.
+
+- A body change needs a deliberate one-row update per environment.
+- Adding a *placeholder* to a template is safe in both directions — an unused
+  payload key is ignored, and `interpolate` only substitutes what the body
+  actually references. What it will not do is start greeting anyone by name.
+- Removing a template from `templates.ts` leaves an inert row behind. Harmless
+  while nothing references the slug, but it will not disappear on its own.
 
 ---
 
