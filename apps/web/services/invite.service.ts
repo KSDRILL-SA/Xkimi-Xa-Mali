@@ -14,7 +14,9 @@ import {
   InviteExpiredError,
   InviteBindingError,
   InviteDuplicateError,
+  MemberCapReachedError,
 } from '@/lib/errors'
+import { MAX_MEMBERS } from '@xxm/utils'
 import { assertAdmin, assertNotSelf, ROLES } from '@/lib/authorization'
 import { bumpRoleVersion } from '@/lib/role-version'
 import { userRepo, runTransaction } from '@/repositories/user.repository'
@@ -124,6 +126,38 @@ export async function getMyInvitation(userId: string) {
   }
 }
 
+// ─── The fifty-member cap ─────────────────────────────────────────────────────
+
+/**
+ * How many of the fifty places are taken, and how many are left.
+ *
+ * A place is held by any member who has not been erased — `deletedAt` is the
+ * only thing that frees one. Status does not: a suspended member keeps their
+ * history and their place, and someone who has registered but not yet been
+ * activated already occupies one.
+ *
+ * Pending invitations count too. Without that, leadership could issue
+ * fifty-one links and the fifty-first person would be refused at the moment
+ * they tried to accept — after being told they were welcome. Refusing at the
+ * point of invitation puts the "no" in front of the person who can act on it.
+ */
+export async function countMemberPlaces() {
+  const [members, pendingInvites] = await Promise.all([
+    userRepo.count({ deletedAt: null }),
+    invitationRepo.count({ status: 'PENDING', expiresAt: { gt: new Date() } }),
+  ])
+
+  const taken = members + pendingInvites
+  return {
+    members,
+    pendingInvites,
+    taken,
+    cap: MAX_MEMBERS,
+    remaining: Math.max(0, MAX_MEMBERS - taken),
+    isFull: taken >= MAX_MEMBERS,
+  }
+}
+
 // ─── Create invite ────────────────────────────────────────────────────────────
 
 export type CreateInviteParams = {
@@ -142,6 +176,12 @@ export async function generateInvite(
   ip?: string,
 ) {
   assertAdmin(adminRoles)
+
+  // Before anything else: is there a place to invite someone into? Checked
+  // here rather than at registration so leadership learns the circle is full
+  // while deciding to invite, not after the invitee has been told they are in.
+  const places = await countMemberPlaces()
+  if (places.isFull) throw new MemberCapReachedError(MAX_MEMBERS)
 
   const { firstName, lastName, email, phone, minimumAmount } = params
   const normPhone = smsProvider.normalisePhone(phone)
@@ -315,6 +355,17 @@ export async function acceptInviteRegistration(
   const tokenHash   = hashToken(rawToken)
 
   const user = await runTransaction(async (tx) => {
+    // Backstop. The real gate is at invitation issue; this catches two invitees
+    // accepting at once, where both were inside the cap when they were invited.
+    //
+    // Counts *members* only, not invitations. This person is holding a pending
+    // invitation right now — counting it would refuse the fiftieth member on
+    // the strength of their own invite. Accepting converts a held place into an
+    // occupied one, so the question is only whether the fifty seats are already
+    // filled by people.
+    const members = await tx.user.count({ where: { deletedAt: null } })
+    if (members >= MAX_MEMBERS) throw new MemberCapReachedError(MAX_MEMBERS)
+
     const created = await userRepo.create({
       email:          invite.email,
       phone:          invite.phone,
