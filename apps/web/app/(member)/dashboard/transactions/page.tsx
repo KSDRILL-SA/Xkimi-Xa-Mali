@@ -160,6 +160,17 @@ export default async function TransactionsPage({
                   <span className="text-xs text-xxm-gray-400 hidden sm:block text-right">
                     {formatDate(tx.createdAt)}
                   </span>
+                  {/* The stated reason for a reversing entry. Shown to the
+                      member because a correction they cannot read the cause of
+                      is not the honest history the Foundation promises — and
+                      this is the screen they actually look at. Spans the full
+                      row so a long reason wraps rather than truncating. */}
+                  {tx.reversalReason && (
+                    <p className="w-full sm:col-span-6 text-xs text-xxm-gray-500 sm:pl-[38px] sm:-mt-1">
+                      <span className="font-semibold text-xxm-gray-600">Reason for reversal: </span>
+                      {tx.reversalReason}
+                    </p>
+                  )}
                 </div>
               )
             })}

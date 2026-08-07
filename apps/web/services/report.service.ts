@@ -37,6 +37,7 @@ type TxRow = {
   status: string
   gatewayRef: string | null
   idempotencyKey: string
+  reversalReason: string | null
   processedAt: Date | null
   createdAt: Date
   contribution: {
@@ -93,6 +94,9 @@ export async function getTransactionHistory(
       status: t.status,
       gatewayRef: t.gatewayRef,
       idempotencyKey: t.idempotencyKey,
+      // Null on everything that is not a reversing entry, and on reversals
+      // written before a reason was required.
+      reversalReason: t.reversalReason ?? null,
       period: periodLabel(t.contribution.periodMonth, t.contribution.periodYear),
       processedAt: t.processedAt?.toISOString() ?? null,
       createdAt: t.createdAt.toISOString(),
