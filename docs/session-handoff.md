@@ -181,7 +181,7 @@ explicit decision.
 | **Netcash adapter never exercised live** | Every member, on the first collection | A batch rejected wholesale, or a code we map wrongly. Mitigate by running one member first |
 | **Migrations not run before deploy** | Everyone | Prisma errors on any query touching the new columns |
 | **A wrong service key reads as fifty declined debits** | Every member at once | Mitigated: `isConfigurationFailure()` separates our misconfiguration from a member's bank declining. Do not collapse that distinction |
-| **The Founder Guide PDF is in `main`/`Dev` history** | The four founders | It was committed by accident and untracked again in #290. It is `.gitignore`d now (`*.pdf`). Removing it from history needs a rewrite of both branches — the owner's call |
+| **The Founder Guide PDF blob is still retrievable from GitHub by SHA** | The four founders | Purged from `main` and `Dev` history by `git filter-repo` on 2026-08-07 and both branches force-pushed, so it is gone from every branch and every local clone that re-clones. **But GitHub still serves the old commit `d3ddd74` and blob `3bf27523…` directly** — merged pull requests keep `refs/pull/*` alive and GitHub does not garbage-collect on request. See §9 for the one remaining step, which only the owner can take |
 | **CI is still not executing** (§4.3 H-3) | Everyone | GitHub Actions minutes exhausted on the free tier. **Every result in this document was verified locally.** Nothing automated is checking the repository |
 
 ---
@@ -213,3 +213,34 @@ for, and scaling work down is the owner's decision, not an engineer's.
   all still open, none regressed.
 - **No changes to badge thresholds, contribution amounts, fee calculations,
   debit days or grace periods.** Those are the owner's decisions (§6).
+
+---
+
+## 9. The Founder Guide PDF — what was done and what is left
+
+The PDF was committed by accident twice during the merge sequence and reached
+`Dev`'s history. On 2026-08-07 it was purged with `git filter-repo
+--invert-paths` and both branches were force-pushed. Verified afterwards:
+
+- Gone from every commit on `main` and `Dev`.
+- Gone from the local object store after `reflog expire` + `gc --prune=now`.
+- All four gates re-run green on the rewritten history before pushing (941 tests).
+- A full pre-rewrite backup bundle was taken first.
+- `*.pdf`, `.codex/` and `.vscode/` are now in `.gitignore`, so a broad
+  `git add` cannot reintroduce it.
+
+**What a rewrite cannot do, and this one did not:**
+
+GitHub still serves the pre-rewrite commit `d3ddd74` and the blob
+`3bf2752348503a60bae2e1039cc7835d85ff8446` (15.5 MB) by direct SHA. Merged
+pull requests retain `refs/pull/<n>/head`, which keeps those objects reachable,
+and GitHub does not garbage-collect on demand.
+
+**The one remaining step, which only the repository owner can take:** open a
+GitHub Support request asking them to garbage-collect unreachable objects and
+purge cached views for this repository, citing the commit and blob SHAs above.
+Until then, treat the document as retrievable by anyone with repository access.
+
+Scope of exposure in the meantime: the repository is **private** with a single
+collaborator, so this is the owner's own account plus GitHub staff — not the
+public. That is why this was recorded rather than treated as an incident.
