@@ -16,6 +16,9 @@ vi.mock('@/lib/db', () => {
 vi.mock('@/lib/signature-storage', () => ({
   storeSignaturePng: () => { throw new Error('reached storage past the admin guard') },
 }))
+vi.mock('@/lib/env', () => ({
+  env: { UPSTASH_REDIS_REST_URL: undefined, UPSTASH_REDIS_REST_TOKEN: undefined },
+}))
 
 import * as services from '@/lib/services'
 import { AdminForbiddenError } from '@/lib/services'

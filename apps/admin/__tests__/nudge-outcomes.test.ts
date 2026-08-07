@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 
 vi.mock('@/lib/db', () => ({ db: { $queryRaw: vi.fn() }, Prisma: {} }))
 vi.mock('@/lib/signature-storage', () => ({ storeSignaturePng: vi.fn() }))
+vi.mock('@/lib/env', () => ({
+  env: { UPSTASH_REDIS_REST_URL: undefined, UPSTASH_REDIS_REST_TOKEN: undefined },
+}))
 
 import { db } from '@/lib/db'
 import { getNudgeOutcomes, AdminForbiddenError } from '@/lib/services'
