@@ -92,7 +92,9 @@ export async function executeDebitRun(step: DebitStepRunner) {
   const mandates = await step.run('find-mandates', () =>
     db.paymentMandate.findMany({
       where: { status: 'ACTIVE', debitDay: dayOfMonth },
-      include: { user: { select: { id: true, status: true } } },
+      // firstName is selected so a decline can address the member by name. The
+      // messages that go out when things go well already do.
+      include: { user: { select: { id: true, status: true, firstName: true } } },
     }),
   )
 
@@ -271,31 +273,49 @@ export async function executeDebitRun(step: DebitStepRunner) {
       })
     }
 
-    // A decline is not a pending debit, and the member has to be told the
-    // difference — their money was not taken and they can still pay by hand.
-    // `debit-declined` has been seeded since the templates were written and
-    // nothing has ever sent it, because every non-success was called PENDING.
-    const templateSlug =
-      txStatus === 'SUCCESS' ? 'debit-success'
-      : txStatus === 'FAILED' ? 'debit-declined'
-      : 'debit-pending'
+    // Every placeholder any of these templates renders. An unsupplied one is
+    // not dropped — `interpolate` sends it to the member as literal braces.
+    // The URL is the page that can actually settle the debt rather than the
+    // app root, because "log in to pay" that lands on a dashboard is an
+    // instruction the member still has to go and interpret.
+    const notifyPayload = {
+      mandateId: mandate.id,
+      firstName: mandate.user.firstName ?? '',
+      amount: Number(mandate.amount).toString(),
+      period: periodKey,
+      transactionId: transaction.id,
+      url: `${env.NEXTAUTH_URL ?? ''}/dashboard/contribute`,
+    }
 
-    await step.run(`notify-${mandate.id}`, () =>
-      queueNotification({
+    // A decline is not a pending debit, and the member has to be told the
+    // difference: their money was not taken, and they can still pay by hand.
+    //
+    // `payment-failed-*` rather than the `debit-declined` pair that was also
+    // seeded. Both were dead, but only these are in MANDATORY_SLUGS — the
+    // others are filtered by notification preferences, so a member who had SMS
+    // switched off would never have learned their debit failed. A declined
+    // collection is not a message anyone should be able to opt out of.
+    await step.run(`notify-${mandate.id}`, async () => {
+      if (txStatus === 'FAILED') {
+        // Both channels: this one costs the member money if it is missed.
+        await queueNotification({
+          userId: mandate.userId, templateSlug: 'payment-failed-sms',
+          channel: 'SMS', payload: notifyPayload,
+        })
+        await queueNotification({
+          userId: mandate.userId, templateSlug: 'payment-failed-email',
+          channel: 'EMAIL', payload: notifyPayload,
+        })
+        return
+      }
+
+      await queueNotification({
         userId: mandate.userId,
-        templateSlug,
+        templateSlug: txStatus === 'SUCCESS' ? 'debit-success' : 'debit-pending',
         channel: 'SMS',
-        payload: {
-          mandateId: mandate.id,
-          amount: Number(mandate.amount).toString(),
-          period: periodKey,
-          transactionId: transaction.id,
-          // debit-declined renders {{url}}. An unsupplied placeholder is not
-          // dropped — it is sent to the member as literal braces.
-          url: env.NEXTAUTH_URL ?? '',
-        },
-      }),
-    )
+        payload: notifyPayload,
+      })
+    })
   }, (mandate) => mandate.id)
 
   // One sync after the whole run — the month's debits just moved the paid total.

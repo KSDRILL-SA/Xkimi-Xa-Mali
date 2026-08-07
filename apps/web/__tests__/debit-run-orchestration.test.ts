@@ -72,7 +72,7 @@ function mandate(id: string) {
     debitDay: 1,
     netcashMandateId: `nc-${id}`,
     delayedUntil: null,
-    user: { id: `user-${id}`, status: 'ACTIVE' },
+    user: { id: `user-${id}`, status: 'ACTIVE', firstName: 'Kurhula' },
   }
 }
 
@@ -127,7 +127,10 @@ describe('executeDebitRun — a gateway that throws', () => {
 
   it('does not tell the member their debit was declined — nothing was', async () => {
     await executeDebitRun(step)
-    expect(slugsSent()).not.toContain('debit-declined')
+    // The gateway was unreachable. Saying "declined" would be a false statement
+    // about the member's bank account.
+    expect(slugsSent()).not.toContain('payment-failed-sms')
+    expect(slugsSent()).not.toContain('payment-failed-email')
   })
 
   it('still collects from every other mandate', async () => {
@@ -160,13 +163,23 @@ describe('executeDebitRun — a gateway that declines', () => {
     expect(mocks.txCreate.mock.calls[0][0].data.status).toBe('FAILED')
   })
 
-  it('sends debit-declined, with the url the template renders', async () => {
+  it('tells the member on both channels, using the mandatory templates', async () => {
     await executeDebitRun(step)
 
-    const call = mocks.queueNotification.mock.calls[0][0]
-    expect(call.templateSlug).toBe('debit-declined')
-    // An unsupplied placeholder is not dropped — it reaches the member as {{url}}.
-    expect(call.payload.url).toBe('https://app.example.test')
+    // payment-failed-* are in MANDATORY_SLUGS. The debit-declined pair was not,
+    // so a member with SMS switched off would never have heard about it.
+    expect(slugsSent()).toEqual(['payment-failed-sms', 'payment-failed-email'])
+    expect(mocks.queueNotification.mock.calls.map((c) => c[0].channel)).toEqual(['SMS', 'EMAIL'])
+  })
+
+  it('addresses the member by name and links to the page that can settle it', async () => {
+    await executeDebitRun(step)
+
+    const { payload } = mocks.queueNotification.mock.calls[0][0]
+    // Unsupplied placeholders are not dropped — they reach the member as braces.
+    expect(payload.firstName).toBe('Kurhula')
+    expect(payload.url).toBe('https://app.example.test/dashboard/contribute')
+    expect(payload.period).toBe('2026-08')
   })
 
   it('counts as a decline, not an outage', async () => {
