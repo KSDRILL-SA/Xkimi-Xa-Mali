@@ -54,6 +54,7 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['recordGoalProgress',       (r) => services.recordGoalProgress('a1', r, 'g1', 100)],
   ['listAuditLogs',            (r) => services.listAuditLogs(r)],
   ['listInvitations',          (r) => services.listInvitations(r)],
+  ['getMemberPlaces',          (r) => services.getMemberPlaces(r)],
   ['revokeInvitation',         (r) => services.revokeInvitation('a1', r, 'i1')],
   ['setMemberRole',            (r) => services.setMemberRole('a1', r, 'm1', 'ADMIN', true)],
   ['getMemberLoginHistory',    (r) => services.getMemberLoginHistory(r, 'm1')],
