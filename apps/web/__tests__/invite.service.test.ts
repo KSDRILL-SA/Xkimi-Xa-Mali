@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 
 vi.mock('@/lib/db', () => ({
   db: {
-    user:       { findUnique: vi.fn(), findFirst: vi.fn() },
+    user:       { findUnique: vi.fn(), findFirst: vi.fn(), count: vi.fn() },
     invitation: {
       create:     vi.fn(),
       findUnique: vi.fn(),
@@ -49,17 +49,18 @@ import { db } from '@/lib/db'
 import { emailProvider } from '@/integrations/email'
 import { smsProvider } from '@/integrations/sms'
 import { writeAuditLog } from '@/services/audit.service'
-import { ForbiddenError, InviteNotFoundError, InviteUsedError, InviteRevokedError, InviteExpiredError, InviteDuplicateError, InviteBindingError } from '@/lib/errors'
+import { ForbiddenError, InviteNotFoundError, InviteUsedError, InviteRevokedError, InviteExpiredError, InviteDuplicateError, InviteBindingError, MemberCapReachedError } from '@/lib/errors'
 import {
   generateInvite, listInvitations, revokeInvitation,
   validateInviteCode, acceptInviteRegistration, setMemberRole,
+  countMemberPlaces,
 } from '@/services/invite.service'
 
 const InviteForbiddenError = ForbiddenError
 const RoleForbiddenError   = ForbiddenError
 
 const mockDb = db as {
-  user:       { findUnique: MockedFunction<typeof db.user.findUnique>; findFirst: MockedFunction<typeof db.user.findFirst> }
+  user:       { findUnique: MockedFunction<typeof db.user.findUnique>; findFirst: MockedFunction<typeof db.user.findFirst>; count: MockedFunction<typeof db.user.count> }
   invitation: {
     create:     MockedFunction<typeof db.invitation.create>
     findUnique: MockedFunction<typeof db.invitation.findUnique>
@@ -97,7 +98,14 @@ const VALID_INVITE = {
   invitedById: 'a1',
 }
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => {
+  vi.clearAllMocks()
+  // A circle with room in it, unless a test says otherwise. Without a default
+  // every existing invite test would trip the fifty-member cap on an undefined
+  // count.
+  mockDb.user.count.mockResolvedValue(10 as never)
+  mockDb.invitation.count.mockResolvedValue(2 as never)
+})
 
 // ─── generateInvite ───────────────────────────────────────────────────────────
 
@@ -149,6 +157,144 @@ describe('generateInvite', () => {
     )
     expect(result.code).toMatch(/^XKM-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/)
     expect(result.codePrefix).toHaveLength(4)
+  })
+})
+
+// ─── The fifty-member cap ─────────────────────────────────────────────────────
+//
+// The guide is emphatic that fifty is a decision, not an aspiration: "the cap
+// is a design decision, not a limit we are waiting to escape." Nothing enforced
+// it — there was no constant, no check and no configuration, and the fifty-first
+// member would have walked straight in.
+
+describe('the fifty-member cap', () => {
+  const params = {
+    firstName: 'Kurhula', lastName: 'Maluleke',
+    email: 'k@x.co.za', phone: '0821234567', minimumAmount: 200,
+  }
+  const BASE = 'http://localhost:3000'
+
+  function armInviteCreation() {
+    mockDb.invitation.findFirst.mockResolvedValue(null as never)
+    mockDb.user.findFirst.mockResolvedValue(null as never)
+    mockDb.invitation.create.mockResolvedValue({ id: 'inv1' } as never)
+    mockSendSMS.mockResolvedValue([] as never)
+    mockSendInviteEmail.mockResolvedValue(undefined as never)
+    mockWriteAuditLog.mockResolvedValue(undefined)
+  }
+
+  it('counts an outstanding invitation as a place taken', async () => {
+    armInviteCreation()
+    // 49 members and one unaccepted invitation is a full circle. Counting only
+    // members would let leadership issue a fifty-first link that could never
+    // be honoured.
+    mockDb.user.count.mockResolvedValue(49 as never)
+    mockDb.invitation.count.mockResolvedValue(1 as never)
+
+    const places = await countMemberPlaces()
+    expect(places).toMatchObject({ taken: 50, remaining: 0, isFull: true })
+
+    await expect(generateInvite('a1', ADMIN, params, BASE)).rejects.toBeInstanceOf(MemberCapReachedError)
+    expect(mockDb.invitation.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses the fifty-first invitation', async () => {
+    armInviteCreation()
+    mockDb.user.count.mockResolvedValue(50 as never)
+    mockDb.invitation.count.mockResolvedValue(0 as never)
+
+    await expect(generateInvite('a1', ADMIN, params, BASE)).rejects.toBeInstanceOf(MemberCapReachedError)
+    expect(mockDb.invitation.create).not.toHaveBeenCalled()
+  })
+
+  it('still allows the fiftieth invitation', async () => {
+    armInviteCreation()
+    mockDb.user.count.mockResolvedValue(49 as never)
+    mockDb.invitation.count.mockResolvedValue(0 as never)
+
+    // Off-by-one in the strict direction is still a broken promise: the guide
+    // says fifty members, not forty-nine.
+    await expect(generateInvite('a1', ADMIN, params, BASE)).resolves.toBeDefined()
+    expect(mockDb.invitation.create).toHaveBeenCalled()
+  })
+
+  it('ignores expired invitations when counting places', async () => {
+    armInviteCreation()
+    mockDb.user.count.mockResolvedValue(49 as never)
+    mockDb.invitation.count.mockResolvedValue(0 as never)
+
+    await countMemberPlaces()
+
+    // An invitation nobody accepted before it lapsed is not holding a seat.
+    expect(mockDb.invitation.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'PENDING',
+          expiresAt: expect.objectContaining({ gt: expect.any(Date) }),
+        }),
+      }),
+    )
+  })
+
+  it('frees a place when a member is erased', async () => {
+    armInviteCreation()
+    mockDb.user.count.mockResolvedValue(49 as never)
+    mockDb.invitation.count.mockResolvedValue(0 as never)
+
+    await countMemberPlaces()
+
+    // Right-to-erasure is the only thing that releases a seat. Suspension does
+    // not: a suspended member keeps their history and their place.
+    expect(mockDb.user.count).toHaveBeenCalledWith({ where: { deletedAt: null } })
+  })
+
+  describe('the registration backstop', () => {
+    const input = {
+      inviteCode: 'XKM-ABCD-1234',
+      firstName: 'Kurhula', lastName: 'Maluleke',
+      email: 'k@x.co.za', phone: '+27821234567',
+      password: 'Password1',
+      consentToPopia: true as const,
+    }
+
+    function armAccept(memberCount: number) {
+      mockDb.invitation.findUnique.mockResolvedValue(VALID_INVITE as never)
+      mockDb.role.findUniqueOrThrow.mockResolvedValue({ id: 'role1' } as never)
+      const userCreate = vi.fn().mockResolvedValue({ id: 'u1', email: 'k@x.co.za', firstName: 'Kurhula' })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockDb.$transaction.mockImplementation(async (fn: any) => {
+        const txMock = {
+          user: { create: userCreate, count: vi.fn().mockResolvedValue(memberCount) },
+          userRole: { create: vi.fn() },
+          notificationPreference: { create: vi.fn() },
+          emailVerificationToken: { create: vi.fn() },
+          invitation: { update: vi.fn() },
+        }
+        return fn(txMock as unknown as typeof db)
+      })
+      mockSendVerificationEmail.mockResolvedValue(undefined as never)
+      mockWriteAuditLog.mockResolvedValue(undefined)
+      return { userCreate }
+    }
+
+    it('refuses to create the fifty-first member', async () => {
+      const { userCreate } = armAccept(50)
+
+      // Two invitees accepting at once were both inside the cap when invited.
+      await expect(acceptInviteRegistration(input, 'http://localhost'))
+        .rejects.toBeInstanceOf(MemberCapReachedError)
+      expect(userCreate).not.toHaveBeenCalled()
+    })
+
+    it('admits the fiftieth member, whose own invitation does not count against them', async () => {
+      const { userCreate } = armAccept(49)
+
+      // The backstop counts members, not invitations. This person is holding a
+      // pending invitation right now; counting it would refuse them a place on
+      // the strength of the very invite that brought them.
+      await expect(acceptInviteRegistration(input, 'http://localhost')).resolves.toBeDefined()
+      expect(userCreate).toHaveBeenCalled()
+    })
   })
 })
 
@@ -269,7 +415,10 @@ describe('acceptInviteRegistration', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockDb.$transaction.mockImplementation(async (fn: any) => {
       const txMock = {
-        user: { create: vi.fn().mockResolvedValue({ id: 'u1', email: 'k@x.co.za', firstName: 'Kurhula' }) },
+        user: {
+          create: vi.fn().mockResolvedValue({ id: 'u1', email: 'k@x.co.za', firstName: 'Kurhula' }),
+          count: vi.fn().mockResolvedValue(10),
+        },
         userRole: { create: vi.fn() },
         notificationPreference: { create: vi.fn() },
         emailVerificationToken: { create: vi.fn() },

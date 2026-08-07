@@ -375,6 +375,11 @@ model Transaction {
   idempotencyKey  String            @unique
   retryCount      Int               @default(0)
   failureReason   String?
+  /// Why leadership reversed this transaction. Set on the REVERSAL row, never on
+  /// the original — the original is evidence and is not edited. Null on rows
+  /// written before the reason was required, and on everything that is not a
+  /// reversal. Distinct from failureReason, which is the gateway refusing.
+  reversalReason  String?
   reversalOfId    String?           @unique
   processedAt     DateTime?
   createdAt       DateTime          @default(now())

@@ -5,6 +5,19 @@ export const MAX_CONTRIBUTION_ZAR  = 10_000
 export const CONTRIBUTION_STEP_ZAR = 50
 export const DEFAULT_DEBIT_DAY     = 1
 export const DEFAULT_INVITE_AMOUNT = 200
+
+/**
+ * The size of the circle. Fifty, and not a number we are working toward
+ * escaping — the Founder Guide is explicit that "the cap is a design decision,
+ * not a limit we are waiting to escape."
+ *
+ * A seat is occupied by any member who has not been erased, whatever their
+ * status: a suspended member keeps their history and their place, and a member
+ * who has registered but is not yet activated already has one. A pending
+ * invitation holds a seat too — otherwise fifty-one links could be issued and
+ * the fifty-first person would be turned away in the moment they tried to join.
+ */
+export const MAX_MEMBERS = 50
 export const MAX_TRANSACTION_RETRY = 3
 export const IDEMPOTENCY_TTL_SECONDS = 60 * 60 * 72
 
