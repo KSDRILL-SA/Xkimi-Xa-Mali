@@ -41,6 +41,7 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['approveMandate',           (r) => services.approveMandate('a1', r, 'mn1')],
   ['rejectMandate',            (r) => services.rejectMandate('a1', r, 'mn1')],
   ['listAllContributions',     (r) => services.listAllContributions(r, { month: 1, year: 2026 })],
+  ['listTransactionsForContributions', (r) => services.listTransactionsForContributions(r, ['c1'])],
   ['generateContributions',    (r) => services.generateContributions('a1', r, 1, 2026)],
   ['listAllGoals',             (r) => services.listAllGoals(r)],
   ['getGoalById',              (r) => services.getGoalById(r, 'g1')],
