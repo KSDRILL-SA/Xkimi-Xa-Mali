@@ -72,6 +72,9 @@ enum GoalStatus {
   ACTIVE
   ACHIEVED
   FAILED
+  /// A proposal leadership reviewed and refused. Kept rather than deleted: the
+  /// member who proposed it can see it was answered, and read why.
+  REJECTED
 }
 
 enum NotifChannel {
@@ -148,6 +151,7 @@ model User {
   loginHistory           LoginHistory[]
   lockedGoals            Goal[]                  @relation("GoalLocker")
   createdGoals           Goal[]                  @relation("GoalCreator")
+  reviewedGoals          Goal[]                  @relation("GoalReviewer")
   recordedProgress       GoalProgress[]          @relation("ProgressRecorder")
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
@@ -463,12 +467,22 @@ model Goal {
   version       Int        @default(0)
   lockedAt      DateTime?
   lockedById    String?
+  /// Who proposed or created this goal. A member for a proposal, an admin for
+  /// one leadership raised itself — the two paths are told apart by the roles
+  /// of this user, not by a separate column.
   createdById   String?
+  /// Why leadership refused a proposal. Set only alongside status REJECTED.
+  rejectionReason String?
+  /// Which leader reviewed the proposal, and when. Empty on every goal created
+  /// before proposals existed, which is the honest answer for them.
+  reviewedById  String?
+  reviewedAt    DateTime?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
   locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
   creator  User?          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  reviewer User?          @relation("GoalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   progress GoalProgress[]
   cheers   GoalCheer[]
   comments GoalComment[]
@@ -477,6 +491,7 @@ model Goal {
 
   @@index([lockedById])
   @@index([createdById])
+  @@index([reviewedById])
   @@index([status])
   @@index([status, deadline])
   @@map("goals")
