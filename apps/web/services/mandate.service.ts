@@ -133,7 +133,17 @@ export async function createMandate(
 
   // Persist the status Netcash actually returned (a 200 response may still carry
   // a REJECTED/CANCELLED status), not an assumed PENDING.
-  const status = paymentGateway.mapMandateStatus(netcashRes.status)
+  // An unrecognised status on a mandate we have just created is treated as
+  // PENDING — not yet authorised — rather than guessed at. Logged because it
+  // means the gateway is speaking a vocabulary this code does not have.
+  const mappedStatus = paymentGateway.mapMandateStatus(netcashRes.status)
+  if (mappedStatus === null) {
+    logger.error('Unrecognised mandate status from the gateway on creation', {
+      userId,
+      gatewayStatus: netcashRes.status,
+    })
+  }
+  const status = mappedStatus ?? 'PENDING'
 
   // The DebiCheck mandate is already live at Netcash. If the local write fails we
   // must cancel it, otherwise we orphan a debit authorisation with no local record.
@@ -344,7 +354,17 @@ export async function processMandateWebhook(event: WebhookEvent) {
 
   if (!mandate) return // unknown mandate ID — no-op
 
-  const newStatus = paymentGateway.mapMandateStatus(event.status) as MandateStatus
+  // A status we cannot read is not a status change. Leaving the mandate as it
+  // is keeps a member being collected from on an authorisation that is still
+  // good, rather than moving them out of ACTIVE on a word we do not know.
+  const newStatus = paymentGateway.mapMandateStatus(event.status)
+  if (newStatus === null) {
+    logger.error('Unrecognised mandate status in webhook — mandate left unchanged', {
+      mandateId: mandate.id,
+      gatewayStatus: event.status,
+    })
+    return
+  }
 
   // CANCELLED is terminal — never let a replayed or out-of-order event revive a
   // cancelled mandate (which would resume debiting an account the member closed).
