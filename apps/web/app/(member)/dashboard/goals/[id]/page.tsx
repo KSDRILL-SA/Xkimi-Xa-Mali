@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
-import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2, Star } from 'lucide-react'
+import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2, Star, Camera, Paperclip } from 'lucide-react'
 import { env } from '@/lib/env'
 import { getGoal } from '@/services/goal.service'
 import { getGoalEngagement } from '@/services/goal-engagement.service'
@@ -186,6 +186,48 @@ export default async function GoalDetailPage({
           </div>
         </Reveal>
       )}
+      {/* ── What the money actually bought ────────────────────── */}
+      {/* Step 6, and the point of the whole cycle: "the purchase is shown back
+          to the circle. Everyone sees what their money actually did." This is
+          the screen members look at, so this is where it has to appear. */}
+      {goal.outcomeNote && (
+        <Reveal variant="up" delay={155}>
+          <div className="rounded-3xl border border-xxm-gold/25 bg-gradient-to-br from-xxm-gold/8 to-white p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-xxm-gold/15 flex items-center justify-center shrink-0">
+                <Camera size={20} className="text-xxm-gold-dark" aria-hidden />
+              </div>
+              <div>
+                <h2 className="font-display text-base font-extrabold text-xxm-green-900">
+                  What this bought
+                </h2>
+                {goal.outcomeRecordedAt && (
+                  <p className="text-[11px] text-xxm-gray-400 mt-0.5">
+                    Documented {new Date(goal.outcomeRecordedAt).toLocaleDateString('en-ZA')}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <p className="text-sm text-xxm-gray-700 leading-relaxed whitespace-pre-wrap">
+              {goal.outcomeNote}
+            </p>
+
+            {goal.outcomeProofUrl && (
+              <a
+                href={goal.outcomeProofUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-bold text-xxm-green hover:underline"
+              >
+                <Paperclip size={14} aria-hidden />
+                See the photo or receipt
+              </a>
+            )}
+          </div>
+        </Reveal>
+      )}
+
       {goal.status === 'FAILED' && (
         <Reveal variant="up" delay={150} className="flex items-center gap-3 rounded-2xl bg-red-50 border border-red-100 px-5 py-4">
           <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
