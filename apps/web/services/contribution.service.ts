@@ -13,6 +13,8 @@ import { logger } from '@xxm/observability'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { tallyBy } from '@/lib/aggregate'
 import { postPoolCredit, postPoolDebit } from './ledger.service'
+import { queueNotification } from './notification.service'
+import { env } from '@/lib/env'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import {
   ContributionNotFoundError,
@@ -487,15 +489,42 @@ export async function createReversal(
   transactionId: string,
   adminId: string,
   adminRoles: string[],
-  ip?: string,
+  reason: string,
+  ip?: string | null,
 ) {
   assertAdmin(adminRoles)
 
+  // The route validates this, but the service is the thing that writes the row
+  // and a second caller must not be able to record an unexplained reversal.
+  // "A mistake is never quietly deleted" is only true if the correction says
+  // what the mistake was.
+  const trimmedReason = reason?.trim() ?? ''
+  if (trimmedReason.length < 10) {
+    throw new ContributionConflictError('A reversal requires a stated reason', 'TXN_004')
+  }
+
   const original = await transactionRepo.findById(transactionId, {
     reversal: true,
-    contribution: { select: { userId: true } },
+    contribution: {
+      select: {
+        userId: true,
+        periodMonth: true,
+        periodYear: true,
+        user: { select: { firstName: true } },
+      },
+    },
   }) as Prisma.TransactionGetPayload<{
-    include: { reversal: true; contribution: { select: { userId: true } } }
+    include: {
+      reversal: true
+      contribution: {
+        select: {
+          userId: true
+          periodMonth: true
+          periodYear: true
+          user: { select: { firstName: true } }
+        }
+      }
+    }
   }> | null
 
   if (!original) throw new TransactionNotFoundError()
@@ -518,6 +547,10 @@ export async function createReversal(
         status: 'SUCCESS',
         idempotencyKey,
         reversalOfId: original.id,
+        // On the reversing entry, not on the original. The original is the
+        // record of what was believed to have happened and is not edited —
+        // that is the whole point of correcting by addition.
+        reversalReason: trimmedReason,
         processedAt: new Date(),
       },
       tx,
@@ -543,6 +576,44 @@ export async function createReversal(
 
   await cache.del(CACHE_KEYS.DASHBOARD_STATS)
 
+  // Tell the member. A reversal changes what they were already told they had
+  // paid, and until now this happened in silence: the money went back, the
+  // contribution status was recalculated, and the only written trace was an
+  // audit entry no member can read.
+  //
+  // Both slugs are in MANDATORY_SLUGS, so this reaches a member who has
+  // notifications switched off. Best-effort by the same rule as the ledger post
+  // above — the money has already moved correctly and a messaging outage must
+  // not undo it — but it is logged rather than swallowed.
+  const period = original.contribution
+    ? `${String(original.contribution.periodMonth).padStart(2, '0')}/${original.contribution.periodYear}`
+    : ''
+  const notifyPayload = {
+    firstName: original.contribution?.user?.firstName ?? '',
+    amount: Number(original.amount).toString(),
+    period,
+    reason: trimmedReason,
+    url: `${env.NEXTAUTH_URL ?? ''}/dashboard/transactions`,
+  }
+
+  if (original.contribution?.userId) {
+    const memberId = original.contribution.userId
+    await Promise.all([
+      queueNotification({
+        userId: memberId, templateSlug: 'contribution-reversed-sms',
+        channel: 'SMS', payload: notifyPayload,
+      }),
+      queueNotification({
+        userId: memberId, templateSlug: 'contribution-reversed-email',
+        channel: 'EMAIL', payload: notifyPayload,
+      }),
+    ]).catch((err) => logger.error('Reversal notification failed', {
+      transactionId: original.id,
+      userId: memberId,
+      error: err instanceof Error ? err.message : String(err),
+    }))
+  }
+
   await writeAuditLog({
     userId: adminId,
     action: 'TRANSACTION_REVERSED',
@@ -552,8 +623,9 @@ export async function createReversal(
       originalTransactionId: transactionId,
       contributionId: original.contributionId,
       amount: Number(original.amount),
+      reason: trimmedReason,
     },
-    ipAddress: ip,
+    ipAddress: ip ?? undefined,
   })
 
   logger.info('Transaction reversed', {
