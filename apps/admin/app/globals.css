@@ -1,0 +1,26 @@
+@import '../../../packages/ui/src/globals.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: light; }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-feature-settings: 'cv02','cv03','cv04','cv11';
+  }
+
+  body {
+    background-color: var(--xxm-champagne);
+    color: var(--xxm-green-900);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: var(--font-geist-sans, system-ui, sans-serif);
+  }
+
+  ::selection { background-color: var(--xxm-green); color: #ffffff; }
+
+  :focus-visible { outline: 2px solid var(--xxm-gold); outline-offset: 2px; }
+}

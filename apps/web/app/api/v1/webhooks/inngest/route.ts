@@ -1,0 +1,46 @@
+import { serve } from 'inngest/next'
+import { inngest } from '@/lib/inngest'
+import {
+  debitMorningWarning,
+  debitRun,
+  debitOverdueReminder,
+  contributionDueReminder,
+  contributionMonthRollover,
+  contributionOverdueSweep,
+  ledgerReconciliation,
+  transactionRetryFailed,
+  mandateDelayHandler,
+  notificationFlush,
+  goalDeadlineChecker,
+  goalAchievedCelebration,
+  mandateStatusSync,
+  inviteExpiry,
+  badgeRecalculation,
+  badgeGraceCheck,
+  financialAnomalyWatch,
+  monthlyStatementNotice,
+} from '@/inngest'
+
+export const { GET, POST, PUT } = serve({
+  client: inngest,
+  functions: [
+    debitMorningWarning,
+    debitRun,
+    debitOverdueReminder,
+    contributionDueReminder,
+    contributionMonthRollover,
+    contributionOverdueSweep,
+    ledgerReconciliation,
+    transactionRetryFailed,
+    mandateDelayHandler,
+    notificationFlush,
+    goalDeadlineChecker,
+    goalAchievedCelebration,
+    mandateStatusSync,
+    inviteExpiry,
+    badgeRecalculation,
+    badgeGraceCheck,
+    financialAnomalyWatch,
+    monthlyStatementNotice,
+  ],
+})

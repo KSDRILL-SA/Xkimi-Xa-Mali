@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main, Dev]
+  pull_request:
+    branches: [main, Dev]
+
+jobs:
+  quality:
+    name: Type Check, Lint & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: xxm
+          POSTGRES_PASSWORD: xxm_test
+          POSTGRES_DB: xxm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # This is a build check, not a deployment. Without it the production-only
+      # config rules apply and the build demands a dozen real credentials.
+      DEPLOY_ENV: ci
+      DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
+      # Migrations run over the unpooled endpoint. The CI Postgres has no pooler,
+      # so it is the same address; on Neon these differ.
+      DIRECT_DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
+      AUTH_SECRET: test_secret_32_chars_minimum_here_x
+      NEXTAUTH_SECRET: test_secret_32_chars_minimum_here
+      # Throwaway CI-only key (32 bytes / 64 hex chars). Not a real secret.
+      ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
+      NETCASH_SERVICE_KEY: test
+      NETCASH_WEBHOOK_SECRET: test
+      NETCASH_API_URL: https://ws.netcash.co.za/NSWSSX/NetcashTest.asmx
+      BULKSMS_USERNAME: test
+      BULKSMS_PASSWORD: test
+      RESEND_API_KEY: test
+      RESEND_FROM_EMAIL: test@test.com
+      INNGEST_EVENT_KEY: test
+      INNGEST_SIGNING_KEY: test
+      UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL_TEST }}
+      UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN_TEST }}
+      BLOB_READ_WRITE_TOKEN: test
+      WHATSAPP_GROUP_LINK: https://chat.whatsapp.com/test
+      NEXT_PUBLIC_WEB_URL: http://localhost:3000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Nothing was checking this, and a high-severity advisory sat open behind
+      # an overrides block that was not being applied at all. typecheck, lint,
+      # test and build are all blind to it.
+      #
+      # `npm ls --all` is deliberately NOT gated here: it exits 1 on upstream
+      # transitive conflicts this repo does not control (magicast via
+      # @prisma/config, brace-expansion via two incompatible minimatch ranges).
+      # Gating on it would fail CI for something no change here can fix.
+      - name: Security advisories
+        run: npm audit --audit-level=high
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Run Prisma migrations
+        run: cd packages/database && npx prisma migrate deploy
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate Prisma schema
+        run: cd packages/database && npx prisma validate

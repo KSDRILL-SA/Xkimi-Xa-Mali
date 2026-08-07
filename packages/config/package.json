@@ -1,0 +1,20 @@
+{
+  "name": "@xxm/config",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Shared configuration \u2014 tsconfig, tailwind, eslint",
+  "exports": {
+    "./tsconfig/base": "./tsconfig/base.json",
+    "./tailwind": "./tailwind/base.ts",
+    "./eslint": "./eslint/index.mjs"
+  },
+  "files": [
+    "tsconfig",
+    "tailwind",
+    "eslint"
+  ],
+  "scripts": {
+    "test": "exit 0"
+  }
+}

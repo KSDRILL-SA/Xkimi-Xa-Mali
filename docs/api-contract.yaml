@@ -1,0 +1,624 @@
+openapi: 3.1.0
+info:
+  title: Xkimm Xa Mali Foundation API
+  version: 1.0.0
+  description: |
+    Financial contribution management platform for the Xkimm Xa Mali Foundation savings group.
+    All endpoints are prefixed with /api/v1.
+    All responses use the standard envelope: { data, meta } or { error }.
+
+servers:
+  - url: https://xkimmxamali.vercel.app/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Local development
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+
+  schemas:
+    ResponseMeta:
+      type: object
+      properties:
+        requestId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        pagination:
+          type: object
+          properties:
+            page: { type: integer }
+            limit: { type: integer }
+            total: { type: integer }
+            totalPages: { type: integer }
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, traceId]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            traceId: { type: string }
+
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        status: { type: string, enum: [PENDING, ACTIVE, SUSPENDED] }
+        roles: { type: array, items: { type: string } }
+        createdAt: { type: string, format: date-time }
+
+    BankAccount:
+      type: object
+      properties:
+        id: { type: string }
+        bankName: { type: string }
+        accountNumberMasked: { type: string, example: "****1234" }
+        accountType: { type: string, enum: [SAVINGS, CHEQUE, TRANSMISSION] }
+        branchCode: { type: string }
+        isPrimary: { type: boolean }
+        verifiedAt: { type: string, format: date-time, nullable: true }
+
+    PaymentMandate:
+      type: object
+      properties:
+        id: { type: string }
+        bankAccountId: { type: string }
+        debitDay: { type: integer, minimum: 1, maximum: 28 }
+        amount: { type: number, minimum: 100 }
+        status: { type: string, enum: [PENDING, ACTIVE, SUSPENDED, CANCELLED] }
+        createdAt: { type: string, format: date-time }
+
+    Contribution:
+      type: object
+      properties:
+        id: { type: string }
+        periodMonth: { type: integer }
+        periodYear: { type: integer }
+        amountDue: { type: number }
+        amountPaid: { type: number }
+        dueDate: { type: string, format: date }
+        status:
+          type: string
+          enum: [PENDING, PARTIAL, PAID, OVERDUE, WAIVED]
+
+    Transaction:
+      type: object
+      properties:
+        id: { type: string }
+        contributionId: { type: string }
+        amount: { type: number }
+        type: { type: string, enum: [DEBIT_ORDER, MANUAL, REVERSAL] }
+        status: { type: string, enum: [PENDING, PROCESSING, SUCCESS, FAILED, REVERSED] }
+        gatewayRef: { type: string, nullable: true }
+        processedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    Goal:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [MONTHLY, YEARLY, CUSTOM] }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        targetAmount: { type: number }
+        currentAmount: { type: number }
+        deadline: { type: string, format: date }
+        status: { type: string, enum: [DRAFT, ACTIVE, ACHIEVED, FAILED] }
+        lockedAt: { type: string, format: date-time, nullable: true }
+
+paths:
+  # ─── AUTH ───────────────────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, phone, firstName, lastName, idNumber, password]
+              properties:
+                email: { type: string, format: email }
+                phone: { type: string, pattern: '^(\+27|0)[6-8][0-9]{8}$' }
+                firstName: { type: string, minLength: 2, maxLength: 50 }
+                lastName: { type: string, minLength: 2, maxLength: 50 }
+                idNumber: { type: string, pattern: '^\d{13}$' }
+                password: { type: string, minLength: 8 }
+                consentToPopia: { type: boolean }
+      responses:
+        '201':
+          description: Registration successful — verification email sent
+        '400':
+          $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email or phone already registered
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Login successful — session cookie set
+        '401':
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      security: [{ cookieAuth: [] }]
+      summary: Logout
+      responses:
+        '200':
+          description: Session cleared
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      security: [{ cookieAuth: [] }]
+      summary: Get current authenticated user
+      responses:
+        '200':
+          description: Current user with roles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+                  meta: { $ref: '#/components/schemas/ResponseMeta' }
+
+  # ─── MEMBERS ────────────────────────────────────────────────────────────────
+
+  /members:
+    get:
+      tags: [Members]
+      security: [{ cookieAuth: [] }]
+      summary: List all members (admin only)
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING, ACTIVE, SUSPENDED] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: Member list
+        '403':
+          description: Admin only
+
+  /members/{id}:
+    get:
+      tags: [Members]
+      security: [{ cookieAuth: [] }]
+      summary: Get member profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Member profile (own or admin access)
+        '403':
+          description: Cannot view another member's profile
+        '404':
+          description: Member not found
+
+    patch:
+      tags: [Members]
+      security: [{ cookieAuth: [] }]
+      summary: Update member profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                phone: { type: string }
+                address: { type: object }
+      responses:
+        '200':
+          description: Profile updated
+
+  # ─── BANK ACCOUNTS ──────────────────────────────────────────────────────────
+
+  /bank-accounts:
+    get:
+      tags: [Bank Accounts]
+      security: [{ cookieAuth: [] }]
+      summary: List own bank accounts
+      responses:
+        '200':
+          description: Own bank accounts (numbers masked)
+
+    post:
+      tags: [Bank Accounts]
+      security: [{ cookieAuth: [] }]
+      summary: Add a bank account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bankName, accountNumber, accountType, branchCode]
+              properties:
+                bankName: { type: string }
+                accountNumber: { type: string }
+                accountType: { type: string, enum: [SAVINGS, CHEQUE, TRANSMISSION] }
+                branchCode: { type: string }
+      responses:
+        '201':
+          description: Bank account added
+
+  # ─── PAYMENT MANDATES ───────────────────────────────────────────────────────
+
+  /mandates:
+    get:
+      tags: [Mandates]
+      security: [{ cookieAuth: [] }]
+      summary: List own mandates
+      responses:
+        '200':
+          description: Own payment mandates
+
+    post:
+      tags: [Mandates]
+      security: [{ cookieAuth: [] }]
+      summary: Create a debit order mandate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bankAccountId, debitDay, amount]
+              properties:
+                bankAccountId: { type: string }
+                debitDay: { type: integer, minimum: 1, maximum: 28 }
+                amount: { type: number, minimum: 100 }
+      responses:
+        '201':
+          description: Mandate created and submitted to Netcash
+
+  /mandates/{id}/delay:
+    post:
+      tags: [Mandates]
+      security: [{ cookieAuth: [] }]
+      summary: Request a payment delay for this cycle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newDate]
+              properties:
+                newDate:
+                  type: string
+                  format: date
+                  description: Requested new debit date (must be before month-end)
+                reason: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: Delay request recorded
+
+  # ─── CONTRIBUTIONS ──────────────────────────────────────────────────────────
+
+  /contributions:
+    get:
+      tags: [Contributions]
+      security: [{ cookieAuth: [] }]
+      summary: List contributions (own, or all for admin)
+      parameters:
+        - name: year
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Contribution records
+
+  /contributions/manual:
+    post:
+      tags: [Contributions]
+      security: [{ cookieAuth: [] }]
+      summary: Make a manual early contribution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, periodMonth, periodYear]
+              properties:
+                amount: { type: number, minimum: 100 }
+                periodMonth: { type: integer, minimum: 1, maximum: 12 }
+                periodYear: { type: integer, minimum: 2024 }
+      responses:
+        '201':
+          description: Manual contribution initiated
+
+  # ─── TRANSACTIONS ───────────────────────────────────────────────────────────
+
+  /transactions:
+    get:
+      tags: [Transactions]
+      security: [{ cookieAuth: [] }]
+      summary: Transaction history
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Transactions list
+
+  /transactions/statement:
+    get:
+      tags: [Transactions]
+      security: [{ cookieAuth: [] }]
+      summary: Download statement PDF
+      parameters:
+        - name: month
+          in: query
+          required: true
+          schema: { type: integer }
+        - name: year
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Signed Blob URL to PDF (15-min expiry)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      url: { type: string, format: uri }
+                      expiresAt: { type: string, format: date-time }
+
+  # ─── GOALS ──────────────────────────────────────────────────────────────────
+
+  /goals:
+    get:
+      tags: [Goals]
+      security: [{ cookieAuth: [] }]
+      summary: List all goals
+      responses:
+        '200':
+          description: Goals list
+
+    post:
+      tags: [Goals]
+      security: [{ cookieAuth: [] }]
+      summary: Create a goal (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, title, targetAmount, deadline]
+              properties:
+                type: { type: string, enum: [MONTHLY, YEARLY, CUSTOM] }
+                title: { type: string }
+                description: { type: string }
+                targetAmount: { type: number }
+                deadline: { type: string, format: date }
+      responses:
+        '201':
+          description: Goal created
+
+  /goals/{id}/lock:
+    post:
+      tags: [Goals]
+      security: [{ cookieAuth: [] }]
+      summary: Lock a goal (admin only — irreversible)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Goal locked
+        '409':
+          description: Goal already locked
+
+  # ─── NOTIFICATIONS ──────────────────────────────────────────────────────────
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Own notification history
+      responses:
+        '200':
+          description: Notifications list
+
+  /notifications/preferences:
+    get:
+      tags: [Notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Get notification preferences
+      responses:
+        '200':
+          description: Preferences
+
+    patch:
+      tags: [Notifications]
+      security: [{ cookieAuth: [] }]
+      summary: Update notification preferences
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sms: { type: boolean }
+                email: { type: boolean }
+                push: { type: boolean }
+      responses:
+        '200':
+          description: Preferences updated
+
+  # ─── ADMIN ──────────────────────────────────────────────────────────────────
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      security: [{ cookieAuth: [] }]
+      summary: Admin dashboard stats
+      responses:
+        '200':
+          description: Aggregated stats — total pool, collection rate, overdue count
+
+  /admin/members/{id}/suspend:
+    post:
+      tags: [Admin]
+      security: [{ cookieAuth: [] }]
+      summary: Suspend a member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Member suspended
+
+  /admin/members/{id}/activate:
+    post:
+      tags: [Admin]
+      security: [{ cookieAuth: [] }]
+      summary: Reactivate a suspended member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Member reactivated
+
+  /admin/reports:
+    get:
+      tags: [Admin]
+      security: [{ cookieAuth: [] }]
+      summary: Financial reports
+      parameters:
+        - name: month
+          in: query
+          schema: { type: integer }
+        - name: year
+          in: query
+          schema: { type: integer }
+        - name: format
+          in: query
+          schema: { type: string, enum: [json, csv] }
+      responses:
+        '200':
+          description: Financial report
+
+  # ─── WEBHOOKS ───────────────────────────────────────────────────────────────
+
+  /webhooks/netcash:
+    post:
+      tags: [Webhooks]
+      summary: Netcash payment result callback
+      description: HMAC-SHA256 signature required. Session cookie rejected.
+      responses:
+        '200':
+          description: Acknowledged
+
+  /webhooks/bulksms:
+    post:
+      tags: [Webhooks]
+      summary: BulkSMS delivery receipt
+      responses:
+        '200':
+          description: Acknowledged
+
+  /webhooks/inngest:
+    post:
+      tags: [Webhooks]
+      summary: Inngest job event handler
+      responses:
+        '200':
+          description: Acknowledged
+
+  # ─── HEALTH ─────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      responses:
+        '200':
+          description: All systems operational
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  db: { type: string, example: ok }
+                  redis: { type: string, example: ok }
+                  ts: { type: string, format: date-time }

@@ -1,0 +1,140 @@
+import bcrypt from 'bcryptjs'
+import { createHash, randomBytes } from 'crypto'
+import { emailProvider } from '@/integrations/email'
+import { writeAuditLog } from './audit.service'
+import { logger } from '@xxm/observability'
+import { userRepo, runTransaction } from '@/repositories/user.repository'
+import { authTokenRepo } from '@/repositories/auth-token.repository'
+import {
+  InvalidTokenError,
+  InvalidCredentialsError,
+} from '@/lib/errors'
+import { bumpRoleVersion } from '@/lib/role-version'
+
+const BCRYPT_ROUNDS = 12
+const RESET_TTL_MS = 60 * 60 * 1000
+
+function hashToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+function generateToken(): string {
+  return randomBytes(32).toString('hex')
+}
+
+export async function verifyEmail(rawToken: string, ipAddress?: string) {
+  const tokenHash = hashToken(rawToken)
+
+  const record = await authTokenRepo.findVerificationToken(tokenHash)
+
+  if (!record || record.expiresAt < new Date()) throw new InvalidTokenError('Invalid or expired verification link')
+  if (record.usedAt) throw new InvalidTokenError('This verification link has already been used')
+
+  await runTransaction(async (tx) => {
+    const consumed = await authTokenRepo.consumeVerificationToken(tokenHash, tx)
+    if (!consumed) throw new InvalidTokenError('This verification link has already been used')
+    await tx.user.update({
+      where: { id: record.userId },
+      data: { status: 'ACTIVE', emailVerified: new Date() },
+    })
+  })
+
+  await writeAuditLog({
+    userId: record.userId,
+    action: 'EMAIL_VERIFIED',
+    entity: 'User',
+    entityId: record.userId,
+    ipAddress,
+  })
+}
+
+export async function requestPasswordReset(email: string, baseUrl: string, ipAddress?: string) {
+  // Always return without revealing whether email exists
+  const user = await userRepo.findByEmail(email)
+  if (!user) return
+
+  // Invalidate any existing unused tokens
+  await authTokenRepo.invalidateResetTokens(user.id)
+
+  const rawToken = generateToken()
+  const tokenHash = hashToken(rawToken)
+
+  await authTokenRepo.createResetToken({
+    userId: user.id,
+    tokenHash,
+    expiresAt: new Date(Date.now() + RESET_TTL_MS),
+  })
+
+  await emailProvider.sendPasswordResetEmail(user.email, user.firstName, rawToken, baseUrl)
+
+  await writeAuditLog({
+    userId: user.id,
+    action: 'PASSWORD_RESET_REQUESTED',
+    entity: 'User',
+    entityId: user.id,
+    ipAddress,
+  })
+}
+
+export async function resetPassword(rawToken: string, newPassword: string, ipAddress?: string) {
+  const tokenHash = hashToken(rawToken)
+
+  const record = await authTokenRepo.findResetToken(tokenHash)
+
+  if (!record || record.expiresAt < new Date()) throw new InvalidTokenError('Invalid or expired reset link')
+  if (record.usedAt) throw new InvalidTokenError('This reset link has already been used')
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+
+  await runTransaction(async (tx) => {
+    const consumed = await authTokenRepo.consumeResetToken(tokenHash, tx)
+    if (!consumed) throw new InvalidTokenError('This reset link has already been used')
+    await tx.user.update({
+      where: { id: record.userId },
+      data: { password: passwordHash },
+    })
+  })
+
+  await Promise.all([
+    bumpRoleVersion(record.userId),
+    writeAuditLog({
+      userId: record.userId,
+      action: 'PASSWORD_RESET',
+      entity: 'User',
+      entityId: record.userId,
+      ipAddress,
+    }),
+  ])
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+  ipAddress?: string,
+) {
+  const user = await userRepo.findByIdOrThrow(userId)
+
+  if (!user.password) throw new InvalidCredentialsError('No password set on this account')
+
+  const valid = await bcrypt.compare(currentPassword, user.password)
+  if (!valid) {
+    logger.warn('Failed password change attempt', { userId })
+    throw new InvalidCredentialsError('Current password is incorrect')
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+
+  await Promise.all([
+    userRepo.update(userId, { password: passwordHash }),
+    bumpRoleVersion(userId),
+  ])
+
+  await writeAuditLog({
+    userId,
+    action: 'PASSWORD_CHANGED',
+    entity: 'User',
+    entityId: userId,
+    ipAddress,
+  })
+}
