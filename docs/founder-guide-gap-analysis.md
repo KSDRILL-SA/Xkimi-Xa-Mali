@@ -190,7 +190,35 @@ proof, receipt or photograph. There is no upload, no display, no admin action.
 
 ---
 
-### GAP-4 — Nobody is told when a Goal fails (MEDIUM)
+### GAP-4 — Nobody is told when a Goal fails (MEDIUM) — ✅ CLOSED 2026-08-07
+
+Closed as described below, with one change the plan did not anticipate.
+
+**`markExpiredGoalsFailed` could not tell you what it had failed.** It was a
+single `updateMany` returning a count, and once the status has moved the
+deadline filter no longer matches those rows — so after the write there is no
+way back to *which* goals lapsed. The circle cannot be told about a goal nobody
+can name. It now reads the set first and returns the goals with their pledgers.
+
+The job was given the `execute*(step)` seam and is driven by a **memoising**
+stub (§4.6): an always-executing runner would pass these tests with a
+counter-inside-`step.run` bug still in place. `membersNotified` accumulates
+outside the step, and a test re-enters the function to prove it still reports
+correctly when every step is already recorded.
+
+Pledgers are told in-app *and* by SMS. The `goal-failed` slug is deliberately
+**not** in `MANDATORY_SLUGS` — this is news about a goal, not money leaving a
+member's own balance, so someone who has switched SMS off is entitled not to get
+it; the in-app message reaches them regardless. Seeded, and inserted for
+existing databases by migration `20260807130000`.
+
+The message says plainly that no funds were released, and a test holds it to
+that: a member watching a goal they backed fail should not be left wondering
+where their money went.
+
+<details>
+<summary>Original GAP-4 text</summary>
+
 
 **The guide:**
 
@@ -210,6 +238,8 @@ the members who pledged to it (and optionally the whole circle). Seed a
 `goal-failed` template alongside the existing goal templates. **Read §4.8 of
 `ENGINEERING_WORKFLOW.md` first** — a new template reaches an existing database
 only because it is new; a *changed* body would not.
+
+</details>
 
 ---
 
