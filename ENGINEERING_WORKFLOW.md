@@ -244,7 +244,7 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 | M-1 | **CSP hardening** | ✅ **Fixed.** Per-request nonce; `script-src 'unsafe-inline'` removed; `base-uri` and `form-action` locked. Cost — 13 public pages became dynamic — is documented in `web/app/layout.tsx` and accepted |
 | M-2 | **POPIA compliance planning** | 🟡 Partial. Right-to-erasure honoured in member listings; consent captured at registration. Retention policy and DSAR process not yet formalised |
 | M-3 | **Monitoring improvements** | 🟡 Partial. `@xxm/observability` + Sentry wired across apps. Gaps: no alert on failed debit collections (see H-1), no dependency-health gate in CI, `SECURITY-HARDENING.md` tracks "CI security gate" as P2 |
-| M-4 | **Integration testing expansion** | 🟡 **Improved** (2026-08-07): 813 tests. **Both jobs that move money are now covered end to end** — `executeDebitRun(step)` and `executeTransactionRetry(step)` take the step runner as a parameter, so a stub drives each without an Inngest server. 26 cases across the two. Both were validated against the defect, not the fix: reintroducing the `FAILED`→`PENDING` collapse fails exactly the cases describing it. **Writing the second set found three live defects in the retry job** — see §4.6. **Still partial**: the other 16 Inngest jobs have no seam, `ledger-reconciliation` being the one that matters most |
+| M-4 | **Integration testing expansion** | 🟡 **Improved** (2026-08-07): 820 tests. **All three money-touching jobs are covered end to end** — `executeDebitRun`, `executeTransactionRetry` and `executeLedgerReconciliation` each take the step runner as a parameter, so a stub drives them without an Inngest server. 33 cases. **Every one of the three had a defect no existing test could reach**, and each was demonstrated failing before it was fixed — see §4.6. `ledger-reconciliation` additionally needs a *memoising* stub: the always-run stub passes with its bug in place. **Still partial**: the other 15 jobs have no seam, though none of them move money directly |
 | M-5 | **Web display font silently removed** | ✅ **Fixed** (2026-08-07). Loader restored; build green with it. The stub had been introduced on the assumption Google Fonts could not be fetched at build time — that assumption was wrong, so the regression bought nothing |
 | M-6 | **Admin `role-version.ts` bypasses validated config** | ✅ **Fixed** (2026-08-07). Reads through `lib/env` again. The stated reason for the bypass — that the strict module broke isolated tests — had a counter-example in the same directory: `role-revocation.test.ts` was already mocking `@/lib/env`. Four suites that reach the module transitively now do the same |
 | M-7 | **Crypto envelope doc/code drift** | ✅ **Fixed** (2026-08-07). Both diagrams now describe `base64(iv ‖ authTag ‖ ciphertext)` with a 16-byte IV, matching `lib/encryption.ts` |
@@ -363,6 +363,16 @@ Three things worth carrying forward:
 The mapping now lives in `lib/transaction-status` and both jobs import it. Two
 copies is what it cost to get it wrong twice in the same way.
 
+**All three money-touching jobs were given a seam, and all three turned out to
+have a defect nothing could reach.** The third, `ledger-reconciliation`, counted
+its corrections inside `step.run` and so reported zero on the pass that
+returned, having corrected everything. That one adds a fourth lesson:
+
+- **The stub has to behave like the runtime.** A step runner that always
+  executes passes the reconciliation tests with the bug still in place. Only a
+  stub that memoises completed steps — which is what Inngest does on re-entry —
+  makes it visible. A seam is only as honest as what you drive it with.
+
 ### 4.7 A process trap that cost an afternoon
 
 **A "killed" background task does not kill the `npm` process underneath it.**
@@ -467,6 +477,14 @@ Do **not**:
   - making `unverifiable` fail open for privileged sessions
   - reintroducing `'unsafe-inline'` to `script-src`
   - weakening a guard to make a test or an import work
+- **Count or accumulate anything inside `step.run`.** A completed step is not
+  executed again when Inngest re-enters the function — its recorded value is
+  returned. A counter incremented inside one stops climbing after the first
+  pass, so the run reports having done nothing while having done everything.
+  Side effects that must happen exactly once (a write, an audit entry) belong
+  *inside* the step; counters and accumulators belong *outside* it, in the
+  function body that re-runs. This shipped in `ledger-reconciliation`, and a
+  test stub that always executes will not catch it — the stub has to memoise.
 - **Swallow an error on the money path.** A caught exception must reach the
   logger from `@xxm/observability` and must change the outcome the caller sees.
   `console.error` is not a substitute (see H-1).
