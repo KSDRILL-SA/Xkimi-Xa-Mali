@@ -20,6 +20,9 @@ import { inngest, InngestEvents } from '@/lib/inngest'
 import { logger } from '@xxm/observability'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
+import { userRepo } from '@/repositories/user.repository'
+import { bumpRoleVersion } from '@/lib/role-version'
+import { notifyAdmins } from './inbox.service'
 
 const mandateBankInclude = {
   bankAccount: {
@@ -454,4 +457,98 @@ function mapAccountType(type: AccountType): GatewayAccountType {
     TRANSMISSION: 'Transmission',
   }
   return map[type]
+}
+
+
+// ─── Leaving the Foundation ───────────────────────────────────────────────────
+
+/**
+ * A member chooses to leave.
+ *
+ * Under Your Rights the guide promises "Leave the Foundation at any time, with
+ * your history intact", and the FAQ answers "Yes, at any time. Your history
+ * stays on record but future contributions stop." There was no self-service
+ * route at all.
+ *
+ * Immediate, by the founders' decision — "at any time" reads as immediate, and
+ * a leaving that waits on an acknowledgement means a debit the member asked to
+ * stop can still run before anyone gets to it.
+ *
+ * What this does NOT do is as important as what it does. Nothing is deleted:
+ * every contribution, transaction, ledger entry and statement stays exactly
+ * where it is, and money already contributed is not refunded. The status moves
+ * out of ACTIVE, which is what every collection path already filters on, and
+ * the mandate is cancelled at the gateway so the bank stops too.
+ */
+export async function leaveFoundation(
+  userId: string,
+  ipAddress?: string,
+) {
+  const user = await userRepo.findById(userId)
+  if (!user) throw new MandateNotFoundError()
+
+  if (user.status === 'RESIGNED') {
+    throw new MandateConflictError('You have already left the Foundation', 'USR_010')
+  }
+
+  // Cancel first, so no debit can be claimed between the status write and the
+  // gateway call. Each mandate goes through the same cancelMandate the member
+  // could have called themselves — one implementation of "stop collecting",
+  // not a second one that could drift from it.
+  const mandates = await mandateRepo.findMany({
+    userId,
+    status: { in: ['PENDING', 'ACTIVE', 'SUSPENDED'] },
+  })
+
+  for (const mandate of mandates) {
+    await cancelMandate(mandate.id, userId, [], ipAddress).catch((err) =>
+      logger.error('Mandate cancel failed while a member was leaving', {
+        userId, mandateId: mandate.id,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    )
+  }
+
+  const resignedAt = new Date()
+
+  const updated = await userRepo.update(userId, {
+    status: 'RESIGNED',
+    resignedAt,
+  }, { id: true, firstName: true, lastName: true })
+
+  // Bump AND publish the role version, so a session issued while they were
+  // still active is re-established against the new status rather than running
+  // on a stale token. bumpRoleVersion does both — incrementing separately here
+  // would double-count and publish the wrong number.
+  await bumpRoleVersion(userId)
+
+  await writeAuditLog({
+    userId,
+    action: 'MEMBER_RESIGNED',
+    entity: 'User',
+    entityId: userId,
+    payload: {
+      mandatesCancelled: mandates.length,
+      previousStatus: user.status,
+    },
+    ipAddress,
+  })
+
+  // Leadership is told after the fact, not asked in advance. The guide says the
+  // member may leave at any time; making that conditional on a leader reading an
+  // inbox would make "at any time" untrue.
+  const name = `${(updated as { firstName: string }).firstName} ${(updated as { lastName: string }).lastName}`
+  await notifyAdmins({
+    title: `${name} has left the Foundation`,
+    body:
+      `${name} has chosen to leave. Their debit order has been cancelled and no future ` +
+      `collection will include them. Their full contribution history remains on record.`,
+    category: 'SYSTEM',
+  }).catch((err) => logger.error('Failed to notify leadership of a resignation', {
+    userId, error: err instanceof Error ? err.message : String(err),
+  }))
+
+  logger.info('Member left the Foundation', { userId, mandatesCancelled: mandates.length })
+
+  return { resignedAt: resignedAt.toISOString(), mandatesCancelled: mandates.length }
 }
