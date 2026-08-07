@@ -72,4 +72,4 @@ export function goalIcon(status: string, type: string): LucideIcon {
   return typeTheme(type).icon
 }
 
-export { Target }
+export { Target, Trophy }

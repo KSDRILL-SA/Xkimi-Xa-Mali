@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePrefersReducedMotion } from '@/lib/hooks/usePrefersReducedMotion'
 
 type MilestoneBarProps = {
   value: number               // 0–100
@@ -26,15 +27,16 @@ export function MilestoneBar({
   className,
 }: MilestoneBarProps) {
   const clamped = Math.max(0, Math.min(100, value))
-  const [width, setWidth] = useState(0)
+  const reduce = usePrefersReducedMotion()
+  const [animated, setAnimated] = useState(0)
 
   useEffect(() => {
-    const reduce = typeof window !== 'undefined'
-      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    if (reduce) { setWidth(clamped); return }
-    const id = requestAnimationFrame(() => setWidth(clamped))
+    if (reduce) return
+    const id = requestAnimationFrame(() => setAnimated(clamped))
     return () => cancelAnimationFrame(id)
-  }, [clamped])
+  }, [clamped, reduce])
+
+  const width = reduce ? clamped : animated
 
   return (
     <div className={`relative ${height} w-full rounded-full bg-xxm-gray-100 overflow-hidden ${className ?? ''}`}>
