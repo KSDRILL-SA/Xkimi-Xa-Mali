@@ -177,6 +177,16 @@ export class InviteDuplicateError extends ConflictError {
   constructor() { super('An active invite or account already exists for this email or phone', 'INV_006') }
 }
 
+/**
+ * The circle is full. Deliberately worded as a decision rather than a fault —
+ * nobody has done anything wrong, and the cap is the point.
+ */
+export class MemberCapReachedError extends ConflictError {
+  constructor(cap: number) {
+    super(`The Foundation is capped at ${cap} members and every place is taken`, 'INV_007')
+  }
+}
+
 // ─── Report domain ────────────────────────────────────────────────────────────
 
 export class ReportNotFoundError extends NotFoundError {
