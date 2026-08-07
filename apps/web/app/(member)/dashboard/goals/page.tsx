@@ -9,6 +9,7 @@ import { getGoals, getGoalStatusCounts } from '@/services/goal.service'
 import { isAdmin } from '@/lib/authorization'
 import { primaryFundFirst } from '@/lib/goal-order'
 import { GoalCard, type GoalCardData } from '@/components/goal/GoalCard'
+import { ProposeGoalForm } from '@/components/goal/ProposeGoalForm'
 
 export const metadata: Metadata = { title: 'Goals' }
 
@@ -109,6 +110,14 @@ export default async function GoalsPage({
           </Link>
         </Reveal>
       )}
+
+      {/* ── Propose a Goal ────────────────────────────────────── */}
+      {/* Step 1 of the guide's six-step flow. Shown to everyone: a leader is
+          also a member, and nothing is lost by their proposal going through
+          the same review queue. */}
+      <Reveal variant="up" delay={150}>
+        <ProposeGoalForm />
+      </Reveal>
 
       {/* ── Filter chips ──────────────────────────────────────── */}
       <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5">
