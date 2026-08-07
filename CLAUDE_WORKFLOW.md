@@ -244,7 +244,7 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 | M-1 | **CSP hardening** | ✅ **Fixed.** Per-request nonce; `script-src 'unsafe-inline'` removed; `base-uri` and `form-action` locked. Cost — 13 public pages became dynamic — is documented in `web/app/layout.tsx` and accepted |
 | M-2 | **POPIA compliance planning** | 🟡 Partial. Right-to-erasure honoured in member listings; consent captured at registration. Retention policy and DSAR process not yet formalised |
 | M-3 | **Monitoring improvements** | 🟡 Partial. `@xxm/observability` + Sentry wired across apps. Gaps: no alert on failed debit collections (see H-1), no dependency-health gate in CI, `SECURITY-HARDENING.md` tracks "CI security gate" as P2 |
-| M-4 | **Integration testing expansion** | 🟡 Partial. 786 unit tests across 51 files, all passing. No test exercises the debit run end-to-end through Inngest, which is why H-1's regression was not caught |
+| M-4 | **Integration testing expansion** | 🟡 **Improved** (2026-08-07): 801 tests, and the debit run is now covered end to end. `executeDebitRun(step)` takes the step runner as a parameter, so a stub drives the whole job without an Inngest server — 13 cases over gateway throw, decline, success, and the mandates that must be left alone. Validated by mutation: reintroducing the FAILED→PENDING collapse fails exactly the three cases describing it. **Still partial** — the other 17 Inngest jobs have no equivalent seam, and `ledger-reconciliation` and `transaction-retry-failed` both touch money |
 | M-5 | **Web display font silently removed** | ✅ **Fixed** (2026-08-07). Loader restored; build green with it. The stub had been introduced on the assumption Google Fonts could not be fetched at build time — that assumption was wrong, so the regression bought nothing |
 | M-6 | **Admin `role-version.ts` bypasses validated config** | ✅ **Fixed** (2026-08-07). Reads through `lib/env` again. The stated reason for the bypass — that the strict module broke isolated tests — had a counter-example in the same directory: `role-revocation.test.ts` was already mocking `@/lib/env`. Four suites that reach the module transitively now do the same |
 | M-7 | **Crypto envelope doc/code drift** | ✅ **Fixed** (2026-08-07). Both diagrams now describe `base64(iv ‖ authTag ‖ ciphertext)` with a 16-byte IV, matching `lib/encryption.ts` |
@@ -316,7 +316,28 @@ override (step 1) is still correct because it is genuinely redundant, but it is
 - `magicast@0.5.4 invalid` — via `@prisma/config`'s nested `c12`. Upstream,
   pre-existing, present before any of this work.
 
-### 4.5 A process trap that cost an afternoon
+### 4.5 The 63→0 hardening claim, re-verified
+
+Checked 2026-08-07, because M-8 meant the mechanism it was credited to had not
+been running. **The tree is genuinely clean — `npm audit` reports 0 — but the
+claim was not true when made: it was 1 high, not 0.** What each override was
+actually doing:
+
+| Override | What the consumer asks for | Verdict |
+|---|---|---|
+| `sharp` `^0.35.3` | `next` itself requests `^0.35.3` | Redundant |
+| `undici` `^6.28.0` | `@vercel/blob` asks `^6.23.0` | Raises the floor, but natural resolution already lands ≥6.28 |
+| `brace-expansion` `^2.1.4` | `minimatch` `^1.1.7`, `glob/minimatch` `^5.0.8` | Mis-specified — satisfies neither |
+| `js-yaml` `^4.3.1` | `@eslint/eslintrc` `^4.3.0` | Load-bearing (added 2026-08-07) |
+
+So none of the four original overrides were protecting anything: natural
+resolution was already landing safe versions, which is exactly why their being
+inert went unnoticed. **The lesson is about evidence, not about npm** — the
+result was reported from `package.json` rather than from the installed tree.
+Verify a dependency claim with `npm audit` and `npm ls <pkg>`, never by reading
+a manifest.
+
+### 4.6 A process trap that cost an afternoon
 
 **A "killed" background task does not kill the `npm` process underneath it.**
 The task wrapper stops; npm keeps reifying `node_modules`.
