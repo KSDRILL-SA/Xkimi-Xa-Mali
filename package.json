@@ -26,17 +26,15 @@
     "prettier": "^3.4.2",
     "turbo": "^2.3.3"
   },
+  "_overrides_note": "Adding an entry here does not apply it. Overrides take effect during dependency resolution, and npm skips resolution when node_modules already exists — it reports 'up to date' and rebuilds the lockfile from the tree. brace-expansion and js-yaml sat unpatched that way while this block looked like it was protecting them. To add or change an entry: remove node_modules, delete package-lock.json, run `npm install --package-lock-only`, then verify with `npm ls <pkg>` — never by reading this file.",
   "overrides": {
-    "postcss": "^8.5.24",
     "sharp": "^0.35.3",
     "undici": "^6.28.0",
-    "brace-expansion": "^2.1.4"
+    "brace-expansion": "^2.1.4",
+    "js-yaml": "^4.3.1"
   },
   "engines": {
     "node": ">=20.0.0",
     "npm": ">=10.0.0"
-  },
-  "dependencies": {
-    "@vercel/blob": "2.6.1"
   }
 }
