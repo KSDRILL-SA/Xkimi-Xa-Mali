@@ -15,7 +15,7 @@ import { MilestoneBar } from '@/components/goal/MilestoneBar'
 import { GoalEngagement } from '@/components/goal/GoalEngagement'
 import { GoalPayCard } from '@/components/goal/GoalPayCard'
 import { GoalHistory, type ProgressEntry } from '@/components/goal/GoalHistory'
-import { statusTheme, typeTheme, goalIcon } from '@/components/goal/goal-theme'
+import { statusTheme, typeTheme, Trophy } from '@/components/goal/goal-theme'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
 
@@ -50,10 +50,13 @@ export default async function GoalDetailPage({
 
   const st = statusTheme(goal.status)
   const tt = typeTheme(goal.type)
-  const Icon = goalIcon(goal.status, goal.type)
+  // A property access, not a call. The compiler cannot see through a function
+  // that returns a component and reads it as one being created during render;
+  // every other icon in this app is selected the same way.
+  const Icon = goal.status === 'ACHIEVED' ? Trophy : tt.icon
   const pct = goal.progressPct
   const remaining = goal.remaining
-  const daysLeft = Math.ceil((new Date(goal.deadline).getTime() - Date.now()) / 86_400_000)
+  const daysLeft = goal.daysLeft
   const isOverdue = goal.status === 'ACTIVE' && daysLeft < 0
   const progressEntries: ProgressEntry[] = goal.progress
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   set: vi.fn(),
@@ -15,23 +15,17 @@ vi.mock('@/lib/db', () => ({ db: { user: { findUnique: vi.fn() } } }))
 vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: mocks.warn, error: vi.fn(), debug: vi.fn() },
 }))
-
-const originalUrl = process.env.UPSTASH_REDIS_REST_URL
-const originalToken = process.env.UPSTASH_REDIS_REST_TOKEN
+vi.mock('@/lib/env', () => ({
+  env: {
+    UPSTASH_REDIS_REST_URL: 'https://redis.example.test',
+    UPSTASH_REDIS_REST_TOKEN: 'test-token',
+  },
+}))
 
 beforeEach(() => {
   vi.resetModules()
   mocks.set.mockReset().mockResolvedValue('OK')
   mocks.warn.mockReset()
-  process.env.UPSTASH_REDIS_REST_URL = 'https://redis.example.test'
-  process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token'
-})
-
-afterEach(() => {
-  if (originalUrl === undefined) delete process.env.UPSTASH_REDIS_REST_URL
-  else process.env.UPSTASH_REDIS_REST_URL = originalUrl
-  if (originalToken === undefined) delete process.env.UPSTASH_REDIS_REST_TOKEN
-  else process.env.UPSTASH_REDIS_REST_TOKEN = originalToken
 })
 
 describe('publishRoleVersion', () => {

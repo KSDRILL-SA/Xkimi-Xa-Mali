@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { assessFromCounts } from '@/services/risk.service'
+import { assessFromCounts, MEMBER_ATTRIBUTABLE_FAILURE } from '@/services/risk.service'
 import { assertCanAccess } from '@/lib/authorization'
 import { subtractZAR } from '@/lib/money'
 import { cache, CACHE_KEYS } from '@/lib/cache'
@@ -185,7 +185,7 @@ export async function getMemberInsights(
   const [ytdAgg, activeMandate, recentFailed, periods, activeGoals, groupPulse] = await Promise.all([
     db.contribution.aggregate({ where: { userId, periodYear: year }, _sum: { amountPaid: true } }),
     db.paymentMandate.findFirst({ where: { userId, status: 'ACTIVE' }, select: { amount: true, debitDay: true } }),
-    db.transaction.count({ where: { contribution: { userId }, status: 'FAILED', createdAt: { gte: lookback } } }),
+    db.transaction.count({ where: { contribution: { userId }, ...MEMBER_ATTRIBUTABLE_FAILURE, createdAt: { gte: lookback } } }),
     // Full period history (one small row per month) — powers both the status
     // counts and the streak, so no separate groupBy query is needed.
     db.contribution.findMany({

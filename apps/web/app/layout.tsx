@@ -1,13 +1,17 @@
 import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
+import { Playfair_Display } from 'next/font/google'
 import { env } from '@/lib/env'
 import { NavigationProgressLoader } from '@/components/NavigationProgressLoader'
 import './globals.css'
 
-const playfairDisplay = {
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['700', '800', '900'],
   variable: '--font-display',
-}
+  display: 'swap',
+})
 
 /**
  * Every page renders per request.

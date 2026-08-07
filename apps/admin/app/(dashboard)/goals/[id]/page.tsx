@@ -175,6 +175,7 @@ export default async function AdminGoalDetailPage({
         current={Number(goal.currentAmount)}
         deadline={goal.deadline}
         createdBy={goal.creator ? `${goal.creator.firstName} ${goal.creator.lastName}` : null}
+        daysLeft={Math.ceil((new Date(goal.deadline).getTime() - Date.now()) / 86_400_000)}
       />
 
       {/* ── Status actions ────────────────────────────────────── */}
