@@ -50,6 +50,7 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['activateGoal',             (r) => services.activateGoal('a1', r, 'g1')],
   ['rejectGoal',               (r) => services.rejectGoal('a1', r, 'g1', 'Not a fit for the circle right now')],
   ['lockGoal',                 (r) => services.lockGoal('a1', r, 'g1')],
+  ['recordGoalOutcome',        (r) => services.recordGoalOutcome('a1', r, 'g1', 'Bought the catering equipment')],
   ['setPrimaryGoal',           (r) => services.setPrimaryGoal('a1', r, 'g1')],
   ['deleteGoal',               (r) => services.deleteGoal('a1', r, 'g1')],
   ['recordGoalProgress',       (r) => services.recordGoalProgress('a1', r, 'g1', 100)],
