@@ -1,4 +1,18 @@
 import { db } from '@/lib/db'
+import { INFRASTRUCTURE_FAILURE_PREFIX } from '@xxm/utils'
+
+/**
+ * A failed transaction that says something about the member.
+ *
+ * A decline and a gateway outage both land as FAILED, but only one of them is
+ * about the member's account. Counting an outage against them would report a
+ * brother as struggling because Netcash was down, and could put a call in front
+ * of someone whose money was there the whole time.
+ */
+export const MEMBER_ATTRIBUTABLE_FAILURE = {
+  status: 'FAILED',
+  failureReason: { not: { startsWith: INFRASTRUCTURE_FAILURE_PREFIX } },
+} as const
 
 /**
  * How much trouble a member's contributions are in.
@@ -85,7 +99,7 @@ export async function assessMemberRisks(userIds: readonly string[]): Promise<Map
     // back and are tallied here — still one query for the whole cohort.
     db.transaction.findMany({
       where: {
-        status: 'FAILED',
+        ...MEMBER_ATTRIBUTABLE_FAILURE,
         createdAt: { gte: since },
         contribution: { userId: { in: [...userIds] } },
       },
