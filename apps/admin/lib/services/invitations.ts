@@ -1,6 +1,38 @@
 import { db } from '@/lib/db'
+import { MAX_MEMBERS } from '@xxm/utils'
 import { publishRoleVersion } from '@/lib/role-version'
 import { assertAdmin, writeAuditLog, AdminNotFoundError, AdminConflictError } from './shared'
+
+// ─── The fifty-member cap ─────────────────────────────────────────────────────
+
+/**
+ * How many of the fifty places are taken — so leadership can see the headroom
+ * before inviting, rather than discovering it by being refused.
+ *
+ * Deliberately the same rule the member app enforces: a place is held by any
+ * member who has not been erased, plus every unexpired pending invitation. The
+ * two apps have separate database clients, so this counts rather than asks; if
+ * the rule changes, both of these move together or the console starts lying
+ * about a limit it does not enforce.
+ */
+export async function getMemberPlaces(adminRoles: string[]) {
+  assertAdmin(adminRoles)
+
+  const [members, pendingInvites] = await Promise.all([
+    db.user.count({ where: { deletedAt: null } }),
+    db.invitation.count({ where: { status: 'PENDING', expiresAt: { gt: new Date() } } }),
+  ])
+
+  const taken = members + pendingInvites
+  return {
+    members,
+    pendingInvites,
+    taken,
+    cap: MAX_MEMBERS,
+    remaining: Math.max(0, MAX_MEMBERS - taken),
+    isFull: taken >= MAX_MEMBERS,
+  }
+}
 
 // ─── Invitations ──────────────────────────────────────────────────────────────
 

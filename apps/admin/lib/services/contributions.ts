@@ -32,6 +32,36 @@ export async function listAllContributions(
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
 }
 
+/**
+ * The transactions behind a set of contributions, for the reversal action.
+ *
+ * A reversal acts on a Transaction, but this console lists Contributions — so
+ * without this there is nothing for leadership to point at. Loaded for the
+ * page's current rows only, in one query rather than one per row.
+ *
+ * `reversal` comes back so the UI can show that a payment has already been
+ * corrected and refuse to offer it twice; the service enforces that too, but an
+ * action a screen should never have offered is a worse experience than one that
+ * was never shown.
+ */
+export async function listTransactionsForContributions(
+  adminRoles: string[],
+  contributionIds: string[],
+) {
+  assertAdmin(adminRoles)
+  if (contributionIds.length === 0) return []
+
+  return db.transaction.findMany({
+    where: { contributionId: { in: contributionIds } },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true, contributionId: true, amount: true, type: true, status: true,
+      gatewayRef: true, reversalReason: true, createdAt: true,
+      reversal: { select: { id: true } },
+    },
+  })
+}
+
 export async function generateContributions(
   adminId: string, adminRoles: string[],
   month: number, year: number,

@@ -56,6 +56,15 @@ export const NOTIFICATION_TEMPLATES: Array<{
     body: 'Xkimm Xa Mali Foundation: {{firstName}}, your {{period}} statement is ready to download: {{url}}',
   },
   {
+    // Sent to the members who pledged toward a Goal that lapsed without
+    // reaching target. Plain hyphen, not an em dash: outside GSM-7 the whole
+    // message is billed as UCS-2 and halves the character budget.
+    slug: 'goal-failed',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimm Xa Mali Foundation: "{{goal}}" did not reach its target by its deadline and has been marked Failed. No funds were released - nothing has left the pool: {{url}}',
+  },
+  {
     slug: 'debit-tomorrow-warning',
     channel: 'SMS',
     subject: null,
@@ -97,6 +106,18 @@ export const NOTIFICATION_TEMPLATES: Array<{
     channel: 'SMS',
     subject: null,
     body: 'Xkimm Xa Mali Foundation: {{firstName}}, your R{{amount}} debit was declined. Please log in to pay: {{url}}',
+  },
+  {
+    // Money leaving a member's balance after they were told it had arrived.
+    // In MANDATORY_SLUGS, so it reaches a member who has SMS switched off —
+    // see the `debit-declined` note below for what happens when it is not.
+    // No {{reason}} here: a reason may run to 500 characters and would split
+    // the message across billable parts. It points at the transactions screen,
+    // which now shows the reason in full; the email carries it inline.
+    slug: 'contribution-reversed-sms',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimm Xa Mali Foundation: {{firstName}}, your R{{amount}} payment for {{period}} has been reversed. The reason is on your transactions page: {{url}}',
   },
   {
     slug: 'account-activated',
@@ -212,6 +233,16 @@ export const NOTIFICATION_TEMPLATES: Array<{
     channel: 'EMAIL',
     subject: 'Your {{period}} statement is ready — Xkimm Xa Mali Foundation',
     body: 'Hi {{firstName}}, your contribution statement for {{period}} is ready to download from the Statements page: {{url}}',
+  },
+  {
+    // The reversing entry, explained. Says plainly that nothing was deleted —
+    // that is the guide's promise about how a mistake gets corrected here, and
+    // a member seeing money disappear deserves to be told the original is
+    // still on record rather than left to infer it.
+    slug: 'contribution-reversed-email',
+    channel: 'EMAIL',
+    subject: 'A payment has been reversed — Xkimm Xa Mali Foundation',
+    body: 'Hi {{firstName}}, your R{{amount}} contribution for {{period}} has been reversed by leadership. Reason given: {{reason}}. Nothing has been deleted — the original payment and the reversing entry both remain in your history. View them here: {{url}}',
   },
   {
     slug: 'badge-level-up-email',

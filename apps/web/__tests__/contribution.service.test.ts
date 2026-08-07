@@ -9,6 +9,7 @@ vi.mock('@/lib/env', () => ({
   env: {
     ENCRYPTION_KEY: '0'.repeat(64),
     NETCASH_API_URL: 'https://netcash.test',
+    NEXTAUTH_URL: 'https://app.test',
   },
 }))
 
@@ -80,6 +81,10 @@ vi.mock('@/services/goal.service', () => ({
   syncPrimaryGoalProgress: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/services/notification.service', () => ({
+  queueNotification: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
@@ -102,6 +107,7 @@ vi.mock('@/lib/inngest', async () => {
 import { db } from '@/lib/db'
 import { paymentGateway } from '@/integrations/payment'
 import { postPoolDebit } from '@/services/ledger.service'
+import { queueNotification } from '@/services/notification.service'
 import {
   recalculateContributionStatus,
   processTransactionWebhook,
@@ -507,6 +513,8 @@ describe('getContributionSummary', () => {
 describe('createReversal', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  const REASON = 'Debited twice for June after a gateway redelivery'
+
   const SUCCESS_TXN = {
     id: 'txn-1',
     status: 'SUCCESS',
@@ -514,7 +522,12 @@ describe('createReversal', () => {
     contributionId: 'ctr-1',
     mandateId: 'm1',
     reversal: null,
-    contribution: { userId: 'user-1' },
+    contribution: {
+      userId: 'user-1',
+      periodMonth: 6,
+      periodYear: 2025,
+      user: { firstName: 'Thabo' },
+    },
   }
 
   function armReversal() {
@@ -528,14 +541,14 @@ describe('createReversal', () => {
   }
 
   it('rejects a non-admin caller before reading anything', async () => {
-    await expect(createReversal('txn-1', 'member-1', ['MEMBER'], '127.0.0.1')).rejects.toThrow(ForbiddenError)
+    await expect(createReversal('txn-1', 'member-1', ['MEMBER'], REASON, '127.0.0.1')).rejects.toThrow(ForbiddenError)
     expect(db.transaction.findUnique).not.toHaveBeenCalled()
   })
 
   it('creates a REVERSAL, flips the original to REVERSED, and debits the pool ledger', async () => {
     armReversal()
 
-    await createReversal('txn-1', 'admin-1', ['ADMIN'], '127.0.0.1')
+    await createReversal('txn-1', 'admin-1', ['ADMIN'], REASON, '127.0.0.1')
 
     // A dedicated REVERSAL row linked to the original.
     expect(db.transaction.create).toHaveBeenCalledWith(
@@ -551,21 +564,94 @@ describe('createReversal', () => {
     )
   })
 
+  it('records the reason on the reversing entry and never on the original', async () => {
+    armReversal()
+
+    await createReversal('txn-1', 'admin-1', ['ADMIN'], REASON, '127.0.0.1')
+
+    // The correction carries the explanation.
+    expect(db.transaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ reversalReason: REASON }) }),
+    )
+    // The original is evidence. Its only change is the status that drops it out
+    // of the paid sum — the amount and everything else stay exactly as written.
+    expect(db.transaction.update).toHaveBeenCalledWith({ where: { id: 'txn-1' }, data: { status: 'REVERSED' } })
+  })
+
+  it('trims the stated reason', async () => {
+    armReversal()
+
+    await createReversal('txn-1', 'admin-1', ['ADMIN'], `   ${REASON}   `, '127.0.0.1')
+
+    expect(db.transaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ reversalReason: REASON }) }),
+    )
+  })
+
+  it('refuses a reversal with no meaningful reason, before writing anything', async () => {
+    armReversal()
+
+    // A reversing entry nobody can retrace is the thing the guide rules out.
+    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], '   ', '127.0.0.1')).rejects.toThrow(ContributionConflictError)
+    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], 'oops', '127.0.0.1')).rejects.toThrow(ContributionConflictError)
+    expect(db.transaction.create).not.toHaveBeenCalled()
+    expect(db.transaction.update).not.toHaveBeenCalled()
+  })
+
+  it('tells the member on both channels, using the mandatory templates', async () => {
+    armReversal()
+
+    await createReversal('txn-1', 'admin-1', ['ADMIN'], REASON, '127.0.0.1')
+
+    // Before this, a reversal moved a member's money back in total silence —
+    // the only written trace was an audit entry no member can read.
+    //
+    // Both slugs are in MANDATORY_SLUGS. The `debit-declined` pair was seeded
+    // and left out of that set, and so was never delivered once; this asserts
+    // the same mistake was not repeated here.
+    const slugs = mockFn(queueNotification).mock.calls.map((c) => (c[0] as { templateSlug: string }).templateSlug)
+    expect(slugs).toEqual(['contribution-reversed-sms', 'contribution-reversed-email'])
+
+    expect(mockFn(queueNotification)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        channel: 'EMAIL',
+        payload: expect.objectContaining({
+          firstName: 'Thabo',
+          amount: '500',
+          period: '06/2025',
+          reason: REASON,
+          url: 'https://app.test/dashboard/transactions',
+        }),
+      }),
+    )
+  })
+
+  it('completes the reversal even if telling the member fails', async () => {
+    armReversal()
+    mockFn(queueNotification).mockRejectedValue(new Error('sms gateway down'))
+
+    // The money has already moved. A messaging outage must not undo it, and
+    // must not be swallowed either.
+    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], REASON, '127.0.0.1')).resolves.toBeDefined()
+    expect(db.transaction.create).toHaveBeenCalled()
+  })
+
   it('throws when the transaction does not exist', async () => {
     mockFn<typeof db.transaction.findUnique>(db.transaction.findUnique).mockResolvedValue(null)
-    await expect(createReversal('missing', 'admin-1', ['ADMIN'], '127.0.0.1')).rejects.toThrow(TransactionNotFoundError)
+    await expect(createReversal('missing', 'admin-1', ['ADMIN'], REASON, '127.0.0.1')).rejects.toThrow(TransactionNotFoundError)
     expect(db.transaction.create).not.toHaveBeenCalled()
   })
 
   it('refuses to reverse a transaction that is not SUCCESS', async () => {
     mockFn<typeof db.transaction.findUnique>(db.transaction.findUnique).mockResolvedValue({ ...SUCCESS_TXN, status: 'PENDING' } as never)
-    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], '127.0.0.1')).rejects.toThrow(ContributionConflictError)
+    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], REASON, '127.0.0.1')).rejects.toThrow(ContributionConflictError)
     expect(db.transaction.create).not.toHaveBeenCalled()
   })
 
   it('refuses to double-reverse a transaction that already has a reversal', async () => {
     mockFn<typeof db.transaction.findUnique>(db.transaction.findUnique).mockResolvedValue({ ...SUCCESS_TXN, reversal: { id: 'rev-x' } } as never)
-    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], '127.0.0.1')).rejects.toThrow(ContributionConflictError)
+    await expect(createReversal('txn-1', 'admin-1', ['ADMIN'], REASON, '127.0.0.1')).rejects.toThrow(ContributionConflictError)
     expect(db.transaction.create).not.toHaveBeenCalled()
   })
 })
