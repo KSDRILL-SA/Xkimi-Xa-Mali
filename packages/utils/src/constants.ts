@@ -8,6 +8,17 @@ export const DEFAULT_INVITE_AMOUNT = 200
 export const MAX_TRANSACTION_RETRY = 3
 export const IDEMPOTENCY_TTL_SECONDS = 60 * 60 * 72
 
+/**
+ * Marks a transaction that failed for reasons the member had no part in — the
+ * gateway was unreachable, timed out, or errored.
+ *
+ * A decline and an outage both land as a FAILED transaction, but they mean
+ * opposite things about the member. Only a decline says anything about their
+ * account, so only a decline should reach them or count toward how they are
+ * assessed. `failureReason` carries this prefix to keep the two apart.
+ */
+export const INFRASTRUCTURE_FAILURE_PREFIX = 'INFRASTRUCTURE: '
+
 export const USER_STATUS = {
   PENDING:   'PENDING',
   ACTIVE:    'ACTIVE',

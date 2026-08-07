@@ -22,6 +22,9 @@ vi.mock('@/lib/db', () => ({
   Prisma: {},
 }))
 vi.mock('@/lib/signature-storage', () => ({ storeSignaturePng: vi.fn() }))
+vi.mock('@/lib/env', () => ({
+  env: { UPSTASH_REDIS_REST_URL: undefined, UPSTASH_REDIS_REST_TOKEN: undefined },
+}))
 
 import { db } from '@/lib/db'
 import {

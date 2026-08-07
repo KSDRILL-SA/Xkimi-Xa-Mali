@@ -26,20 +26,6 @@ function key(userId: string): string {
   return `${ROLE_VERSION_PREFIX}${userId}`
 }
 
-export async function getRoleVersion(userId: string): Promise<number> {
-  const cached = await redis.get<string>(key(userId))
-  if (cached !== null) return Number(cached)
-
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: { roleVersion: true },
-  })
-
-  const version = user?.roleVersion ?? 0
-  await writeRoleVersion(userId, version, 'getRoleVersion')
-  return version
-}
-
 /**
  * Write the version through to Redis, loudly.
  *
@@ -82,12 +68,4 @@ export async function bumpRoleVersion(userId: string): Promise<void> {
   await writeRoleVersion(userId, updated.roleVersion, 'bumpRoleVersion')
 
   logger.info('Role version bumped', { userId, newVersion: updated.roleVersion })
-}
-
-export async function invalidateRoleVersionCache(userId: string): Promise<void> {
-  await redis.del(key(userId)).catch(() => {})
-}
-
-export async function clearRoleVersionCache(userId: string): Promise<void> {
-  await invalidateRoleVersionCache(userId)
 }

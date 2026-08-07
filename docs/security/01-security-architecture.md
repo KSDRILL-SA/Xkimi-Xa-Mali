@@ -39,8 +39,8 @@ Login → NextAuth Credentials → server-signed JWT in an **HTTP-only, Secure, 
 
 ```mermaid
 flowchart LR
-    PT["plaintext ID / bank number"] --> ENC["AES-256-GCM<br/>random 12-byte IV/value<br/>ENCRYPTION_KEY (env, never in DB/code)"]
-    ENC --> DB["stored iv:authTag:ciphertext<br/>tamper-evident"]
+    PT["plaintext ID / bank number"] --> ENC["AES-256-GCM<br/>random 16-byte IV/value<br/>ENCRYPTION_KEY (env, never in DB/code)"]
+    ENC --> DB["stored base64(iv ‖ authTag ‖ ciphertext)<br/>16 ‖ 16 ‖ n bytes · tamper-evident"]
     DB --> DEC["decrypt only in service layer<br/>(Netcash calls, admin view, POPIA export)<br/>never logged or cached"]
 ```
 

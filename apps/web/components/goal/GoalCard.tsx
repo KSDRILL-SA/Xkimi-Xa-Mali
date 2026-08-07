@@ -3,7 +3,7 @@ import { formatZAR, formatDate } from '@/lib/formatters'
 import { Lock, Clock, ArrowUpRight, Star } from 'lucide-react'
 import { ProgressRing } from './ProgressRing'
 import { MilestoneBar } from './MilestoneBar'
-import { statusTheme, typeTheme, goalIcon } from './goal-theme'
+import { statusTheme, typeTheme, Trophy } from './goal-theme'
 
 export type GoalCardData = {
   id: string
@@ -15,6 +15,10 @@ export type GoalCardData = {
   progressPct: number
   remaining: number
   deadline: string
+  /** Whole days until the deadline, negative once past. Computed by the data
+   *  layer — see `serializeGoal`. Reading the clock here would make the card's
+   *  output depend on when it rendered. */
+  daysLeft: number
   lockedAt?: string | null
   isPrimary?: boolean
 }
@@ -22,10 +26,13 @@ export type GoalCardData = {
 export function GoalCard({ goal, index = 0 }: { goal: GoalCardData; index?: number }) {
   const st = statusTheme(goal.status)
   const tt = typeTheme(goal.type)
-  const Icon = goalIcon(goal.status, goal.type)
+  // A property access, not a call. The compiler cannot see through a function
+  // that returns a component and reads it as one being created during render;
+  // every other icon in this app is selected the same way.
+  const Icon = goal.status === 'ACHIEVED' ? Trophy : tt.icon
   const pct = goal.progressPct
-  const isOverdue = goal.status === 'ACTIVE' && new Date(goal.deadline) < new Date()
-  const daysLeft = Math.ceil((new Date(goal.deadline).getTime() - Date.now()) / 86_400_000)
+  const daysLeft = goal.daysLeft
+  const isOverdue = goal.status === 'ACTIVE' && daysLeft < 0
 
   return (
     <Link

@@ -10,14 +10,22 @@ interface Props {
   current: number
   deadline: Date | string
   createdBy: string | null
+  /**
+   * Whole days until the deadline, negative once it has passed.
+   *
+   * Passed in rather than derived here. Reading the clock during render makes
+   * the component's output depend on when it happens to run, so two renders of
+   * the same goal can disagree — which React's purity rule exists to prevent.
+   * "Now" is an input to the request, and belongs with the page that serves it.
+   */
+  daysLeft: number
 }
 
 /** The read-only summary of a goal: money raised, target, remaining and time left. */
-export function GoalOverview({ description, status, target, current, deadline, createdBy }: Props) {
+export function GoalOverview({ description, status, target, current, deadline, createdBy, daysLeft }: Props) {
   const cfg       = STATUS_CONFIG[status] ?? STATUS_CONFIG.DRAFT!
   const pct       = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0
   const remaining = Math.max(0, target - current)
-  const daysLeft  = Math.ceil((new Date(deadline).getTime() - Date.now()) / 86_400_000)
   const isOverdue = status === 'ACTIVE' && daysLeft < 0
 
   return (

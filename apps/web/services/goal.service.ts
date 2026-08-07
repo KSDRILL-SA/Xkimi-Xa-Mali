@@ -47,6 +47,11 @@ function serializeGoal(goal: GoalRow) {
       ? Math.min(100, Math.round((Number(goal.currentAmount) / Number(goal.targetAmount)) * 100))
       : 0,
     remaining: Math.max(0, subtractZAR(Number(goal.targetAmount), Number(goal.currentAmount))),
+    // Whole days until the deadline, negative once past. Derived here, with the
+    // other computed fields, because a component that reads the clock while
+    // rendering produces output that depends on when it happened to run — which
+    // is what React's purity rule forbids. This function is not a component.
+    daysLeft: Math.ceil((goal.deadline.getTime() - Date.now()) / 86_400_000),
     deadline: goal.deadline.toISOString(),
     status: goal.status,
     isPrimary: goal.isPrimary,

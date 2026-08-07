@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, Input, Label, Alert } from '@xxm/ui'
 import { Check, Copy, X, UserPlus } from 'lucide-react'
@@ -38,11 +38,20 @@ function ModalContent({
   onClose: () => void
 }) {
   const [copied, setCopied] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const [state, formAction, isPending] = useActionState(createAction, {})
 
   // Portal target only exists on the client — wait for mount before rendering.
-  useEffect(() => setMounted(true), [])
+  //
+  // Read as external state rather than set from an effect. The effect version
+  // rendered null, committed, set state, and rendered again — a cascading
+  // render on every open, and the thing react-hooks/set-state-in-effect flags.
+  // useSyncExternalStore answers false on the server and true on the client
+  // without a second pass; the store never changes, so it never subscribes.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  )
 
   function handleCopy() {
     if (!state.data) return

@@ -87,7 +87,7 @@ export const NOTIFICATION_TEMPLATES: Array<{
     slug: 'payment-failed-sms',
     channel: 'SMS',
     subject: null,
-    body: 'Xkimm Xa Mali Foundation: Your R{{amount}} debit was declined. Please log in to resolve: {{url}}',
+    body: 'Xkimm Xa Mali Foundation: {{firstName}}, your R{{amount}} debit was declined. Please log in to pay: {{url}}',
   },
   {
     slug: 'account-activated',
@@ -101,12 +101,12 @@ export const NOTIFICATION_TEMPLATES: Array<{
     subject: null,
     body: 'Xkimm Xa Mali Foundation: You have been invited to join. Your invite code is {{code}}. Register at: {{url}}',
   },
-  {
-    slug: 'debit-declined',
-    channel: 'SMS',
-    subject: null,
-    body: 'Xkimm Xa Mali Foundation: Your contribution debit of R{{amount}} was declined. Log in to pay manually: {{url}}',
-  },
+  // NOTE: there is deliberately no `debit-declined` pair. A declined debit uses
+  // `payment-failed-sms` / `payment-failed-email`, which are in MANDATORY_SLUGS
+  // and so reach a member who has notifications switched off. A duplicate pair
+  // existed here and was never sent by anything; it was removed rather than
+  // wired up, because whichever one a future change picked would have been a
+  // coin flip between reaching the member and not.
   {
     slug: 'mandate-cancelled',
     channel: 'SMS',
@@ -185,12 +185,6 @@ export const NOTIFICATION_TEMPLATES: Array<{
     channel: 'EMAIL',
     subject: 'Contribution received — Xkimm Xa Mali Foundation',
     body: 'Hi {{firstName}}, your R{{amount}} contribution for {{period}} has been processed successfully.',
-  },
-  {
-    slug: 'debit-declined-email',
-    channel: 'EMAIL',
-    subject: 'Contribution payment failed — Xkimm Xa Mali Foundation',
-    body: 'Hi {{firstName}}, your R{{amount}} debit for {{period}} was declined. Please log in to resolve: {{url}}',
   },
   {
     slug: 'overdue-reminder-email',

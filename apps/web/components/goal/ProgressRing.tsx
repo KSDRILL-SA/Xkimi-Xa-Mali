@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { CountUp } from './CountUp'
+import { usePrefersReducedMotion } from '@/lib/hooks/usePrefersReducedMotion'
 
 type ProgressRingProps = {
   value: number               // 0–100
@@ -36,15 +37,15 @@ export function ProgressRing({
   const circumference = 2 * Math.PI * radius
 
   // Start empty, then animate to the real value once mounted.
-  const [shown, setShown] = useState(0)
+  const reduce = usePrefersReducedMotion()
+  const [animated, setAnimated] = useState(0)
   useEffect(() => {
-    const reduce = typeof window !== 'undefined'
-      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    if (reduce) { setShown(clamped); return }
-    const id = requestAnimationFrame(() => setShown(clamped))
+    if (reduce) return
+    const id = requestAnimationFrame(() => setAnimated(clamped))
     return () => cancelAnimationFrame(id)
-  }, [clamped])
+  }, [clamped, reduce])
 
+  const shown = reduce ? clamped : animated
   const offset = circumference - (shown / 100) * circumference
 
   return (

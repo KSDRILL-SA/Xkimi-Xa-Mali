@@ -173,7 +173,7 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    KEY["ENCRYPTION_KEY<br/>64 hex = 32 bytes"] --> ENC["lib/encryption.ts<br/>AES-256-GCM · random IV/value<br/>format iv:authTag:ciphertext"]
+    KEY["ENCRYPTION_KEY<br/>64 hex = 32 bytes"] --> ENC["lib/encryption.ts<br/>AES-256-GCM · random IV/value<br/>base64(iv ‖ authTag ‖ ciphertext)"]
     ENC --> F1["USER.idNumber"]
     ENC --> F2["BANK_ACCOUNT.accountNumber"]
     PLAIN["Plain (intentional): email, phone — indexed for lookup;<br/>bank/branch names; all amounts — needed for reporting"]

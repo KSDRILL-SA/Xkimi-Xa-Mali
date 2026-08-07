@@ -1,13 +1,15 @@
 import { db } from './db'
 import { Redis } from '@upstash/redis'
 import { logger } from '@xxm/observability'
+import { env } from './env'
 
-// Do not import the strict environment module here. This helper is imported by
-// service code in unit tests, while production startup still validates these
-// variables through lib/env. Reading the two values directly keeps the helper
-// usable in isolated tests without weakening production configuration checks.
-const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL
-const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN
+// Read through the validated config module rather than process.env directly,
+// so production startup keeps enforcing `requiredWhenLive` on both Upstash
+// variables. Tests mock '@/lib/env' (see apps/admin/__tests__/role-revocation.test.ts
+// and role-version-publish.test.ts) rather than the environment itself, so
+// importing the strict module here does not weaken isolated unit tests.
+const REDIS_URL = env.UPSTASH_REDIS_REST_URL
+const REDIS_TOKEN = env.UPSTASH_REDIS_REST_TOKEN
 const REDIS_CONFIGURED = !!(REDIS_URL && REDIS_TOKEN)
 
 /**
