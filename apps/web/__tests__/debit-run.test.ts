@@ -16,7 +16,8 @@ vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: mocks.error, debug: vi.fn() },
 }))
 
-import { processMandateBatch, toTransactionStatus } from '@/inngest/functions/debit-run'
+import { processMandateBatch } from '@/inngest/functions/debit-run'
+import { toTransactionStatus } from '@/lib/transaction-status'
 
 beforeEach(() => {
   vi.clearAllMocks()
