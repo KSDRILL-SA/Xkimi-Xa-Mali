@@ -1,0 +1,23 @@
+{
+  "name": "@xxm/database",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:seed": "node --env-file-if-exists=../../apps/web/.env.local --env-file-if-exists=../../apps/admin/.env.local --env-file-if-exists=../../apps/website/.env.local --import tsx/esm prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "@xxm/utils": "*"
+  },
+  "devDependencies": {
+    "prisma": "^6.1.0",
+    "tsx": "^4.19.2",
+    "vitest": "^4.1.10"
+  }
+}

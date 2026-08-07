@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Turbo
+.turbo/
+
+# Testing
+coverage/
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Prisma
+packages/database/prisma/dev.db
+packages/database/prisma/dev.db-journal
+
+# Local dev server logs
+.dev-servers.log
+
+# Vercel
+.vercel
+
+# Sentry
+.sentryclirc
+
+# The Founder Guide PDF. Readable locally and used as the specification, but
+# deliberately not tracked: it is a binary naming four real people and their
+# financial arrangements, so distributing it is the owners' decision rather
+# than a side effect of a commit. It has been committed by accident twice.
+*.pdf
+
+# Local agent/editor scratch
+.codex/
+.vscode/

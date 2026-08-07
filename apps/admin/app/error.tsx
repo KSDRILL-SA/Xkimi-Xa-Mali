@@ -1,0 +1,25 @@
+'use client'
+
+import { useEffect } from 'react'
+import { Button } from '@xxm/ui'
+import { AlertCircle } from 'lucide-react'
+import { logger } from '@xxm/observability'
+
+export default function ErrorPage({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    logger.error('Admin app error boundary', { err: error, digest: error.digest })
+  }, [error])
+
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center p-4">
+      <div className="text-center space-y-4 max-w-sm">
+        <div className="w-14 h-14 mx-auto xxm-icon-bg-danger">
+          <AlertCircle size={24} />
+        </div>
+        <h2 className="text-xl font-bold text-xxm-green-900">Something went wrong</h2>
+        <p className="text-sm text-xxm-gray-500">An unexpected error occurred. Try again or contact support.</p>
+        <Button onClick={reset} variant="secondary">Try again</Button>
+      </div>
+    </div>
+  )
+}

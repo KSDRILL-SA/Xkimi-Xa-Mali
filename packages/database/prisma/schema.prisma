@@ -1,0 +1,917 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // The app runs through Neon's pooled endpoint. Migrations cannot: a connection
+  // pooler multiplexes statements across backends, so the advisory lock and
+  // session state `prisma migrate` relies on do not survive. DIRECT_DATABASE_URL
+  // points at the unpooled endpoint and is used for migrations only.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  /// Chose to leave. Not a deletion and not a punishment: history stays, future
+  /// collections stop because every debit path collects only from ACTIVE.
+  RESIGNED
+}
+
+enum RoleName {
+  ADMIN
+  MEMBER
+}
+
+enum AccountType {
+  SAVINGS
+  CHEQUE
+  TRANSMISSION
+}
+
+enum MandateStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum ContributionStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+  WAIVED
+}
+
+enum TransactionType {
+  DEBIT_ORDER
+  MANUAL
+  REVERSAL
+  SCHEDULED
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REVERSED
+}
+
+enum GoalType {
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+enum GoalStatus {
+  DRAFT
+  ACTIVE
+  ACHIEVED
+  FAILED
+  /// A proposal leadership reviewed and refused. Kept rather than deleted: the
+  /// member who proposed it can see it was answered, and read why.
+  REJECTED
+}
+
+enum NotifChannel {
+  SMS
+  EMAIL
+  PUSH
+  WHATSAPP
+}
+
+enum NotifStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
+enum InboxCategory {
+  BROADCAST
+  SYSTEM
+  PAYMENT
+  GOAL
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum BadgeTier {
+  AMATEUR
+  SEMI_PRO
+  PRO
+  WORLD_CLASS
+}
+
+enum BudgetType {
+  MONTHLY
+  YEARLY
+  CUSTOM
+}
+
+// ─── Identity ─────────────────────────────────────────────────────────────────
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  phone           String     @unique
+  firstName       String
+  lastName        String
+  idNumber        String?
+  address         Json?
+  password        String?
+  emailVerified   DateTime?
+  image           String?
+  status          UserStatus @default(PENDING)
+  popiaConsentAt  DateTime?
+  loginAttempts   Int        @default(0)
+  lockedUntil     DateTime?
+  roleVersion     Int        @default(0)
+  /// When this member chose to leave. Null for everyone still in the circle.
+  resignedAt      DateTime?
+  deletedAt       DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  roles                  UserRole[]
+  accounts               Account[]
+  sessions               Session[]
+  bankAccounts           BankAccount[]
+  mandates               PaymentMandate[]
+  contributions          Contribution[]
+  notifications          Notification[]
+  notificationPreference NotificationPreference?
+  auditLogs              AuditLog[]
+  loginHistory           LoginHistory[]
+  lockedGoals            Goal[]                  @relation("GoalLocker")
+  createdGoals           Goal[]                  @relation("GoalCreator")
+  documentedGoals        Goal[]                  @relation("GoalOutcomeRecorder")
+  reviewedGoals          Goal[]                  @relation("GoalReviewer")
+  recordedProgress       GoalProgress[]          @relation("ProgressRecorder")
+  passwordResetTokens    PasswordResetToken[]
+  emailVerifTokens       EmailVerificationToken[]
+  invitesSent            Invitation[]            @relation("InvitesSent")
+  inviteAccepted         Invitation?             @relation("InviteAccepted")
+  approvedMandates       PaymentMandate[]        @relation("MandateApprover")
+  revokedInvitations     Invitation[]            @relation("InviteRevoker")
+  badgeScore             BadgeScore?
+  badgeHistory           BadgeHistory[]
+  communityMessages      CommunityMessage[]      @relation("MessageAuthor")
+  deletedCommunityMsgs   CommunityMessage[]      @relation("MessageDeleter")
+  goalCheers             GoalCheer[]             @relation("GoalCheerUser")
+  goalComments           GoalComment[]           @relation("GoalCommentAuthor")
+  deletedGoalComments    GoalComment[]           @relation("GoalCommentDeleter")
+  inboxMessages          InboxMessage[]          @relation("InboxRecipient")
+  sentInboxMessages      InboxMessage[]          @relation("InboxSender")
+  goalPledges            GoalPledge[]            @relation("GoalPledger")
+  goalPayments           GoalPayment[]           @relation("GoalPaymentUser")
+  budgets                UserBudget[]
+  budgetOverrides        BudgetOverride[]
+  signature              AdminSignature?
+  signatureHistory       AdminSignatureHistory[]
+
+  @@index([status])
+  @@index([email, status])
+  // Active-user filtering is served by the partial index `idx_users_active`
+  // (status WHERE deletedAt IS NULL), created in raw SQL — Prisma's DSL cannot
+  // express a partial index, so it is intentionally not declared here.
+  @@map("users")
+}
+
+// ─── NextAuth required models ─────────────────────────────────────────────────
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── Auth tokens ──────────────────────────────────────────────────────────────
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+model Role {
+  id    String   @id @default(cuid())
+  name  RoleName @unique
+  users UserRole[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+// ─── Banking ──────────────────────────────────────────────────────────────────
+
+model BankAccount {
+  id            String      @id @default(cuid())
+  userId        String
+  bankName      String
+  accountNumber String
+  accountType   AccountType
+  branchCode    String
+  isPrimary     Boolean     @default(false)
+  verifiedAt    DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mandates PaymentMandate[]
+
+  // userId lookups are served by the composite below (leading column).
+  @@index([userId, isPrimary])
+  @@map("bank_accounts")
+}
+
+model PaymentMandate {
+  id               String        @id @default(cuid())
+  userId           String
+  bankAccountId    String
+  debitDay         Int
+  amount           Decimal       @db.Decimal(12, 2)
+  currency         String        @default("ZAR")
+  status           MandateStatus @default(PENDING)
+  netcashMandateId String?       @unique
+  delayedUntil     DateTime?
+  failureReason    String?
+  approvedAt       DateTime?
+  approvedById     String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  bankAccount  BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
+  approvedBy   User?         @relation("MandateApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  // netcashMandateId uniqueness is enforced by a partial unique index
+  // (WHERE netcashMandateId IS NOT NULL) in raw SQL. The @unique above keeps the
+  // Prisma client aware of it; the DB shape is intentionally partial.
+  // "At most one PENDING or ACTIVE mandate per user" is enforced by a partial
+  // unique index (payment_mandates_one_active_per_user, userId WHERE status IN
+  // ('PENDING','ACTIVE')) in raw SQL — the race-safe backstop for createMandate.
+  // userId lookups are served by the [userId, status] composite (leading column).
+  @@index([userId, status])
+  @@index([bankAccountId])
+  @@index([status])
+  @@index([delayedUntil])
+  @@map("payment_mandates")
+}
+
+// ─── Contributions & Transactions ─────────────────────────────────────────────
+
+model Contribution {
+  id          String             @id @default(cuid())
+  userId      String
+  periodMonth Int
+  periodYear  Int
+  amountDue   Decimal            @db.Decimal(12, 2)
+  amountPaid  Decimal            @default(0) @db.Decimal(12, 2)
+  currency    String             @default("ZAR")
+  dueDate     DateTime
+  status      ContributionStatus @default(PENDING)
+  version     Int                @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions Transaction[]
+
+  @@unique([userId, periodMonth, periodYear])
+  // userId lookups are served by the [userId, ...] composites below (leading column).
+  @@index([userId, status])
+  @@index([periodYear, periodMonth])
+  @@index([status, dueDate])
+  @@index([status, periodYear, periodMonth], map: "contributions_status_period_idx")
+  @@index([userId, createdAt])
+  @@map("contributions")
+}
+
+model Transaction {
+  id              String            @id @default(cuid())
+  contributionId  String
+  mandateId       String
+  amount          Decimal           @db.Decimal(12, 2)
+  currency        String            @default("ZAR")
+  type            TransactionType
+  status          TransactionStatus @default(PENDING)
+  gatewayRef      String?
+  gatewayResponse Json?
+  idempotencyKey  String            @unique
+  retryCount      Int               @default(0)
+  failureReason   String?
+  /// Why leadership reversed this transaction. Set on the REVERSAL row, never on
+  /// the original — the original is evidence and is not edited. Null on rows
+  /// written before the reason was required, and on everything that is not a
+  /// reversal. Distinct from failureReason, which is the gateway refusing.
+  reversalReason  String?
+  reversalOfId    String?           @unique
+  processedAt     DateTime?
+  createdAt       DateTime          @default(now())
+
+  contribution Contribution   @relation(fields: [contributionId], references: [id], onDelete: Restrict)
+  mandate      PaymentMandate @relation(fields: [mandateId], references: [id], onDelete: Restrict)
+  reversalOf   Transaction?   @relation("TransactionReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
+  reversal     Transaction?   @relation("TransactionReversal")
+
+  // reversalOfId uniqueness (double-reversal guard) is enforced by a partial
+  // unique index (WHERE reversalOfId IS NOT NULL) in raw SQL; @unique above keeps
+  // the client aware. contributionId lookups are served by [contributionId, status].
+  @@index([contributionId, status])
+  @@index([mandateId])
+  @@index([status, createdAt])
+  @@index([gatewayRef])
+  @@index([type])
+  @@index([status, retryCount])
+  @@map("transactions")
+}
+
+/// Idempotency guard for inbound webhooks (e.g. Netcash). A redelivered event
+/// with the same (source, eventKey) is acknowledged but never reprocessed.
+model ProcessedWebhookEvent {
+  id        String   @id @default(cuid())
+  source    String
+  eventKey  String
+  createdAt DateTime @default(now())
+
+  @@unique([source, eventKey])
+  @@index([createdAt])
+  @@map("processed_webhook_events")
+}
+
+enum LedgerAccount {
+  POOL
+}
+
+enum LedgerDirection {
+  CREDIT
+  DEBIT
+}
+
+/// Append-only, immutable ledger of every movement in/out of the collective
+/// pool. The unique (refType, refId, direction) makes posting idempotent, so an
+/// entry is recorded exactly once per source event no matter how many times the
+/// hook or the reconciler runs. The pool balance is CREDIT sum minus DEBIT sum.
+model LedgerEntry {
+  id          String          @id @default(cuid())
+  account     LedgerAccount   @default(POOL)
+  direction   LedgerDirection
+  amount      Decimal         @db.Decimal(12, 2)
+  refType     String
+  refId       String
+  memberId    String?
+  description String?
+  createdAt   DateTime        @default(now())
+
+  @@unique([refType, refId, direction])
+  @@index([account, createdAt])
+  @@index([memberId])
+  @@map("ledger_entries")
+}
+
+// ─── Goals ────────────────────────────────────────────────────────────────────
+
+model Goal {
+  id            String     @id @default(cuid())
+  type          GoalType
+  title         String
+  description   String?
+  targetAmount  Decimal    @db.Decimal(12, 2)
+  currentAmount Decimal    @default(0) @db.Decimal(12, 2)
+  currency      String     @default("ZAR")
+  deadline      DateTime
+  status        GoalStatus @default(DRAFT)
+  // The one common yearly fund every monthly contribution flows into. At most
+  // one goal may be primary at a time — enforced by a partial unique index
+  // (WHERE "isPrimary") created in raw SQL in the migration.
+  isPrimary     Boolean    @default(false)
+  version       Int        @default(0)
+  lockedAt      DateTime?
+  lockedById    String?
+  /// Who proposed or created this goal. A member for a proposal, an admin for
+  /// one leadership raised itself — the two paths are told apart by the roles
+  /// of this user, not by a separate column.
+  createdById   String?
+  /// Step 6 of the Goal flow: what the money actually bought, shown back to the
+  /// circle. The note is the account; the proof is a photo or receipt and is
+  /// optional, so a missing receipt can never make a goal impossible to close.
+  outcomeNote         String?
+  outcomeProofUrl     String?
+  outcomeRecordedAt   DateTime?
+  outcomeRecordedById String?
+  /// Why leadership refused a proposal. Set only alongside status REJECTED.
+  rejectionReason String?
+  /// Which leader reviewed the proposal, and when. Empty on every goal created
+  /// before proposals existed, which is the honest answer for them.
+  reviewedById  String?
+  reviewedAt    DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
+  creator  User?          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  outcomeRecorder User?   @relation("GoalOutcomeRecorder", fields: [outcomeRecordedById], references: [id], onDelete: SetNull)
+  reviewer User?          @relation("GoalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  progress GoalProgress[]
+  cheers   GoalCheer[]
+  comments GoalComment[]
+  pledges  GoalPledge[]
+  payments GoalPayment[]
+
+  @@index([lockedById])
+  @@index([createdById])
+  @@index([outcomeRecordedById])
+  @@index([reviewedById])
+  @@index([status])
+  @@index([status, deadline])
+  @@map("goals")
+}
+
+// A member's directed extra payment toward a goal (primary or additional),
+// collected via the payment gateway. Mirrors the transaction settlement model:
+// SUCCESS money counts toward the goal; a unique idempotency key makes a retried
+// submission a no-op.
+model GoalPayment {
+  id             String            @id @default(cuid())
+  goalId         String
+  userId         String
+  amount         Decimal           @db.Decimal(12, 2)
+  status         TransactionStatus @default(PENDING)
+  idempotencyKey String            @unique
+  gatewayRef     String?
+  createdAt      DateTime          @default(now())
+  processedAt    DateTime?
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation("GoalPaymentUser", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([goalId, status])
+  @@index([userId])
+  @@map("goal_payments")
+}
+
+model GoalCheer {
+  id        String   @id @default(cuid())
+  goalId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation("GoalCheerUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, userId])
+  @@index([goalId])
+  @@map("goal_cheers")
+}
+
+model GoalComment {
+  id          String    @id @default(cuid())
+  goalId      String
+  userId      String
+  content     String    @db.VarChar(500)
+  isDeleted   Boolean   @default(false)
+  deletedById String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  goal      Goal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user      User  @relation("GoalCommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  deletedBy User? @relation("GoalCommentDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
+
+  @@index([goalId, createdAt])
+  @@map("goal_comments")
+}
+
+model GoalPledge {
+  id        String   @id @default(cuid())
+  goalId    String
+  userId    String
+  amount    Decimal  @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation("GoalPledger", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, userId])
+  @@index([goalId])
+  @@map("goal_pledges")
+}
+
+model GoalProgress {
+  id           String   @id @default(cuid())
+  goalId       String
+  amount       Decimal  @db.Decimal(12, 2)
+  note         String?
+  recordedById String?
+  recordedAt   DateTime @default(now())
+
+  goal       Goal  @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  recordedBy User? @relation("ProgressRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  // goalId lookups are served by the [goalId, recordedAt] composite (leading column).
+  @@index([goalId, recordedAt])
+  @@map("goal_progress")
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model NotificationTemplate {
+  id      String       @id @default(cuid())
+  slug    String       @unique
+  channel NotifChannel
+  subject String?
+  body    String
+
+  notifications Notification[]
+
+  @@index([channel])
+  @@map("notification_templates")
+}
+
+model Notification {
+  id           String       @id @default(cuid())
+  userId       String
+  templateId   String
+  channel      NotifChannel
+  status       NotifStatus  @default(QUEUED)
+  payload      Json
+  retryCount   Int          @default(0)
+  errorMessage String?
+  externalRef  String?
+  sentAt       DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt @default(now())
+
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template NotificationTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([templateId])
+  // No index on [status] alone: it is a strict prefix of [status, createdAt],
+  // which serves the same queries. None on [channel] either — nothing filters
+  // by channel on its own, and with four possible values an index on it would
+  // never be chosen. Both were measured as dead and dropped; every plan on this
+  // table was identical afterwards, and inserts got ~8% cheaper.
+  @@index([status, createdAt])
+  // Serves the stalled-'in-flight' recovery scan: WHERE status/errorMessage +
+  // updatedAt < cutoff. See notification.service.recoverStalledNotifications.
+  @@index([status, updatedAt])
+  // externalRef lookups are served by a partial index (WHERE externalRef IS NOT
+  // NULL) in raw SQL — lookups are always by a concrete provider ref, so the
+  // partial covers them without indexing the many NULL rows.
+  @@map("notifications")
+}
+
+/// Member-facing in-app messages (admin broadcasts and key system events).
+/// Distinct from Notification, which is an SMS/email delivery log.
+model InboxMessage {
+  id          String        @id @default(cuid())
+  userId      String
+  title       String
+  body        String        @db.Text
+  category    InboxCategory @default(BROADCAST)
+  readAt      DateTime?
+  createdById String?
+  createdAt   DateTime      @default(now())
+
+  user      User  @relation("InboxRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("InboxSender", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("inbox_messages")
+}
+
+model NotificationPreference {
+  id       String  @id @default(cuid())
+  userId   String  @unique
+  sms      Boolean @default(true)
+  email    Boolean @default(true)
+  push     Boolean @default(true)
+  whatsapp Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+// ─── Audit ────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  payload   Json
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── Invitations ─────────────────────────────────────────────────────────────
+
+model Invitation {
+  id            String           @id @default(cuid())
+  codeHash      String           @unique
+  codePrefix    String
+  firstName     String
+  lastName      String
+  email         String
+  phone         String
+  minimumAmount Decimal          @db.Decimal(12, 2)
+  currency      String           @default("ZAR")
+  status        InvitationStatus @default(PENDING)
+  invitedById   String
+  acceptedById  String?          @unique
+  revokedById   String?
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime         @default(now())
+
+  invitedBy  User  @relation("InvitesSent",    fields: [invitedById],  references: [id], onDelete: Restrict)
+  acceptedBy User? @relation("InviteAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
+  revokedBy  User? @relation("InviteRevoker",  fields: [revokedById],  references: [id], onDelete: SetNull)
+
+  // "One PENDING invite per contact" is enforced by partial unique indexes
+  // (email/phone WHERE status = 'PENDING') in raw SQL — this matches the service,
+  // which only blocks a pending duplicate and allows re-inviting an expired or
+  // revoked contact. There is deliberately NO full unique on email/phone.
+  @@index([invitedById])
+  @@index([email])
+  @@index([status])
+  @@index([status, expiresAt])
+  @@map("invitations")
+}
+
+// ─── Login history ────────────────────────────────────────────────────────────
+
+model LoginHistory {
+  id        String   @id @default(cuid())
+  userId    String
+  ipAddress String?
+  userAgent String?
+  success   Boolean
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, success])
+  @@map("login_history")
+}
+
+// ─── System configuration ─────────────────────────────────────────────────────
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@map("system_config")
+}
+
+// ─── Badges & Community ────────────────────────────────────────────────────────
+
+model BadgeScore {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  currentBadge      BadgeTier  @default(AMATEUR)
+  overallScore      Decimal    @default(0) @db.Decimal(6, 3)
+  consistencyScore  Decimal    @default(0) @db.Decimal(6, 3)
+  timelinessScore   Decimal    @default(0) @db.Decimal(6, 3)
+  generosityScore   Decimal    @default(0) @db.Decimal(6, 3)
+  streakBonus       Decimal    @default(0) @db.Decimal(6, 3)
+  progressToNext    Decimal    @default(0) @db.Decimal(6, 3)
+  currentStreak     Int        @default(0)
+  longestStreak     Int        @default(0)
+  totalPaidMonths   Int        @default(0)
+  totalOnTimeMonths Int        @default(0)
+  totalOverdue      Int        @default(0)
+  overdueInLast6    Int        @default(0)
+  monthsActive      Int        @default(0)
+  avgContribution   Decimal    @default(0) @db.Decimal(10, 2)
+  graceUntil        DateTime?
+  lastCalculatedAt  DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([currentBadge])
+  @@index([overallScore])
+  @@map("badge_scores")
+}
+
+model BadgeHistory {
+  id        String     @id @default(cuid())
+  userId    String
+  fromBadge BadgeTier?
+  toBadge   BadgeTier
+  trigger   String
+  score     Decimal    @db.Decimal(6, 3)
+  createdAt DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("badge_history")
+}
+
+model CommunityMessage {
+  id            String    @id @default(cuid())
+  userId        String
+  content       String    @db.VarChar(500)
+  replyToId     String?
+  isPinned      Boolean   @default(false)
+  isDeleted     Boolean   @default(false)
+  deletedById   String?
+  deletedAt     DateTime?
+  editableUntil DateTime
+  editedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user      User               @relation("MessageAuthor", fields: [userId], references: [id], onDelete: Restrict)
+  deletedBy User?              @relation("MessageDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
+  replyTo   CommunityMessage?  @relation("Replies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   CommunityMessage[] @relation("Replies")
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([isPinned])
+  // Two PARTIAL indexes serve the board itself and live in raw SQL, because
+  // @@index cannot express a WHERE clause:
+  //   community_messages_board_idx    (isPinned DESC, createdAt DESC)
+  //                                   WHERE isDeleted = false AND replyToId IS NULL
+  //   community_messages_replies_idx  (replyToId, createdAt) WHERE isDeleted = false
+  // A plain composite on the same columns was measured and the planner ignored
+  // it; restricting each index to the rows its query wants is what made the
+  // board page 37x faster. See the 20260726140000 migration.
+  @@map("community_messages")
+}
+
+// ─── Budget Guard ───────────────────────────────────────────────────────────────
+
+model UserBudget {
+  id        String     @id @default(cuid())
+  userId    String
+  type      BudgetType
+  amount    Decimal    @db.Decimal(10, 2)
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  overrides BudgetOverride[]
+
+  @@index([userId, type, isActive])
+  @@map("user_budgets")
+}
+
+model BudgetOverride {
+  id              String   @id @default(cuid())
+  budgetId        String
+  userId          String
+  contributionId  String?
+  attemptedAmount Decimal  @db.Decimal(10, 2)
+  budgetAmount    Decimal  @db.Decimal(10, 2)
+  overageAmount   Decimal  @db.Decimal(10, 2)
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  budget UserBudget @relation(fields: [budgetId], references: [id], onDelete: Restrict)
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("budget_overrides")
+}
+
+// ─── Admin Signature ────────────────────────────────────────────────────────────
+
+model AdminSignature {
+  id                  String   @id @default(cuid())
+  adminId             String   @unique
+  signatureUrl        String
+  signatureHash       String
+  displayName         String
+  isActive            Boolean  @default(true)
+  nextChangeAllowedAt DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@map("admin_signatures")
+}
+
+model AdminSignatureHistory {
+  id            String   @id @default(cuid())
+  adminId       String
+  signatureUrl  String
+  signatureHash String
+  replacedAt    DateTime @default(now())
+  replacedById  String
+
+  admin User @relation(fields: [adminId], references: [id], onDelete: Restrict)
+
+  @@index([adminId, replacedAt])
+  @@map("admin_signature_history")
+}
