@@ -59,7 +59,7 @@ export type InternalResult<T> = {
 export async function internalAdminPost<T = unknown>(
   path: string,
   body: unknown,
-  opts: { adminUserId?: string } = {},
+  opts: { adminUserId?: string; adminIp?: string } = {},
 ): Promise<InternalResult<T>> {
   const base   = WEB_BASE_URL
   const secret = process.env['ADMIN_API_SECRET']
@@ -73,6 +73,11 @@ export async function internalAdminPost<T = unknown>(
         'x-admin-secret':    secret,
         'x-admin-timestamp': String(Date.now()),
         ...(opts.adminUserId && { 'x-admin-user-id': opts.adminUserId }),
+        // Without this the web app records its caller's socket address, which
+        // on a server-to-server hop is this app rather than the admin who
+        // clicked. The audit trail promises "where", and our own infrastructure
+        // is not an answer to that question.
+        ...(opts.adminIp && { 'x-admin-ip': opts.adminIp }),
       },
       body: JSON.stringify(body),
     })
