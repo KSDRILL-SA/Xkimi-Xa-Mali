@@ -18,6 +18,9 @@ enum UserStatus {
   PENDING
   ACTIVE
   SUSPENDED
+  /// Chose to leave. Not a deletion and not a punishment: history stays, future
+  /// collections stop because every debit path collects only from ACTIVE.
+  RESIGNED
 }
 
 enum RoleName {
@@ -135,6 +138,8 @@ model User {
   loginAttempts   Int        @default(0)
   lockedUntil     DateTime?
   roleVersion     Int        @default(0)
+  /// When this member chose to leave. Null for everyone still in the circle.
+  resignedAt      DateTime?
   deletedAt       DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt

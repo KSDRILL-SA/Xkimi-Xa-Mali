@@ -50,3 +50,13 @@ packages/database/prisma/dev.db-journal
 
 # Sentry
 .sentryclirc
+
+# The Founder Guide PDF. Readable locally and used as the specification, but
+# deliberately not tracked: it is a binary naming four real people and their
+# financial arrangements, so distributing it is the owners' decision rather
+# than a side effect of a commit. It has been committed by accident twice.
+*.pdf
+
+# Local agent/editor scratch
+.codex/
+.vscode/
