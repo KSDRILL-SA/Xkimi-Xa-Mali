@@ -1,4 +1,4 @@
-# CLAUDE_WORKFLOW.md — Engineering Operating Manual
+# Engineering Operating Manual
 
 **Repository:** `Xkimi-Xa-Mali` (Xkimm Xa Mali Foundation)
 **Audience:** Every AI agent and Claude Code session that touches this repository.

@@ -5,7 +5,7 @@ external integrations** — work through this in order.
 
 > [!NOTE]
 > **Build status, 2026-08-07: green.** `npm run build` exits 0 for all three
-> apps; `typecheck` and `test` (788) also pass. The admin app had been failing
+> apps; `typecheck`, `lint` and `test` (800) also pass. The admin app had been failing
 > since the move to Next 16 — an `@import` placed after the `@tailwind`
 > directives, which Turbopack rejects — and this page's older claim of
 > "production-build verified (web 75/75, admin 19/19, website 8/8)" had been
@@ -16,7 +16,7 @@ external integrations** — work through this in order.
 > **Two things are still not clear before deploying:**
 > - `npm ls` exits 1 and one high-severity advisory (`js-yaml`) is open. The
 >   cause is not a version mismatch — the `overrides` block is inert. Fix recipe
->   in [`CLAUDE_WORKFLOW.md`](./CLAUDE_WORKFLOW.md) §4.4.
+>   in [`ENGINEERING_WORKFLOW.md`](./ENGINEERING_WORKFLOW.md) §4.4.
 > - CI is not executing at all (§8 below — Actions minutes exhausted), so nothing
 >   is verifying any of this except a local run.
 
