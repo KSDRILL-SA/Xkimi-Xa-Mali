@@ -244,7 +244,7 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 | M-1 | **CSP hardening** | ✅ **Fixed.** Per-request nonce; `script-src 'unsafe-inline'` removed; `base-uri` and `form-action` locked. Cost — 13 public pages became dynamic — is documented in `web/app/layout.tsx` and accepted |
 | M-2 | **POPIA compliance planning** | 🟡 Partial. Right-to-erasure honoured in member listings; consent captured at registration. Retention policy and DSAR process not yet formalised |
 | M-3 | **Monitoring improvements** | 🟡 Partial. `@xxm/observability` + Sentry wired across apps. Gaps: no alert on failed debit collections (see H-1), no dependency-health gate in CI, `SECURITY-HARDENING.md` tracks "CI security gate" as P2 |
-| M-4 | **Integration testing expansion** | 🟡 **Improved** (2026-08-07): 801 tests, and the debit run is now covered end to end. `executeDebitRun(step)` takes the step runner as a parameter, so a stub drives the whole job without an Inngest server — 13 cases over gateway throw, decline, success, and the mandates that must be left alone. Validated by mutation: reintroducing the FAILED→PENDING collapse fails exactly the three cases describing it. **Still partial** — the other 17 Inngest jobs have no equivalent seam, and `ledger-reconciliation` and `transaction-retry-failed` both touch money |
+| M-4 | **Integration testing expansion** | 🟡 **Improved** (2026-08-07): 813 tests. **Both jobs that move money are now covered end to end** — `executeDebitRun(step)` and `executeTransactionRetry(step)` take the step runner as a parameter, so a stub drives each without an Inngest server. 26 cases across the two. Both were validated against the defect, not the fix: reintroducing the `FAILED`→`PENDING` collapse fails exactly the cases describing it. **Writing the second set found three live defects in the retry job** — see §4.6. **Still partial**: the other 16 Inngest jobs have no seam, `ledger-reconciliation` being the one that matters most |
 | M-5 | **Web display font silently removed** | ✅ **Fixed** (2026-08-07). Loader restored; build green with it. The stub had been introduced on the assumption Google Fonts could not be fetched at build time — that assumption was wrong, so the regression bought nothing |
 | M-6 | **Admin `role-version.ts` bypasses validated config** | ✅ **Fixed** (2026-08-07). Reads through `lib/env` again. The stated reason for the bypass — that the strict module broke isolated tests — had a counter-example in the same directory: `role-revocation.test.ts` was already mocking `@/lib/env`. Four suites that reach the module transitively now do the same |
 | M-7 | **Crypto envelope doc/code drift** | ✅ **Fixed** (2026-08-07). Both diagrams now describe `base64(iv ‖ authTag ‖ ciphertext)` with a 16-byte IV, matching `lib/encryption.ts` |
@@ -337,7 +337,33 @@ result was reported from `package.json` rather than from the installed tree.
 Verify a dependency claim with `npm audit` and `npm ls <pkg>`, never by reading
 a manifest.
 
-### 4.6 A process trap that cost an afternoon
+### 4.6 The same mistake in two places, and what found it
+
+The debit run and the retry job both mapped the gateway's three answers onto
+two, writing every non-success as `PENDING`. Fixing it in one did not fix the
+other, and the second copy was worse: `PENDING` is not in the `status: 'FAILED'`
+set the retry job queries, so a declined retry **left the recovery pool after a
+single attempt** and was never tried again, with `failureReason` nulled in the
+same write. It then counted the decline as a retry and wrote a
+`TRANSACTION_RETRIED` audit entry for money that never moved.
+
+Three things worth carrying forward:
+
+- **A fix that depends on another component is not finished until that one is
+  checked too.** The debit-run fix works by writing a `FAILED` row *so the retry
+  job picks it up*. That made the retry job's correctness part of the debit
+  run's, and it had never been exercised.
+- **The defects were found by writing the test, not by reading the diff.** The
+  job had been read carefully twice — closely enough to copy its conventions —
+  and the bug was not visible either time.
+- **Assert against the defect before fixing it.** Each of these was demonstrated
+  failing first (`expected 'PENDING' to be 'FAILED'`). A test written after the
+  fix proves only that the code does what it does.
+
+The mapping now lives in `lib/transaction-status` and both jobs import it. Two
+copies is what it cost to get it wrong twice in the same way.
+
+### 4.7 A process trap that cost an afternoon
 
 **A "killed" background task does not kill the `npm` process underneath it.**
 The task wrapper stops; npm keeps reifying `node_modules`.
