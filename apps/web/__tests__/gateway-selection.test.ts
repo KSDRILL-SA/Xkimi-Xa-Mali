@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 vi.mock('@/lib/env', () => ({
   env: {
     NETCASH_API_URL: 'https://netcash.test',
+    NETCASH_DEBICHECK_TEMPLATE_ID: 'NCDCT000000001',
     NETCASH_SERVICE_KEY: 'k',
     NETCASH_WEBHOOK_SECRET: 's',
     ENCRYPTION_KEY: '0'.repeat(64),

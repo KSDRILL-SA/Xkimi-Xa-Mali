@@ -305,7 +305,61 @@ acknowledgement. The guide says "at any time", which reads as immediate.
 
 ---
 
-### GAP-9 — Netcash: the money path cannot run (BLOCKER, pre-existing)
+### GAP-9 — Netcash: the money path cannot run (BLOCKER) — 🟡 ADAPTER REBUILT 2026-08-07, unverified against a live account
+
+**The instruction below — "do not start this without sandbox credentials" — was
+wrong about what credentials are for.** Credentials are needed to *test* an
+adapter. They are not needed to *build* one correctly: what that needs is the
+vendor's documented contract, and §5 of the manual requires verifying against
+exactly that rather than against this codebase. Nobody had looked. The contract
+is public.
+
+**Verified sources, all fetched 2026-08-07:**
+
+| What | Where |
+|---|---|
+| Namespace, contract name, SOAPAction | live WSDL, `NIWS_NIF.svc?wsdl` |
+| Exact parameter names and order | live schema, `NIWS_NIF.svc?xsd=xsd0` |
+| DebiCheckAuthenticate fields | `api.netcash.co.za/inbound-payments/dc/debicheck-tt1-synchronous/` |
+| Batch file H/K/T/F layout | `api.netcash.co.za/inbound-payments/dc/debi-check-2/` |
+| Response codes | `api.netcash.co.za/ws-methods/web-service-response-codes/` |
+
+`targetNamespace` is `http://tempuri.org/`, the contract is `INIWS_NIF`, and
+SOAPAction is `http://tempuri.org/INIWS_NIF/<Method>`.
+
+**Four things the rebuild found that would each have cost real money:**
+
+1. **Amounts are in cents.** Batch field 162 and `DebiCheckAmendAuthentication`
+   are both denominated in cents; `DebiCheckAuthenticate` is in rands. The whole
+   system is in rands. Sending R450 unconverted collects R4.50.
+2. **A collection is a batch upload, not an API call.** `BatchFileUpload`
+   returns a **file token**, not a settlement — the bank has not answered.
+   Anything that records that as SUCCESS is crediting money that has not moved.
+   The adapter returns PENDING.
+3. **`SofwareVendorCode` is misspelled in the vendor's schema**, and
+   `reasonCode` is lower-case where its siblings are not. XML element names are
+   case-sensitive; spelling either "correctly" is what breaks.
+4. **The default `NETCASH_API_URL` pointed at `NSWSSX/NetcashTest.asmx`** — a
+   different, older service with no DebiCheck method at all.
+
+**An onboarding fact worth having before the application:** an ISV agreement is
+**not** required. Netcash publishes a default software vendor key
+(`24ade73c-…`); a vendor-specific GUID is issued only under an ISV agreement and
+is optional.
+
+**What remains, and it is only this:** the adapter has never spoken to a live
+Netcash account. 21 tests hold it to the published contract — envelope,
+parameter names and order, batch layout, cents conversion, response-code
+meanings — but a contract test is not a settlement. Before the first real
+collection: obtain the account, set `NETCASH_DEBICHECK_TEMPLATE_ID`, call
+`checkServiceKey()`, then run one member through one full cycle in test mode.
+
+The mock gateway remains the default and is still refused on a live deployment,
+so nothing selects this adapter by accident.
+
+<details>
+<summary>Original GAP-9 text</summary>
+
 
 **The guide's central mechanism:**
 
@@ -329,6 +383,8 @@ against the stand-in gateway. The interface is the seam and it is the right one.
 **Do not start this without sandbox credentials and the account's real
 specification.** Confirm with Netcash which API the account is provisioned for
 before writing anything.
+
+</details>
 
 ---
 

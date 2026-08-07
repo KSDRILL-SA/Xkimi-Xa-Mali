@@ -225,7 +225,7 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 |---|---|---|---|
 | C-1 | **Role-version propagation bug** — admin bumped `roleVersion` in Postgres but never published it to the Redis key the member app's Edge middleware reads, so revocation did not reach the request path | ✅ **Fixed** | `admin/lib/services/members.ts:98-107`, `invitations.ts:66-74` now publish `updated.roleVersion`. All three `roleVersion: { increment: 1 }` sites in the repo publish. Covered by `admin/__tests__/role-version-publish.test.ts` |
 | C-2 | **Redis authorization resilience** — a missing key read as version 0 (never stale), and a 300s TTL meant revocations silently lapsed | ✅ **Fixed** | Keys written without TTL (`web/lib/role-version.ts:52-63`). Three-state verdict in `web/lib/role-version-policy.ts`; privileged fail closed, members fail open. Guards for null / non-finite / throw at `web/middleware.ts:84-93` |
-| C-3 | **Netcash integration verification requirement** — `lib/netcash.ts` issues JSON POSTs to REST paths against a SOAP `.asmx` endpoint; the adapter is built against the wrong API shape | 🔴 **Open — by design.** Documented, not coded | `docs/completion-guide.md` §2.5. Requires provisioned sandbox credentials before it can be rebuilt. `IPaymentGateway` is the correct seam; everything behind it is unaffected |
+| C-3 | **Netcash integration verification requirement** — `lib/netcash.ts` issues JSON POSTs to REST paths against a SOAP `.asmx` endpoint; the adapter is built against the wrong API shape | 🟡 **Rebuilt 2026-08-07, unverified against a live account.** The adapter is now real SOAP against `NIWS_NIF.svc`, built from the live WSDL and schema rather than inferred — see §4.10. What is left is a dry run on a provisioned account, which is the one thing credentials are actually needed for | `apps/web/lib/netcash/`, `__tests__/netcash-soap.test.ts` (21 cases) |
 
 ### 4.2 Confirmed High findings
 
@@ -441,6 +441,75 @@ previous body, and a targeted `notificationTemplate.update` was required.
   actually references. What it will not do is start greeting anyone by name.
 - Removing a template from `templates.ts` leaves an inert row behind. Harmless
   while nothing references the slug, but it will not disappear on its own.
+
+### 4.10 "Blocked on credentials" was blocked on reading the documentation
+
+**The Netcash adapter was rebuilt against the real contract on 2026-08-07,
+without any account, sandbox or credential.**
+
+C-3 had sat open since the first audit, recorded as unstartable until sandbox
+credentials existed. That was a category error, and it cost months: **credentials
+are what you need to *test* an adapter, not to *build* one.** What building
+correctly needs is the vendor's contract — and §2.5 of the manual already
+requires verifying external API claims against the vendor's documentation rather
+than against this codebase. Nobody had opened it. It is public, complete, and
+the live WSDL and XSD are anonymously fetchable.
+
+Four defects fell out of doing that, each of which would have cost real money:
+
+- **Amounts are in cents.** Batch field 162 and `DebiCheckAmendAuthentication`
+  are cents; `DebiCheckAuthenticate` is rands; this system is rands throughout.
+  R450 sent unconverted collects R4.50, and nothing about that reads as wrong
+  until a member's statement does.
+- **A collection is a batch upload.** `BatchFileUpload` returns a *file token*,
+  not a settlement — the bank has not answered yet, and the outcome arrives
+  later via `RequestFileUploadReport`. Recording a token as SUCCESS credits
+  money that has not moved. PENDING is the only honest answer.
+- **Two vendor spellings must be reproduced exactly.** `SofwareVendorCode` is
+  misspelled in Netcash's own schema and `reasonCode` is lower-case among
+  capitalised siblings. XML names are case-sensitive; "correcting" either breaks
+  the call.
+- **The default endpoint was a different service.** `NETCASH_API_URL` defaulted
+  to `NSWSSX/NetcashTest.asmx`, which exposes no DebiCheck method at all.
+
+Two lessons, and the second is the one that generalises:
+
+- **A dev-only simulator can preserve a broken integration indefinitely.** The
+  old client fell back to returning plausible successes whenever no service key
+  was set outside production. Every developer machine therefore showed a working
+  money path built on endpoints that do not exist. It has been deleted; the mock
+  gateway is the single stand-in, and selecting it is an explicit decision
+  (`PAYMENT_GATEWAY=mock`) rather than a silent fallback.
+- **"Blocked on X" deserves the same scrutiny as "it doesn't touch money"
+  (§4.6).** Both are claims. Before carrying a blocker forward another quarter,
+  state precisely what the missing thing would let you do — and check whether
+  that is the same thing as what you were about to do.
+
+What genuinely remains is a dry run against a provisioned account. That is real,
+and it is the only part credentials were ever needed for.
+
+### 4.11 Two build artefacts that do not follow a branch switch
+
+Both cost time on 2026-08-07 and both present as an error in a file the branch
+never touched.
+
+**The generated Prisma client is global, not per-branch.** `npm run db:generate`
+writes to the repository-root `node_modules/@prisma/client`, so after switching
+branches the client still describes whichever schema was generated last. A
+branch that does not have a new enum value will typecheck *against one that
+does* — or, worse, the reverse: a branch that needs a column compiles because a
+sibling branch's client still has it. **Run `npm run db:generate` immediately
+after any branch switch that crosses a schema change.**
+
+This is sharpened by Turbo caching: `typecheck` may replay a cached pass and
+report green while `next build` runs its own `tsc` and fails. A green typecheck
+and a red build on the same tree is the signature of exactly this.
+
+**Stale `.next/types/validator.ts` references routes from the other branch.**
+Next generates a route-type validator during `build`; after switching branches it
+still imports pages and route handlers that no longer exist, and typecheck fails
+with `Cannot find module '../../app/.../page.js'`. `rm -rf apps/*/.next` clears
+it. Nothing is wrong with the code.
 
 ---
 

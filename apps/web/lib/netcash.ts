@@ -2,6 +2,21 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { env } from './env'
 import { withRetry } from './retry'
 import { ExternalServiceError } from './errors'
+import { NetcashSoapError } from './netcash/soap'
+import {
+  debiCheckAuthenticate,
+  debiCheckCancel,
+  debiCheckAmend,
+  debiCheckCurrentStatus,
+  batchFileUpload,
+  requestFileUploadReport,
+  isValidServiceKey,
+} from './netcash/methods'
+import {
+  buildDebiCheckBatchFile,
+  toCents,
+  DEFAULT_SOFTWARE_VENDOR_KEY,
+} from './netcash/batch-file'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,6 +40,9 @@ export type NetcashCreateMandatePayload = {
   debitDay: number
   startDate: string
   referenceNumber: string
+  /** Required by DebiCheckAuthenticate — the bank contacts the debtor on these. */
+  mobileNumber?: string
+  emailAddress?: string
 }
 
 export type NetcashMandateResponse = {
@@ -67,140 +85,254 @@ export type NetcashDebitResponse = {
   errorCode?: string
 }
 
-// ─── HTTP client ──────────────────────────────────────────────────────────────
+// ─── Transport ────────────────────────────────────────────────────────────────
+//
+// The SOAP transport lives in `./netcash/soap`. What stood here was a JSON HTTP
+// client, a retry wrapper around it, and a development-only simulator that
+// returned plausible successes for REST paths the vendor does not publish.
+//
+// All three are gone rather than left in place. The simulator is the one worth
+// naming: it made a wrong integration look like a working one on every
+// developer machine, which is a large part of why the mismatch survived this
+// long. Local development uses the mock gateway — selected explicitly by
+// `PAYMENT_GATEWAY=mock`, and refused on a live deployment — so there is one
+// stand-in rather than two, and choosing it is a decision somebody makes rather
+// than a silent fallback.
 
-class NetcashError extends Error {
-  constructor(public readonly statusCode: number, message: string, public readonly errorCode?: string) {
-    super(message)
-    this.name = 'NetcashError'
-  }
-}
+// ─── Mandate operations ───────────────────────────────────────────────────────
+//
+// Each of these is now a real NIWS_NIF SOAP call. What was here before issued
+// JSON POSTs to paths that do not exist (`/mandate/create`, `/debit/once-off`)
+// with the service key in a header rather than as a method parameter — so none
+// of it could ever have worked against the live service.
 
-const NETCASH_TIMEOUT_MS = 30_000
-
-// Dev-only simulator: when no Netcash service key is configured outside of
-// production, return plausible success responses so the mandate/debit flow can
-// be exercised end-to-end locally. This is NEVER reached in production — there,
-// a missing key throws (real DebiCheck registration requires real credentials).
-function simulateNetcash<T>(path: string, body: Record<string, unknown>): T {
-  const ref = `SIM-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
-  const existingId = typeof body.mandateId === 'string' ? body.mandateId : ref
-
-  if (path.includes('/mandate/create')) {
-    // New mandates start PENDING — the group admin still approves them to ACTIVE.
-    return { mandateId: ref, status: 'PENDING' as const } as unknown as T
-  }
-  if (path.includes('/mandate/cancel')) {
-    return { mandateId: existingId, status: 'CANCELLED' as const } as unknown as T
-  }
-  if (path.includes('/mandate/update') || path.includes('/mandate/delay')) {
-    return { mandateId: existingId, status: 'ACTIVE' as const } as unknown as T
-  }
-  if (path.includes('/mandate/status')) {
-    return { mandateId: existingId, status: 'ACTIVE' as const } as unknown as T
-  }
-  if (path.includes('/debit/')) {
-    return { transactionRef: ref, status: 'SUCCESS' as const } as unknown as T
-  }
-  return { status: 'SUCCESS' as const } as unknown as T
-}
-
-async function netcashPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+/** The service key, or a refusal that names what is missing. */
+function requireServiceKey(): string {
   if (!env.NETCASH_SERVICE_KEY) {
-    if (process.env.NODE_ENV !== 'production') return simulateNetcash<T>(path, body)
-    throw new ExternalServiceError('Netcash', 'NETCASH_SERVICE_KEY not configured')
+    throw new ExternalServiceError('Netcash', 'NETCASH_SERVICE_KEY is not configured')
   }
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), NETCASH_TIMEOUT_MS)
-
-  try {
-    const res = await fetch(`${env.NETCASH_API_URL}${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Service-Key': env.NETCASH_SERVICE_KEY,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    })
-
-    const json = (await res.json()) as T & { errorCode?: string; message?: string }
-
-    if (!res.ok || json.errorCode) {
-      throw new NetcashError(
-        res.status,
-        json.message ?? `Netcash HTTP ${res.status}`,
-        json.errorCode,
-      )
-    }
-
-    return json
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new NetcashError(408, 'Netcash request timed out', 'TIMEOUT')
-    }
-    throw err
-  } finally {
-    clearTimeout(timeout)
-  }
+  return env.NETCASH_SERVICE_KEY
 }
 
-// Retry wrapper: retries on network errors and 5xx, not on 4xx (bad request).
-function netcashCall<T>(path: string, body: Record<string, unknown>, label: string): Promise<T> {
-  return withRetry(
-    () => netcashPost<T>(path, body),
-    {
-      maxAttempts: 3,
-      baseDelayMs: 1_000,
-      maxDelayMs: 10_000,
-      label: `Netcash.${label}`,
-      retryIf: (err) => {
-        if (err instanceof NetcashError && err.statusCode >= 400 && err.statusCode < 500) return false
-        return true
-      },
-    },
-  ).catch((err) => {
-    const detail = err instanceof NetcashError ? err.message : undefined
-    throw new ExternalServiceError('Netcash', detail)
+function softwareVendorKey(): string {
+  return process.env.NETCASH_SOFTWARE_VENDOR_KEY || DEFAULT_SOFTWARE_VENDOR_KEY
+}
+
+function mandateTemplateId(): string {
+  const id = process.env.NETCASH_DEBICHECK_TEMPLATE_ID
+  if (!id) {
+    throw new ExternalServiceError(
+      'Netcash',
+      'NETCASH_DEBICHECK_TEMPLATE_ID is not configured — a DebiCheck mandate cannot be authenticated without a template',
+    )
+  }
+  return id
+}
+
+/**
+ * Retry only what is worth retrying.
+ *
+ * A configuration refusal — wrong key, inactive merchant, wrong template — will
+ * fail identically three times and only delays the moment a human finds out.
+ * A timeout or a transport error is worth another attempt.
+ */
+function callWithRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  return withRetry(fn, {
+    maxAttempts: 3,
+    baseDelayMs: 1_000,
+    maxDelayMs: 10_000,
+    label: `Netcash.${label}`,
+    retryIf: (err) =>
+      !(
+        err instanceof NetcashSoapError &&
+        err.httpStatus !== undefined &&
+        err.httpStatus >= 400 &&
+        err.httpStatus < 500
+      ),
+  }).catch((err) => {
+    if (err instanceof NetcashSoapError) throw new ExternalServiceError('Netcash', err.message)
+    throw err
   })
 }
 
-// ─── Mandate operations ───────────────────────────────────────────────────────
+/** CCYYMMDD from a YYYY-MM-DD string. */
+function toNetcashDate(iso: string): string {
+  return iso.slice(0, 10).replace(/-/g, '')
+}
 
 export async function createDebiCheckMandate(
   payload: NetcashCreateMandatePayload,
 ): Promise<NetcashMandateResponse> {
-  return netcashCall('/mandate/create', { serviceKey: env.NETCASH_SERVICE_KEY, ...payload }, 'createMandate')
+  const serviceKey = requireServiceKey()
+
+  const result = await callWithRetry('createMandate', () =>
+    debiCheckAuthenticate({
+      serviceKey,
+      accountReference: payload.referenceNumber,
+      mandateTemplateId: mandateTemplateId(),
+      // A South African ID is 13 digits; anything else is a passport or business
+      // registration number, which is what IsIdNumber = 0 means.
+      isIdNumber: !!payload.idNumber && /^\d{13}$/.test(payload.idNumber),
+      debtorIdentification: payload.idNumber ?? '',
+      accountName: payload.accountName,
+      bankAccountName: payload.accountName,
+      branchCode: payload.branchCode,
+      bankAccountNumber: payload.accountNumber,
+      bankAccountType: payload.accountType,
+      mobileNumber: payload.mobileNumber ?? '',
+      emailAddress: payload.emailAddress ?? '',
+      collectionAmount: payload.amount,
+      firstCollectionDiffers: false,
+      firstCollectionAmount: payload.amount,
+      firstCollectionDate: toNetcashDate(payload.startDate),
+      collectionDayCode: String(payload.debitDay).padStart(2, '0'),
+    }),
+  )
+
+  // The bank answers inside this call. "Accepted" is an authorised mandate;
+  // anything else is a refusal, and recording it as pending would leave a
+  // member waiting on an authorisation that is never coming.
+  const authorised = result.ok && /accepted/i.test(result.status ?? '')
+
+  return {
+    mandateId: result.contractReference ?? '',
+    status: authorised ? 'AUTHORIZED' : 'REJECTED',
+    message: result.message,
+    errorCode: result.code || undefined,
+  }
 }
 
+/** Netcash's cancellation reason for a mandate the payer no longer wants. */
+const CANCEL_REASON_AT_PAYER_REQUEST = '01'
+
 export async function cancelDebiCheckMandate(mandateId: string): Promise<NetcashMandateResponse> {
-  return netcashCall('/mandate/cancel', { serviceKey: env.NETCASH_SERVICE_KEY, mandateId }, 'cancelMandate')
+  const serviceKey = requireServiceKey()
+  const result = await callWithRetry('cancelMandate', () =>
+    debiCheckCancel({
+      serviceKey,
+      contractReference: mandateId,
+      reasonCode: CANCEL_REASON_AT_PAYER_REQUEST,
+    }),
+  )
+
+  return {
+    mandateId,
+    status: result.ok ? 'CANCELLED' : 'ACTIVE',
+    message: result.message,
+    errorCode: result.code || undefined,
+  }
 }
 
 export async function updateDebiCheckMandate(
   mandateId: string,
   changes: { amount?: number; debitDay?: number },
-  effectiveDate: string,
+  _effectiveDate: string,
 ): Promise<NetcashMandateResponse> {
-  return netcashCall(
-    '/mandate/update',
-    {
-      serviceKey: env.NETCASH_SERVICE_KEY,
-      mandateId,
-      ...(changes.amount !== undefined && { amount: changes.amount }),
-      ...(changes.debitDay !== undefined && { debitDay: changes.debitDay }),
-      effectiveDate,
-    },
-    'updateMandate',
+  const serviceKey = requireServiceKey()
+
+  // Only the amount can be amended without re-authenticating the debtor. A
+  // changed collection day is a new mandate as far as the bank is concerned, and
+  // reporting success here would claim something that did not happen.
+  if (changes.amount === undefined) {
+    throw new ExternalServiceError(
+      'Netcash',
+      'Only the collection amount can be amended on an authorised DebiCheck mandate',
+    )
+  }
+
+  const cents = toCents(changes.amount)
+  const result = await callWithRetry('updateMandate', () =>
+    debiCheckAmend({
+      serviceKey,
+      contractReference: mandateId,
+      collectionAmountCents: cents,
+      maximumCollectionAmountCents: cents,
+    }),
+  )
+
+  return {
+    mandateId,
+    status: result.ok ? 'ACTIVE' : 'SUSPENDED',
+    message: result.message,
+    errorCode: result.code || undefined,
+  }
+}
+
+export async function delayMandate(
+  _mandateId: string,
+  _newDate: string,
+): Promise<NetcashMandateResponse> {
+  // DebiCheck has no "move this month's collection" operation. A delay is
+  // expressed by when the collection batch is submitted, not by amending the
+  // mandate — so this says so rather than calling something that would change
+  // the mandate itself and report a success the bank never gave.
+  throw new ExternalServiceError(
+    'Netcash',
+    'DebiCheck mandates cannot be delayed at the gateway — submit the collection batch on the later action date instead',
   )
 }
 
-export async function delayMandate(mandateId: string, newDate: string): Promise<NetcashMandateResponse> {
-  return netcashCall('/mandate/delay', { serviceKey: env.NETCASH_SERVICE_KEY, mandateId, newDate }, 'delayMandate')
+export async function getMandateStatus(mandateId: string): Promise<NetcashStatusResponse> {
+  const serviceKey = requireServiceKey()
+  const result = await callWithRetry('getMandateStatus', () =>
+    debiCheckCurrentStatus({ serviceKey, contractReference: mandateId }),
+  )
+
+  return {
+    mandateId,
+    // Left exactly as the gateway said it. mapNetcashStatus decides what an
+    // unfamiliar value means, and it deliberately answers "I do not know"
+    // rather than guessing a status that would stop a member being collected.
+    status: (result.status ?? 'PENDING') as NetcashMandateStatus,
+  }
 }
 
-export async function getMandateStatus(mandateId: string): Promise<NetcashStatusResponse> {
-  return netcashCall('/mandate/status', { serviceKey: env.NETCASH_SERVICE_KEY, mandateId }, 'getMandateStatus')
+/**
+ * Submit a single collection.
+ *
+ * A DebiCheck collection is a batch upload even for one transaction — there is
+ * no per-transaction endpoint. The response is a **file token**, not a
+ * settlement: the money has not moved and the bank has not answered. PENDING is
+ * the only honest status here; the outcome arrives later through the load report
+ * or the webhook.
+ */
+async function submitDebit(
+  payload: { mandateId: string; amount: number; reference: string; idempotencyKey: string },
+  label: string,
+  actionDate: Date,
+): Promise<NetcashDebitResponse> {
+  const serviceKey = requireServiceKey()
+
+  const { file } = buildDebiCheckBatchFile({
+    serviceKey,
+    batchName: payload.idempotencyKey.slice(0, 30),
+    actionDate,
+    softwareVendorKey: softwareVendorKey(),
+    rows: [
+      {
+        accountReference: payload.reference,
+        mandateReference: payload.mandateId,
+        amountRands: payload.amount,
+      },
+    ],
+  })
+
+  const result = await callWithRetry(label, () => batchFileUpload({ serviceKey, file }))
+
+  if (!result.ok) {
+    return {
+      status: 'FAILED',
+      message: result.message,
+      reason: result.message,
+      errorCode: result.code || undefined,
+    }
+  }
+
+  return {
+    transactionRef: result.fileToken ?? undefined,
+    status: 'PENDING',
+    message: result.message,
+  }
 }
 
 export async function submitOnceOffDebit(payload: {
@@ -209,7 +341,7 @@ export async function submitOnceOffDebit(payload: {
   reference: string
   idempotencyKey: string
 }): Promise<NetcashDebitResponse> {
-  return netcashCall('/debit/once-off', { serviceKey: env.NETCASH_SERVICE_KEY, ...payload }, 'submitOnceOffDebit')
+  return submitDebit(payload, 'submitOnceOffDebit', new Date())
 }
 
 export async function submitScheduledDebit(payload: {
@@ -218,7 +350,30 @@ export async function submitScheduledDebit(payload: {
   reference: string
   idempotencyKey: string
 }): Promise<NetcashDebitResponse> {
-  return netcashCall('/debit/scheduled', { serviceKey: env.NETCASH_SERVICE_KEY, ...payload }, 'submitScheduledDebit')
+  return submitDebit(payload, 'submitScheduledDebit', new Date())
+}
+
+/**
+ * Is the configured service key live and authorised for debit orders?
+ *
+ * Read-only and cheap. Worth calling before a debit run: an expired or
+ * unauthorised key otherwise presents as every member's payment being declined
+ * at the same moment.
+ */
+export async function checkServiceKey(): Promise<{ ok: boolean; message: string }> {
+  const serviceKey = requireServiceKey()
+  const result = await isValidServiceKey({
+    serviceKey,
+    softwareVendorCode: softwareVendorKey(),
+  })
+  return { ok: result.ok, message: result.message }
+}
+
+/** The outcome of a submitted batch. Null while it is still being processed. */
+export async function fetchBatchReport(fileToken: string): Promise<string | null> {
+  const serviceKey = requireServiceKey()
+  const result = await requestFileUploadReport({ serviceKey, fileToken })
+  return result.ready ? result.report : null
 }
 
 // ─── Status mapping ───────────────────────────────────────────────────────────

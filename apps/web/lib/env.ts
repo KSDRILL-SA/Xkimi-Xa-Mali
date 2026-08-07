@@ -76,8 +76,22 @@ export const env = createEnv({
     // money — with nothing in the logs to say so.
     NETCASH_API_URL: configuredWhenLive(
       z.string().url(),
-      'https://ws.netcash.co.za/NSWSSX/NetcashTest.asmx',
+      // The NIWS NIF endpoint, per the live WSDL. The previous default pointed
+      // at NSWSSX/NetcashTest.asmx — a different, older service that does not
+      // expose any DebiCheck method, so every call would have 404'd or been
+      // silently accepted by the wrong contract.
+      'https://ws.netcash.co.za/NIWS/NIWS_NIF.svc',
     ),
+    // Netcash publishes a default software vendor key for integrators without
+    // an Independent Software Vendor agreement, and lib/netcash/batch-file.ts
+    // carries it. Set this only once Netcash issues a vendor-specific GUID —
+    // an ISV agreement is NOT a prerequisite for going live.
+    NETCASH_SOFTWARE_VENDOR_KEY: z.string().min(1).optional(),
+    // The DebiCheck mandate template (e.g. NCDCT000000001), issued by Netcash
+    // with the account. No default is possible: it identifies the collection
+    // terms the debtor's bank shows them, and a wrong one is either rejected
+    // (325, non-real-time template) or authorises the wrong agreement.
+    NETCASH_DEBICHECK_TEMPLATE_ID: requiredWhenLive(z.string().min(1)),
     // Netcash's webhook source IPs. Defaulted in lib/netcash.ts; set this only if
     // Netcash tells you the range has changed. Wrong values reject every callback.
     NETCASH_WEBHOOK_IPS: z.string().min(1).optional(),
@@ -131,6 +145,8 @@ export const env = createEnv({
     NETCASH_SERVICE_KEY: process.env.NETCASH_SERVICE_KEY,
     NETCASH_WEBHOOK_SECRET: process.env.NETCASH_WEBHOOK_SECRET,
     NETCASH_API_URL: process.env.NETCASH_API_URL,
+    NETCASH_SOFTWARE_VENDOR_KEY: process.env.NETCASH_SOFTWARE_VENDOR_KEY,
+    NETCASH_DEBICHECK_TEMPLATE_ID: process.env.NETCASH_DEBICHECK_TEMPLATE_ID,
     NETCASH_WEBHOOK_IPS: process.env.NETCASH_WEBHOOK_IPS,
     BULKSMS_USERNAME: process.env.BULKSMS_USERNAME,
     BULKSMS_PASSWORD: process.env.BULKSMS_PASSWORD,
