@@ -47,6 +47,15 @@ export const NOTIFICATION_TEMPLATES: Array<{
     body: 'Xkimm Xa Mali Foundation: Thank you! Your R{{amount}} toward "{{goal}}" has been received - your badge points just got a boost.',
   },
   {
+    // Sent to the members who pledged toward a Goal that lapsed without
+    // reaching target. Plain hyphen, not an em dash: outside GSM-7 the whole
+    // message is billed as UCS-2 and halves the character budget.
+    slug: 'goal-failed',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimm Xa Mali Foundation: "{{goal}}" did not reach its target by its deadline and has been marked Failed. No funds were released - nothing has left the pool: {{url}}',
+  },
+  {
     slug: 'debit-tomorrow-warning',
     channel: 'SMS',
     subject: null,

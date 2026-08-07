@@ -579,16 +579,38 @@ export async function getGoalProgress(goalId: string, page = 1, limit = 20) {
 
 // ─── Inngest: deadline checker ────────────────────────────────────────────────
 
-export async function markExpiredGoalsFailed(): Promise<number> {
+/** A goal that just lapsed, and the members who had pledged toward it. */
+export type FailedGoal = {
+  id: string
+  title: string
+  pledgerIds: string[]
+}
+
+export async function markExpiredGoalsFailed(): Promise<FailedGoal[]> {
   const now = new Date()
 
-  const result = await goalRepo.updateMany(
-    {
-      status: 'ACTIVE',
-      deadline: { lt: now },
-    },
+  // Read the set before the write. `updateMany` returns nothing but a count,
+  // and once the status has moved the deadline filter no longer matches these
+  // rows — so after the update there is no way back to *which* goals lapsed.
+  // The circle cannot be told about a goal nobody can name.
+  const expiring = (await goalRepo.findMany(
+    { status: 'ACTIVE', deadline: { lt: now } },
+    { select: { id: true, title: true, pledges: { select: { userId: true } } } },
+  )) as unknown as Array<{ id: string; title: string; pledges: { userId: string }[] }>
+
+  if (expiring.length === 0) return []
+
+  await goalRepo.updateMany(
+    { id: { in: expiring.map((g) => g.id) }, status: 'ACTIVE' },
     { status: 'FAILED' },
   )
 
-  return result.count
+  return expiring.map((g) => ({
+    id: g.id,
+    title: g.title,
+    // One member may hold only one pledge per goal (the [goalId, userId]
+    // unique), but de-duplicating costs nothing and a repeated message about
+    // money not being taken would be its own small unkindness.
+    pledgerIds: [...new Set(g.pledges.map((p) => p.userId))],
+  }))
 }
