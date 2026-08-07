@@ -30,6 +30,8 @@ import { db } from '@/lib/db'
 import {
   setPrimaryGoal,
   recordGoalProgress,
+  activateGoal,
+  rejectGoal,
   AdminForbiddenError,
   AdminNotFoundError,
   AdminConflictError,
@@ -177,5 +179,103 @@ describe('recordGoalProgress — primary fund guard', () => {
 
     expect(res.newTotal).toBe(600)
     expect(res.achieved).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Reviewing a member's proposal — the two answers to step 2 of the guide's flow
+// ---------------------------------------------------------------------------
+
+describe('reviewing a proposal', () => {
+  const draft = (over: Record<string, unknown> = {}) => ({
+    id: 'g1',
+    title: 'Catering equipment',
+    status: 'DRAFT',
+    createdById: 'member-1',
+    ...over,
+  })
+
+  const REASON = 'Not affordable alongside the year-end fund'
+
+  it('rejectGoal refuses a non-admin before reading anything', async () => {
+    await expect(rejectGoal('m1', NOT_ADMIN, 'g1', REASON)).rejects.toBeInstanceOf(AdminForbiddenError)
+    expect(db.goal.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('keeps the proposal as REJECTED rather than deleting it', async () => {
+    mock(db.goal.findUnique).mockResolvedValue(draft() as never)
+    mock(db.goal.update).mockResolvedValue({} as never)
+
+    await rejectGoal('admin-1', ADMIN, 'g1', REASON)
+
+    // The founders' decision, on the guide's own principle that nothing is
+    // quietly removed: the member can see it was considered, and read why.
+    expect(db.goal.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'REJECTED',
+          rejectionReason: REASON,
+          reviewedById: 'admin-1',
+        }),
+      }),
+    )
+  })
+
+  it('requires a reason before declining', async () => {
+    mock(db.goal.findUnique).mockResolvedValue(draft() as never)
+
+    await expect(rejectGoal('admin-1', ADMIN, 'g1', '   ')).rejects.toBeInstanceOf(AdminConflictError)
+    await expect(rejectGoal('admin-1', ADMIN, 'g1', 'no')).rejects.toBeInstanceOf(AdminConflictError)
+    expect(db.goal.update).not.toHaveBeenCalled()
+  })
+
+  it('tells the member who proposed it, with the reason', async () => {
+    mock(db.goal.findUnique).mockResolvedValue(draft() as never)
+    mock(db.goal.update).mockResolvedValue({} as never)
+
+    await rejectGoal('admin-1', ADMIN, 'g1', REASON)
+
+    expect(db.inboxMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ userId: 'member-1', category: 'GOAL' }),
+      }),
+    )
+    const body = mock(db.inboxMessage.create).mock.calls[0]![0] as unknown as { data: { body: string } }
+    expect(body.data.body).toContain(REASON)
+  })
+
+  it('tells the member when their proposal is approved', async () => {
+    mock(db.goal.findUnique).mockResolvedValue(draft() as never)
+    mock(db.goal.update).mockResolvedValue({} as never)
+
+    await activateGoal('admin-1', ADMIN, 'g1')
+
+    // A review nobody hears the result of is not a review.
+    expect(db.inboxMessage.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ userId: 'member-1' }),
+      }),
+    )
+    expect(db.goal.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'ACTIVE', reviewedById: 'admin-1' }),
+      }),
+    )
+  })
+
+  it('does not send a leader an inbox message about their own draft', async () => {
+    mock(db.goal.findUnique).mockResolvedValue(draft({ createdById: 'admin-1' }) as never)
+    mock(db.goal.update).mockResolvedValue({} as never)
+
+    await activateGoal('admin-1', ADMIN, 'g1')
+
+    expect(db.inboxMessage.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to decline a goal that is no longer a draft', async () => {
+    mock(db.goal.findUnique).mockResolvedValue(draft({ status: 'ACTIVE' }) as never)
+
+    await expect(rejectGoal('admin-1', ADMIN, 'g1', REASON)).rejects.toBeInstanceOf(AdminConflictError)
+    expect(db.goal.update).not.toHaveBeenCalled()
   })
 })
