@@ -1,0 +1,21 @@
+-- Record why a transaction was reversed, on the reversing entry itself.
+--
+-- The Founder Guide does not merely promise that a mistake gets corrected. It
+-- promises the correction stays legible: "a visible reversing entry, so the full
+-- history stays honest and any of us can retrace exactly what happened, years
+-- later." A REVERSAL row with no stated cause satisfies the mechanics of that
+-- sentence and none of its intent.
+--
+-- The reason lives here rather than only in the audit log because the audit log
+-- is a leadership surface. The member reads /dashboard/transactions, and it is
+-- the member whose money moved back.
+--
+-- Nullable, and additive: every REVERSAL row written before this migration has
+-- no recorded reason and honestly says so. Backfilling a guess would be the
+-- opposite of the promise above.
+--
+-- Deliberately not reusing "failureReason": that column means the gateway
+-- refused something. A reversal is a decision a person made, and collapsing the
+-- two would make "why did this fail" unanswerable for both.
+
+ALTER TABLE "transactions" ADD COLUMN IF NOT EXISTS "reversalReason" TEXT;

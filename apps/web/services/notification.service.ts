@@ -82,6 +82,11 @@ const MANDATORY_SLUGS = new Set([
   'payment-failed-email',
   'overdue-reminder',
   'overdue-reminder-email',
+  // A reversal takes back money the member was already told had arrived. That
+  // is the one message in this list they are most likely to need and least
+  // likely to expect, so it is not opt-out-able either.
+  'contribution-reversed-sms',
+  'contribution-reversed-email',
 ])
 
 // ---------------------------------------------------------------------------

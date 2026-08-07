@@ -9,7 +9,7 @@ import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/li
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { roundZAR, sumZAR, subtractZAR } from '@/lib/money'
 import { inngest, InngestEvents } from '@/lib/inngest'
-import { createInboxMessages } from './inbox.service'
+import { createInboxMessages, notifyAdmins } from './inbox.service'
 import { logger } from '@xxm/observability'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -264,6 +264,79 @@ export async function syncAdditionalGoalProgress(goalId: string): Promise<void> 
   await evictGoalsCache()
 
   if (reachedTarget) await emitGoalAchieved(goalId, g.title)
+}
+
+// ─── Member proposals ─────────────────────────────────────────────────────────
+
+/**
+ * A member proposes a Goal.
+ *
+ * The guide's six-step flow opens with "1 A member proposes it — with a clear
+ * purpose and an amount", then "2 Leadership reviews it". Only leadership could
+ * create a Goal, so the flow began with something a member could not do.
+ *
+ * Almost nothing new was needed. `DRAFT` already means "proposed but not
+ * approved" and `activateGoal` already means "leadership approved"; what was
+ * missing was a door a member could walk through. This is that door, and it is
+ * deliberately the *same* `DRAFT` state the admin path creates — one review
+ * queue, not two.
+ *
+ * `createGoal` is left exactly as it was. It is the leadership path and still
+ * asserts admin.
+ *
+ * A proposal is told apart from a leadership draft by the roles of
+ * `createdById`, not by a separate column — the existing relation already
+ * carries who, which is what leadership needs to see.
+ */
+export async function proposeGoal(
+  input: CreateGoalInput,
+  userId: string,
+  ip: string,
+) {
+  const goal = await goalRepo.create({
+    title: input.title,
+    description: input.description ?? null,
+    type: input.type,
+    targetAmount: input.targetAmount,
+    currentAmount: 0,
+    deadline: new Date(input.deadline),
+    status: 'DRAFT',
+    createdById: userId,
+  })
+
+  await writeAuditLog({
+    userId,
+    action: 'GOAL_PROPOSED',
+    entity: 'Goal',
+    entityId: goal.id,
+    payload: { title: input.title, targetAmount: input.targetAmount, type: input.type },
+    ipAddress: ip,
+  })
+
+  // Leadership has to know there is something to review, or step 2 never
+  // happens and the member is left waiting on a queue nobody is watching.
+  // Best-effort: a proposal that was recorded must not be lost because an
+  // inbox write failed.
+  await notifyAdmins({
+    title: 'A member has proposed a Goal',
+    body:
+      `A new Goal has been proposed for review: "${input.title}", ` +
+      `target ${formatProposalAmount(input.targetAmount)}. ` +
+      `Open Goals in the console to approve or decline it.`,
+    category: 'GOAL',
+  }).catch((err) => logger.error('Failed to notify leadership of a goal proposal', {
+    goalId: goal.id,
+    error: err instanceof Error ? err.message : String(err),
+  }))
+
+  await evictGoalsCache()
+
+  return serializeGoal(goal as GoalRow)
+}
+
+/** Rands, plainly, for a message body. */
+function formatProposalAmount(amount: number): string {
+  return `R${amount.toLocaleString('en-ZA')}`
 }
 
 // ─── Admin mutations ──────────────────────────────────────────────────────────
@@ -588,16 +661,38 @@ export async function getGoalProgress(goalId: string, page = 1, limit = 20) {
 
 // ─── Inngest: deadline checker ────────────────────────────────────────────────
 
-export async function markExpiredGoalsFailed(): Promise<number> {
+/** A goal that just lapsed, and the members who had pledged toward it. */
+export type FailedGoal = {
+  id: string
+  title: string
+  pledgerIds: string[]
+}
+
+export async function markExpiredGoalsFailed(): Promise<FailedGoal[]> {
   const now = new Date()
 
-  const result = await goalRepo.updateMany(
-    {
-      status: 'ACTIVE',
-      deadline: { lt: now },
-    },
+  // Read the set before the write. `updateMany` returns nothing but a count,
+  // and once the status has moved the deadline filter no longer matches these
+  // rows — so after the update there is no way back to *which* goals lapsed.
+  // The circle cannot be told about a goal nobody can name.
+  const expiring = (await goalRepo.findMany(
+    { status: 'ACTIVE', deadline: { lt: now } },
+    { select: { id: true, title: true, pledges: { select: { userId: true } } } },
+  )) as unknown as Array<{ id: string; title: string; pledges: { userId: string }[] }>
+
+  if (expiring.length === 0) return []
+
+  await goalRepo.updateMany(
+    { id: { in: expiring.map((g) => g.id) }, status: 'ACTIVE' },
     { status: 'FAILED' },
   )
 
-  return result.count
+  return expiring.map((g) => ({
+    id: g.id,
+    title: g.title,
+    // One member may hold only one pledge per goal (the [goalId, userId]
+    // unique), but de-duplicating costs nothing and a repeated message about
+    // money not being taken would be its own small unkindness.
+    pledgerIds: [...new Set(g.pledges.map((p) => p.userId))],
+  }))
 }

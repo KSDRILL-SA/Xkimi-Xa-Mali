@@ -11,7 +11,21 @@ export async function listAllGoals(adminRoles: string[], page = 1, limit = 20) {
   const [items, total] = await Promise.all([
     db.goal.findMany({
       skip, take: limit, orderBy: { createdAt: 'desc' },
-      select: { id: true, title: true, type: true, status: true, targetAmount: true, currentAmount: true, deadline: true, lockedAt: true, isPrimary: true, createdAt: true },
+      select: {
+        id: true, title: true, type: true, status: true, targetAmount: true,
+        currentAmount: true, deadline: true, lockedAt: true, isPrimary: true,
+        createdAt: true, rejectionReason: true,
+        // Who raised it. A draft from a member is a proposal awaiting review; a
+        // draft from a leader is leadership's own note. Leadership has to be
+        // able to tell them apart before deciding, so the creator's roles come
+        // back with the row rather than being inferred from the status.
+        creator: {
+          select: {
+            firstName: true, lastName: true,
+            roles: { select: { role: { select: { name: true } } } },
+          },
+        },
+      },
     }),
     db.goal.count(),
   ])
@@ -90,9 +104,94 @@ export async function activateGoal(adminId: string, adminRoles: string[], goalId
   const goal = await db.goal.findUnique({ where: { id: goalId } })
   if (!goal) throw new AdminNotFoundError('Goal not found')
   if (goal.status !== 'DRAFT') throw new AdminConflictError('Only DRAFT goals can be activated')
-  const updated = await db.goal.update({ where: { id: goalId }, data: { status: 'ACTIVE' } })
+  const updated = await db.goal.update({
+    where: { id: goalId },
+    data: { status: 'ACTIVE', reviewedById: adminId, reviewedAt: new Date() },
+  })
   await writeAuditLog({ userId: adminId, action: 'GOAL_ACTIVATED', entity: 'Goal', entityId: goalId, payload: { title: goal.title } })
+
+  // Step 2 of the guide's flow is "leadership reviews it". A review nobody
+  // hears the result of is not a review. Only the proposer is told here — the
+  // whole circle already learns of an activated goal through its own channel.
+  await notifyProposer(goal.createdById, adminId, {
+    title: `Your Goal "${goal.title}" has been approved`,
+    body: `Leadership has reviewed and approved "${goal.title}". It is now active and open to the circle.`,
+  })
+
   return updated
+}
+
+/**
+ * Leadership refuses a proposal.
+ *
+ * The proposal is kept, not deleted — a fifth `GoalStatus`, decided by the
+ * founders on the guide's own principle that nothing is quietly removed. The
+ * member who proposed it can see it was considered and answered, and read why.
+ *
+ * A reason is required for the same reason a reversal needs one: an answer with
+ * no cause tells the member nothing and leaves nothing to retrace.
+ */
+export async function rejectGoal(
+  adminId: string, adminRoles: string[],
+  goalId: string, reason: string, ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const trimmed = reason?.trim() ?? ''
+  if (trimmed.length < 10) {
+    throw new AdminConflictError('A reason of at least 10 characters is required to decline a proposal')
+  }
+
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'DRAFT') throw new AdminConflictError('Only DRAFT goals can be declined')
+
+  const updated = await db.goal.update({
+    where: { id: goalId },
+    data: {
+      status: 'REJECTED',
+      rejectionReason: trimmed,
+      reviewedById: adminId,
+      reviewedAt: new Date(),
+    },
+  })
+
+  await writeAuditLog({
+    userId: adminId, action: 'GOAL_REJECTED', entity: 'Goal', entityId: goalId,
+    payload: { title: goal.title, reason: trimmed }, ipAddress: ip,
+  })
+
+  await notifyProposer(goal.createdById, adminId, {
+    title: `Your Goal "${goal.title}" was not taken forward`,
+    body:
+      `Leadership has reviewed "${goal.title}" and decided not to take it forward. ` +
+      `Reason given: ${trimmed} — the proposal stays on the record, and you are welcome ` +
+      `to raise it with any leader.`,
+  })
+
+  return updated
+}
+
+/**
+ * Tell whoever proposed a goal what leadership decided.
+ *
+ * Silent when leadership raised the goal themselves — an admin does not need an
+ * inbox message about their own decision — and best-effort, because a review
+ * that has already been recorded must not fail on a notification.
+ */
+async function notifyProposer(
+  createdById: string | null,
+  adminId: string,
+  msg: { title: string; body: string },
+) {
+  if (!createdById || createdById === adminId) return
+  await notifyInbox({
+    userId: createdById,
+    title: msg.title,
+    body: msg.body,
+    category: 'GOAL',
+    createdById: adminId,
+  })
 }
 
 /**

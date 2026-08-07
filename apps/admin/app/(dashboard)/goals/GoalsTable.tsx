@@ -3,13 +3,15 @@
 import Link from 'next/link'
 import type { Route } from 'next'
 import { ProgressBar } from '@xxm/ui'
-import { Target, Trophy, Calendar, CalendarRange, Sparkles, Lock, Check, Trash2, Plus, Star, ArrowRight, type LucideIcon } from 'lucide-react'
+import { Target, Trophy, Calendar, CalendarRange, Sparkles, Lock, Check, X, Trash2, Plus, Star, ArrowRight, UserPlus, type LucideIcon } from 'lucide-react'
 import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 
 export type GoalRow = {
   id: string; title: string; type: string; status: string; statusClass: string
   target: string; current: string; progress: number; deadline: string; locked: boolean
   isPrimary: boolean
+  /** Who proposed it, when that was a member rather than leadership. */
+  proposedBy: string | null
 }
 
 type GoalAction = (formData: FormData) => Promise<void>
@@ -23,10 +25,11 @@ const TYPE_META: Record<string, { label: string; icon: LucideIcon; chip: string;
 const GRID = 'grid grid-cols-[2fr_96px_96px_150px_120px_110px_190px] gap-3'
 
 export function GoalsTable({
-  rows, activateAction, deleteAction, lockAction, progressAction, primaryAction,
+  rows, activateAction, rejectAction, deleteAction, lockAction, progressAction, primaryAction,
 }: {
   rows: GoalRow[]
   activateAction: GoalAction
+  rejectAction: GoalAction
   deleteAction: GoalAction
   lockAction: GoalAction
   progressAction: GoalAction
@@ -84,6 +87,14 @@ export function GoalsTable({
                             <Star size={9} aria-hidden /> Primary fund
                           </span>
                         )}
+                        {/* Leadership needs to know a draft came from a member
+                            before deciding on it — that is the difference
+                            between a review and an edit of their own note. */}
+                        {r.proposedBy && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-sky-50 text-sky-700" title={`Proposed by ${r.proposedBy}`}>
+                            <UserPlus size={9} aria-hidden /> {r.proposedBy}
+                          </span>
+                        )}
                       </span>
                     </div>
                     {r.locked && (
@@ -121,6 +132,44 @@ export function GoalsTable({
                             <Check size={11} aria-hidden /> Activate
                           </button>
                         </form>
+
+                        {/* Step 2 of the guide's flow is a review, and a review
+                            has two answers. Declining keeps the proposal on the
+                            record with the reason attached — the member sees it
+                            was considered, not that it vanished. */}
+                        <details className="relative">
+                          <summary className="list-none [&::-webkit-details-marker]:hidden cursor-pointer inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-xxm-gray-100 text-xxm-gray-600 text-xs font-semibold hover:bg-xxm-gray-200 transition-colors">
+                            <X size={11} aria-hidden /> Decline
+                          </summary>
+                          <form
+                            action={rejectAction}
+                            className="absolute right-0 z-10 mt-1 w-72 rounded-2xl border border-xxm-gray-200 bg-white shadow-xxm p-3 space-y-2"
+                          >
+                            <input type="hidden" name="goalId" value={r.id} />
+                            <label className="block">
+                              <span className="block text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest mb-1">
+                                Reason (required)
+                              </span>
+                              <textarea
+                                name="reason"
+                                required
+                                minLength={10}
+                                maxLength={500}
+                                rows={3}
+                                placeholder="Why is this not being taken forward?"
+                                className="w-full px-2.5 py-1.5 rounded-xl border border-xxm-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                              />
+                            </label>
+                            <ConfirmSubmitButton
+                              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-xxm-gray-700 text-white text-xs font-bold hover:bg-xxm-gray-800 transition-colors"
+                              title="Decline this proposal?"
+                              message={`"${r.title}" will be marked Declined and the member who proposed it will be told, with your reason. Nothing is deleted.`}
+                              confirmLabel="Decline it"
+                            >
+                              <X size={11} aria-hidden /> Decline proposal
+                            </ConfirmSubmitButton>
+                          </form>
+                        </details>
                         {!r.locked && (
                           <form action={deleteAction}>
                             <input type="hidden" name="goalId" value={r.id} />

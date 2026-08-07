@@ -58,6 +58,7 @@ vi.mock('@/lib/inngest', () => ({
 
 vi.mock('@/services/inbox.service', () => ({
   createInboxMessages: vi.fn().mockResolvedValue(0),
+  notifyAdmins: vi.fn().mockResolvedValue(0),
 }))
 
 vi.mock('@xxm/observability', () => ({
@@ -73,6 +74,7 @@ import { writeAuditLog } from '@/services/audit.service'
 import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/errors'
 import {
   createGoal,
+  proposeGoal,
   updateGoal,
   deleteGoal,
   activateGoal,
@@ -84,10 +86,11 @@ import {
   syncAdditionalGoalProgress,
   celebrateGoalAchieved,
 } from '@/services/goal.service'
-import { createInboxMessages } from '@/services/inbox.service'
+import { createInboxMessages, notifyAdmins } from '@/services/inbox.service'
 
 const GoalForbiddenError = ForbiddenError
 const mockWriteAuditLog = writeAuditLog as ReturnType<typeof vi.fn>
+const mockFn = <T extends (...a: never[]) => unknown>(fn: unknown) => fn as MockedFunction<T>
 
 // Every goal write is admin-only; callers pass the requester's roles so the
 // service self-enforces authorization (defence-in-depth behind the route guard).
@@ -156,6 +159,88 @@ describe('createGoal', () => {
     expect(mockWriteAuditLog).toHaveBeenCalledOnce()
     expect(result.status).toBe('DRAFT')
     expect(result.progressPct).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// proposeGoal — step 1 of the guide's six-step flow
+// ---------------------------------------------------------------------------
+
+describe('proposeGoal', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  const INPUT = {
+    title: 'Equipment for a family catering business',
+    type: 'CUSTOM' as const,
+    targetAmount: 15000,
+    deadline: '2026-12-01',
+  }
+
+  it('lets a member with no admin role create a DRAFT proposal', async () => {
+    ;(db.goal.create as MockedFunction<typeof db.goal.create>).mockResolvedValue(DRAFT_GOAL as never)
+
+    // The whole point of the gap: the six-step flow opened with something only
+    // leadership could do. No roles argument is taken here at all.
+    const result = await proposeGoal(INPUT, 'member-1', '127.0.0.1')
+
+    expect(db.goal.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: 'DRAFT',
+          createdById: 'member-1',
+          currentAmount: 0,
+        }),
+      }),
+    )
+    expect(result.status).toBe('DRAFT')
+  })
+
+  it('lands in the same DRAFT queue leadership already reviews', async () => {
+    ;(db.goal.create as MockedFunction<typeof db.goal.create>).mockResolvedValue(DRAFT_GOAL as never)
+
+    await proposeGoal(INPUT, 'member-1', '127.0.0.1')
+
+    // Not a new state and not a parallel queue — activateGoal already means
+    // "leadership approved", so a proposal has to arrive where that looks.
+    const created = (db.goal.create as MockedFunction<typeof db.goal.create>).mock.calls[0]![0] as { data: { status: string } }
+    expect(created.data.status).toBe('DRAFT')
+  })
+
+  it('tells leadership there is something to review', async () => {
+    ;(db.goal.create as MockedFunction<typeof db.goal.create>).mockResolvedValue(DRAFT_GOAL as never)
+
+    await proposeGoal(INPUT, 'member-1', '127.0.0.1')
+
+    // Without this, step 2 never happens: the proposal sits in a queue nobody
+    // is watching and the member waits on an answer that is not coming.
+    expect(mockFn(notifyAdmins)).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'GOAL' }),
+    )
+    const body = mockFn(notifyAdmins).mock.calls[0]![0] as { body: string }
+    expect(body.body).toContain(INPUT.title)
+  })
+
+  it('records the proposal in the audit log against the member', async () => {
+    ;(db.goal.create as MockedFunction<typeof db.goal.create>).mockResolvedValue(DRAFT_GOAL as never)
+
+    await proposeGoal(INPUT, 'member-1', '127.0.0.1')
+
+    expect(mockWriteAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'member-1',
+        action: 'GOAL_PROPOSED',
+        entity: 'Goal',
+      }),
+    )
+  })
+
+  it('still records the proposal when leadership cannot be notified', async () => {
+    ;(db.goal.create as MockedFunction<typeof db.goal.create>).mockResolvedValue(DRAFT_GOAL as never)
+    mockFn(notifyAdmins).mockRejectedValue(new Error('inbox down'))
+
+    // A proposal that was written must not be lost to a notification failure.
+    await expect(proposeGoal(INPUT, 'member-1', '127.0.0.1')).resolves.toBeDefined()
+    expect(db.goal.create).toHaveBeenCalled()
   })
 })
 
@@ -371,24 +456,55 @@ describe('goal writes reject non-admin callers at the service layer', () => {
 describe('markExpiredGoalsFailed', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  const EXPIRED = [
+    { id: 'g1', title: 'Catering equipment', pledges: [{ userId: 'u1' }, { userId: 'u2' }] },
+    { id: 'g2', title: 'Second goal',        pledges: [] },
+  ]
+
   it('bulk-updates ACTIVE goals past deadline to FAILED', async () => {
-    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 3 } as never)
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue(EXPIRED as never)
+    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 2 } as never)
 
-    const count = await markExpiredGoalsFailed()
+    const failed = await markExpiredGoalsFailed()
 
-    expect(count).toBe(3)
+    expect(failed).toHaveLength(2)
     expect(db.goal.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ status: 'ACTIVE' }),
+        where: expect.objectContaining({ status: 'ACTIVE', id: { in: ['g1', 'g2'] } }),
         data: { status: 'FAILED' },
       }),
     )
   })
 
-  it('returns 0 when no goals are expired', async () => {
-    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 0 } as never)
-    const count = await markExpiredGoalsFailed()
-    expect(count).toBe(0)
+  it('names the goals that lapsed and who had pledged to them', async () => {
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue(EXPIRED as never)
+    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 2 } as never)
+
+    const failed = await markExpiredGoalsFailed()
+
+    // The set is read BEFORE the write. `updateMany` returns only a count, and
+    // once the status has moved the deadline filter no longer matches these
+    // rows — so afterwards there is no way back to which goals lapsed, and the
+    // circle cannot be told about a goal nobody can name.
+    expect(failed[0]).toEqual({
+      id: 'g1',
+      title: 'Catering equipment',
+      pledgerIds: ['u1', 'u2'],
+    })
+    expect(failed[1]!.pledgerIds).toEqual([])
+
+    const readOrder = (db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mock.invocationCallOrder[0]!
+    const writeOrder = (db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mock.invocationCallOrder[0]!
+    expect(readOrder).toBeLessThan(writeOrder)
+  })
+
+  it('returns an empty list and writes nothing when no goals are expired', async () => {
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue([] as never)
+
+    const failed = await markExpiredGoalsFailed()
+
+    expect(failed).toEqual([])
+    expect(db.goal.updateMany).not.toHaveBeenCalled()
   })
 })
 
