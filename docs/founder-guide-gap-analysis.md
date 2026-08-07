@@ -279,7 +279,39 @@ come from leadership, so build the read-only view unless told otherwise.
 
 ---
 
-### GAP-8 — No way for a member to leave (LOW, but it is a stated right)
+### GAP-8 — No way for a member to leave (LOW, but it is a stated right) — ✅ CLOSED 2026-08-07
+
+**Founders' decision, taken 2026-08-07: leaving is IMMEDIATE.** The guide says
+"at any time" twice, and a leaving that waits on a leader reading their inbox
+would make that untrue — worse, a debit the member asked to stop could still run
+before anyone got to it.
+
+`RESIGNED` is a fourth `UserStatus` (migration `20260807170000`, additive), and
+the choice of a new status rather than an existing one is the substance here:
+
+- **Not a deletion.** The guide is explicit that history stays and money already
+  contributed is not refunded. Nothing in this path removes a row, and a test
+  asserts the update never touches `deletedAt`.
+- **Not `SUSPENDED`.** Suspension is something leadership does *to* a member and
+  blocks sign-in. Someone who chose to leave has not been punished, and locking
+  them out of their own statements would be the opposite of "with your history
+  intact". They can still sign in and read their record.
+
+Future collections stop because every debit path already filters on `ACTIVE` —
+the existing mechanism, not a new one. Mandates are cancelled through the same
+`cancelMandate` the member could have called themselves, so there is one
+implementation of "stop collecting". A gateway outage does not hold them in.
+
+`bumpRoleVersion` ends the live session, so a token issued while they were still
+active is re-established rather than running on.
+
+**One thing worth confirming with the founders:** a resigned member retains
+sign-in so their history stays reachable *to them*. That reading of "with your
+history intact" is stated in the code, but it is an interpretation.
+
+<details>
+<summary>Original GAP-8 text</summary>
+
 
 **The guide**, under Your Rights:
 
@@ -302,6 +334,8 @@ stays and contributions already made are not refunded.
 
 Decide with the founders whether leaving is immediate or requires leadership
 acknowledgement. The guide says "at any time", which reads as immediate.
+
+</details>
 
 ---
 

@@ -12,6 +12,7 @@ import { ProfileForm } from '@/components/member/ProfileForm'
 import { BankAccountsSection } from '@/components/member/BankAccountsSection'
 import { NotificationPreferencesForm } from '@/components/member/NotificationPreferencesForm'
 import { ChangePasswordForm } from '@/components/member/ChangePasswordForm'
+import { LeaveFoundation } from '@/components/profile/LeaveFoundation'
 import { DataPrivacySection } from '@/components/member/DataPrivacySection'
 import { BudgetSettingsSection } from '@/components/member/BudgetSettingsSection'
 import { Reveal } from '@xxm/ui'
@@ -133,8 +134,12 @@ export default async function ProfilePage() {
               id: 'privacy',
               label: 'Data & Privacy',
               content: (
-                <div className="p-5 md:p-6">
+                <div className="p-5 md:p-6 space-y-6">
                   <DataPrivacySection userId={userId} />
+                  {/* Under Your Rights: "Leave the Foundation at any time, with
+                      your history intact." Sits beside the other data rights
+                      because that is what it is — a right, not a setting. */}
+                  <LeaveFoundation />
                 </div>
               ),
             },
