@@ -1,9 +1,20 @@
 # Deployment & Launch Runbook — Xkimm Xa Mali Foundation
 
-A practical go-live guide for the three apps. The **code is production-build
-verified** (web 75/75, admin 19/19, website 8/8 static pages compile). What's
-left is **config, infra, and external integrations** — work through this in
-order.
+A practical go-live guide for the three apps. What's left is **config, infra, and
+external integrations** — work through this in order.
+
+> [!WARNING]
+> **The build is currently broken and this runbook cannot be followed end to end.**
+> `npm run build` fails on `@xxm/admin`: `apps/admin/app/globals.css:5` places an
+> `@import` after the `@tailwind` directives, which Next 16's Turbopack CSS parser
+> rejects. `@xxm/web` and `@xxm/website` build. CI (`.github/workflows/ci.yml`)
+> passes install, seed, typecheck, lint and test, then fails at the build step.
+>
+> This page previously claimed the code was "production-build verified (web 75/75,
+> admin 19/19, website 8/8)". That was true under Next 15 and stopped being true
+> when the apps moved to Next 16. **Restore the claim only after `npm run build`
+> exits 0 for all three apps** — see finding H-3 in
+> [`CLAUDE_WORKFLOW.md`](./CLAUDE_WORKFLOW.md) §4.
 
 > **Coming back to this project?** Start with
 > [`docs/completion-guide.md`](./docs/completion-guide.md) — where the system
