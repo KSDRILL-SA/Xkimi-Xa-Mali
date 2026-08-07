@@ -213,7 +213,27 @@ only because it is new; a *changed* body would not.
 
 ---
 
-### GAP-5 — "A statement is ready" reaches only the in-app inbox (MEDIUM)
+### GAP-5 — "A statement is ready" reaches only the in-app inbox (MEDIUM) — ✅ CLOSED 2026-08-07
+
+Closed as described below, with one correction.
+
+**There was no `monthly-statement` template to confirm.** The plan below says
+one "exists in the seed"; it does not, and never did — the notice had never gone
+through `queueNotification`, so nothing had ever needed one. A
+`statement-ready-sms` / `-email` pair was written, seeded, and inserted for
+existing databases by migration `20260807140000`.
+
+Neither is in `MANDATORY_SLUGS`, and that is the point of the gap: the guide's
+promise here is *"you choose which channels you want"*, so overriding a member's
+choice would close it in the wrong direction. The in-app message is still
+written unconditionally — that is the channel nobody opts out of.
+
+The job was given the `execute*(step)` seam and a memoising stub. Queue writes
+are batched, with the counter outside the step.
+
+<details>
+<summary>Original GAP-5 text</summary>
+
 
 **The guide** lists statement-ready among the things you are told, and offers
 four channels for all of them:
@@ -229,6 +249,8 @@ member who chose SMS or email is not told their statement is ready.
 **How to close it.** Replace the direct inbox write with `queueNotification` per
 member, respecting their channel preferences. A `monthly-statement` template
 exists in the seed — confirm the slug before wiring it.
+
+</details>
 
 ---
 
