@@ -28,6 +28,9 @@ const BASE_ENV = {
   BLOB_READ_WRITE_TOKEN: 'blob-token',
   ADMIN_API_SECRET: 'b'.repeat(32),
   NETCASH_API_URL: 'https://netcash.example.invalid',
+  // A live DebiCheck deploy needs the mandate template as much as it needs
+  // the service key — a wrong or absent one is rejected with code 325.
+  NETCASH_DEBICHECK_TEMPLATE_ID: 'NCDCT000000001',
   ADMIN_WHATSAPP_NUMBER: '27000000000',
   SUPPORT_EMAIL: 'support@example.invalid',
   NEXT_PUBLIC_ADMIN_URL: 'https://admin.example.invalid',
@@ -47,6 +50,7 @@ const CONTROLLED = [
   ...Object.keys(BASE_ENV),
   'NETCASH_SERVICE_KEY',
   'NETCASH_WEBHOOK_SECRET',
+  'NETCASH_DEBICHECK_TEMPLATE_ID',
   'NEXTAUTH_SECRET',
   'PAYMENT_GATEWAY',
   'DEPLOY_ENV',
