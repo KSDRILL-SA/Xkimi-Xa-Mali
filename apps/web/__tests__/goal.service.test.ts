@@ -456,24 +456,55 @@ describe('goal writes reject non-admin callers at the service layer', () => {
 describe('markExpiredGoalsFailed', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  const EXPIRED = [
+    { id: 'g1', title: 'Catering equipment', pledges: [{ userId: 'u1' }, { userId: 'u2' }] },
+    { id: 'g2', title: 'Second goal',        pledges: [] },
+  ]
+
   it('bulk-updates ACTIVE goals past deadline to FAILED', async () => {
-    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 3 } as never)
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue(EXPIRED as never)
+    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 2 } as never)
 
-    const count = await markExpiredGoalsFailed()
+    const failed = await markExpiredGoalsFailed()
 
-    expect(count).toBe(3)
+    expect(failed).toHaveLength(2)
     expect(db.goal.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ status: 'ACTIVE' }),
+        where: expect.objectContaining({ status: 'ACTIVE', id: { in: ['g1', 'g2'] } }),
         data: { status: 'FAILED' },
       }),
     )
   })
 
-  it('returns 0 when no goals are expired', async () => {
-    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 0 } as never)
-    const count = await markExpiredGoalsFailed()
-    expect(count).toBe(0)
+  it('names the goals that lapsed and who had pledged to them', async () => {
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue(EXPIRED as never)
+    ;(db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mockResolvedValue({ count: 2 } as never)
+
+    const failed = await markExpiredGoalsFailed()
+
+    // The set is read BEFORE the write. `updateMany` returns only a count, and
+    // once the status has moved the deadline filter no longer matches these
+    // rows — so afterwards there is no way back to which goals lapsed, and the
+    // circle cannot be told about a goal nobody can name.
+    expect(failed[0]).toEqual({
+      id: 'g1',
+      title: 'Catering equipment',
+      pledgerIds: ['u1', 'u2'],
+    })
+    expect(failed[1]!.pledgerIds).toEqual([])
+
+    const readOrder = (db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mock.invocationCallOrder[0]!
+    const writeOrder = (db.goal.updateMany as MockedFunction<typeof db.goal.updateMany>).mock.invocationCallOrder[0]!
+    expect(readOrder).toBeLessThan(writeOrder)
+  })
+
+  it('returns an empty list and writes nothing when no goals are expired', async () => {
+    ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue([] as never)
+
+    const failed = await markExpiredGoalsFailed()
+
+    expect(failed).toEqual([])
+    expect(db.goal.updateMany).not.toHaveBeenCalled()
   })
 })
 

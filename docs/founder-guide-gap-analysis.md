@@ -63,7 +63,78 @@ tested.
 
 ## 2. The gaps, in priority order
 
-### GAP-1 — Reversing a mistaken transaction (CRITICAL)
+### GAP-1 — Reversing a mistaken transaction (CRITICAL) — ✅ CLOSED 2026-08-07
+
+> **This entry was substantially wrong when written, and is corrected below.**
+> It claimed there was "no admin service function, no API route and no UI",
+> "confirmed by searching the whole tree for `revers`". The search missed the
+> code. `createReversal` existed and was tested; so did the route. Recorded
+> rather than quietly rewritten, because the failure mode — grepping, finding
+> only labels, and concluding the feature was absent — is the same one §4.5 of
+> the manual warns about: **the claim was made from a search, not from the
+> thing itself.** What follows the correction is what was actually built.
+
+**What was already there** (contrary to the original text below):
+
+| Claimed missing | Reality |
+|---|---|
+| Service function | `apps/web/services/contribution.service.ts` — `createReversal`, complete |
+| API route | `apps/web/app/api/v1/admin/transactions/[id]/reverse/route.ts` |
+| Tests | `apps/web/__tests__/contribution.service.test.ts` — 5 cases |
+| Schema link | `reversalOfId` + a partial unique double-reversal guard, migration `20260530100000` |
+| UI | Genuinely absent |
+
+**The real defect: the route was unreachable — dead code.** It called `auth()`
+and required a session cookie. The admin console never holds one; it reaches the
+member app server-to-server through `internalAdminPost` with the shared secret,
+so every reversal it could have issued returned **401**. The member app has no
+admin UI to issue one from. A capability the guide puts in a table with a "Yes"
+against leadership could not be performed by anyone, and the route had no test
+that would have noticed — the §4.6 pattern exactly. Demonstrated failing
+(`expected 401 to be 201`) before the fix.
+
+**One instruction in the original text was actively wrong** and was not
+followed: it said to insert the reversal "with the negated amount". This
+repository deliberately stores it **positive** and excludes `type: REVERSAL`
+from every inflow sum (`transaction.repository.ts`, with a parity test holding
+the Prisma filter and the raw-SQL fragment to the same rule). Negating would
+have contradicted a tested invariant.
+
+**What was built:**
+
+1. The route now accepts the trusted internal call via `isValidInternalRequest`,
+   the pattern `broadcast/route.ts` already established, and takes the acting
+   admin from `getInternalAdminUserId` so the audit entry names a person rather
+   than `system`.
+2. **A reason is mandatory** — validated at the route (Zod, ≥10 chars) and again
+   in the service, so a second caller cannot record an unexplained reversal.
+   Stored on the reversing entry as `Transaction.reversalReason` (additive
+   migration `20260807120000`) and shown to the member on
+   `/dashboard/transactions`. The audit log is a leadership surface; the member
+   is the one whose money moved.
+3. **The member is now told** — `contribution-reversed-sms` / `-email`, both
+   registered in `MANDATORY_SLUGS` so they reach a member who has notifications
+   switched off. Seeded, and inserted for existing databases by migration
+   `20260807120001` (§4.8: a *new* slug travels, a changed body does not).
+   Previously a reversal moved a member's money back in silence.
+4. **UI** — each contribution row on the admin contributions screen expands to
+   its transactions; a settled, not-yet-reversed one offers a required reason
+   and a `ConfirmSubmitButton`. The server action goes through `requireAdmin`,
+   so the role-version staleness check runs and a demoted admin cannot move
+   money with a stale token.
+5. The reversal logic stays in **one place**. The console calls across rather
+   than reimplementing — three copies of a status mapping is how the same defect
+   shipped three times here.
+
+Logic decisions taken by the owner before the work started: single copy in the
+member app; additive column for the reason; expandable row rather than a new
+transactions screen.
+
+---
+
+<details>
+<summary>Original GAP-1 text, kept for the record</summary>
+
 
 **The guide promises it three times.** In the capability table:
 
@@ -115,6 +186,8 @@ UI** that performs a reversal. Confirmed by searching the whole tree for
 the negated amount; the contribution status is recalculated; the ledger balance
 returns to its pre-transaction value; a non-admin is refused; a stale admin
 session is refused; an already-REVERSED transaction cannot be reversed twice.
+
+</details>
 
 ---
 
@@ -218,7 +291,35 @@ proof, receipt or photograph. There is no upload, no display, no admin action.
 
 ---
 
-### GAP-4 — Nobody is told when a Goal fails (MEDIUM)
+### GAP-4 — Nobody is told when a Goal fails (MEDIUM) — ✅ CLOSED 2026-08-07
+
+Closed as described below, with one change the plan did not anticipate.
+
+**`markExpiredGoalsFailed` could not tell you what it had failed.** It was a
+single `updateMany` returning a count, and once the status has moved the
+deadline filter no longer matches those rows — so after the write there is no
+way back to *which* goals lapsed. The circle cannot be told about a goal nobody
+can name. It now reads the set first and returns the goals with their pledgers.
+
+The job was given the `execute*(step)` seam and is driven by a **memoising**
+stub (§4.6): an always-executing runner would pass these tests with a
+counter-inside-`step.run` bug still in place. `membersNotified` accumulates
+outside the step, and a test re-enters the function to prove it still reports
+correctly when every step is already recorded.
+
+Pledgers are told in-app *and* by SMS. The `goal-failed` slug is deliberately
+**not** in `MANDATORY_SLUGS` — this is news about a goal, not money leaving a
+member's own balance, so someone who has switched SMS off is entitled not to get
+it; the in-app message reaches them regardless. Seeded, and inserted for
+existing databases by migration `20260807130000`.
+
+The message says plainly that no funds were released, and a test holds it to
+that: a member watching a goal they backed fail should not be left wondering
+where their money went.
+
+<details>
+<summary>Original GAP-4 text</summary>
+
 
 **The guide:**
 
@@ -239,9 +340,31 @@ the members who pledged to it (and optionally the whole circle). Seed a
 `ENGINEERING_WORKFLOW.md` first** — a new template reaches an existing database
 only because it is new; a *changed* body would not.
 
+</details>
+
 ---
 
-### GAP-5 — "A statement is ready" reaches only the in-app inbox (MEDIUM)
+### GAP-5 — "A statement is ready" reaches only the in-app inbox (MEDIUM) — ✅ CLOSED 2026-08-07
+
+Closed as described below, with one correction.
+
+**There was no `monthly-statement` template to confirm.** The plan below says
+one "exists in the seed"; it does not, and never did — the notice had never gone
+through `queueNotification`, so nothing had ever needed one. A
+`statement-ready-sms` / `-email` pair was written, seeded, and inserted for
+existing databases by migration `20260807140000`.
+
+Neither is in `MANDATORY_SLUGS`, and that is the point of the gap: the guide's
+promise here is *"you choose which channels you want"*, so overriding a member's
+choice would close it in the wrong direction. The in-app message is still
+written unconditionally — that is the channel nobody opts out of.
+
+The job was given the `execute*(step)` seam and a memoising stub. Queue writes
+are batched, with the counter outside the step.
+
+<details>
+<summary>Original GAP-5 text</summary>
+
 
 **The guide** lists statement-ready among the things you are told, and offers
 four channels for all of them:
@@ -258,9 +381,38 @@ member who chose SMS or email is not told their statement is ready.
 member, respecting their channel preferences. A `monthly-statement` template
 exists in the seed — confirm the slug before wiring it.
 
+</details>
+
 ---
 
-### GAP-6 — The fifty-member cap is not enforced (MEDIUM)
+### GAP-6 — The fifty-member cap is not enforced (MEDIUM) — ✅ CLOSED 2026-08-07
+
+Built as described below. Three details worth recording, because each was a
+decision the plan did not settle:
+
+- **What occupies a place.** Any member who has not been erased — `deletedAt` is
+  the only thing that frees one. Status does not: a suspended member keeps their
+  history and their place, and someone registered but not yet activated already
+  holds one. Plus every *unexpired* pending invitation; a lapsed invite is not
+  holding a seat.
+- **The backstop counts members, not invitations.** At the moment someone
+  accepts, they are themselves holding a pending invitation. Applying the
+  invite-time rule there would have refused the fiftieth member on the strength
+  of the very invite that brought them. The registration check asks only whether
+  fifty places are already filled by people, and runs inside the transaction
+  that creates the user.
+- **Fifty means fifty.** A test holds the fiftieth invitation open, not just the
+  fifty-first closed — an off-by-one in the strict direction breaks the promise
+  in the same way.
+
+`MAX_MEMBERS` lives in `packages/utils/src/constants.ts`; the console shows
+"43 of 50" with the headroom before leadership invites rather than after being
+refused. The two apps have separate database clients, so each counts for itself
+and the rule is documented in both places.
+
+<details>
+<summary>Original GAP-6 text</summary>
+
 
 **The guide** is emphatic that this is deliberate, not aspirational:
 
@@ -285,9 +437,32 @@ no check, no configuration.
 4. Surface the count in the admin console — "43 of 50" — so leadership can see
    the headroom before inviting.
 
+</details>
+
 ---
 
-### GAP-7 — No "Invitations" tile on the member dashboard (LOW)
+### GAP-7 — No "Invitations" tile on the member dashboard (LOW) — ✅ CLOSED 2026-08-07
+
+Built read-only, as the plan below directs. The member sees who invited them,
+when it was issued and accepted, and the minimum it was issued at.
+
+Two things worth knowing:
+
+- **The code cannot be shown, and the page says so.** Only `codeHash` is stored
+  — the raw code was displayed once, at issue, and is not recoverable. The page
+  shows `XKM-ABCD-••••`: enough to recognise the invitation, not enough to reuse
+  it. A test asserts nothing code-shaped leaks into the response.
+- **Founding members have no invitation.** The four co-founders predate the
+  invite system, so the page has an empty state that says that rather than
+  looking broken.
+
+`getMyInvitation` is scoped by construction: it keys on `acceptedById`, which is
+unique, so there is no id parameter for a caller to get wrong. The nav is now
+the twelve tiles the guide lists.
+
+<details>
+<summary>Original GAP-7 text</summary>
+
 
 **The guide** lists twelve tiles for the member dashboard, including:
 
@@ -304,6 +479,8 @@ member in: who invited them, when they accepted, and the reminder that the link
 is theirs alone. If the founders also want members to *issue* invitations,
 that is a different feature and a decision for them — the guide says invitations
 come from leadership, so build the read-only view unless told otherwise.
+
+</details>
 
 ---
 
@@ -362,9 +539,9 @@ before writing anything.
 
 ## 3. Suggested order
 
-1. **GAP-1 reversal** — the only gap that contradicts a capability the guide
-   puts in a table with a "Yes" against leadership, and the guide leans on the
-   reversing-entry principle three separate times.
+1. ~~**GAP-1 reversal**~~ — ✅ done 2026-08-07. Note for whoever takes the next
+   one: most of it already existed and the entry describing it was wrong. Open
+   the files named in a gap before trusting its "what is missing" list.
 2. **GAP-6 fifty cap** — an afternoon, and it is a promise about the character
    of the circle rather than a feature.
 3. **GAP-4 and GAP-5 notifications** — small, and both are cases where the
