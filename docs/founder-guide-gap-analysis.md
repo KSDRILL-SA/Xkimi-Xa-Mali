@@ -305,7 +305,34 @@ exists in the seed — confirm the slug before wiring it.
 
 ---
 
-### GAP-6 — The fifty-member cap is not enforced (MEDIUM)
+### GAP-6 — The fifty-member cap is not enforced (MEDIUM) — ✅ CLOSED 2026-08-07
+
+Built as described below. Three details worth recording, because each was a
+decision the plan did not settle:
+
+- **What occupies a place.** Any member who has not been erased — `deletedAt` is
+  the only thing that frees one. Status does not: a suspended member keeps their
+  history and their place, and someone registered but not yet activated already
+  holds one. Plus every *unexpired* pending invitation; a lapsed invite is not
+  holding a seat.
+- **The backstop counts members, not invitations.** At the moment someone
+  accepts, they are themselves holding a pending invitation. Applying the
+  invite-time rule there would have refused the fiftieth member on the strength
+  of the very invite that brought them. The registration check asks only whether
+  fifty places are already filled by people, and runs inside the transaction
+  that creates the user.
+- **Fifty means fifty.** A test holds the fiftieth invitation open, not just the
+  fifty-first closed — an off-by-one in the strict direction breaks the promise
+  in the same way.
+
+`MAX_MEMBERS` lives in `packages/utils/src/constants.ts`; the console shows
+"43 of 50" with the headroom before leadership invites rather than after being
+refused. The two apps have separate database clients, so each counts for itself
+and the rule is documented in both places.
+
+<details>
+<summary>Original GAP-6 text</summary>
+
 
 **The guide** is emphatic that this is deliberate, not aspirational:
 
@@ -329,6 +356,8 @@ no check, no configuration.
    concurrently.
 4. Surface the count in the admin console — "43 of 50" — so leadership can see
    the headroom before inviting.
+
+</details>
 
 ---
 
