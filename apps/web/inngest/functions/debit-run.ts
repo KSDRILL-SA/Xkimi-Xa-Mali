@@ -16,21 +16,7 @@ import { cache, CACHE_KEYS } from '@/lib/cache'
 import { env } from '@/lib/env'
 import { logger } from '@xxm/observability'
 import { INFRASTRUCTURE_FAILURE_PREFIX } from '@xxm/utils'
-
-/**
- * What the gateway said, as a transaction status.
- *
- * The gateway distinguishes three outcomes and so must this. SUCCESS is
- * collected. PENDING is submitted and awaiting a settlement webhook. FAILED is
- * a decline, and it used to be written as PENDING — which hid it from the
- * retry job, left the contribution waiting on a webhook that was never coming,
- * and told the member their debit was pending when it had been declined.
- */
-export function toTransactionStatus(gatewayStatus: 'SUCCESS' | 'PENDING' | 'FAILED'): TransactionStatus {
-  if (gatewayStatus === 'SUCCESS') return 'SUCCESS'
-  if (gatewayStatus === 'FAILED') return 'FAILED'
-  return 'PENDING'
-}
+import { toTransactionStatus } from '@/lib/transaction-status'
 
 /**
  * Run every mandate, whatever the ones before it did.
