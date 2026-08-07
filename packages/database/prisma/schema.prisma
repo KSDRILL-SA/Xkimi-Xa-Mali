@@ -151,6 +151,7 @@ model User {
   loginHistory           LoginHistory[]
   lockedGoals            Goal[]                  @relation("GoalLocker")
   createdGoals           Goal[]                  @relation("GoalCreator")
+  documentedGoals        Goal[]                  @relation("GoalOutcomeRecorder")
   reviewedGoals          Goal[]                  @relation("GoalReviewer")
   recordedProgress       GoalProgress[]          @relation("ProgressRecorder")
   passwordResetTokens    PasswordResetToken[]
@@ -471,6 +472,13 @@ model Goal {
   /// one leadership raised itself — the two paths are told apart by the roles
   /// of this user, not by a separate column.
   createdById   String?
+  /// Step 6 of the Goal flow: what the money actually bought, shown back to the
+  /// circle. The note is the account; the proof is a photo or receipt and is
+  /// optional, so a missing receipt can never make a goal impossible to close.
+  outcomeNote         String?
+  outcomeProofUrl     String?
+  outcomeRecordedAt   DateTime?
+  outcomeRecordedById String?
   /// Why leadership refused a proposal. Set only alongside status REJECTED.
   rejectionReason String?
   /// Which leader reviewed the proposal, and when. Empty on every goal created
@@ -482,6 +490,7 @@ model Goal {
 
   locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
   creator  User?          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  outcomeRecorder User?   @relation("GoalOutcomeRecorder", fields: [outcomeRecordedById], references: [id], onDelete: SetNull)
   reviewer User?          @relation("GoalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   progress GoalProgress[]
   cheers   GoalCheer[]
@@ -491,6 +500,7 @@ model Goal {
 
   @@index([lockedById])
   @@index([createdById])
+  @@index([outcomeRecordedById])
   @@index([reviewedById])
   @@index([status])
   @@index([status, deadline])

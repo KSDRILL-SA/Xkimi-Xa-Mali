@@ -47,6 +47,7 @@ export async function getGoalById(adminRoles: string[], goalId: string) {
       },
       creator: { select: { firstName: true, lastName: true } },
       locker:  { select: { firstName: true, lastName: true } },
+      outcomeRecorder: { select: { firstName: true, lastName: true } },
     },
   })
   if (!goal) throw new AdminNotFoundError('Goal not found')
@@ -191,6 +192,85 @@ async function notifyProposer(
     category: 'GOAL',
     createdById: adminId,
   })
+}
+
+/**
+ * Step 6: document what the money actually did.
+ *
+ * The guide calls this the closing act of the whole Goal cycle and the moment
+ * the Foundation proves itself — "the purchase is shown back to the circle.
+ * Everyone sees what their money actually did." Nothing recorded it: a Goal hit
+ * its target, went Achieved, and the story stopped.
+ *
+ * Only on an ACHIEVED goal. Documenting an outcome for a goal that has not been
+ * reached would be describing a purchase that did not happen.
+ *
+ * The written note is required and the proof is optional — the founders'
+ * decision. A written account should never be blocked because a receipt cannot
+ * be found months later, and a goal that can never be closed out helps nobody.
+ *
+ * Recording an outcome is not a correction, so it may be done once. A second
+ * one would overwrite the first, and quietly replacing what the circle was
+ * shown is the thing the guide rules out.
+ */
+export async function recordGoalOutcome(
+  adminId: string, adminRoles: string[],
+  goalId: string,
+  note: string,
+  proofUrl?: string | null,
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const trimmed = note?.trim() ?? ''
+  if (trimmed.length < 10) {
+    throw new AdminConflictError('An outcome needs at least 10 characters describing what the money did')
+  }
+
+  const goal = await db.goal.findUnique({ where: { id: goalId } })
+  if (!goal) throw new AdminNotFoundError('Goal not found')
+  if (goal.status !== 'ACHIEVED') {
+    throw new AdminConflictError('Only an achieved goal can have its outcome documented')
+  }
+  if (goal.outcomeRecordedAt) {
+    throw new AdminConflictError('This goal already has a documented outcome')
+  }
+
+  const updated = await db.goal.update({
+    where: { id: goalId },
+    data: {
+      outcomeNote: trimmed,
+      outcomeProofUrl: proofUrl ?? null,
+      outcomeRecordedAt: new Date(),
+      outcomeRecordedById: adminId,
+    },
+  })
+
+  await writeAuditLog({
+    userId: adminId, action: 'GOAL_OUTCOME_RECORDED', entity: 'Goal', entityId: goalId,
+    payload: { title: goal.title, hasProof: !!proofUrl }, ipAddress: ip,
+  })
+
+  // Shown back to the circle — which is the whole point, and is not achieved by
+  // writing it into a database nobody is told about. Every active member, not
+  // only those who pledged: the guide says everyone sees what their money did,
+  // and every member's contributions flow into the pool.
+  const members = await db.user.findMany({
+    where: { status: UserStatus.ACTIVE },
+    select: { id: true },
+  })
+
+  await Promise.all(
+    members.map((m) => notifyInbox({
+      userId: m.id,
+      title: `What "${goal.title}" bought`,
+      body: `${trimmed}${proofUrl ? ' A photo or receipt has been attached — open the goal to see it.' : ''}`,
+      category: 'GOAL',
+      createdById: adminId,
+    })),
+  )
+
+  return updated
 }
 
 export async function lockGoal(adminId: string, adminRoles: string[], goalId: string) {
