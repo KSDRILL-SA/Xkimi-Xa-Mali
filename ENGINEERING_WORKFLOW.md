@@ -1,7 +1,7 @@
 # Engineering Operating Manual
 
 **Repository:** `Xkimi-Xa-Mali` (Xkimm Xa Mali Foundation)
-**Audience:** Every AI agent and Claude Code session that touches this repository.
+**Audience:** Every automated agent and engineering session that touches this repository.
 **Status of this document:** Authoritative. Read it before the first tool call of a session.
 
 This is a **real-money financial platform**. A defect here does not produce a bad
@@ -406,8 +406,10 @@ as verified when only the unit tests were run and the failure was in the build.
 - Branch per task, off `Dev`: `fix/<short-slug>`, `feat/<short-slug>`, `chore/<short-slug>`.
 - Commit messages describe **the user-visible change or the bug that is now gone**,
   not the mechanics of the edit.
-- **Never reference AI, Claude, or any assistant in a commit message, branch
-  name, PR title, or PR body.** This is absolute.
+- **Never name the tooling that wrote the code — no assistant, model, or vendor
+  names — in a commit message, branch name, PR title, PR body, or filename.**
+  This is absolute. The change is described by what it does, never by what
+  produced it. It applies to this file too.
 - A major dependency upgrade is never a `chore:` — H-2/H-3 above exist because a
   Next 15 → 16 major landed inside one.
 
