@@ -36,6 +36,19 @@ export const authTokenRepo = {
     return count === 1
   },
 
+  // Retire every outstanding verification link for this account.
+  //
+  // Called before issuing a replacement, so asking for a new link cannot leave
+  // two working ones behind — the same rule `invalidateResetTokens` applies to
+  // password resets, and for the same reason: a link that reaches a mailbox
+  // stays valid until something says otherwise.
+  invalidateVerificationTokens(userId: string) {
+    return db.emailVerificationToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    })
+  },
+
   // ─── Password reset tokens ────────────────────────────────────────────────
 
   findResetToken(tokenHash: string) {

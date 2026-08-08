@@ -197,6 +197,9 @@ async function handleRequest(
     pathname === '/api/v1/auth/forgot-password' ||
     pathname === '/api/v1/auth/reset-password' ||
     pathname === '/api/v1/auth/verify-email' ||
+    // Reachable without a session by necessity: the people who need it are the
+    // ones who cannot sign in.
+    pathname === '/api/v1/auth/resend-verification' ||
     pathname === '/api/v1/auth/invitations/validate'
 
   if (isPublicPage || isPublicApi) {
