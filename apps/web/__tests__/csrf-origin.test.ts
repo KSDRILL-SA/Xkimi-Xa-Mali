@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildAllowedOrigins, verifyCsrfOrigin } from '@/lib/csrf-origin'
+import { buildAllowedOrigins, verifyCsrfOrigin } from '@xxm/utils/csrf-origin'
 
 function req(
   url: string,

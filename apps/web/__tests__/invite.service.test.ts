@@ -10,6 +10,12 @@ vi.mock('@/lib/db', () => ({
       findMany:   vi.fn(),
       count:      vi.fn(),
       update:     vi.fn(),
+      // Acceptance is now conditional on the row still being PENDING, so the
+      // database refuses a second acceptance rather than the read thirty lines
+      // earlier. Previously the only thing stopping two requests carrying the
+      // same code was the unique constraint on User.email — protection by
+      // accident, from a constraint about something else.
+      updateMany: vi.fn(),
     },
     role:     { findUniqueOrThrow: vi.fn(), findUnique: vi.fn() },
     userRole: { create: vi.fn(), upsert: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
@@ -327,7 +333,7 @@ describe('the fifty-member cap', () => {
           userRole: { create: vi.fn() },
           notificationPreference: { create: vi.fn() },
           emailVerificationToken: { create: vi.fn() },
-          invitation: { update: vi.fn() },
+          invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
         }
         return fn(txMock as unknown as typeof db)
       })
@@ -481,7 +487,7 @@ describe('acceptInviteRegistration', () => {
         userRole: { create: vi.fn() },
         notificationPreference: { create: vi.fn() },
         emailVerificationToken: { create: vi.fn() },
-        invitation: { update: vi.fn() },
+        invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       }
       return fn(txMock as unknown as typeof db)
     })
@@ -493,6 +499,32 @@ describe('acceptInviteRegistration', () => {
     expect(mockWriteAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'INVITE_ACCEPTED' }),
     )
+  })
+
+  it('refuses a second acceptance of the same code, in the database', async () => {
+    // Two requests carrying one code both read PENDING, both pass the check
+    // thirty lines up, and both reach the write. This was survivable only
+    // because User.email is unique and the second insert happened to violate
+    // it — protection by accident, from a constraint about something else.
+    mockDb.invitation.findUnique.mockResolvedValue(VALID_INVITE as never)
+    mockDb.role.findUniqueOrThrow.mockResolvedValue({ id: 'role1' } as never)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockDb.$transaction.mockImplementation(async (fn: any) => {
+      const txMock = {
+        user: {
+          create: vi.fn().mockResolvedValue({ id: 'u2', email: 'k@x.co.za', firstName: 'Kurhula' }),
+          count: vi.fn().mockResolvedValue(10),
+        },
+        userRole: { create: vi.fn() },
+        notificationPreference: { create: vi.fn() },
+        emailVerificationToken: { create: vi.fn() },
+        // The row was claimed by the other request between the read and here.
+        invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      }
+      return fn(txMock as unknown as typeof db)
+    })
+
+    await expect(acceptInviteRegistration(input, 'http://localhost')).rejects.toThrow(InviteUsedError)
   })
 })
 

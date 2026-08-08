@@ -1,6 +1,6 @@
 import NextAuth from 'next-auth'
 import { authConfig } from '@/lib/auth.config'
-import { verifyCsrfOrigin } from '@/lib/csrf-origin'
+import { verifyCsrfOrigin } from '@xxm/utils/csrf-origin'
 import { getCachedRoleVersion, setCachedRoleVersion } from '@/lib/role-version-cache'
 import { mustReauthenticate, type RoleVersionVerdict } from '@/lib/role-version-policy'
 import { NextResponse } from 'next/server'

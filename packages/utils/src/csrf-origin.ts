@@ -1,4 +1,11 @@
-// Edge-safe CSRF origin checks for authenticated mutating API requests.
+// Edge-safe CSRF origin checks for authenticated mutating requests.
+//
+// Shared rather than copied. This lived in the member app alone, and the admin
+// console — which approves mandates, reverses transactions and suspends members
+// — had no origin check at all. Copying it across would have reproduced the
+// failure mode §9 of the operating manual names as recurring in this
+// repository: a control applied to one app and not its sibling, with nothing to
+// keep the two in step. One implementation, two importers.
 
 export type CsrfRequest = {
   headers: Headers

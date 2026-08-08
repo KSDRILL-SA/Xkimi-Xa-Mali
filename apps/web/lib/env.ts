@@ -26,6 +26,26 @@ const LIVE = isLiveDeployment()
 const requiredWhenLive = (schema: z.ZodString) => (LIVE ? schema : schema.optional())
 
 /**
+ * A flag that can actually be turned off.
+ *
+ * `z.coerce.boolean()` is `Boolean(string)`, under which every non-empty string
+ * is true — including `"false"`, `"0"` and `"off"`. Flags declared that way can
+ * be switched on and never back, by any value anyone would think to write. Two
+ * in this file were declared that way and had been unswitchable since they were
+ * added.
+ *
+ * Only the two literal strings are accepted, so a typo (`"ture"`, `"yes"`)
+ * fails validation at boot rather than silently selecting the wrong branch —
+ * which for a flag is the difference between a config error and a config error
+ * you find out about in production.
+ */
+const booleanFlag = (fallback: boolean) =>
+  z
+    .enum(['true', 'false'])
+    .default(fallback ? 'true' : 'false')
+    .transform((v) => v === 'true')
+
+/**
  * Required on the live deployment; falls back to an obviously-fake placeholder
  * elsewhere.
  *
@@ -180,8 +200,16 @@ export const env = createEnv({
     ADMIN_WHATSAPP_NUMBER: configuredWhenLive(z.string().min(1), '27000000000'),
     // Shown to members on the support page as a mailto: link.
     SUPPORT_EMAIL: configuredWhenLive(z.string().email(), 'support@example.invalid'),
-    ENABLE_MANUAL_PAYMENTS: z.coerce.boolean().default(true),
-    ENABLE_GOAL_LOCKING: z.coerce.boolean().default(true),
+    // NOT `z.coerce.boolean()`. That is `Boolean(string)`, under which every
+    // non-empty string is true — so `ENABLE_MANUAL_PAYMENTS=false` parsed as
+    // **true** and neither of these could be switched off by any value anyone
+    // would think to write. They read as feature flags and behaved as
+    // constants.
+    //
+    // `booleanFlag` accepts only the two strings, so a typo fails validation at
+    // boot rather than silently selecting the wrong branch.
+    ENABLE_MANUAL_PAYMENTS: booleanFlag(true),
+    ENABLE_GOAL_LOCKING: booleanFlag(true),
     // Sentry (build-time source-map upload; optional in dev)
     SENTRY_ORG: z.string().optional(),
     SENTRY_PROJECT: z.string().optional(),
@@ -189,6 +217,7 @@ export const env = createEnv({
     // Security tunables — allows per-environment adjustment without code changes
     MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
     LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
+    // See `booleanFlag`. Off by default.
     // Require every account whose password predates the twelve-character policy
     // to reset before signing in again.
     //
@@ -197,14 +226,9 @@ export const env = createEnv({
     // it signs out every account created under the old eight-character rule,
     // including the single admin's, and the only way back in is an email.
     //
-    // NOT `z.coerce.boolean()`. That is `Boolean(string)`, so the string
-    // "false" coerces to **true** and the flag could never be turned back off —
-    // the shape of a lockout that cannot be undone by editing an env var.
-    // ENABLE_MANUAL_PAYMENTS and ENABLE_GOAL_LOCKING above have this bug today.
-    REQUIRE_PASSWORD_POLICY_RESET: z
-      .enum(['true', 'false'])
-      .default('false')
-      .transform((v) => v === 'true'),
+    // For this one the coercion bug would have meant a lockout no env edit
+    // could undo.
+    REQUIRE_PASSWORD_POLICY_RESET: booleanFlag(false),
     // Shared secret for internal admin→web API calls (server-to-server, no
     // session needed). Missing on the live deployment, every admin action that
     // reaches through to the member app fails authentication.
