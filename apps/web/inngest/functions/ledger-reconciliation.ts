@@ -7,6 +7,8 @@ import { reconcileLedger } from '@/services/ledger.service'
 import { syncPrimaryGoalProgress } from '@/services/goal.service'
 import { SUCCESSFUL_INFLOW_SQL } from '@/repositories/transaction.repository'
 import { writeAuditLog } from '@/services/audit.service'
+import { raiseOperationalAlert } from '@/services/alert.service'
+import { alertOnFailure } from '@/inngest/on-failure'
 
 /**
  * Inngest's `step`, narrowed to what this job uses.
@@ -90,6 +92,39 @@ export async function executeLedgerReconciliation(step: ReconciliationStepRunner
   // Re-derive the primary fund's progress from the (now-reconciled) contributions.
   await step.run('sync-primary-goal', () => syncPrimaryGoalProgress())
 
+  // Drift is not a routine correction, and a job that fixes it quietly is
+  // indistinguishable from a job with nothing to fix. What a contribution
+  // records and what its transactions add up to disagreed; something wrote one
+  // and not the other. Self-healing every night is the signature of a
+  // systematic bug, and until now the only trace was a log line and an audit
+  // row that nobody reads on purpose.
+  //
+  // Raised after the corrections rather than before, so the message can say
+  // both what was found and that it was dealt with.
+  if (drifted.length > 0) {
+    await step.run('alert-ledger-drift', () => {
+      const netDrift = drifted.reduce((sum, item) => sum + (item.actual - item.recorded), 0)
+
+      return raiseOperationalAlert({
+        code: 'LEDGER_DRIFT_DETECTED',
+        // Records disagreeing about money is the definition of the thing this
+        // system exists to get right. It goes out on every channel.
+        severity: 'critical',
+        title: `Ledger drift on ${drifted.length} contribution${drifted.length === 1 ? '' : 's'}`,
+        body: [
+          `${drifted.length} contribution${drifted.length === 1 ? '' : 's'} recorded a paid amount that its transactions do not add up to.`,
+          `Net difference: R${netDrift.toFixed(2)} (positive means more was received than recorded).`,
+          `${corrected} ${corrected === 1 ? 'was' : 'were'} recalculated from the transactions, which are the source of truth.`,
+          '',
+          'The correction is already applied. What needs a person is why it drifted:',
+          'a recurring count here means something is writing one side and not the other.',
+        ].join('\n'),
+        entityId: new Date().toISOString().slice(0, 10),
+        payload: { drifted: drifted.length, corrected, netDrift, detail: drifted },
+      })
+    })
+  }
+
   // No "checked" count: the query's HAVING clause returns only rows that have
   // already drifted, so the number examined is never known here. Adding
   // `corrected` to `drifted` counted the same contributions twice and named
@@ -102,7 +137,13 @@ export async function executeLedgerReconciliation(step: ReconciliationStepRunner
 }
 
 export const ledgerReconciliation = inngest.createFunction(
-  { id: 'ledger-reconciliation', name: 'Nightly Ledger Reconciliation' },
+  {
+    id: 'ledger-reconciliation',
+    name: 'Nightly Ledger Reconciliation',
+    // If this stops running, drift accumulates unseen — and the job that would
+    // have told anyone about drift is this one.
+    onFailure: alertOnFailure('Nightly ledger reconciliation'),
+  },
   { cron: '0 3 * * *' }, // 05:00 SAST (UTC+2)
   ({ step }) => executeLedgerReconciliation(step as unknown as ReconciliationStepRunner),
 )

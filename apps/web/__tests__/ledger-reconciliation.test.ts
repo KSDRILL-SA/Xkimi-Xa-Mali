@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   reconcileLedger: vi.fn(),
   syncPrimaryGoal: vi.fn(),
+  raiseAlert: vi.fn(),
   warn: vi.fn(),
 }))
 
@@ -25,6 +26,7 @@ vi.mock('@/services/ledger.service', () => ({ reconcileLedger: mocks.reconcileLe
 vi.mock('@/services/goal.service', () => ({ syncPrimaryGoalProgress: mocks.syncPrimaryGoal }))
 vi.mock('@/repositories/transaction.repository', () => ({ SUCCESSFUL_INFLOW_SQL: "t.status = 'SUCCESS'" }))
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: mocks.writeAuditLog }))
+vi.mock('@/services/alert.service', () => ({ raiseOperationalAlert: mocks.raiseAlert }))
 vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: mocks.warn, error: vi.fn(), debug: vi.fn() },
 }))
@@ -61,6 +63,7 @@ beforeEach(() => {
   mocks.writeAuditLog.mockResolvedValue(undefined)
   mocks.reconcileLedger.mockResolvedValue({ created: 0 })
   mocks.syncPrimaryGoal.mockResolvedValue(undefined)
+  mocks.raiseAlert.mockResolvedValue(undefined)
 })
 
 describe('executeLedgerReconciliation — correcting drift', () => {
@@ -87,11 +90,36 @@ describe('executeLedgerReconciliation — correcting drift', () => {
     )
   })
 
+  /**
+   * Drift used to be corrected in silence — a log line and an audit row, and
+   * nothing that reaches a person. A contribution and its transactions
+   * disagreeing about money is not a routine correction, and a count that keeps
+   * coming back is the signature of something writing one side and not the
+   * other. Nobody would ever have seen it.
+   */
+  it('tells someone, rather than correcting it quietly', async () => {
+    mocks.queryRaw.mockResolvedValue([
+      { id: 'c1', recorded: 100, actual: 250 },
+      { id: 'c2', recorded: 80, actual: 30 },
+    ])
+
+    await executeLedgerReconciliation(freshStep)
+
+    expect(mocks.raiseAlert).toHaveBeenCalledOnce()
+    const alert = mocks.raiseAlert.mock.calls[0][0]
+    expect(alert).toMatchObject({ code: 'LEDGER_DRIFT_DETECTED', severity: 'critical' })
+    expect(alert.title).toContain('2 contributions')
+    // +150 and -50 net to +100. The direction matters: more money arriving than
+    // was recorded is a different problem from less.
+    expect(alert.payload).toMatchObject({ drifted: 2, corrected: 2, netDrift: 100 })
+  })
+
   it('does nothing but the backfill when the books agree', async () => {
     const summary = await executeLedgerReconciliation(freshStep)
 
     expect(mocks.recalculate).not.toHaveBeenCalled()
     expect(mocks.writeAuditLog).not.toHaveBeenCalled()
+    expect(mocks.raiseAlert).not.toHaveBeenCalled()
     expect(summary).toMatchObject({ drifted: 0, corrected: 0 })
     // The backfill and the goal sync are unconditional — a run with no drift
     // still has settled transactions that may have no ledger entry.
@@ -126,6 +154,9 @@ describe('executeLedgerReconciliation — when the function is re-entered', () =
     // is exactly what must stop them running twice.
     expect(mocks.recalculate).toHaveBeenCalledTimes(1)
     expect(mocks.writeAuditLog).toHaveBeenCalledTimes(1)
+    // The alert lives in a step too, for the same reason: a re-entered run must
+    // not send a second SMS about drift it already reported.
+    expect(mocks.raiseAlert).toHaveBeenCalledTimes(1)
   })
 })
 
