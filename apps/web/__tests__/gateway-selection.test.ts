@@ -13,30 +13,39 @@ vi.mock('@/lib/env', () => ({
 }))
 
 /**
+ * Every variable that can change the outcome, cleared before each case is set
+ * up. DEPLOY_ENV and VERCEL_ENV matter most: they outrank NODE_ENV when deciding
+ * whether this is the live deployment, and both are set in environments these
+ * tests run in — CI sets DEPLOY_ENV at job level. Leaving either in place would
+ * quietly turn every "in production" case below into a non-production one.
+ */
+const CONTROLLED = ['PAYMENT_GATEWAY', 'NODE_ENV', 'DEPLOY_ENV', 'VERCEL_ENV']
+
+/**
  * Selection happens at module load, so each case needs a fresh module registry
  * with the environment already in place.
  *
- * DEPLOY_ENV and VERCEL_ENV are cleared first because they outrank NODE_ENV when
- * deciding whether this is the live deployment, and both are set in environments
- * these tests run in — CI sets DEPLOY_ENV at job level. Leaving either in place
- * would quietly turn every "in production" case below into a non-production one.
+ * `vi.stubEnv` rather than assigning to `process.env`, and this is not a style
+ * preference. Vitest reuses a worker thread across test files. Replacing
+ * `process.env` with a plain object detaches it from the one every other file's
+ * stubs hold a reference to, so their `unstubAllEnvs` restores onto an object
+ * nobody reads any more and their environment leaks into whatever runs next in
+ * that worker. This file used to do exactly that, and it is why it,
+ * `env-netcash` and `whatsapp.preferences` failed together at random under load
+ * — roughly one full-suite run in four, passing on every re-run and standalone.
+ * `env-netcash` already carried a comment warning against it.
  */
 async function loadGateway(env: Record<string, string | undefined>) {
   vi.resetModules()
-  const previous = { ...process.env }
-  delete process.env.DEPLOY_ENV
-  delete process.env.VERCEL_ENV
-  Object.assign(process.env, env)
-  try {
-    return await import('@/integrations/payment')
-  } finally {
-    process.env = previous
+  for (const key of CONTROLLED) vi.stubEnv(key, undefined as unknown as string)
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) vi.stubEnv(key, value)
   }
+  return await import('@/integrations/payment')
 }
 
-const ORIGINAL = { ...process.env }
 beforeEach(() => vi.resetModules())
-afterEach(() => { process.env = { ...ORIGINAL } })
+afterEach(() => vi.unstubAllEnvs())
 
 describe('choosing a payment gateway', () => {
   it('uses the real gateway when nothing is set', async () => {

@@ -551,6 +551,32 @@ still imports pages and route handlers that no longer exist, and typecheck fails
 with `Cannot find module '../../app/.../page.js'`. `rm -rf apps/*/.next` clears
 it. Nothing is wrong with the code.
 
+### 4.12 A test suite that failed in files nobody had touched
+
+Three unrelated suites — `env-netcash`, `gateway-selection`,
+`whatsapp.preferences` — failed *together*, at random, in roughly one
+full-monorepo run in four. They passed standalone, passed on re-run, and had no
+relationship to whatever change was being verified. The obvious reading is
+"flaky tests, ignore them", and that reading was wrong.
+
+**Vitest reuses a worker thread across test files.** `gateway-selection.test.ts`
+replaced `process.env` wholesale (`process.env = { ...ORIGINAL }`), which
+detaches it from the object every other file's `vi.stubEnv` holds a reference
+to. Their `unstubAllEnvs` then restores onto an object nobody reads any more,
+and their environment leaks into whatever runs next in that worker. Whether it
+bit depended on scheduling, which is why it looked like load-dependent noise.
+
+`env-netcash.test.ts` had carried a comment warning against exactly this since
+it was written.
+
+**Never assign to `process.env` in a test — use `vi.stubEnv` / `vi.unstubAllEnvs`,
+which mutate keys in place.** This is now enforced by a `no-restricted-syntax`
+rule over `apps/web/__tests__/**` rather than left to be rediscovered.
+
+The general lesson is the one in §4.10: a failure you have decided is noise is a
+failure you have stopped reading. This one was reproducible, had a single cause,
+and was fixed in four lines.
+
 ---
 
 ## 5. Engineering Workflow
