@@ -87,6 +87,12 @@ const MANDATORY_SLUGS = new Set([
   // likely to expect, so it is not opt-out-able either.
   'contribution-reversed-sms',
   'contribution-reversed-email',
+  // Operational alerts to admins. These are not member notifications and the
+  // opt-out was never meant to cover them: an admin who switched SMS off for
+  // badge news would otherwise stop being told that a debit run collected
+  // nothing. See `services/alert.service.ts`.
+  'admin-alert-sms',
+  'admin-alert-email',
 ])
 
 // ---------------------------------------------------------------------------

@@ -207,3 +207,48 @@ a key you are about to delete.
 | P2 | Members cannot log in | 1 hour |
 | P3 | Notifications not sending | 4 hours |
 | P4 | Reports unavailable | Next business day |
+
+### What reaches you without you looking
+
+The system raises its own alerts through `services/alert.service.ts`. Severity
+decides how far the message travels, not how it is worded:
+
+| Severity | Channels | Meaning |
+|---|---|---|
+| `critical` | Admin inbox **+ email + SMS** | Money did not move, or the records disagree about money |
+| `warning` | Admin inbox **+ email** | Worth seeing today, not tonight |
+
+Every alert is also written to the audit log and to the logger — and a critical
+one logs at error level, so it reaches Sentry regardless of whether any channel
+delivered.
+
+| Alert | Raised by | Severity |
+|---|---|---|
+| `DEBIT_RUN_INCOMPLETE` | Debit run, on the night | critical |
+| `LEDGER_DRIFT_DETECTED` | Nightly reconciliation | critical |
+| `SCHEDULED_JOB_FAILED` | Any money-critical job exhausting its retries | critical |
+| `FINANCIAL_ANOMALY_DETECTED` | Morning sweep | critical if the collection rate is below floor, else warning |
+
+**Only `ACTIVE` admins are alerted.** A suspended founder is not an escalation
+path. If nothing is delivered, the first thing to check is that at least one
+active account holds the ADMIN role — the service logs
+`Operational alert has no active admin to reach` for exactly this, because an
+alerting system with no recipients looks identical to a quiet night.
+
+**Delivery is not instant.** SMS and email are queued and drained by
+`notification-flush`, which runs every five minutes. An alert raised at 18:00
+arrives by about 18:05.
+
+**Three ways alerting can itself be down**, in the order worth checking:
+
+1. **`notification-flush` has stopped.** Nothing queued is going anywhere. Its
+   own failure alert cannot be delivered by it — what carries that one out is
+   the Sentry error, so Sentry is the check that does not depend on this system.
+2. **No active admin holds the ADMIN role.** See above.
+3. **BulkSMS or Resend credentials are wrong.** The inbox message still lands;
+   nobody is paged. Rows in `notifications` stay `QUEUED` or `FAILED` —
+   `SELECT status, count(*) FROM notifications GROUP BY status` is the check.
+
+`SCHEDULED_JOB_FAILED` covers a job that **ran and failed**. It does not cover a
+job that **never fired** — no heartbeat check exists, so a cron that silently
+stops scheduling is still only visible in the Inngest dashboard.

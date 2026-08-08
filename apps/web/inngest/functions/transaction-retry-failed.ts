@@ -9,6 +9,7 @@ import { writeAuditLog } from '@/services/audit.service'
 import { queueNotification } from '@/services/notification.service'
 import { MAX_TRANSACTION_RETRY } from '@xxm/utils'
 import { toTransactionStatus } from '@/lib/transaction-status'
+import { alertOnFailure } from '@/inngest/on-failure'
 
 /**
  * Inngest's `step`, narrowed to what this job uses.
@@ -155,7 +156,14 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
 }
 
 export const transactionRetryFailed = inngest.createFunction(
-  { id: 'transaction-retry-failed', name: 'Retry Failed Transactions' },
+  {
+    id: 'transaction-retry-failed',
+    name: 'Retry Failed Transactions',
+    // The entire recovery path for a collection that did not happen. Silence
+    // here means every failed debit stays failed and nobody finds out until
+    // the month closes.
+    onFailure: alertOnFailure('The failed-transaction retry'),
+  },
   { cron: '0 10 * * *' }, // 12:00 SAST (UTC+2)
   // Narrowed for the same reason as the debit run — see RetryStepRunner.
   ({ step }) => executeTransactionRetry(step as unknown as RetryStepRunner),
