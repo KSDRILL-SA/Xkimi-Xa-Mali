@@ -8,6 +8,7 @@ import {
 import { auditRepo } from '@/repositories/audit.repository'
 import { raiseOperationalAlert } from '@/services/alert.service'
 import { alertOnFailure } from '@/inngest/on-failure'
+import { recordJobHeartbeat } from '@/lib/job-heartbeat'
 
 /** The audit action the alert writes, and therefore what it throttles on. */
 const ABANDONED_ALERT_ACTION = 'NOTIFICATIONS_ABANDONED'
@@ -126,6 +127,11 @@ export const notificationFlush = inngest.createFunction(
     // abandoned from this moment, and waiting five minutes to notice would be a
     // choice rather than an accident.
     const abandoned = await reportAbandonedNotifications(step as unknown as FlushStepRunner)
+
+    // This worker delivers every alert in the system, so its own silence is the
+    // one that disables the rest. It cannot report that itself — which is the
+    // point of writing the beat somewhere another job can read it.
+    await step.run('heartbeat', () => recordJobHeartbeat('notification-flush'))
 
     // If we hit the batch ceiling there may be more — re-trigger immediately
     if (result.processed === 100) {

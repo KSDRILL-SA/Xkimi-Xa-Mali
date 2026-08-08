@@ -5,6 +5,7 @@ import { logger } from '@xxm/observability'
 import { writeAuditLog } from '@/services/audit.service'
 import { queueNotification } from '@/services/notification.service'
 import type { MandateStatus } from '@prisma/client'
+import { recordJobHeartbeat } from '@/lib/job-heartbeat'
 
 /**
  * Nightly reconciliation: pull fresh status from Netcash for every non-terminal
@@ -97,6 +98,8 @@ export async function executeMandateStatusSync(step: StatusSyncStepRunner) {
       failed++
     }
   }
+
+  await step.run('heartbeat', () => recordJobHeartbeat('mandate-status-sync'))
 
   return { total: mandates.length, synced, unchanged, failed, unrecognised }
 }
