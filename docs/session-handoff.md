@@ -39,7 +39,7 @@ code — re-run. This happened twice this session.
 
 ## 2. What was done
 
-Six PRs, all squash-merged to `main`.
+Seven PRs, all squash-merged to `main`.
 
 | PR | What was actually wrong |
 |---|---|
@@ -49,6 +49,7 @@ Six PRs, all squash-merged to `main`.
 | #295 | Three unrelated suites failed together at random, ~1 run in 4. One test file replaced `process.env` wholesale, leaking environment between files sharing a Vitest worker |
 | #296 | The Founder badge — conferred, permanent, kept off the tier ladder |
 | #297 | #296 shipped with no way to grant it. Now managed on the member's own admin page |
+| #298 | The marketing site had no contact address at all — its only public route to the Foundation was a WhatsApp group link, which is useless to someone not yet in the group |
 
 Plus `bfa5aac`: `main` became the only long-lived branch, and every workflow
 document was updated to say so.
@@ -86,7 +87,26 @@ and covered by 21 contract tests. **A contract test is not a settlement.**
 **An ISV agreement is not required.** Netcash publishes a default software vendor
 key; a vendor-specific GUID is optional.
 
-### 4.2 Set `ALERT_FALLBACK_EMAIL` before going live
+### 4.2 The Foundation's mailbox, and the one place it must NOT go
+
+The operational address is **`xkimxamali@gmail.com`**. It lives in the
+environment, never in code:
+
+| Variable | App | Set locally? |
+|---|---|---|
+| `SUPPORT_EMAIL` | web | ✅ |
+| `ALERT_FALLBACK_EMAIL` | web | ✅ |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | website | ✅ |
+
+All three still need setting **in Vercel** for each environment. The public one
+is inlined at build time, so setting it after a deploy does nothing.
+
+> **It cannot be `RESEND_FROM_EMAIL`.** Resend only sends from a domain you have
+> verified and nobody can verify `gmail.com`. That must be `noreply@<your-domain>`
+> once the domain is registered. Nothing fails at build time — Resend rejects the
+> send at run time and every notification silently stops.
+
+### 4.2a Set `ALERT_FALLBACK_EMAIL` before going live
 
 Not optional in practice, despite being an optional variable. With a single
 admin, every other alert channel depends on one account being active, one phone
