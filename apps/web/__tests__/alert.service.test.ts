@@ -18,11 +18,16 @@ const mocks = vi.hoisted(() => ({
   notifyAdmins: vi.fn(),
   queueNotification: vi.fn(),
   writeAuditLog: vi.fn(),
+  sendGenericEmail: vi.fn(),
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
+  env: {} as { ALERT_FALLBACK_EMAIL?: string },
 }))
 
-vi.mock('@/lib/env', () => ({ env: {} }))
+vi.mock('@/lib/env', () => ({ env: mocks.env }))
+vi.mock('@/integrations/email', () => ({
+  emailProvider: { sendGenericEmail: mocks.sendGenericEmail },
+}))
 vi.mock('@/lib/db', () => ({ db: { user: { findMany: mocks.findAdmins } } }))
 vi.mock('@/services/inbox.service', () => ({ notifyAdmins: mocks.notifyAdmins }))
 vi.mock('@/services/notification.service', () => ({ queueNotification: mocks.queueNotification }))
@@ -50,6 +55,8 @@ const queuedOn = (channel: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.env.ALERT_FALLBACK_EMAIL = undefined
+  mocks.sendGenericEmail.mockResolvedValue(undefined)
   mocks.findAdmins.mockResolvedValue([{ id: 'admin-1' }, { id: 'admin-2' }])
   mocks.notifyAdmins.mockResolvedValue(2)
   mocks.queueNotification.mockResolvedValue(undefined)
@@ -199,5 +206,95 @@ describe('nobody to tell', () => {
     expect(
       mocks.loggerError.mock.calls.some(([msg]) => /no active admin/i.test(String(msg))),
     ).toBe(true)
+  })
+})
+
+/**
+ * This system runs with a single admin, by decision. Every channel above routes
+ * through an ACTIVE `User` row and the notification queue, so that chain has
+ * three links — no active admin, a suspended account, a flush worker that is
+ * itself what died — and not one of them has a spare.
+ *
+ * `ALERT_FALLBACK_EMAIL` is the destination that does not depend on anybody's
+ * account.
+ */
+describe('the destination that does not depend on an account', () => {
+  it('reaches the standing address even when there is no admin at all', async () => {
+    mocks.env.ALERT_FALLBACK_EMAIL = 'ops@example.test'
+    mocks.findAdmins.mockResolvedValue([])
+
+    const result = await raiseOperationalAlert(CRITICAL)
+
+    expect(result.admins).toBe(0)
+    expect(result.fallback).toBe(true)
+    const [to, subject, html] = mocks.sendGenericEmail.mock.calls[0]
+    expect(to).toBe('ops@example.test')
+    expect(subject).toContain(CRITICAL.title)
+    expect(html).toContain('9 declined by the bank')
+  })
+
+  it('sends directly rather than queueing — the queue may be what broke', async () => {
+    mocks.env.ALERT_FALLBACK_EMAIL = 'ops@example.test'
+
+    await raiseOperationalAlert(CRITICAL)
+
+    // Putting the alert about a dead notification worker into that worker's
+    // queue is not a plan.
+    expect(mocks.sendGenericEmail).toHaveBeenCalledOnce()
+    expect(queuedOn('EMAIL').map((a) => a.userId)).toEqual(['admin-1', 'admin-2'])
+  })
+
+  it('is reserved for critical alerts', async () => {
+    mocks.env.ALERT_FALLBACK_EMAIL = 'ops@example.test'
+
+    await raiseOperationalAlert(WARNING)
+
+    expect(mocks.sendGenericEmail).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op when unset, leaving the admin fan-out as the whole story', async () => {
+    const result = await raiseOperationalAlert(CRITICAL)
+
+    expect(mocks.sendGenericEmail).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ fallback: false, email: true, sms: true })
+  })
+
+  it('escapes what it interpolates — none of it is authored by a person', async () => {
+    mocks.env.ALERT_FALLBACK_EMAIL = 'ops@example.test'
+
+    // A gateway failure string or a Prisma error goes straight into this body.
+    await raiseOperationalAlert({
+      ...CRITICAL,
+      title: 'gateway said <script>alert(1)</script>',
+      body: 'reason: "5 & 6" <b>bold</b>',
+    })
+
+    const html = mocks.sendGenericEmail.mock.calls[0][2]
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('&lt;script&gt;')
+    expect(html).toContain('&amp;')
+  })
+
+  it('does not let its own failure cost the admin channels', async () => {
+    mocks.env.ALERT_FALLBACK_EMAIL = 'ops@example.test'
+    mocks.sendGenericEmail.mockRejectedValue(new Error('resend down'))
+
+    const result = await raiseOperationalAlert(CRITICAL)
+
+    expect(result.fallback).toBe(false)
+    expect(result.email).toBe(true)
+    expect(result.sms).toBe(true)
+  })
+
+  it('records whether the fallback caught it when no admin could be reached', async () => {
+    mocks.env.ALERT_FALLBACK_EMAIL = 'ops@example.test'
+    mocks.findAdmins.mockResolvedValue([])
+
+    await raiseOperationalAlert(CRITICAL)
+
+    const [, meta] = mocks.loggerError.mock.calls.find(([msg]) =>
+      /no active admin/i.test(String(msg)),
+    )!
+    expect(meta).toMatchObject({ reachedFallback: true })
   })
 })
