@@ -77,6 +77,43 @@ async function loadEnv(overrides: Record<string, string | undefined>) {
 beforeEach(() => vi.resetModules())
 afterEach(() => vi.unstubAllEnvs())
 
+/**
+ * The from-address is the one email setting that fails *after* a successful
+ * deploy. Resend only sends from a domain you have verified, and nobody can
+ * verify a shared mailbox provider's — so a wrong value here does not break the
+ * build, it stops every notification arriving while the app reports itself
+ * healthy. Members find out by not being told their debit failed.
+ */
+describe('an address Resend will never send from', () => {
+  it('fails the live build rather than the first send', async () => {
+    await expect(
+      loadEnv({ NODE_ENV: 'production', DEPLOY_ENV: 'production', ...NETCASH_ENV, RESEND_FROM_EMAIL: 'xkimxamali@gmail.com' }),
+    ).rejects.toThrow()
+  })
+
+  it('rejects the other shared mailbox providers too', async () => {
+    for (const address of ['a@outlook.com', 'a@yahoo.com', 'a@icloud.com', 'a@hotmail.com']) {
+      await expect(
+        loadEnv({ NODE_ENV: 'production', DEPLOY_ENV: 'production', ...NETCASH_ENV, RESEND_FROM_EMAIL: address }),
+      ).rejects.toThrow()
+    }
+  })
+
+  it('accepts an address on a domain we could verify', async () => {
+    const mod = await loadEnv({
+      NODE_ENV: 'production', DEPLOY_ENV: 'production', ...NETCASH_ENV,
+      RESEND_FROM_EMAIL: 'noreply@xkimmxamali.co.za',
+    })
+    expect(mod.env.RESEND_FROM_EMAIL).toBe('noreply@xkimmxamali.co.za')
+  })
+
+  it('still rejects something that is not an address at all', async () => {
+    await expect(
+      loadEnv({ NODE_ENV: 'production', DEPLOY_ENV: 'production', ...NETCASH_ENV, RESEND_FROM_EMAIL: 'not-an-email' }),
+    ).rejects.toThrow()
+  })
+})
+
 describe('Netcash credentials outside production', () => {
   it('are optional in development, so a local run needs no real keys', async () => {
     const mod = await loadEnv({ NODE_ENV: 'development' })

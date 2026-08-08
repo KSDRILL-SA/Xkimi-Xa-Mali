@@ -34,8 +34,56 @@ const requiredWhenLive = (schema: z.ZodString) => (LIVE ? schema : schema.option
  * an all-zero phone number — so that one accidentally reaching a real member is
  * self-evidently wrong rather than plausibly right.
  */
-const configuredWhenLive = (schema: z.ZodString, devPlaceholder: string) =>
-  LIVE ? schema : schema.default(devPlaceholder)
+const configuredWhenLive = <T extends z.ZodType<string, z.ZodTypeDef, string>>(
+  schema: T,
+  devPlaceholder: string,
+) => (LIVE ? schema : schema.default(devPlaceholder))
+
+/**
+ * Mailbox providers whose domain nobody but the provider can verify.
+ *
+ * Not an exhaustive list and not meant to be — it catches the mistake somebody
+ * actually makes, which is putting the Foundation's own inbox here because it is
+ * the address they think of as "our email".
+ */
+const UNVERIFIABLE_SENDER_DOMAINS = [
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'yahoo.co.za', 'outlook.com',
+  'hotmail.com', 'live.com', 'icloud.com', 'me.com', 'aol.com', 'proton.me',
+  'protonmail.com', 'zoho.com', 'mail.com', 'gmx.com', 'yandex.com',
+]
+
+/**
+ * The address members see mail arrive *from*.
+ *
+ * Resend will only send from a domain you have verified in your Resend account,
+ * and a shared mailbox provider's domain cannot be verified by you — Google owns
+ * gmail.com, not us. Setting one here does not fail anything at boot: Resend
+ * rejects each send at run time, so every notification stops arriving while the
+ * app reports itself perfectly healthy. Members find out by not being told their
+ * debit failed.
+ *
+ * So it is rejected at config validation instead, where it costs a deploy rather
+ * than a month of silence. The Foundation's mailbox belongs in `SUPPORT_EMAIL`
+ * and `ALERT_FALLBACK_EMAIL`, which *receive*; this one has to be on a domain we
+ * control, e.g. `noreply@<our-domain>`.
+ */
+const sendableFromAddress = () =>
+  z
+    .string()
+    .email()
+    .refine(
+      (value) => {
+        const domain = value.split('@')[1]?.toLowerCase()
+        return !!domain && !UNVERIFIABLE_SENDER_DOMAINS.includes(domain)
+      },
+      {
+        message:
+          'must be on a domain you can verify in Resend. A shared mailbox provider ' +
+          '(gmail.com and the like) cannot be verified by you, so every send is ' +
+          'rejected at run time and notifications stop silently. Use noreply@<your-domain>. ' +
+          'The Foundation mailbox belongs in SUPPORT_EMAIL and ALERT_FALLBACK_EMAIL, which receive.',
+      },
+    )
 
 /**
  * A Netcash credential. Required on the live deployment, which is the only
@@ -116,7 +164,7 @@ export const env = createEnv({
     BULKSMS_USERNAME: requiredWhenLive(z.string().min(1)),
     BULKSMS_PASSWORD: requiredWhenLive(z.string().min(1)),
     RESEND_API_KEY: requiredWhenLive(z.string().min(1)),
-    RESEND_FROM_EMAIL: configuredWhenLive(z.string().email(), 'noreply@example.invalid'),
+    RESEND_FROM_EMAIL: configuredWhenLive(sendableFromAddress(), 'noreply@example.invalid'),
     // No Inngest keys means none of the 16 scheduled jobs fire — including the
     // debit run itself and ledger reconciliation. The app looks perfectly healthy.
     INNGEST_EVENT_KEY: requiredWhenLive(z.string().min(1)),

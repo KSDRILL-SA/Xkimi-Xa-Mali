@@ -228,6 +228,7 @@ delivered.
 | `LEDGER_DRIFT_DETECTED` | Nightly reconciliation | critical |
 | `SCHEDULED_JOB_FAILED` | Any money-critical job exhausting its retries | critical |
 | `FINANCIAL_ANOMALY_DETECTED` | Morning sweep | critical if the collection rate is below floor, else warning |
+| `NOTIFICATIONS_ABANDONED` | Notification flush, after each batch | critical — messages that exhausted every retry and will never send. Throttled to once per 6 hours |
 
 **Only `ACTIVE` admins are alerted.** A suspended founder is not an escalation
 path. If nothing is delivered, the first thing to check is that at least one
@@ -263,6 +264,14 @@ arrives by about 18:05.
 3. **BulkSMS or Resend credentials are wrong.** The inbox message still lands;
    nobody is paged. Rows in `notifications` stay `QUEUED` or `FAILED` —
    `SELECT status, count(*) FROM notifications GROUP BY status` is the check.
+   This case now raises `NOTIFICATIONS_ABANDONED` once a message has exhausted
+   its retries, so it announces itself rather than waiting to be noticed.
+
+**Recovering abandoned notifications.** They stop being retried at
+`retryCount >= 3` and stay `FAILED` forever. Read `errorMessage` on those rows
+for the cause, fix it, then reset `retryCount` to 0 — the flush worker picks
+them up on its next pass. Resetting before fixing the cause just burns the
+retries again.
 
 `SCHEDULED_JOB_FAILED` covers a job that **ran and failed**. It does not cover a
 job that **never fired** — no heartbeat check exists, so a cron that silently
