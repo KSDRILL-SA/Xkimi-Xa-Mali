@@ -28,13 +28,25 @@ this is a checklist for a person rather than work that can be automated.
 
 ## 1. Topology
 
-The branch mapping follows the existing git workflow — PRs into `Dev`, `main` is
-production — so no new habits are needed.
+The branch mapping follows the git workflow — feature branches open PRs into
+`main`, and `main` is production.
 
 | Branch | Environment | Neon branch | Vercel env | Payment gateway |
 |---|---|---|---|---|
-| `Dev` | staging | `staging` | Preview | `mock`, then Netcash **test** when credentials arrive |
+| `staging` | staging | `staging` | Preview | `mock`, then Netcash **test** when credentials arrive |
+| any PR branch | ephemeral preview | Neon PR branch (auto) | Preview | `mock` |
 | `main` | production | `production` | Production | Netcash **live** |
+
+> **Changed 2026-08-08.** This table previously mapped `Dev` → staging. The `Dev`
+> integration branch was retired that day and `main` became the only long-lived
+> branch, so **staging now needs its own branch.** Create a long-lived `staging`
+> branch off `main` when standing the environment up, and point the Vercel
+> staging deployment at it. Nothing else in this plan changes; the secret matrix
+> below is per *environment*, not per branch.
+>
+> Until that branch exists, per-PR preview deployments are the only non-production
+> environment. That is enough to review a change and **not** enough to rehearse a
+> debit cycle, which is what staging is actually for.
 
 Three Vercel projects per app, each pointed at this monorepo with a different
 root directory (`apps/web`, `apps/admin`, `apps/website`). Install command is
