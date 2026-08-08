@@ -191,6 +191,49 @@ a key you are about to delete.
 
 ---
 
+## A member who never got their verification email
+
+Registration issues one verification link, valid for 24 hours. If it does not
+arrive — a Resend outage, an unverified sending domain, a mistyped address — the
+account is **not** lost. It used to be.
+
+**What the member does:** on the sign-in page, enter their email and password.
+The reply is "please verify your email", and beneath it is **Resend
+verification email**. The offer appears only after the password is correct, so
+it cannot be used to send mail to an address the sender does not own. Three
+requests per 15 minutes per source.
+
+Requesting a new link retires the old one, so only the most recent email works.
+
+**What you see:** `VERIFICATION_EMAIL_FAILED`, a warning-severity alert, raised
+at the moment registration cannot send. It names the address and says the
+account exists but is `PENDING`. It is a warning rather than critical because no
+money is involved and the member has a self-service route — but until it is
+seen, somebody who was invited is sitting outside the door and cannot tell you
+so, because they have no account to tell you from.
+
+**If it keeps failing**, the cause is almost certainly the sending domain rather
+than a blip. Check `RESEND_FROM_EMAIL` is on a domain Resend has verified — a
+new link will not send either until that is right. `SELECT status, count(*) FROM
+notifications GROUP BY status` will not show this: verification mail is sent
+directly rather than queued.
+
+**Who does not get a new link**, deliberately: an address that is not
+registered, an account already verified, and any account that is not `PENDING`.
+A suspended member is not waiting on an email, and sending them one would offer
+a route back in that the verification fix closed.
+
+**Last resort**, if the address on file is wrong and the member cannot receive
+anything:
+
+```sql
+-- Correct the address first, then have them use "Resend verification email".
+UPDATE users SET email = 'correct@address.example' WHERE id = '<user id>';
+```
+
+Verifying by hand instead (`status = 'ACTIVE'`) is possible but skips the proof
+that the address belongs to them, which is the only thing verification is for.
+
 ## Requiring everyone to replace an old password
 
 Registration used to enforce eight characters with one uppercase and one digit,
@@ -290,6 +333,7 @@ delivered.
 | `FINANCIAL_ANOMALY_DETECTED` | Morning sweep | critical if the collection rate is below floor, else warning |
 | `NOTIFICATIONS_ABANDONED` | Notification flush, after each batch | critical — messages that exhausted every retry and will never send. Throttled to once per 6 hours |
 | `SCHEDULED_JOB_SILENT` | Heartbeat check, every 15 minutes | critical — a money-critical job has **not run at all**. Not the same as `SCHEDULED_JOB_FAILED`; see "A job that never fired" below |
+| `VERIFICATION_EMAIL_FAILED` | Registration, when the link does not send | warning — someone who was invited has an account they cannot sign into. They can request a new link themselves; see "A member who never got their verification email" |
 
 **Only `ACTIVE` admins are alerted.** A suspended founder is not an escalation
 path. If nothing is delivered, the first thing to check is that at least one

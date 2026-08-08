@@ -13,6 +13,8 @@ import { bumpRoleVersion } from '@/lib/role-version'
 
 const BCRYPT_ROUNDS = 12
 const RESET_TTL_MS = 60 * 60 * 1000
+/** Matches the window registration issues its first link for. */
+const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
@@ -64,6 +66,57 @@ export async function verifyEmail(rawToken: string, ipAddress?: string) {
     action: 'EMAIL_VERIFIED',
     entity: 'User',
     entityId: record.userId,
+    ipAddress,
+  })
+}
+
+/**
+ * Send a fresh verification link to someone still waiting for one.
+ *
+ * Registration issued exactly one verification token and put it in exactly one
+ * email. If that email failed to send — a Resend outage, an unverified sending
+ * domain, a typo'd address — the account was finished: the `User` row existed
+ * so the email and phone were taken and re-registering was impossible, the
+ * invitation was `ACCEPTED` so the code could not be used again, the status was
+ * `PENDING` so signing in was refused, and the only copy of the token had gone
+ * with the message. Nothing in the product could put that right. It needed
+ * somebody to edit the database.
+ *
+ * This is the way out, and it exists for the ordinary case too: verification
+ * links expire after twenty-four hours, and until now an expired one was the
+ * same dead end as a lost one.
+ *
+ * Says nothing about whether the address is registered — same contract as
+ * `requestPasswordReset`. The caller always gets the same answer.
+ */
+export async function resendVerificationEmail(email: string, baseUrl: string, ipAddress?: string) {
+  const user = await userRepo.findByEmail(email)
+  if (!user) return
+
+  // Already verified, or past the point where verifying means anything. A
+  // suspended or resigned account is not waiting on an email, and sending one
+  // would offer a route back in that #303 deliberately closed.
+  if (user.emailVerified) return
+  if (user.status !== 'PENDING') return
+
+  // Retire the old link before minting a new one, so asking twice does not
+  // leave two live links in two mailboxes.
+  await authTokenRepo.invalidateVerificationTokens(user.id)
+
+  const rawToken = generateToken()
+  await authTokenRepo.createVerificationToken({
+    userId: user.id,
+    tokenHash: hashToken(rawToken),
+    expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
+  })
+
+  await emailProvider.sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
+
+  await writeAuditLog({
+    userId: user.id,
+    action: 'VERIFICATION_EMAIL_RESENT',
+    entity: 'User',
+    entityId: user.id,
     ipAddress,
   })
 }
