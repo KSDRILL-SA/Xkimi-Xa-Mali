@@ -25,6 +25,33 @@ async function recordLoginHistory(userId: string, success: boolean) {
 }
 
 /**
+ * Whether this admin must replace a password that predates the current policy.
+ *
+ * Mirrors the member app's check, including the refusal to enforce when no
+ * reset email could be delivered — which matters more here, not less. There is
+ * one admin; locking them out over a policy, with the recovery path behind the
+ * same door, turns a hardening measure into an outage.
+ *
+ * The reset itself happens in the member app, against the same `User` row.
+ */
+export function adminPasswordPolicyResetRequired(user: { passwordChangedAt: Date | null }): boolean {
+  if (!env.REQUIRE_PASSWORD_POLICY_RESET) return false
+  if (user.passwordChangedAt !== null) return false
+
+  const from = env.RESEND_FROM_EMAIL
+  const deliverable = !!env.RESEND_API_KEY && !!from && !from.endsWith('.invalid')
+  if (!deliverable) {
+    logger.error(
+      'REQUIRE_PASSWORD_POLICY_RESET is on but no reset email can be sent — not enforcing',
+      { reason: 'RESEND_API_KEY / RESEND_FROM_EMAIL unset or still a .invalid placeholder' },
+    )
+    return false
+  }
+
+  return true
+}
+
+/**
  * Refuse a sign-in attempt from a source making too many of them.
  *
  * Named and exported rather than inlined into the provider so it can be driven
@@ -118,6 +145,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
           await recordLoginHistory(user.id, false)
           return null
+        }
+
+        // The password is correct and the ADMIN role is held from here down.
+        // Checked after both, so an account under this requirement is never
+        // identifiable to someone who has not proved they own it.
+        if (adminPasswordPolicyResetRequired(user)) {
+          logger.info('Admin sign-in refused pending password policy reset', { userId: user.id })
+          throw new Error('PASSWORD_RESET_REQUIRED')
         }
 
         if (user.loginAttempts > 0 || user.lockedUntil) {
