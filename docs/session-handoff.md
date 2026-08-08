@@ -1,175 +1,215 @@
 # Session Handoff
 
-**Session closed:** 2026-08-07
-**Branch state at close:** `main` and `Dev` hold **identical trees**; no other
-branches exist; no open pull requests.
+**Session closed:** 2026-08-08
+**Branch state at close:** `main` is the **only** branch. No open pull requests.
 **Health at close:** typecheck 0 · lint 0 errors (5 warnings, all pre-existing
-files) · test 0 — **941 passing** (was 840) · build 0 (3/3) · `npm audit` 0.
+files) · test 0 — **1029 passing** (was 941) · build 0 (3/3) · `npm audit` 0.
 
-This document follows `ENGINEERING_WORKFLOW.md` §8. Read that file and
-`docs/founder-guide-gap-analysis.md` before your first edit.
+Everything below was verified locally. **CI is still not executing** — GitHub
+Actions minutes are exhausted on the free tier. Nothing automated is checking
+this repository.
+
+> The previous handoff (2026-08-07) is preserved in git history at `1151cc5` if
+> you need what it said.
 
 ---
 
-## 1. Start here — the three things that will bite you first
+## 1. Start here — the four things that will bite you first
 
-**1. Run `npm run db:generate` immediately after any branch switch.** The
+**1. `main` is the only branch now.** The `Dev` integration branch was merged and
+deleted on the owner's instruction. Cut feature branches from `main`,
+`gh pr create --base main`, squash-merge, delete. CI triggers on `main` only.
+**Do not recreate `Dev`.**
+
+**2. Run `npm run db:generate` immediately after any branch switch.** The
 generated Prisma client lives in the repository-root `node_modules` and is *not*
-per-branch. After switching you are compiling against whichever schema was
-generated last. This produces the confusing signature of **a green `typecheck`
-and a red `next build` on the same tree**, because Turbo replays a cached
-typecheck while `next build` runs its own `tsc`. Recorded as §4.11.
+per-branch. The signature is **a green `typecheck` and a red `next build` on the
+same tree**, because Turbo replays a cached typecheck while `next build` runs its
+own `tsc`. Recorded as §4.11 in `ENGINEERING_WORKFLOW.md`.
 
-**2. `rm -rf apps/*/.next` after a branch switch too.** Next's generated
-`.next/types/validator.ts` still imports routes from the other branch and fails
-with `Cannot find module '../../app/.../page.js'`. Nothing is wrong with the
-code.
+**3. `rm -rf apps/*/.next` after a branch switch too.** Next's generated
+`.next/types/validator.ts` still imports routes from the other branch.
 
-**3. Do not trust `docs/founder-guide-gap-analysis.md` without opening the files
-it names.** Four of its claims were verified wrong this session — see §5 below.
-It is otherwise an excellent document, and its corrections are now written into
-it with the originals preserved in `<details>` blocks.
+**4. The website build needs the network.** All three apps use
+`next/font/google`, which fetches from `fonts.googleapis.com` at build time. A
+DNS blip fails the build with `next/font: error:` and nothing is wrong with the
+code — re-run. This happened twice this session.
 
 ---
 
 ## 2. What was done
 
-Nine gaps closed, one PR each, all squash-merged to `Dev` and then to `main`.
+Six PRs, all squash-merged to `main`.
 
-| PR | Gap | What was actually wrong |
-|---|---|---|
-| #283 | GAP-1 reversal | Route was **dead code** — it required a session cookie the admin console never sends, so every reversal returned 401. Unreachable from both ends, and untested, so nothing noticed |
-| #284 | GAP-6 fifty-member cap | No constant, no check, no configuration — the 51st member walked straight in |
-| #285 | GAP-4 goal failed | Marked goals Failed and told nobody, while the *achieved* job announced itself |
-| #286 | GAP-5 statement notices | Wrote to the in-app inbox only; members who chose SMS or email were never told |
-| #287 | GAP-7 invitations tile | Eleven of the guide's twelve tiles existed |
-| #288 | GAP-2 goal proposals | `createGoal` asserted admin, so the six-step flow began with something a member could not do |
-| #289 | GAP-3 goal outcome | No field for a note, receipt or photograph — a Goal was achieved and the story stopped |
-| #290 | GAP-8 member can leave | No self-service route existed at all |
-| #291 | GAP-9 Netcash | Adapter posted JSON to REST paths that do not exist; the service is WCF SOAP |
+| PR | What was actually wrong |
+|---|---|
+| #292 | `ENCRYPTION_KEY` was documented "set once, never change" — a leaked key could not be replaced, because replacing it made every stored bank and ID number unreadable |
+| #293 | Alerts existed but every one ended at an in-app inbox message. On debit night "nine contributions were not collected" was filed in a page nobody had reason to open |
+| #294 | Every alert channel routed through an ACTIVE admin's account. With one admin, that chain had no spare link |
+| #295 | Three unrelated suites failed together at random, ~1 run in 4. One test file replaced `process.env` wholesale, leaking environment between files sharing a Vitest worker |
+| #296 | The Founder badge — conferred, permanent, kept off the tier ladder |
+| #297 | #296 shipped with no way to grant it. Now managed on the member's own admin page |
 
-**PR #273 was closed, not merged.** It replaces Google Fonts with local
-equivalents — the exact change recorded as reverted in §4.3 M-5, because the
-assumption behind it was wrong. Merging it would re-introduce a documented
-regression into a green build.
+Plus `bfa5aac`: `main` became the only long-lived branch, and every workflow
+document was updated to say so.
 
 ---
 
 ## 3. Decisions the owner took — do not re-litigate these
 
-Asked and answered on 2026-08-07:
-
 | Question | Decision |
 |---|---|
-| A rejected Goal proposal — deleted or kept? | **Kept**, as a fifth `GoalStatus` (`REJECTED`) |
-| Documenting a Goal outcome — what is required? | Written note **required**, photo/receipt **optional** |
-| A member leaving — immediate or acknowledged? | **Immediate** |
-| Where does reversal logic live? | **One copy**, in the member app; the console calls across |
-| How is a reversal reason stored? | **Additive column** on `Transaction`, visible to the member |
+| Branching | `main` only. `Dev` deleted 2026-08-08 |
+| How many admins? | **One** — the owner. The other three founders are plain `MEMBER`s. He may assign `ADMIN` later; assume one until told otherwise |
+| Founder badge storage | A `MemberDistinction` record — not a boolean, not a fifth `BadgeTier` |
+| Is it revocable? | **Permanent**, survives `RESIGNED`. Removal exists only as an *erratum* for a badge on the wrong account, and demands a reason |
+| Can an admin self-grant? | **Yes** — with one admin who is himself a founder there is no alternative. Recorded as `selfGranted` in the audit payload |
+| How many founders? | **Four**, enforced by `FOUNDER_COUNT` |
+| Where is it managed? | The member's own admin page, beside status and role — **not** the Badges page |
 
 ---
 
-## 4. Outstanding — nothing is blocked on engineering
+## 4. Outstanding
 
-### 4.1 The Netcash dry run — the only real gap
+### 4.1 The Netcash dry run — still the only real gap
 
-**The adapter has never spoken to a live Netcash account.** It is built against
-the vendor's published contract (live WSDL + XSD, fetched and transcribed, not
-inferred) and covered by 21 contract tests. **A contract test is not a
-settlement.**
-
-Before any real collection:
+Unchanged from the last handoff. **The adapter has never spoken to a live Netcash
+account.** It is built against the vendor's published contract (live WSDL + XSD)
+and covered by 21 contract tests. **A contract test is not a settlement.**
 
 1. Obtain the Netcash account and its **debit order service key**.
-2. Set `NETCASH_DEBICHECK_TEMPLATE_ID` (e.g. `NCDCT000000001`). **Required when
-   live — the app refuses to boot without it.**
-3. Call `checkServiceKey()` (`apps/web/lib/netcash.ts`) — read-only, cheap, and
-   confirms the key is live and authorised for debit orders.
+2. Set `NETCASH_DEBICHECK_TEMPLATE_ID` — **required when live; the app refuses to
+   boot without it.**
+3. Call `checkServiceKey()` (`apps/web/lib/netcash.ts`) — read-only and cheap.
 4. Run **one** member through **one** full cycle in test mode before anyone else.
 
-**An ISV agreement is not required.** Netcash publishes a default software
-vendor key (`24ade73c-98cf-47b3-99be-cc7b867b3080`); a vendor-specific GUID
-comes only with an ISV agreement and is optional. Do not assume onboarding is
-blocked on one.
+**An ISV agreement is not required.** Netcash publishes a default software vendor
+key; a vendor-specific GUID is optional.
 
-### 4.2 One interpretation to confirm with the founders
+### 4.2 Set `ALERT_FALLBACK_EMAIL` before going live
 
-A `RESIGNED` member **keeps the ability to sign in**, so their history stays
-reachable to them. That is this codebase's reading of "leave at any time, with
-your history intact" — it is stated in the code and flagged in #290, but it is
-an interpretation, not a quotation. If the founders want them locked out, the
-change is one line in `apps/web/lib/auth.ts` beside the `SUSPENDED` check.
+Not optional in practice, despite being an optional variable. With a single
+admin, every other alert channel depends on one account being active, one phone
+being reachable, and the notification worker being alive. This is a standing
+address — a shared mailbox — that receives every **critical** alert, needs no
+account, and is sent directly rather than queued.
 
-### 4.3 Deploy prerequisites
+Unset today. `DEPLOYMENT.md` and `docs/runbook.md` both say to set it.
 
-Seven migrations must run. All additive:
+### 4.3 Deploy prerequisites — migrations
+
+**Two new migrations this session**, both additive, both applied and verified
+locally (`prisma migrate status` reports no drift):
 
 ```
-20260807120000_transaction_reversal_reason
-20260807120001_contribution_reversed_templates
-20260807130000_goal_failed_template
-20260807140000_statement_ready_templates
-20260807150000_goal_proposals          -- adds GoalStatus.REJECTED
-20260807160000_goal_outcome
-20260807170000_member_resignation      -- adds UserStatus.RESIGNED
+20260808120000_admin_alert_templates    -- the two admin alert templates
+20260808130000_member_distinctions      -- DistinctionKind enum + table + FKs
+20260808130001_founder_badge_template   -- the grant notification
 ```
 
-The two `ALTER TYPE … ADD VALUE` migrations are transactional on PostgreSQL 12+;
-neither writes a row using the new value in the same transaction, which is the
-actual restriction.
+Seven more from the previous session were still unapplied on the local database
+and were applied this session. **37 migrations total.**
 
-**New template rows reach an existing database only because they are new**
-(§4.8). Four new slugs were added this session and each ships with an
-`ON CONFLICT DO NOTHING` insert migration for exactly that reason. If you ever
-*change* a template body, seeding will not update it — that needs a deliberate
-one-row update per environment.
+Run migrations with:
+```
+cd packages/database && node --env-file-if-exists=../../apps/web/.env.local \
+  ../../node_modules/prisma/build/index.js migrate deploy
+```
+`npm run db:migrate` is `migrate dev`, which prompts and needs shadow-database
+permissions the local user does not have.
+
+### 4.4 Staging has no branch any more
+
+`docs/environment-setup-plan.md` mapped `Dev` → staging. With `Dev` gone,
+**staging needs its own long-lived `staging` branch off `main`**, created when
+that environment is stood up. Until then, per-PR previews are the only
+non-production environment — enough to review a change, **not** enough to
+rehearse a debit cycle.
+
+### 4.5 Still open from before
+
+- **CI restoration (H-3)** — the workflow is correct and not running. Blocked on
+  a billing decision.
+- **The Founder Guide PDF** — GitHub still serves the pre-rewrite commit
+  `d3ddd74` and blob `3bf2752348503a60bae2e1039cc7835d85ff8446` by direct SHA.
+  Only the repository owner can open the GitHub Support request to purge it.
+- **`RESIGNED` members keep the ability to sign in** — this codebase's reading of
+  "leave at any time, with your history intact". An interpretation, not a
+  quotation. One line in `apps/web/lib/auth.ts` if the founders disagree.
 
 ---
 
-## 5. Findings recorded — what the gap analysis got wrong
+## 5. What is worth knowing about the new code
 
-All four came from searching for a keyword rather than opening the file.
-Corrections are in the document itself.
+### The encryption keyring (#292)
 
-1. **GAP-1 claimed no service, route or UI existed.** Three of the four already
-   did — `createReversal` was complete with five tests, the route existed, and
-   the schema had carried `reversalOfId` with a partial-unique double-reversal
-   guard since May. The real defect was reachability.
-2. **GAP-1 instructed storing the reversal with a *negated* amount.** Not
-   followed, and it would have been a bug: this repository stores it **positive**
-   and excludes `type: REVERSAL` from every inflow sum, with a parity test
-   binding the Prisma filter and the raw-SQL fragment together.
-3. **GAP-5 claimed a `monthly-statement` template was already seeded.** None
-   existed — the notice had never called `queueNotification`, so nothing had
-   needed one.
-4. **GAP-9 said "do not start without sandbox credentials."** Credentials are
-   what you need to *test* an adapter, not to *build* one. The contract is
-   public and the WSDL and XSD are anonymously fetchable. This is now §4.10, and
-   it generalises: **"blocked on X" deserves the same scrutiny as "it doesn't
-   touch money"** — state precisely what the missing thing would let you do, and
-   check whether that is the same as what you were about to do.
+Ciphertext is now `v1.<keyId>.<base64(iv ‖ tag ‖ ciphertext)>`. Values written
+before this carry no key id and are read by trying every key on the ring — safe
+because GCM authenticates. **Do not "clean up" that legacy path**; every row
+written before 2026-08-08 depends on it.
 
-### Four Netcash defects found by reading the real contract
+`packages/utils/src/keyring.ts` has **no application imports** — no env, no
+logger, no database — because the running app and the backfill script must agree
+byte for byte and the script cannot load the app's env. It is deliberately absent
+from the `@xxm/utils` barrel, which reaches client components.
 
-Each would have cost real money:
+**The trap:** `packages/database/scripts/reencrypt-secrets.ts` carries an
+explicit list of encrypted columns. A new encrypted column not added there means
+a rotation reports success while leaving that column pinned to a key you are
+about to delete.
 
-- **Amounts are in cents** in batch field 162 and in `DebiCheckAmendAuthentication`,
-  but in **rands** in `DebiCheckAuthenticate`. This system is rands throughout.
-  R450 sent unconverted collects R4.50.
-- **`BatchFileUpload` returns a file token, not a settlement.** The bank has not
-  answered. Recording it as SUCCESS credits money that has not moved.
-- **Two vendor spellings must be reproduced verbatim.** `SofwareVendorCode` is
-  misspelled in Netcash's own schema and `reasonCode` is lower-case among
-  capitalised siblings. XML names are case-sensitive — "correcting" either breaks
-  the call. Tests pin both so nobody helpfully fixes them.
-- **`NETCASH_API_URL` defaulted to `NSWSSX/NetcashTest.asmx`** — a different,
-  older service exposing no DebiCheck method at all.
+Procedure: `docs/runbook.md` → "Rotating the encryption key". Three steps; step 3
+is what actually ends an exposure.
 
-A development-only simulator that returned plausible successes whenever no
-service key was set was **deleted**. It made a broken integration look like a
-working one on every developer machine, and is much of why the mismatch survived
-so long. The mock gateway is now the single stand-in and selecting it is an
-explicit decision.
+### Alerting (#293, #294)
+
+`apps/web/services/alert.service.ts` is the only way to raise an operational
+alert. Severity routes it: `critical` → inbox + email + SMS + fallback,
+`warning` → inbox + email. It **never throws** — an alert is raised because
+something already went wrong.
+
+Codes: `DEBIT_RUN_INCOMPLETE`, `LEDGER_DRIFT_DETECTED`, `SCHEDULED_JOB_FAILED`,
+`FINANCIAL_ANOMALY_DETECTED`. Documented in `docs/runbook.md` → "What reaches you
+without you looking", with the three ways alerting can itself be down.
+
+**Not covered:** a job that *never fires*. There is no heartbeat, so a cron that
+silently stops scheduling is only visible in the Inngest dashboard.
+
+### The Founder badge (#296, #297)
+
+Read `docs/founder-badge-plan.md` before changing anything here.
+
+**The governing fact:** `BadgeScore.currentBadge` is *derived* —
+`recalculateOne` rewrites it from `determineTier(metrics)` on every run, and the
+job fires monthly **and on every contribution status change**. A `FOUNDER` value
+in `BadgeTier` would be silently overwritten the next time that founder paid.
+
+**`badge.service.ts` must never read `MemberDistinction`.** Composition happens
+in `withFounderFlag` and at the call sites. A test asserts the badge service
+source file does not contain the word "distinction" — that assertion is the
+guard, not an accident.
+
+`apps/website/lib/founders.ts` checks its roster length against `FOUNDER_COUNT`
+at compile time. Add a fifth founder to either without the other and the build
+stops.
+
+### Adding a notification template
+
+Two gates in `packages/database/__tests__/template-encoding.test.ts` will reject
+you, and both are right:
+1. Every **SMS** body must contain `Xkimm Xa Mali Foundation`.
+2. Every `{{placeholder}}` needs an entry in that file's `SAMPLE` map, or the
+   segment cost cannot be measured.
+
+Also: the seed (`prisma/templates.ts`) and the migration must carry **identical**
+text, and admin-facing slugs belong in `MANDATORY_SLUGS`.
+
+### Never assign to `process.env` in a test (#295)
+
+Vitest reuses a worker thread across files. Replacing `process.env` wholesale
+detaches it from the object every other file's `vi.stubEnv` references. Use
+`vi.stubEnv` / `vi.unstubAllEnvs`. Now enforced by a `no-restricted-syntax` rule
+over `apps/web/__tests__/**`. Recorded as §4.12.
 
 ---
 
@@ -177,12 +217,12 @@ explicit decision.
 
 | Risk | Who it affects | How you would notice |
 |---|---|---|
-| **`NETCASH_DEBICHECK_TEMPLATE_ID` unset on a live deploy** | Everyone — the app will not boot | Deploy fails at env validation with `Invalid environment variables` |
-| **Netcash adapter never exercised live** | Every member, on the first collection | A batch rejected wholesale, or a code we map wrongly. Mitigate by running one member first |
-| **Migrations not run before deploy** | Everyone | Prisma errors on any query touching the new columns |
-| **A wrong service key reads as fifty declined debits** | Every member at once | Mitigated: `isConfigurationFailure()` separates our misconfiguration from a member's bank declining. Do not collapse that distinction |
-| **The Founder Guide PDF blob is still retrievable from GitHub by SHA** | The four founders | Purged from `main` and `Dev` history by `git filter-repo` on 2026-08-07 and both branches force-pushed, so it is gone from every branch and every local clone that re-clones. **But GitHub still serves the old commit `d3ddd74` and blob `3bf27523…` directly** — merged pull requests keep `refs/pull/*` alive and GitHub does not garbage-collect on request. See §9 for the one remaining step, which only the owner can take |
-| **CI is still not executing** (§4.3 H-3) | Everyone | GitHub Actions minutes exhausted on the free tier. **Every result in this document was verified locally.** Nothing automated is checking the repository |
+| **`ALERT_FALLBACK_EMAIL` unset on a live deploy** | Everyone, silently | Nothing. That is the point — with one admin, a suspended account means no alerts and only a log line |
+| **`NETCASH_DEBICHECK_TEMPLATE_ID` unset on a live deploy** | Everyone — the app will not boot | Deploy fails at env validation |
+| **Netcash adapter never exercised live** | Every member, on the first collection | A batch rejected wholesale. Mitigate by running one member first |
+| **Migrations not run before deploy** | Everyone | Prisma errors on any query touching the new tables |
+| **A key removed from `ENCRYPTION_PREVIOUS_KEYS` too early** | Every member with a bank account | `secrets:reencrypt` exits non-zero and lists the rows. **Do not proceed past that** |
+| **CI still not executing** | Everyone | Nothing automated is checking this repository |
 
 ---
 
@@ -191,56 +231,25 @@ explicit decision.
 | # | Action | Effort | Blocked on |
 |---|---|---|---|
 | 1 | Apply to Netcash; obtain account, service key and mandate template id | Days–weeks | External |
-| 2 | Set the live env vars, run `migrate deploy`, call `checkServiceKey()` | 1 hour | Action 1 |
+| 2 | Set the live env vars (**including `ALERT_FALLBACK_EMAIL`**), run `migrate deploy`, call `checkServiceKey()` | 1 hour | Action 1 |
 | 3 | One member, one full debit cycle in test mode, end to end | Half a day | Action 2 |
-| 4 | Confirm the `RESIGNED` sign-in interpretation with the founders | Minutes | Founders |
-| 5 | Restore CI (H-3) — minutes exhausted; nothing automated verifies this repo | Half a day | Billing decision |
-| 6 | Encryption key rotation (H-5) — one key, no key id in the envelope, no previous-key fallback. Tracked **P2 · BEFORE REAL DEBITS** | 1–2 days | None |
-| 7 | Alerting on failed collections and ledger drift (M-3) | 1 day | None |
-
-**Actions 5, 6 and 7 are the honest "production readiness" list.** None of them
-were in scope this session and none are blocked — they simply were not asked
-for, and scaling work down is the owner's decision, not an engineer's.
+| 4 | Click through the Founder badge flow once on a real deploy — grant, check the members list, the member dashboard and a statement PDF, then remove | 20 min | A deploy |
+| 5 | Create the `staging` branch and stand that environment up | Half a day | Owner |
+| 6 | Confirm the `RESIGNED` sign-in interpretation with the founders | Minutes | Founders |
+| 7 | Restore CI (H-3) | Half a day | Billing decision |
+| 8 | GitHub Support request to purge the Founder Guide PDF blob | 15 min | Owner only |
 
 ---
 
 ## 8. What was explicitly not done
 
 - **No live Netcash call.** Not once, by anyone, ever.
-- **No history rewrite** to purge the Founder Guide PDF from `main`/`Dev`.
-- **No CI restoration** — the workflow exists and is correct; it is not running.
-- **No key rotation, no alerting, no POPIA retention policy** — all pre-existing,
-  all still open, none regressed.
+- **No key rotation performed** — the machinery exists and is tested; no key has
+  actually been rotated.
+- **No CI restoration.**
+- **No heartbeat for jobs that never fire.**
+- **No component tests for the admin Founder badge UI** — the admin app has no
+  component test setup. The client beneath the UI is tested; the page render and
+  two form posts are not. Worth clicking through once (action 4 above).
 - **No changes to badge thresholds, contribution amounts, fee calculations,
-  debit days or grace periods.** Those are the owner's decisions (§6).
-
----
-
-## 9. The Founder Guide PDF — what was done and what is left
-
-The PDF was committed by accident twice during the merge sequence and reached
-`Dev`'s history. On 2026-08-07 it was purged with `git filter-repo
---invert-paths` and both branches were force-pushed. Verified afterwards:
-
-- Gone from every commit on `main` and `Dev`.
-- Gone from the local object store after `reflog expire` + `gc --prune=now`.
-- All four gates re-run green on the rewritten history before pushing (941 tests).
-- A full pre-rewrite backup bundle was taken first.
-- `*.pdf`, `.codex/` and `.vscode/` are now in `.gitignore`, so a broad
-  `git add` cannot reintroduce it.
-
-**What a rewrite cannot do, and this one did not:**
-
-GitHub still serves the pre-rewrite commit `d3ddd74` and the blob
-`3bf2752348503a60bae2e1039cc7835d85ff8446` (15.5 MB) by direct SHA. Merged
-pull requests retain `refs/pull/<n>/head`, which keeps those objects reachable,
-and GitHub does not garbage-collect on demand.
-
-**The one remaining step, which only the repository owner can take:** open a
-GitHub Support request asking them to garbage-collect unreachable objects and
-purge cached views for this repository, citing the commit and blob SHAs above.
-Until then, treat the document as retrievable by anyone with repository access.
-
-Scope of exposure in the meantime: the repository is **private** with a single
-collaborator, so this is the owner's own account plus GitHub staff — not the
-public. That is why this was recorded rather than treated as an incident.
+  debit days or grace periods.** Those are the owner's decisions.
