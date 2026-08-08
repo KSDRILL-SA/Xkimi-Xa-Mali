@@ -31,7 +31,7 @@ flowchart LR
 
 - [ ] **Rotate the GitHub Personal Access Token.** It has been pasted in plaintext and passed on the command line repeatedly, so it lives in chat logs, shell history, and process listings. Anyone with it has full repo read/write — they can read all code and push a commit that exfiltrates `ENCRYPTION_KEY` or bank numbers, silently.
   - **Fix:** GitHub → Settings → Developer settings → **revoke** it → issue a new one → store it via `gh auth login` or a git credential helper so it never appears in a command again.
-  - **Also rotate** anything else ever echoed in a terminal: `AUTH_SECRET`, `ADMIN_API_SECRET`, Netcash keys (and `ENCRYPTION_KEY` — but see [P2 key rotation](#-p2--secrets-blast-radius--operations) first; rotating it naively breaks stored data).
+  - **Also rotate** anything else ever echoed in a terminal: `AUTH_SECRET`, `ADMIN_API_SECRET`, Netcash keys (and `ENCRYPTION_KEY` — but follow `docs/runbook.md`, "Rotating the encryption key"; replacing that variable on its own makes every stored bank and ID number unreadable).
   - **Done when:** old token returns 401; new credential is not visible in any command or file.
 
 ---
@@ -58,9 +58,10 @@ flowchart LR
 
 ## 🟡 P2 — Secrets, blast radius & operations (before real debits)
 
-- [ ] **Versioned `ENCRYPTION_KEY` scheme.** Today it's a single key that "must never change" — which also means one leak exposes every record with no clean rotation path.
-  - **Fix:** store a `keyId` alongside each ciphertext; support decrypting old keyIds while encrypting with the current one. Gives you a real post-compromise rotation story. Keep the key only in Vercel's encrypted env — never logged, never in an error payload.
-  - **Done when:** a new key can be introduced without rewriting existing rows.
+- [x] **Versioned `ENCRYPTION_KEY` scheme.** ~~Today it's a single key that "must never change" — which also means one leak exposes every record with no clean rotation path.~~
+  - **Done.** Ciphertext is written as `v1.<keyId>.<base64(iv ‖ tag ‖ ciphertext)>`. `ENCRYPTION_KEY_ID` names the key that writes; `ENCRYPTION_PREVIOUS_KEYS` holds retired keys for reading only. `npm run secrets:reencrypt` moves stored rows onto the active key and refuses to report success while anything is unreadable. Values written before this carry no id and are read by trying each key — safe because GCM authenticates a wrong key rather than returning nonsense.
+  - A new key can now be introduced without rewriting existing rows, and the old one retired once the backfill is clean. The procedure is `docs/runbook.md`, "Rotating the encryption key" — step 3 (delete the old key) is what actually ends an exposure, and it is the step nobody can skip.
+  - Keys stay in the encrypted env store only. No error or log line in `keyring.ts` carries key material, ciphertext or plaintext; a test asserts it.
 
 - [ ] **Lockout should not be a DoS lever.** A hard account lock after N fails lets an attacker lock a known member out before debit day.
   - **Fix:** prefer IP-scoped exponential backoff; keep `LOCKOUT_DURATION_MINUTES` short and **notify** the user instead of silently blocking.

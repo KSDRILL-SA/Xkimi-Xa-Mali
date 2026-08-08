@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   queueNotification: vi.fn(),
   notifyAdmins: vi.fn(),
   writeAuditLog: vi.fn(),
+  raiseAlert: vi.fn(),
   loggerError: vi.fn(),
 }))
 
@@ -53,6 +54,7 @@ vi.mock('@/services/budget.service', () => ({
 }))
 vi.mock('@/services/notification.service', () => ({ queueNotification: mocks.queueNotification }))
 vi.mock('@/services/inbox.service', () => ({ notifyAdmins: mocks.notifyAdmins }))
+vi.mock('@/services/alert.service', () => ({ raiseOperationalAlert: mocks.raiseAlert }))
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: mocks.writeAuditLog }))
 vi.mock('@/lib/cache', () => ({ cache: { del: vi.fn() }, CACHE_KEYS: { DASHBOARD_STATS: 'k' } }))
 vi.mock('@xxm/observability', () => ({
@@ -88,6 +90,7 @@ beforeEach(() => {
   mocks.contribCreate.mockResolvedValue({ id: 'contrib-1', status: 'PENDING' })
   mocks.queueNotification.mockResolvedValue(undefined)
   mocks.notifyAdmins.mockResolvedValue(1)
+  mocks.raiseAlert.mockResolvedValue(undefined)
   mocks.writeAuditLog.mockResolvedValue(undefined)
 })
 
@@ -142,10 +145,23 @@ describe('executeDebitRun — a gateway that throws', () => {
   it('tells the admins money did not arrive', async () => {
     await executeDebitRun(step)
 
-    expect(mocks.notifyAdmins).toHaveBeenCalledOnce()
-    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'DEBIT_RUN_INCOMPLETE' }),
-    )
+    expect(mocks.raiseAlert).toHaveBeenCalledOnce()
+    const alert = mocks.raiseAlert.mock.calls[0][0]
+    // Critical, so it leaves the inbox. This is the alert the runbook's P1 —
+    // "money not moving on debit day, respond immediately" — depends on, and
+    // until now it was filed in a web page nobody had a reason to open.
+    expect(alert).toMatchObject({ code: 'DEBIT_RUN_INCOMPLETE', severity: 'critical' })
+    expect(alert.payload).toMatchObject({ infrastructure: 1 })
+  })
+
+  it('keeps the alert title free of characters that cost an SMS segment', async () => {
+    await executeDebitRun(step)
+
+    // The title becomes the SMS body. One em dash or emoji forces UCS-2 and
+    // cuts the segment from 160 characters to 70 — on the message that goes
+    // out when money did not move.
+    const { title } = mocks.raiseAlert.mock.calls[0][0]
+    expect(title).toMatch(/^[\x20-\x7E]+$/)
   })
 })
 
@@ -204,7 +220,7 @@ describe('executeDebitRun — a clean run', () => {
 
   it('does not wake the admins when nothing is wrong', async () => {
     await executeDebitRun(step)
-    expect(mocks.notifyAdmins).not.toHaveBeenCalled()
+    expect(mocks.raiseAlert).not.toHaveBeenCalled()
   })
 })
 

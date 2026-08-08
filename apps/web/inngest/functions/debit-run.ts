@@ -10,8 +10,8 @@ import { recalculateContributionStatus, invalidateContributionSummaryCache } fro
 import { syncPrimaryGoalProgress } from '@/services/goal.service'
 import { checkBudget } from '@/services/budget.service'
 import { queueNotification } from '@/services/notification.service'
-import { notifyAdmins } from '@/services/inbox.service'
-import { writeAuditLog } from '@/services/audit.service'
+import { raiseOperationalAlert } from '@/services/alert.service'
+import { alertOnFailure } from '@/inngest/on-failure'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 import { env } from '@/lib/env'
 import { logger } from '@xxm/observability'
@@ -314,25 +314,32 @@ export async function executeDebitRun(step: DebitStepRunner) {
   // a person has to see. The morning anomaly sweep would catch it a day later
   // off the same FAILED rows; this says it on the night.
   if (notCollected.length > 0 || outcome.failed > 0) {
-    await step.run('alert-admins-uncollected', async () => {
+    await step.run('alert-admins-uncollected', () => {
+      const uncollected = notCollected.length + outcome.failed
       const lines = [
         `${declined} declined by the bank`,
         `${infrastructure} could not be submitted (gateway unreachable)`,
         `${outcome.failed} failed unexpectedly`,
       ].filter((line) => !line.startsWith('0 '))
 
-      await notifyAdmins({
-        title: `⚠️ ${periodKey}: ${notCollected.length + outcome.failed} contribution${notCollected.length + outcome.failed === 1 ? '' : 's'} not collected`,
+      // Through the alert service rather than straight to the inbox. The
+      // message was already being written; it was only ever being *filed*.
+      // Infrastructure failures are the graver half — a decline is one member's
+      // bank saying no, an unreachable gateway is every remaining member of the
+      // run collecting nothing — but both mean money that was due did not
+      // arrive, and on debit night that is worth an SMS.
+      return raiseOperationalAlert({
+        code: 'DEBIT_RUN_INCOMPLETE',
+        severity: 'critical',
+        // No emoji and no dash: this becomes an SMS, where either one halves
+        // the characters per segment. The service adds its own marker for the
+        // inbox, where that costs nothing.
+        title: `${periodKey}: ${uncollected} contribution${uncollected === 1 ? '' : 's'} not collected`,
         body: [
           ...lines,
           '',
           'Declines and submission failures are retried daily for 7 days, up to 3 attempts.',
         ].join('\n'),
-      })
-
-      await writeAuditLog({
-        action: 'DEBIT_RUN_INCOMPLETE',
-        entity: 'System',
         entityId: periodKey,
         payload: { declined, infrastructure, unexpected: outcome.failed, detail: notCollected },
       })
@@ -355,7 +362,12 @@ export async function executeDebitRun(step: DebitStepRunner) {
 }
 
 export const debitRun = inngest.createFunction(
-  { id: 'debit-run', name: 'Monthly Debit Run' },
+  {
+    id: 'debit-run',
+    name: 'Monthly Debit Run',
+    // The one job where failing quietly means no money moves at all.
+    onFailure: alertOnFailure('The monthly debit run'),
+  },
   { cron: '0 16 * * *' }, // 18:00 SAST (UTC+2)
   // Inngest's `step` carries far more than this job uses, and its `run` is
   // generic over the step tools rather than over a plain thunk, so the two

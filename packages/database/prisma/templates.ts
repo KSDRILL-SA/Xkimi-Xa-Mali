@@ -256,4 +256,22 @@ export const NOTIFICATION_TEMPLATES: Array<{
     subject: 'Approaching your budget limit — Xkimm Xa Mali Foundation',
     body: "Hi {{firstName}}, you've used {{percentage}}% of your monthly budget of R{{budget}}.",
   },
+  {
+    // Operational alerts to leadership, not a member notification.
+    //
+    // Deliberately short and deliberately plain ASCII: an em dash or an emoji
+    // forces the whole message into UCS-2 and halves what fits in a segment,
+    // and this is the message that goes out when money did not move. It carries
+    // the headline and points at the detail rather than trying to contain it.
+    slug: 'admin-alert-sms',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimm Xa Mali Foundation alert: {{title}}. Full detail is in your admin inbox.',
+  },
+  {
+    slug: 'admin-alert-email',
+    channel: 'EMAIL',
+    subject: 'Action needed: {{title}}',
+    body: '{{title}}\n\n{{detail}}\n\nThis is an automated operational alert from the Xkimm Xa Mali Foundation system.',
+  },
 ]
