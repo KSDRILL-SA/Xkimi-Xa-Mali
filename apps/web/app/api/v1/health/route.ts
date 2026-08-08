@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { redis, REDIS_CONFIGURED } from '@/lib/redis'
+import { readHeartbeats, computeOverdue } from '@/lib/job-heartbeat'
 
 const startTime = Date.now()
 
@@ -10,6 +11,15 @@ export async function GET() {
     // Only a genuinely-configured Redis is pinged. The no-op client returns
     // 'PONG' unconditionally, so pinging it would falsely report "ok".
     REDIS_CONFIGURED ? redis.ping() : Promise.resolve('skipped'),
+    // Job liveness, read from outside Inngest.
+    //
+    // `job-heartbeat-check` is the primary detector and it is itself a cron, so
+    // it cannot report its own absence — if Inngest stops scheduling anything,
+    // the watcher stops too and no alert is raised by anyone. This endpoint is
+    // reached over HTTP by whatever is already pinging the deployment, which is
+    // a different failure domain entirely, so it still answers when every job
+    // in the system is dead.
+    readHeartbeats(),
   ])
 
   const dbOk = checks[0].status === 'fulfilled'
@@ -20,6 +30,29 @@ export async function GET() {
     : checks[1].status === 'fulfilled'
       ? 'ok'
       : 'error'
+
+  // Silent jobs are reported but do **not** flip the HTTP status.
+  //
+  // This endpoint's contract is "is this instance serving requests", and a 503
+  // is read by hosting and failover tooling as "take it out of rotation" —
+  // which is the wrong remedy for a cron that stopped firing, and would replace
+  // a working web app with no web app. The stale job list goes in the body
+  // instead, where an uptime monitor can be pointed at `checks.jobs` with a
+  // keyword assertion. This mirrors the existing decision about an unconfigured
+  // Redis directly above.
+  const heartbeats = checks[2]
+  const staleCount = heartbeats.status === 'fulfilled' ? computeOverdue(heartbeats.value).length : null
+
+  // Status and a count, never the job names.
+  //
+  // This route is public and unauthenticated. "notification-flush is stale"
+  // tells an anonymous reader that nothing is being delivered to anybody right
+  // now, which is a window rather than a status. The count is enough for a
+  // monitor to assert on and enough for a human to know to look; the names are
+  // in the alert, the audit log and `job_heartbeats`, all of which require
+  // being the operator. `unknown` rather than `ok` when the read itself failed:
+  // absent evidence is not good news.
+  const jobsStatus = staleCount === null ? 'unknown' : staleCount > 0 ? 'stale' : 'ok'
 
   // The DB is always required. A configured-but-unreachable Redis is a real
   // outage; an unconfigured Redis is a config state that does not fail health,
@@ -34,7 +67,9 @@ export async function GET() {
       checks: {
         db:    dbOk ? 'ok' : 'error',
         redis: redisStatus,
+        jobs:  jobsStatus,
       },
+      ...(staleCount ? { staleJobs: staleCount } : {}),
       ts: new Date().toISOString(),
     },
     {

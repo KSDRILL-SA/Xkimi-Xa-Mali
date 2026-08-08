@@ -3,7 +3,7 @@
 **Session closed:** 2026-08-08
 **Branch state at close:** `main` is the **only** branch. No open pull requests.
 **Health at close:** typecheck 0 · lint 0 errors (5 warnings, all pre-existing
-files) · test 0 — **1039 passing** (was 941) · build 0 (3/3) · `npm audit` 0.
+files) · test 0 — **1073 passing** (was 941) · build 0 (3/3) · `npm audit` 0.
 
 Everything below was verified locally. **CI is still not executing** — GitHub
 Actions minutes are exhausted on the free tier. Nothing automated is checking
@@ -51,6 +51,7 @@ Eight PRs, all squash-merged to `main`.
 | #297 | #296 shipped with no way to grant it. Now managed on the member's own admin page |
 | #298 | The marketing site had no contact address at all — its only public route to the Foundation was a WhatsApp group link, which is useless to someone not yet in the group |
 | #299 | A notification that exhausted its retries sat FAILED forever and nothing said so. The app was healthy, the queue drained, and members simply stopped being told things — including that their money did not move |
+| #300 | Every alert in the system was raised *by* a job that ran, so a job that never fired at all raised nothing. No error, no failed row, no alert — indistinguishable from a quiet month, and on debit night it is every member uncollected |
 
 Plus `bfa5aac`: `main` became the only long-lived branch, and every workflow
 document was updated to say so.
@@ -132,7 +133,17 @@ locally (`prisma migrate status` reports no drift):
 ```
 
 Seven more from the previous session were still unapplied on the local database
-and were applied this session. **37 migrations total.**
+and were applied this session.
+
+One more was added on 2026-08-08 by #300, additive, applied and verified locally:
+
+```
+20260808140000_job_heartbeats           -- job_heartbeats table, seeded for the watched jobs
+```
+
+**39 migrations total.** (An earlier revision of this handoff said 37 before
+#300; the directory count was 38. Corrected against
+`ls packages/database/prisma/migrations`.)
 
 Run migrations with:
 ```
@@ -202,8 +213,9 @@ Redis**, because the cache is a no-op shim when Upstash is unconfigured and a
 Redis throttle would fail open. Recovery is in the runbook: fix the cause first,
 then reset `retryCount`.
 
-**Not covered:** a job that *never fires*. There is no heartbeat, so a cron that
-silently stops scheduling is only visible in the Inngest dashboard.
+**Now covered:** a job that *never fires* — see "Job heartbeats (#300)" below.
+What remains uncovered is the watcher's own absence, which needs a ping from
+outside this system.
 
 ### The Founder badge (#296, #297)
 
@@ -222,6 +234,52 @@ guard, not an accident.
 `apps/website/lib/founders.ts` checks its roster length against `FOUNDER_COUNT`
 at compile time. Add a fifth founder to either without the other and the build
 stops.
+
+### Job heartbeats (#300)
+
+**The failure with nothing to look at.** Every alert this system raises is
+raised *by* a job that ran — `onFailure` needs a run that failed,
+`DEBIT_RUN_INCOMPLETE` needs a debit run that reached the end,
+`NOTIFICATIONS_ABANDONED` needs a flush worker that counted. A job that is never
+invoked produces none of them and produces no error either, so it looks exactly
+like a quiet month.
+
+Five money-critical jobs now write `job_heartbeats` as their **last** step, and
+`job-heartbeat-check` (cron `*/15`) raises **`SCHEDULED_JOB_SILENT`** when a beat
+is overdue. Windows and the response procedure are in `docs/runbook.md` → "A job
+that never fired".
+
+Four things worth knowing before touching it:
+
+- **`SCHEDULED_JOB_SILENT` is deliberately not `SCHEDULED_JOB_FAILED`.** A failed
+  job has a run in the dashboard with a stack trace at the end of it; a silent
+  one has nothing to open and the question is whether the app is registered at
+  all. One code for both puts the wrong first move in front of the reader.
+- **A missing heartbeat row is overdue, not fine.** This is C-2 in a new place —
+  there, a missing Redis key read as version 0 and a revoked admin kept every
+  power. The migration seeds a row per watched job so a fresh deploy gets one
+  full window instead of five alerts, but the missing case still alerts, because
+  "never registered at all" is the most likely shape of this failure.
+- **The beat means the run reached the end, not that it went well.** A debit run
+  that declined every mandate still beats. Conflating the two would make total
+  collection failure look identical to the job not running.
+- **`recordJobHeartbeat` never throws.** It is called after money has moved and
+  must not fail the run that moved it. A swallowed write leaves the row stale,
+  and a stale row is what the checker alerts on — so it fails towards a false
+  alarm, never a missed one. **The consequence for tests:** a suite that mocks
+  `@/lib/db` without `jobHeartbeat` will pass green while the heartbeat is never
+  written. `debit-run-orchestration.test.ts` names the table explicitly for this
+  reason.
+
+`mandate-delay-handler` is **not** watched — it is event-triggered
+(`xxm/mandate.delay-handler`), so a month in which nobody moves a debit date is a
+month in which it correctly never runs.
+
+**What this does not close:** the watcher is a cron like everything it watches,
+so it cannot detect its own absence. `/api/v1/health` now reports
+`checks.jobs` (`ok`/`stale`/`unknown`) plus a **count** — never the job names,
+because that route is public and unauthenticated. Closing the gap properly needs
+an external monitor asserting on `"jobs":"ok"`. That is an owner action.
 
 ### Adding a notification template
 
@@ -253,6 +311,7 @@ over `apps/web/__tests__/**`. Recorded as §4.12.
 | **Migrations not run before deploy** | Everyone | Prisma errors on any query touching the new tables |
 | **A key removed from `ENCRYPTION_PREVIOUS_KEYS` too early** | Every member with a bank account | `secrets:reencrypt` exits non-zero and lists the rows. **Do not proceed past that** |
 | **CI still not executing** | Everyone | Nothing automated is checking this repository |
+| **Inngest stops scheduling entirely** | Everyone, on the next debit day | The heartbeat check (#300) stops with everything else, so nothing inside this system says so. Only an external monitor on `/api/v1/health` catches it — currently not configured |
 
 ---
 
@@ -264,10 +323,11 @@ over `apps/web/__tests__/**`. Recorded as §4.12.
 | 2 | Set the live env vars (**including `ALERT_FALLBACK_EMAIL`**), run `migrate deploy`, call `checkServiceKey()` | 1 hour | Action 1 |
 | 3 | One member, one full debit cycle in test mode, end to end | Half a day | Action 2 |
 | 4 | Click through the Founder badge flow once on a real deploy — grant, check the members list, the member dashboard and a statement PDF, then remove | 20 min | A deploy |
-| 5 | Create the `staging` branch and stand that environment up | Half a day | Owner |
-| 6 | Confirm the `RESIGNED` sign-in interpretation with the founders | Minutes | Founders |
-| 7 | Restore CI (H-3) | Half a day | Billing decision |
-| 8 | GitHub Support request to purge the Founder Guide PDF blob | 15 min | Owner only |
+| 5 | Point the uptime monitor at `/api/v1/health` with a `"jobs":"ok"` body assertion — the only thing that catches Inngest stopping altogether | 15 min | A deploy |
+| 6 | Create the `staging` branch and stand that environment up | Half a day | Owner |
+| 7 | Confirm the `RESIGNED` sign-in interpretation with the founders | Minutes | Founders |
+| 8 | Restore CI (H-3) | Half a day | Billing decision |
+| 9 | GitHub Support request to purge the Founder Guide PDF blob | 15 min | Owner only |
 
 ---
 
@@ -277,7 +337,10 @@ over `apps/web/__tests__/**`. Recorded as §4.12.
 - **No key rotation performed** — the machinery exists and is tested; no key has
   actually been rotated.
 - **No CI restoration.**
-- **No heartbeat for jobs that never fire.**
+- **No external ping.** The heartbeat check (#300) catches a job that stops
+  firing, but it is itself a cron and cannot catch its own absence. Pointing an
+  uptime monitor at `/api/v1/health` with a `"jobs":"ok"` body assertion is what
+  actually closes that, and it is an owner action.
 - **No component tests for the admin Founder badge UI** — the admin app has no
   component test setup. The client beneath the UI is tested; the page render and
   two form posts are not. Worth clicking through once (action 4 above).

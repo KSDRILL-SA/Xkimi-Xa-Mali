@@ -778,6 +778,28 @@ model SystemConfig {
   @@map("system_config")
 }
 
+// ─── Scheduled job liveness ───────────────────────────────────────────────────
+
+/// One row per scheduled job, rewritten at the end of every completed run.
+///
+/// Every other alert in this system is raised *by* a job that ran. A job that
+/// never fires at all — an Inngest app that failed to sync, a function that was
+/// disabled, a deploy that dropped a registration — raises nothing, because the
+/// thing that would have spoken is the thing that is missing. This table is the
+/// evidence that it ran; `job-heartbeat-check` is what reads it.
+///
+/// `jobId` is the Inngest function id, which is what makes the row findable
+/// from a dashboard. There is deliberately no expected-interval column: that
+/// belongs beside the cron expression in code, not in a second place it can
+/// drift from.
+model JobHeartbeat {
+  jobId     String   @id
+  lastRunAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@map("job_heartbeats")
+}
+
 // ─── Badges & Community ────────────────────────────────────────────────────────
 
 model BadgeScore {

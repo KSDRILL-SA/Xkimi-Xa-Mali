@@ -17,6 +17,7 @@ import { env } from '@/lib/env'
 import { logger } from '@xxm/observability'
 import { INFRASTRUCTURE_FAILURE_PREFIX } from '@xxm/utils'
 import { toTransactionStatus } from '@/lib/transaction-status'
+import { recordJobHeartbeat } from '@/lib/job-heartbeat'
 
 /**
  * Run every mandate, whatever the ones before it did.
@@ -345,6 +346,11 @@ export async function executeDebitRun(step: DebitStepRunner) {
       })
     })
   }
+
+  // Last, and unconditionally: a run that declined every mandate still ran, and
+  // the heartbeat records that it ran, not that it went well. What went well is
+  // the alert above's business.
+  await step.run('heartbeat', () => recordJobHeartbeat('debit-run'))
 
   const summary = {
     period: periodKey,

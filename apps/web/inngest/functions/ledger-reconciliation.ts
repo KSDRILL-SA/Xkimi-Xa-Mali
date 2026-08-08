@@ -9,6 +9,7 @@ import { SUCCESSFUL_INFLOW_SQL } from '@/repositories/transaction.repository'
 import { writeAuditLog } from '@/services/audit.service'
 import { raiseOperationalAlert } from '@/services/alert.service'
 import { alertOnFailure } from '@/inngest/on-failure'
+import { recordJobHeartbeat } from '@/lib/job-heartbeat'
 
 /**
  * Inngest's `step`, narrowed to what this job uses.
@@ -129,6 +130,8 @@ export async function executeLedgerReconciliation(step: ReconciliationStepRunner
   // already drifted, so the number examined is never known here. Adding
   // `corrected` to `drifted` counted the same contributions twice and named
   // the total after something this job cannot measure.
+  await step.run('heartbeat', () => recordJobHeartbeat('ledger-reconciliation'))
+
   return {
     drifted: drifted.length,
     corrected,
