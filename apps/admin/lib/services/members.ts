@@ -42,6 +42,9 @@ export async function listMembers(
         id: true, firstName: true, lastName: true, email: true,
         phone: true, status: true, createdAt: true,
         roles: { select: { role: true } },
+        // So the list can show who holds the Founder badge without opening each
+        // member. At most four rows across the whole table.
+        distinctions: { select: { kind: true } },
         _count: { select: { contributions: true, mandates: true } },
       },
     }),
@@ -80,6 +83,9 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
         select: { id: true, periodMonth: true, periodYear: true, amountDue: true, amountPaid: true, status: true },
       },
       notificationPreference: { select: { sms: true, email: true, push: true, whatsapp: true } },
+      // Conferred, never earned — a separate table the badge score knows
+      // nothing about. See docs/founder-badge-plan.md.
+      distinctions: { select: { kind: true, grantedAt: true, grantedById: true, note: true } },
       _count: { select: { contributions: true, mandates: true } },
     },
   })
