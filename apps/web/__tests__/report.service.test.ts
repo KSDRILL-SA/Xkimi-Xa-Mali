@@ -31,6 +31,12 @@ vi.mock('@/lib/db', () => ({
     bankAccount: {
       findMany: vi.fn(),
     },
+    // A statement prints the Founder mark, so building one now asks whether the
+    // member holds it. Defaulted to "no": every existing case in this file is
+    // about an ordinary member, and a statement must render for one.
+    memberDistinction: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
   },
 }))
 
@@ -80,6 +86,7 @@ const mockContribAggregate = db.contribution.aggregate as MockedFunction<typeof 
 const mockBankAccountFindMany = db.bankAccount.findMany as MockedFunction<typeof db.bankAccount.findMany>
 const mockUpload = storageProvider.upload as MockedFunction<typeof storageProvider.upload>
 const mockRenderPDF      = renderStatementPDF as MockedFunction<typeof renderStatementPDF>
+const mockDistinctionFindUnique = db.memberDistinction.findUnique as MockedFunction<typeof db.memberDistinction.findUnique>
 const mockVerifySignature = verifySignatureExists as MockedFunction<typeof verifySignatureExists>
 const mockEmbedSignature  = embedSignatureInPdf  as MockedFunction<typeof embedSignatureInPdf>
 
@@ -247,6 +254,32 @@ describe('generateMemberStatement', () => {
     )
     expect(result.url).toBe('https://blob.vercel.com/statements/user-1/2025-05.pdf')
     expect(result.signedUrl).toBe('https://blob.vercel.com/signed-url')
+
+    // An ordinary member's statement carries no Founder mark.
+    expect(mockRenderPDF.mock.calls[0][0].member.isFounder).toBe(false)
+  })
+
+  /**
+   * A statement is a permanent record, and the Founder badge is permanent, so it
+   * belongs on one. It is printed beside the name — there is no badge tier on a
+   * statement at all, so there is nothing here for it to be confused with.
+   */
+  it('prints the Founder mark on the statement of a founder', async () => {
+    mockVerifySignature.mockResolvedValueOnce(null as never)
+
+    mockUserFindMany.mockResolvedValueOnce([{
+      id: 'user-1', firstName: 'Kurhula', lastName: 'Maluleke', email: 'k@test.com',
+      phone: '+27821234567', createdAt: new Date('2025-01-01T00:00:00Z'),
+    }] as never)
+    mockContribFindMany.mockResolvedValueOnce([] as never)
+    mockDistinctionFindUnique.mockResolvedValueOnce({ userId: 'user-1' } as never)
+
+    mockRenderPDF.mockResolvedValueOnce(Buffer.from('PDF_CONTENT'))
+    mockUpload.mockResolvedValueOnce({ url: 'https://blob/u.pdf', signedUrl: 'https://blob/s' })
+
+    await generateMemberStatement('user-1', 'user-1', MEMBER_ROLES, 5, 2025)
+
+    expect(mockRenderPDF.mock.calls[0][0].member.isFounder).toBe(true)
   })
 })
 

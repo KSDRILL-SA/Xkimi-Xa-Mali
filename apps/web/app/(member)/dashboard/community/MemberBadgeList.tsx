@@ -1,11 +1,14 @@
 import type { BadgeTier } from '@prisma/client'
 import { BADGE_TIER_CONFIG } from '@/lib/badge-tier'
+import { FounderMark } from '@/components/FounderMark'
 
 type Member = {
   userId: string
   firstName: string
   lastName: string
   currentBadge: BadgeTier
+  /** Conferred, not earned. Shown beside the tier, never instead of it. */
+  isFounder?: boolean
 }
 
 export function MemberBadgeList({ members }: { members: Member[] }) {
@@ -27,9 +30,15 @@ export function MemberBadgeList({ members }: { members: Member[] }) {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-xxm-green-900 truncate">{m.firstName} {m.lastName}</p>
               </div>
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${cfg.badgeClass}`}>
-                {cfg.label}
-              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Beside the tier, never instead of it — a founder sitting at
+                    Amateur shows both, and neither reads as a correction of the
+                    other. */}
+                {m.isFounder ? <FounderMark size="sm" /> : null}
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${cfg.badgeClass}`}>
+                  {cfg.label}
+                </span>
+              </div>
             </div>
           )
         })}

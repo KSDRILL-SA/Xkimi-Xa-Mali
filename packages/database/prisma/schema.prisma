@@ -114,6 +114,15 @@ enum BadgeTier {
   WORLD_CLASS
 }
 
+/// A mark that is *conferred*, never earned or computed.
+///
+/// Deliberately not a fifth BadgeTier. Tiers are recalculated from contribution
+/// behaviour on every status change, so a value placed there would be
+/// overwritten the next time that member paid — see docs/founder-badge-plan.md.
+enum DistinctionKind {
+  FOUNDER
+}
+
 enum BudgetType {
   MONTHLY
   YEARLY
@@ -180,6 +189,8 @@ model User {
   budgetOverrides        BudgetOverride[]
   signature              AdminSignature?
   signatureHistory       AdminSignatureHistory[]
+  distinctions           MemberDistinction[]     @relation("DistinctionHolder")
+  distinctionsGranted    MemberDistinction[]     @relation("DistinctionGranter")
 
   @@index([status])
   @@index([email, status])
@@ -811,6 +822,32 @@ model BadgeHistory {
 
   @@index([userId, createdAt])
   @@map("badge_history")
+}
+
+/// A permanent, granted distinction — today only FOUNDER.
+///
+/// Separate from BadgeScore by design: that record is derived and rewritten by
+/// the recalculation job, and this one is a decision a person made and must
+/// outlive every recalculation. Nothing in badge.service.ts reads or writes it.
+model MemberDistinction {
+  id          String          @id @default(cuid())
+  userId      String
+  kind        DistinctionKind
+  /// Who granted it. With a single admin who is himself a founder, self-grants
+  /// are expected — storing this is what makes one visible as such.
+  grantedById String
+  grantedAt   DateTime        @default(now())
+  note        String?
+
+  user      User @relation("DistinctionHolder", fields: [userId], references: [id], onDelete: Cascade)
+  /// Deliberately no cascade: a granted badge must not disappear because the
+  /// person who granted it was removed.
+  grantedBy User @relation("DistinctionGranter", fields: [grantedById], references: [id])
+
+  /// A double grant is impossible in the database, not merely in the service.
+  @@unique([userId, kind])
+  @@index([kind])
+  @@map("member_distinctions")
 }
 
 model CommunityMessage {

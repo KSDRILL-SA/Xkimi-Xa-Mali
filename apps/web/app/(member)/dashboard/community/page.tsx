@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { getSession } from '@/lib/session'
 import { getMessages } from '@/services/community.service'
 import { getCommunityBadges } from '@/services/badge.service'
+import { withFounderFlag } from '@/services/distinction.service'
 import { MessageBoard } from './MessageBoard'
 import { MemberBadgeList } from './MemberBadgeList'
 import { Reveal } from '@xxm/ui'
@@ -14,10 +15,13 @@ export default async function CommunityPage() {
   const userId = session!.user.id
   const roles = (session!.user.roles as string[] | undefined) ?? []
 
-  const [messages, members] = await Promise.all([
+  const [messages, badges] = await Promise.all([
     getMessages(1, 20, userId),
     getCommunityBadges(),
   ])
+  // Composed here rather than inside the badge service, which never learns that
+  // distinctions exist. One query for the whole list.
+  const members = await withFounderFlag(badges)
 
   return (
     <div className="space-y-6">

@@ -257,6 +257,15 @@ export const NOTIFICATION_TEMPLATES: Array<{
     body: "Hi {{firstName}}, you've used {{percentage}}% of your monthly budget of R{{budget}}.",
   },
   {
+    // A founder badge is granted by hand, so it appears on an account without
+    // the member having done anything. Unannounced, that reads as a bug rather
+    // than an honour. Email only: it is not money moving and not urgent.
+    slug: 'founder-badge-granted',
+    channel: 'EMAIL',
+    subject: 'Your Founder badge - Xkimm Xa Mali Foundation',
+    body: 'Hi {{firstName}}, the Founder badge has been added to your account. It marks you as one of the four who started this collective, it sits alongside whatever contribution badge you have earned, and it stays with your account for good.',
+  },
+  {
     // Operational alerts to leadership, not a member notification.
     //
     // Deliberately short and deliberately plain ASCII: an em dash or an emoji
