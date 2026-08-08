@@ -25,6 +25,11 @@ const PLACEHOLDERS = {
   NEXT_PUBLIC_ADMIN_URL: 'http://localhost:3002',
   NEXT_PUBLIC_WHATSAPP_GROUP_LINK: 'https://chat.whatsapp.com/not-configured',
   NEXT_PUBLIC_ADMIN_WHATSAPP_NUMBER: '27000000000',
+  // The Foundation's public contact address. Placeholder is deliberately
+  // undeliverable: a plausible-looking fallback is exactly the failure this file
+  // exists to prevent, and an unnoticed one would send a prospective member's
+  // first message nowhere.
+  NEXT_PUBLIC_SUPPORT_EMAIL: 'support@example.invalid',
 } as const
 
 type PublicVar = keyof typeof PLACEHOLDERS
@@ -38,6 +43,7 @@ const RAW: Record<PublicVar, string | undefined> = {
   NEXT_PUBLIC_ADMIN_URL: process.env.NEXT_PUBLIC_ADMIN_URL,
   NEXT_PUBLIC_WHATSAPP_GROUP_LINK: process.env.NEXT_PUBLIC_WHATSAPP_GROUP_LINK,
   NEXT_PUBLIC_ADMIN_WHATSAPP_NUMBER: process.env.NEXT_PUBLIC_ADMIN_WHATSAPP_NUMBER,
+  NEXT_PUBLIC_SUPPORT_EMAIL: process.env.NEXT_PUBLIC_SUPPORT_EMAIL,
 }
 
 function resolve(): Record<PublicVar, string> {
@@ -66,4 +72,5 @@ export const siteEnv = {
   ADMIN_URL: resolved.NEXT_PUBLIC_ADMIN_URL,
   WA_LINK: resolved.NEXT_PUBLIC_WHATSAPP_GROUP_LINK,
   ADMIN_WA_NUMBER: resolved.NEXT_PUBLIC_ADMIN_WHATSAPP_NUMBER,
+  SUPPORT_EMAIL: resolved.NEXT_PUBLIC_SUPPORT_EMAIL,
 } as const

@@ -68,6 +68,7 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 | `ENCRYPTION_KEY_ID` / `ENCRYPTION_PREVIOUS_KEYS` | Only set while rotating. Unset behaves as it always has (key id `1`, no previous keys). |
 | `ADMIN_API_SECRET` | 32+ chars. Must be **identical** on web + admin (admin→web internal calls). |
 | `ALERT_FALLBACK_EMAIL` | Standing address for critical alerts, independent of any account. **Set this** — with a single admin, every other alert channel depends on one person's account being active and one worker being alive. See [the runbook](docs/runbook.md#what-reaches-you-without-you-looking). |
+| `SUPPORT_EMAIL` · `NEXT_PUBLIC_SUPPORT_EMAIL` | The Foundation's contact address, shown to members on the support page and in the marketing site footer. **The two must match.** The public one is inlined at build time, so setting it after a deploy does nothing. |
 | `WEB_INTERNAL_URL` | (admin) the web app's prod URL, e.g. `https://app.<your-domain>`. |
 | `NEXTAUTH_URL` | each app's own prod URL. |
 | `NETCASH_SERVICE_KEY` | **production** service key. The build **fails without it** — no silent start. |
@@ -82,12 +83,23 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 | `WHATSAPP_GROUP_LINK` / `NEXT_PUBLIC_WHATSAPP_GROUP_LINK` | the group invite link. |
 | `TRUSTED_PROXY` | `vercel` unless a CDN/WAF is genuinely in front. Decides which forwarded-IP header is believed — get it wrong and per-IP rate limiting can be bypassed by sending the header yourself. |
 
+**The Foundation's operational mailbox is `xkimxamali@gmail.com`.** Use it for
+`SUPPORT_EMAIL`, `NEXT_PUBLIC_SUPPORT_EMAIL` and `ALERT_FALLBACK_EMAIL` — all
+three are addresses that *receive*.
+
+> [!WARNING]
+> **It cannot be `RESEND_FROM_EMAIL`.** Resend only sends from a domain you have
+> verified, and nobody can verify `gmail.com`. That one must be
+> `noreply@<your-domain>` once the domain is registered. This does not fail the
+> build — Resend rejects the send at run time and **every notification silently
+> stops**, which is the quietest way this system can break.
+
 ## 3. Database (Neon, production)
 
 ```bash
 # from packages/database, with prod DATABASE_URL *and* DIRECT_DATABASE_URL exported
 # (migrations run over the unpooled endpoint — see .env.example)
-npx prisma migrate deploy   # applies ALL 28 migrations (incl. ledger, inbox, webhook-dedupe, goal engagement, pledges)
+npx prisma migrate deploy   # applies ALL 37 migrations (incl. ledger, inbox, webhook-dedupe, goal engagement, pledges, member distinctions)
 npm run db:seed             # roles + founder accounts
 ```
 
