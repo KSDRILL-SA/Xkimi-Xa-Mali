@@ -98,6 +98,99 @@ A **REVERSED** result posts a ledger DEBIT — confirm the balance moved via `GE
 
 ---
 
+## Rotating the encryption key
+
+`ENCRYPTION_KEY` protects stored bank account numbers and ID numbers. Rotate it
+when it may have been exposed — pasted into a terminal, committed, shared, or
+held by someone who has left — and on a schedule if you have one.
+
+**Do not simply change the value.** The key is not a password; it is the only
+thing that can read what it wrote. Replacing it on its own makes every stored
+bank and ID number unreadable in the same instant, and nothing in the app can
+recover them.
+
+A rotation is three steps, and the middle one has to finish before the third.
+
+### Before you start
+
+- Take a database backup. Neon → branch → restore point. This is the step you
+  will wish you had taken.
+- Generate the new key: `openssl rand -hex 32` (64 hex characters).
+- Decide the new id — the next integer. If `ENCRYPTION_KEY_ID` is unset the
+  current key is id `1`, so the new one is `2`.
+- Do one environment at a time, staging first. Keys differ per environment, so
+  nothing about production is proved by staging succeeding — but the *procedure*
+  is, which is what you are rehearsing.
+
+### Step 1 — add the new key, keep the old one for reading
+
+Set all three, together, in the same deploy:
+
+```
+ENCRYPTION_KEY=<the new key>
+ENCRYPTION_KEY_ID=2
+ENCRYPTION_PREVIOUS_KEYS=1:<the old key>
+```
+
+From this deploy on, new values are written under key 2 and stamped with it.
+Everything already stored still reads, under key 1. Nothing is unavailable, and
+members notice nothing.
+
+The app refuses to start on configuration that cannot be a rotation — the same
+id twice, the same key material under two ids, a malformed key. Read the message
+rather than working around it; each one means a step was missed.
+
+### Step 2 — move the stored values across
+
+```
+npm run secrets:reencrypt              # preview; writes nothing
+npm run secrets:reencrypt -- --apply   # rewrite
+```
+
+Run it against the environment you are rotating, with that environment's
+variables set. It walks `users.idNumber` and `bank_accounts.accountNumber`,
+rewrites each value under the active key, and prints a count per column.
+
+Safe to interrupt and safe to re-run: rows already under the active key are
+skipped without being decrypted, and each row is committed on its own.
+
+**It must report zero unreadable before you go further.** A non-zero exit means
+some values are still tied to a key that is about to be deleted. Each one is
+listed with its row id and the key it claims:
+
+| Reported as | What it means | What to do |
+|---|---|---|
+| `key=1` and unreadable | The old key in `ENCRYPTION_PREVIOUS_KEYS` is wrong | Fix the value and re-run. Do not proceed |
+| `key=unversioned`, unreadable | Written under a key not on the ring at all — usually another environment's | Find the key that wrote it, or re-capture the value from the member |
+| `key=unrecognisable` | Never was ciphertext — a fixture, or a test mock that reached a real database | Correct or clear the row. It has no recoverable plaintext |
+
+Re-run the preview until it reports zero.
+
+### Step 3 — retire the old key
+
+Only once step 2 has reported zero unreadable **in that environment**:
+
+```
+ENCRYPTION_PREVIOUS_KEYS=      # removed
+```
+
+Then delete the old key from wherever it is stored. Until you do, an exposed key
+is still an exposed key — steps 1 and 2 restore your ability to remove it, they
+do not remove it.
+
+Keep the old key somewhere retrievable until you are confident, and keep the
+backup from step 0 for as long as your retention policy allows. A key deleted
+one step early is not recoverable from anything the app holds.
+
+### Adding a new encrypted column later
+
+`packages/database/scripts/reencrypt-secrets.ts` carries an explicit list of the
+encrypted columns. A column added to the schema and not added there will be
+missed, and the rotation will report success while leaving that column pinned to
+a key you are about to delete.
+
+---
+
 ## Monitoring & escalation
 
 | Tool | Check |
@@ -114,3 +207,48 @@ A **REVERSED** result posts a ledger DEBIT — confirm the balance moved via `GE
 | P2 | Members cannot log in | 1 hour |
 | P3 | Notifications not sending | 4 hours |
 | P4 | Reports unavailable | Next business day |
+
+### What reaches you without you looking
+
+The system raises its own alerts through `services/alert.service.ts`. Severity
+decides how far the message travels, not how it is worded:
+
+| Severity | Channels | Meaning |
+|---|---|---|
+| `critical` | Admin inbox **+ email + SMS** | Money did not move, or the records disagree about money |
+| `warning` | Admin inbox **+ email** | Worth seeing today, not tonight |
+
+Every alert is also written to the audit log and to the logger — and a critical
+one logs at error level, so it reaches Sentry regardless of whether any channel
+delivered.
+
+| Alert | Raised by | Severity |
+|---|---|---|
+| `DEBIT_RUN_INCOMPLETE` | Debit run, on the night | critical |
+| `LEDGER_DRIFT_DETECTED` | Nightly reconciliation | critical |
+| `SCHEDULED_JOB_FAILED` | Any money-critical job exhausting its retries | critical |
+| `FINANCIAL_ANOMALY_DETECTED` | Morning sweep | critical if the collection rate is below floor, else warning |
+
+**Only `ACTIVE` admins are alerted.** A suspended founder is not an escalation
+path. If nothing is delivered, the first thing to check is that at least one
+active account holds the ADMIN role — the service logs
+`Operational alert has no active admin to reach` for exactly this, because an
+alerting system with no recipients looks identical to a quiet night.
+
+**Delivery is not instant.** SMS and email are queued and drained by
+`notification-flush`, which runs every five minutes. An alert raised at 18:00
+arrives by about 18:05.
+
+**Three ways alerting can itself be down**, in the order worth checking:
+
+1. **`notification-flush` has stopped.** Nothing queued is going anywhere. Its
+   own failure alert cannot be delivered by it — what carries that one out is
+   the Sentry error, so Sentry is the check that does not depend on this system.
+2. **No active admin holds the ADMIN role.** See above.
+3. **BulkSMS or Resend credentials are wrong.** The inbox message still lands;
+   nobody is paged. Rows in `notifications` stay `QUEUED` or `FAILED` —
+   `SELECT status, count(*) FROM notifications GROUP BY status` is the check.
+
+`SCHEDULED_JOB_FAILED` covers a job that **ran and failed**. It does not cover a
+job that **never fired** — no heartbeat check exists, so a cron that silently
+stops scheduling is still only visible in the Inngest dashboard.

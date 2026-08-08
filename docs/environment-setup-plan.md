@@ -123,7 +123,8 @@ wrong is quiet, and that is where the real risk sits.
 
 | Secret | web | admin | website | Rule |
 |---|:--:|:--:|:--:|---|
-| `ENCRYPTION_KEY` | ✅ | — | — | **Set once, never change.** Different per environment. |
+| `ENCRYPTION_KEY` | ✅ | — | — | **Never change it on its own** — rotate it via the runbook. Different per environment. |
+| `ENCRYPTION_KEY_ID`, `ENCRYPTION_PREVIOUS_KEYS` | ✅ | — | — | Only set while rotating. Unset = key id `1`, no previous keys. |
 | `AUTH_SECRET` | ✅ | ✅ | — | **Identical** across web+admin *within* an environment; different *between* environments |
 | `ADMIN_API_SECRET` | ✅ | ✅ | — | **Identical** across web+admin within an environment |
 | `DATABASE_URL` | ✅ | ✅ | — | Same within an environment. The **pooled** Neon string |
@@ -134,10 +135,15 @@ wrong is quiet, and that is where the real risk sits.
 
 ### `ENCRYPTION_KEY` is the one that cannot be recovered
 
-It decrypts stored bank account and ID numbers. Lose it and that data is
-permanently unreadable; rotate it and the same thing happens. Vercel's
-environment store must not be its only home — put it in a password manager
+It decrypts stored bank account and ID numbers. **Lose it and that data is
+permanently unreadable** — no part of the app can recover it. Vercel's
+environment store must not be its only home: put it in a password manager
 **before** pasting it anywhere, and never reuse the staging key in production.
+
+Replacing it is a different matter. It can be rotated — add the new key, move
+the stored rows onto it, then retire the old one — but only in that order, and
+only by following `docs/runbook.md`, "Rotating the encryption key". Editing the
+variable on its own has the same effect as losing it.
 
 ### Pooled vs unpooled
 

@@ -68,7 +68,23 @@ export const env = createEnv({
     // Auth callbacks and every absolute URL the app builds resolve against this.
     NEXTAUTH_URL: requiredWhenLive(z.string().url()),
     FOUNDER_EMAIL: z.string().email().optional(),
+    // The key new ciphertext is written under. Rotating it is a three-step
+    // operation, not an edit — see `docs/runbook.md`, "Rotating the encryption
+    // key". Replacing this value on its own, without moving the old key to
+    // ENCRYPTION_PREVIOUS_KEYS first, makes every stored bank and ID number
+    // unreadable.
     ENCRYPTION_KEY: z.string().length(64),
+    // Stamped into every value written from now on, so a row can be attributed
+    // to a key without trying keys against it. Bump it — 1 → 2 — as part of a
+    // rotation; leave it alone otherwise.
+    ENCRYPTION_KEY_ID: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,32}$/, 'must be 1-32 characters of A-Z, a-z, 0-9, _ or -')
+      .default('1'),
+    // Retired keys, `id:hex` comma separated, used for reading only. A key
+    // stays here until the re-encrypt backfill reports zero rows left under it;
+    // removing it earlier is what turns a rotation into data loss.
+    ENCRYPTION_PREVIOUS_KEYS: z.string().min(1).optional(),
     NETCASH_SERVICE_KEY: netcashCredential(),
     NETCASH_WEBHOOK_SECRET: netcashCredential(),
     // No default. It used to fall back to the TEST endpoint, so forgetting it in
@@ -142,6 +158,8 @@ export const env = createEnv({
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     FOUNDER_EMAIL: process.env.FOUNDER_EMAIL,
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+    ENCRYPTION_KEY_ID: process.env.ENCRYPTION_KEY_ID,
+    ENCRYPTION_PREVIOUS_KEYS: process.env.ENCRYPTION_PREVIOUS_KEYS,
     NETCASH_SERVICE_KEY: process.env.NETCASH_SERVICE_KEY,
     NETCASH_WEBHOOK_SECRET: process.env.NETCASH_WEBHOOK_SECRET,
     NETCASH_API_URL: process.env.NETCASH_API_URL,

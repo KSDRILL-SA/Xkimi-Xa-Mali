@@ -123,7 +123,7 @@ Generate secrets: `openssl rand -base64 32` (secrets) · `openssl rand -hex 32` 
 |---|---|
 | `DATABASE_URL` | Neon connection string (pooled in prod) |
 | `AUTH_SECRET` / `NEXTAUTH_SECRET` | 32+ chars |
-| `ENCRYPTION_KEY` | AES-256 for bank/ID numbers. **64 hex chars. Set once — never change** (rotating it makes stored data unreadable) |
+| `ENCRYPTION_KEY` | AES-256 for bank/ID numbers. **64 hex chars. Never change it on its own** — that makes stored data unreadable. Rotating it is a three-step procedure with `ENCRYPTION_KEY_ID` and `ENCRYPTION_PREVIOUS_KEYS`: [runbook](docs/runbook.md#rotating-the-encryption-key) |
 | `ADMIN_API_SECRET` | Trusted admin→web calls. **Must match on web + admin** |
 | `UPSTASH_REDIS_REST_URL` / `_TOKEN` | Cache + rate limit |
 | `NETCASH_SERVICE_KEY` / `_WEBHOOK_SECRET` | |
