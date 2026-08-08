@@ -235,6 +235,21 @@ active account holds the ADMIN role — the service logs
 `Operational alert has no active admin to reach` for exactly this, because an
 alerting system with no recipients looks identical to a quiet night.
 
+**Set `ALERT_FALLBACK_EMAIL`.** This system runs with a **single admin** by
+decision, so every channel above depends on one person's account being active,
+their phone being reachable, and the notification worker being alive. None of
+those links has a spare.
+
+`ALERT_FALLBACK_EMAIL` is a standing address — a shared operations mailbox, or a
+bridge into the WhatsApp group — that receives every **critical** alert
+regardless of what the admin fan-out does. It is sent **directly**, not queued,
+because if the queue is what broke then queueing the alert about it is not a
+plan. It needs no user account, so it survives the admin being suspended,
+locked out, or simply asleep.
+
+It is optional and unset by default; unset, alerting behaves exactly as it did
+before it existed. **On a live deployment, set it.**
+
 **Delivery is not instant.** SMS and email are queued and drained by
 `notification-flush`, which runs every five minutes. An alert raised at 18:00
 arrives by about 18:05.

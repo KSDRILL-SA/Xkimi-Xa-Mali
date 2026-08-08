@@ -1,5 +1,7 @@
 import { logger } from '@xxm/observability'
 import { db } from '@/lib/db'
+import { env } from '@/lib/env'
+import { emailProvider } from '@/integrations/email'
 import { notifyAdmins } from '@/services/inbox.service'
 import { queueNotification } from '@/services/notification.service'
 import { writeAuditLog } from '@/services/audit.service'
@@ -65,8 +67,10 @@ export async function raiseOperationalAlert(alert: OperationalAlert): Promise<{
   inbox: boolean
   email: boolean
   sms: boolean
+  /** Whether the account-independent destination took it. Critical alerts only. */
+  fallback: boolean
 }> {
-  const result = { admins: 0, inbox: false, email: false, sms: false }
+  const result = { admins: 0, inbox: false, email: false, sms: false, fallback: false }
 
   // The log line first, and unconditionally. It is the only channel that does
   // not depend on the database being readable or a provider being reachable,
@@ -107,12 +111,19 @@ export async function raiseOperationalAlert(alert: OperationalAlert): Promise<{
       notifyAdmins({ title: `${marker} ${alert.title}`, body: alert.body }),
     )) !== null
 
+  // The standing destination, attempted for every critical alert regardless of
+  // how the admin fan-out goes. See {@link deliverToFallback}.
+  if (alert.severity === 'critical') {
+    result.fallback = await deliverToFallback(alert)
+  }
+
   if (!admins || admins.length === 0) {
     // Nothing to escalate to. Worth its own line: an alerting system with no
     // recipients looks identical to a quiet night from the outside.
     logger.error('Operational alert has no active admin to reach', {
       code: alert.code,
       severity: alert.severity,
+      reachedFallback: result.fallback,
     })
     return result
   }
@@ -128,6 +139,60 @@ export async function raiseOperationalAlert(alert: OperationalAlert): Promise<{
   }
 
   return result
+}
+
+/**
+ * The destination that does not depend on anybody's account.
+ *
+ * Every other channel routes through a `User` row: find the active admins, queue
+ * a notification against each, let the flush worker deliver it. That chain has
+ * three links that can each be the reason nothing arrives — no active admin, a
+ * suspended account, a flush worker that is itself the thing that died — and
+ * this system currently runs with **one** admin, so none of those links has a
+ * spare.
+ *
+ * `ALERT_FALLBACK_EMAIL` is a standing address: a shared operations mailbox, a
+ * WhatsApp-to-email bridge, whatever is monitored by more than one person. It is
+ * sent **directly**, not queued, for the same reason — if the queue is what
+ * broke, putting the alert about it into the queue is not a plan.
+ *
+ * Optional. Unset, this is a no-op and the admin fan-out is the whole story,
+ * which is exactly the behaviour before this existed.
+ */
+async function deliverToFallback(alert: OperationalAlert): Promise<boolean> {
+  const to = env.ALERT_FALLBACK_EMAIL
+  if (!to) return false
+
+  const sent = await attempt('fallback-email', () =>
+    emailProvider.sendGenericEmail(
+      to,
+      `Action needed: ${alert.title}`,
+      `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">` +
+        `<h2 style="margin:0 0 16px;">${escapeHtml(alert.title)}</h2>` +
+        `<pre style="white-space:pre-wrap;font-family:inherit;margin:0 0 24px;">${escapeHtml(alert.body)}</pre>` +
+        `<p style="color:#666;font-size:13px;margin:0;">Automated operational alert (${escapeHtml(alert.code)}) ` +
+        `from the Xkimm Xa Mali Foundation system.</p></div>`,
+      // Not an idempotency key Resend can dedupe on across runs — the code and
+      // the entity are what make two alerts the same alert.
+      `alert:${alert.code}:${alert.entityId ?? ''}`,
+    ),
+  )
+
+  return sent !== null
+}
+
+/**
+ * The alert title and body are assembled from job output — a gateway's failure
+ * string, a Prisma error. None of it is authored by a person, and all of it is
+ * about to be interpolated into HTML.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 /**
