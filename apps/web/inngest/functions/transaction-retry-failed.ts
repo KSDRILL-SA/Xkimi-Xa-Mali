@@ -10,6 +10,7 @@ import { queueNotification } from '@/services/notification.service'
 import { MAX_TRANSACTION_RETRY } from '@xxm/utils'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { alertOnFailure } from '@/inngest/on-failure'
+import { recordJobHeartbeat } from '@/lib/job-heartbeat'
 
 /**
  * Inngest's `step`, narrowed to what this job uses.
@@ -148,6 +149,8 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
       errored++
     }
   }
+
+  await step.run('heartbeat', () => recordJobHeartbeat('transaction-retry-failed'))
 
   const summary = { total: candidates.length, retried, skipped, declined, errored }
   logger.info('Transaction retry job completed', summary)

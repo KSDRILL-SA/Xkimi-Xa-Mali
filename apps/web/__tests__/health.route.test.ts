@@ -13,18 +13,42 @@ type RedisState = {
   pingRejects?: boolean
 }
 
-async function loadRoute(opts: { dbFails?: boolean; redis: RedisState }) {
+/**
+ * `beating` — every watched job wrote a heartbeat a moment ago.
+ * `silent`  — no heartbeat rows at all, which is what a dead Inngest looks like.
+ * `error`   — the heartbeat read itself failed.
+ */
+type HeartbeatState = 'beating' | 'silent' | 'error'
+
+async function loadRoute(opts: {
+  dbFails?: boolean
+  redis: RedisState
+  heartbeats?: HeartbeatState
+}) {
   vi.resetModules()
 
   const ping = vi.fn(() =>
     opts.redis.pingRejects ? Promise.reject(new Error('unreachable')) : Promise.resolve('PONG'),
   )
 
+  const heartbeats = opts.heartbeats ?? 'beating'
+
+  // Imported after the reset so it resolves against the mocked db below, and
+  // before the route so the fixture matches whatever the registry currently
+  // holds rather than a hardcoded copy of it.
+  const findMany = vi.fn(async () => {
+    if (heartbeats === 'error') throw new Error('relation "job_heartbeats" does not exist')
+    if (heartbeats === 'silent') return []
+    const { WATCHED_JOBS } = await import('@/lib/job-heartbeat')
+    return WATCHED_JOBS.map((job) => ({ jobId: job.jobId, lastRunAt: new Date() }))
+  })
+
   vi.doMock('@/lib/db', () => ({
     db: {
       $queryRaw: vi.fn(() =>
         opts.dbFails ? Promise.reject(new Error('db down')) : Promise.resolve([{ '?column?': 1 }]),
       ),
+      jobHeartbeat: { findMany },
     },
   }))
 
@@ -84,10 +108,66 @@ describe('GET /api/v1/health — honest Redis reporting', () => {
     expect(body.checks.db).toBe('error')
   })
 
+  it('reports jobs ok when every watched job has beaten recently', async () => {
+    const { GET } = await loadRoute({ redis: { configured: true } })
+    const body = await (await GET()).json()
+
+    expect(body.checks.jobs).toBe('ok')
+    expect(body.staleJobs).toBeUndefined()
+  })
+
   it('is never cached', async () => {
     const { GET } = await loadRoute({ redis: { configured: true } })
     const res = await GET()
 
     expect(res.headers.get('Cache-Control')).toBe('no-store')
+  })
+})
+
+describe('GET /api/v1/health — job liveness, read from outside Inngest', () => {
+  it('reports stale when nothing is beating', async () => {
+    // The state this endpoint exists to report: `job-heartbeat-check` is itself
+    // a cron, so if Inngest stops scheduling anything the watcher stops with
+    // everything else and raises nothing. This answers over HTTP, which is a
+    // different failure domain, so it still speaks when every job is dead.
+    const { GET } = await loadRoute({ redis: { configured: true }, heartbeats: 'silent' })
+    const body = await (await GET()).json()
+    const { WATCHED_JOBS } = await import('@/lib/job-heartbeat')
+
+    expect(body.checks.jobs).toBe('stale')
+    expect(body.staleJobs).toBe(WATCHED_JOBS.length)
+  })
+
+  it('never names the stale jobs on a public, unauthenticated endpoint', async () => {
+    // "notification-flush is stale" tells an anonymous reader that nothing is
+    // being delivered to anybody right now, which is a window rather than a
+    // status. A monitor only needs the count; an operator has the alert, the
+    // audit log and the table.
+    const { GET } = await loadRoute({ redis: { configured: true }, heartbeats: 'silent' })
+    const raw = await (await GET()).text()
+
+    expect(raw).not.toContain('debit-run')
+    expect(raw).not.toContain('notification-flush')
+  })
+
+  it('does not take the deployment out of rotation over a stalled cron', async () => {
+    // A 503 is read by hosting and failover tooling as "replace this instance",
+    // which is the wrong remedy for a job that stopped firing and would trade a
+    // working web app for no web app. The same call as the unconfigured-Redis
+    // case directly above it in the route.
+    const { GET } = await loadRoute({ redis: { configured: true }, heartbeats: 'silent' })
+    const res = await GET()
+
+    expect(res.status).toBe(200)
+    expect((await res.json()).status).toBe('ok')
+  })
+
+  it('reports unknown rather than ok when the heartbeat read itself fails', async () => {
+    // Absent evidence is not good news — the C-2 lesson. A failed read must not
+    // be indistinguishable from a healthy answer.
+    const { GET } = await loadRoute({ redis: { configured: true }, heartbeats: 'error' })
+    const body = await (await GET()).json()
+
+    expect(body.checks.jobs).toBe('unknown')
   })
 })

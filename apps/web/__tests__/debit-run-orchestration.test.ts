@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   raiseAlert: vi.fn(),
   loggerError: vi.fn(),
+  heartbeatUpsert: vi.fn(),
 }))
 
 vi.mock('@/lib/env', () => ({
@@ -36,6 +37,12 @@ vi.mock('@/lib/db', () => ({
     paymentMandate: { findMany: mocks.findMandates },
     transaction: { findUnique: mocks.txFindUnique, create: mocks.txCreate },
     contribution: { findUnique: mocks.contribFindUnique, create: mocks.contribCreate },
+    // Named explicitly rather than left off. `recordJobHeartbeat` swallows its
+    // own failures on purpose — it is called after money has moved and must not
+    // fail the run that moved it — so an unmocked table here would throw, be
+    // caught, and let every assertion below pass while the heartbeat was never
+    // written at all.
+    jobHeartbeat: { upsert: mocks.heartbeatUpsert },
   },
 }))
 vi.mock('@/lib/redis', () => ({ redis: { get: mocks.redisGet, set: mocks.redisSet } }))
@@ -255,5 +262,35 @@ describe('executeDebitRun — mandates it must leave alone', () => {
 
     expect(mocks.submitScheduledDebit).not.toHaveBeenCalled()
     expect(summary.due).toBe(0)
+  })
+
+  it('records a heartbeat, so a month in which it never runs is visible', async () => {
+    // Without this the run leaves no trace of having happened at all. Every
+    // alert the debit run can raise, it raises from inside itself — so the one
+    // failure it cannot report is not being invoked, which is also the one that
+    // means nobody is collected.
+    mocks.findMandates.mockResolvedValue([mandate('a')])
+    mocks.submitScheduledDebit.mockResolvedValue({ status: 'SUCCESS', transactionRef: 'ref-a' })
+
+    await executeDebitRun(step)
+
+    expect(mocks.heartbeatUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { jobId: 'debit-run' } }),
+    )
+  })
+
+  it('still records a heartbeat on a night when every collection was declined', async () => {
+    // The beat means "this run reached the end", not "this run went well".
+    // Conflating the two would make a total failure of collection look exactly
+    // like the job not running, and they need different responses.
+    mocks.findMandates.mockResolvedValue([mandate('a')])
+    mocks.submitScheduledDebit.mockResolvedValue({ status: 'FAILED', reason: 'insufficient funds' })
+
+    const summary = await executeDebitRun(step)
+
+    expect(summary.declined).toBe(1)
+    expect(mocks.heartbeatUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { jobId: 'debit-run' } }),
+    )
   })
 })
