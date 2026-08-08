@@ -1,7 +1,8 @@
 import { db } from '@/lib/db'
 import { MAX_MEMBERS } from '@xxm/utils'
+import { refuseRoleChange, ROLE_CHANGE_REFUSAL_MESSAGE } from '@xxm/utils/role-policy'
 import { publishRoleVersion } from '@/lib/role-version'
-import { assertAdmin, writeAuditLog, AdminNotFoundError, AdminConflictError } from './shared'
+import { assertAdmin, writeAuditLog, AdminNotFoundError, AdminConflictError, AdminForbiddenError } from './shared'
 
 // ─── The fifty-member cap ─────────────────────────────────────────────────────
 
@@ -85,6 +86,24 @@ export async function setMemberRole(
   const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true } })
   if (!member) throw new AdminNotFoundError('Member not found')
 
+  // The guards this function did not have, and the member app's copy did.
+  //
+  // This is the copy the console is wired to, so a sole admin could open their
+  // own member page, click "Remove admin", and leave the system with no admin
+  // at all — sessions ended by the roleVersion bump, sign-in refused for want
+  // of the role, and no way to grant it back because granting needs an admin.
+  // The protection existed; it was on the path nobody took.
+  //
+  // Counted only when it matters. Revoking ADMIN is rare; every other change
+  // skips the query.
+  const adminCount =
+    role === 'ADMIN' && !assign
+      ? await db.userRole.count({ where: { roleId: roleRecord.id } })
+      : 0
+
+  const refusal = refuseRoleChange({ actorId: adminId, targetId: memberId, role, assign, adminCount })
+  if (refusal) throw new AdminForbiddenError(ROLE_CHANGE_REFUSAL_MESSAGE[refusal])
+
   if (assign) {
     await db.userRole.upsert({
       where: { userId_roleId: { userId: memberId, roleId: roleRecord.id } },
@@ -106,7 +125,11 @@ export async function setMemberRole(
   await publishRoleVersion(updated.id, updated.roleVersion)
 
   await writeAuditLog({
-    userId: adminId, action: assign ? 'ADMIN_ROLE_ASSIGNED' : 'ADMIN_ROLE_REMOVED',
+    // ADMIN_ROLE_REVOKED, matching the member app. This wrote
+    // ADMIN_ROLE_REMOVED, so an audit query filtering on the member app's name
+    // silently missed every revocation the console actually performed — and the
+    // console is the only place revocations happen.
+    userId: adminId, action: assign ? 'ADMIN_ROLE_ASSIGNED' : 'ADMIN_ROLE_REVOKED',
     entity: 'User', entityId: memberId,
     payload: { role, assign }, ipAddress: ip,
   })
