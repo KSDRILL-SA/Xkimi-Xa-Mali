@@ -9,7 +9,7 @@ Three fully isolated tiers — no tier shares data or credentials with another.
 | Tier | Trigger | Database | Redis | Netcash |
 |---|---|---|---|---|
 | **Local** | Dev machine | Neon dev branch *(Docker optional via `docker-compose.yml`)* | Upstash dev | Test gateway |
-| **Preview** | PR / push to `Dev` | Neon PR branch (auto) | Upstash dev | Test gateway |
+| **Preview** | PR to `main` / push to `staging` | Neon PR branch (auto) | Upstash dev | Test gateway |
 | **Production** | Promote to `main` | Neon production (pooled) | Upstash production | **Live** |
 
 ---
@@ -18,7 +18,7 @@ Three fully isolated tiers — no tier shares data or credentials with another.
 
 ```mermaid
 flowchart TD
-    DEV["feature branch<br/>conventional commits"] --> PR["PR → Dev"]
+    DEV["feature branch<br/>conventional commits"] --> PR["PR → main"]
     PR --> CI
 
     subgraph CI["GitHub Actions"]
@@ -28,7 +28,7 @@ flowchart TD
     end
 
     CI -->|green| REVIEW["review"] --> MERGE["squash merge"]
-    MERGE -->|push Dev| PREV["Vercel preview<br/>Neon PR branch · test gateway"]
+    MERGE -->|push staging| PREV["Vercel preview<br/>Neon PR branch · test gateway"]
     MERGE -->|promote main| PROD["Vercel production<br/>migrate deploy → build → deploy<br/>Neon prod · live gateway"]
 ```
 
@@ -81,7 +81,7 @@ flowchart LR
         LA["next dev :3000"] --- LDB["Neon dev branch"]
         LA --- LIN["Inngest dev :8288"]
     end
-    subgraph P["Preview — Dev"]
+    subgraph P["Preview — staging"]
         PA["*.vercel.app"] --- PDB["Neon PR branch"]
     end
     subgraph PR["Production — main"]

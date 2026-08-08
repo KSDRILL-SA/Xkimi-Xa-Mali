@@ -565,8 +565,10 @@ it. Nothing is wrong with the code.
 4. **Read the remediation roadmap** — `SECURITY-HARDENING.md` (P1/P2/P3 bands) and
    `docs/environment-setup-plan.md`.
 5. **Verify current branch** — `git status && git branch --show-current`.
-   Work branches from `Dev`. PRs target `Dev`. `main` is the release branch and
-   is updated by merging `Dev` into it, never by committing to it directly.
+   Work branches from `main`. PRs target `main`. **`main` is the only long-lived
+   branch** — the `Dev` integration branch was retired on 2026-08-08, so there is
+   no second place for the truth to drift to. A feature branch is cut from
+   `main`, squash-merged back, and deleted.
    **Note that this is convention, not enforcement:** branch protection requires
    GitHub Pro or a public repository, and this repo is private on the free tier,
    so nothing mechanically stops a push to `main`. Behave as though something
@@ -604,7 +606,7 @@ as verified when only the unit tests were run and the failure was in the build.
 
 ### 5.4 Branch and commit conventions
 
-- Branch per task, off `Dev`: `fix/<short-slug>`, `feat/<short-slug>`, `chore/<short-slug>`.
+- Branch per task, off `main`: `fix/<short-slug>`, `feat/<short-slug>`, `chore/<short-slug>`.
 - Commit messages describe **the user-visible change or the bug that is now gone**,
   not the mechanics of the edit.
 - **Never name the tooling that wrote the code — no assistant, model, or vendor

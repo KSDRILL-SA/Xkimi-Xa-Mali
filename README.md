@@ -171,4 +171,4 @@ Three Vercel projects (one per app, **Root Directory** = the app path). Set prod
 | [docs/api-contract.yaml](docs/api-contract.yaml) | OpenAPI 3.1 spec |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/constitutions/](docs/constitutions/) | How to contribute + coding standards |
 
-All 13 build modules (M01–M12 + M11a) and Phase-2 hardening are complete. Contributions follow the constitutions in [docs/constitutions/](docs/constitutions/); branches `feat/ fix/ docs/ chore/` target `Dev`.
+All 13 build modules (M01–M12 + M11a) and Phase-2 hardening are complete. Contributions follow the constitutions in [docs/constitutions/](docs/constitutions/); branches `feat/ fix/ docs/ chore/` target `main`.

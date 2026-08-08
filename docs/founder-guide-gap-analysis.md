@@ -681,8 +681,9 @@ before writing anything.
   one; every single one turned out to contain a defect no existing test could
   reach. Extract `execute*(step)`, drive it with a stub, and **assert against the
   defect before fixing it**.
-- **One issue, one branch, one PR, targeting `Dev`.** Squash merge. Direct
-  pushes to `Dev` and `main` are blocked.
+- **One issue, one branch, one PR, targeting `main`.** Squash merge. Direct
+  pushes to `main` are blocked. (This said `Dev` when written; that integration
+  branch was retired on 2026-08-08 and `main` is now the only long-lived one.)
 - **Never name any assistant, model or vendor** in a commit message, branch
   name, PR title, PR body or filename. This is absolute.
 - **Migrations are additive.** No destructive schema changes.

@@ -63,7 +63,7 @@ flowchart TD
         VPD --- NBD
     end
 
-    subgraph MERGE["On merge to Dev / main"]
+    subgraph MERGE["On merge to main"]
         PMD["prisma migrate deploy<br/>(Neon production)"]
         PSD["prisma db seed<br/>(idempotent)"]
         VPR["Vercel production deploy"]

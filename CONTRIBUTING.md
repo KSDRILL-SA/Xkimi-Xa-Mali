@@ -42,20 +42,25 @@ chore/deps-upgrade-prisma
 
 ```mermaid
 flowchart TD
-    BRANCH["Create feature branch<br/>from Dev"]
+    BRANCH["Create feature branch<br/>from main"]
     CODE["Implement changes<br/>follow constitutions"]
     TESTS["npm run test"]
     TYPECHECK["npm run typecheck"]
     LINT["npm run lint"]
-    PR["Open PR → Dev<br/>fill PR template"]
+    PR["Open PR → main<br/>fill PR template"]
     REVIEW["Code review"]
-    MERGE["Squash merge to Dev"]
-    RELEASE["Tagged release → main<br/>(admin only)"]
+    MERGE["Squash merge to main"]
+    RELEASE["Deploy from main"]
 
     BRANCH --> CODE --> TESTS --> TYPECHECK --> LINT --> PR --> REVIEW --> MERGE --> RELEASE
 ```
 
-All PRs target `Dev`. Direct pushes to `Dev` and `main` are blocked.
+All PRs target `main`. Direct pushes to `main` are blocked.
+
+`main` is the only long-lived branch. There is no integration branch: a feature
+branch is cut from `main`, squash-merged back into it, and deleted. That means
+`main` is always the deployable truth and there is no second place for it to
+drift from.
 
 ---
 
@@ -63,7 +68,7 @@ All PRs target `Dev`. Direct pushes to `Dev` and `main` are blocked.
 
 Before opening a PR, confirm:
 
-- [ ] Branch is up to date with `Dev`
+- [ ] Branch is up to date with `main`
 - [ ] `npm run typecheck` passes with zero errors
 - [ ] `npm run lint` passes with zero warnings
 - [ ] `npm run test` passes

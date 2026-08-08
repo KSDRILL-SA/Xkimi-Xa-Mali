@@ -20,7 +20,7 @@
 
 ## Checklist
 
-- [ ] Branch is off `Dev` and targets `Dev`
+- [ ] Branch is off `main` and targets `main`
 - [ ] Commit messages follow the `type(scope): description` convention
 - [ ] No secrets, credentials, or personal data in the diff
 - [ ] UI changes tested on mobile viewport (if applicable)

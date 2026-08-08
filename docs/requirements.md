@@ -390,9 +390,9 @@ mindmap
 | ID | Requirement |
 |----|-------------|
 | NFR-DEP-001 | All three apps (web, admin, website) deploy independently to Vercel |
-| NFR-DEP-002 | Every PR to Dev triggers a Vercel preview deployment |
+| NFR-DEP-002 | Every PR to main triggers a Vercel preview deployment |
 | NFR-DEP-003 | Database migrations run automatically as part of the Vercel build command (`prisma migrate deploy`) |
-| NFR-DEP-004 | The CI gate (typecheck → lint → test → prisma validate) must pass before any merge to Dev |
+| NFR-DEP-004 | The CI gate (typecheck → lint → test → prisma validate) must pass before any merge to main |
 | NFR-DEP-005 | Environment variables are never committed to version control |
 | NFR-DEP-006 | A fresh clone plus `npm install` produces a working local development environment |
 | NFR-DEP-007 | Staging uses Neon database branching — isolated from production data |
