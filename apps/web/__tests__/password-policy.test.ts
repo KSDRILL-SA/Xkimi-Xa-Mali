@@ -166,20 +166,50 @@ describe('refusing to lock everyone out of a door with no key', () => {
 })
 
 describe('the flag cannot be set to a value that means its opposite', () => {
-  it('is not parsed with z.coerce.boolean', async () => {
+  it('is declared with booleanFlag, never z.coerce.boolean', async () => {
     // `Boolean("false")` is true. A flag declared that way can be turned on and
-    // never turned off, which for this one means a lockout no env edit can
-    // undo. ENABLE_MANUAL_PAYMENTS and ENABLE_GOAL_LOCKING have this bug today.
+    // never turned off, which for this one means a lockout no env edit can undo.
     const { readFileSync } = await import('node:fs')
     const { resolve } = await import('node:path')
     const envSource = readFileSync(resolve(__dirname, '../lib/env.ts'), 'utf8')
 
     const declaration = envSource.slice(
       envSource.indexOf('REQUIRE_PASSWORD_POLICY_RESET:'),
-      envSource.indexOf('REQUIRE_PASSWORD_POLICY_RESET:') + 200,
+      envSource.indexOf('REQUIRE_PASSWORD_POLICY_RESET:') + 120,
     )
 
+    expect(declaration).toContain('booleanFlag(false)')
     expect(declaration).not.toContain('coerce.boolean')
-    expect(declaration).toContain("enum(['true', 'false'])")
+  })
+
+  it('leaves no z.coerce.boolean anywhere in the file', async () => {
+    // ENABLE_MANUAL_PAYMENTS and ENABLE_GOAL_LOCKING were declared that way and
+    // had been unswitchable since they were added: `ENABLE_MANUAL_PAYMENTS=false`
+    // parsed as **true**. They read as feature flags and behaved as constants.
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const envSource = readFileSync(resolve(__dirname, '../lib/env.ts'), 'utf8')
+
+    // Matches a declaration, not a mention — the helper's own docstring names
+    // the pattern in order to explain why it is not used.
+    expect(envSource).not.toMatch(/:\s*z\.coerce\.boolean/)
+  })
+
+  it('accepts only the two strings, so a typo fails at boot', async () => {
+    // "yes", "1" and "ture" are all things someone will eventually type into a
+    // Vercel env field. Rejecting them at boot beats silently taking the wrong
+    // branch for the life of the deployment.
+    const { z } = await import('zod')
+    const booleanFlag = (fallback: boolean) =>
+      z
+        .enum(['true', 'false'])
+        .default(fallback ? 'true' : 'false')
+        .transform((v) => v === 'true')
+
+    expect(booleanFlag(true).parse(undefined)).toBe(true)
+    expect(booleanFlag(true).parse('false')).toBe(false)
+    expect(booleanFlag(false).parse('true')).toBe(true)
+    expect(() => booleanFlag(false).parse('yes')).toThrow()
+    expect(() => booleanFlag(false).parse('1')).toThrow()
   })
 })

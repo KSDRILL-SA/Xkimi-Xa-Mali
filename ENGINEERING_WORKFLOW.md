@@ -47,12 +47,21 @@ packages/
 | App | Runtime shape | What it is trusted with |
 |---|---|---|
 | `@xxm/web` | Next.js App Router; **Edge middleware** + Node route handlers | Member auth, mandate capture, contribution display, **all 18 Inngest jobs including the debit run** |
-| `@xxm/admin` | Next.js App Router; **Node middleware** (can reach Postgres) | Member status/role changes, mandate approval, **transaction reversal**, broadcasts, reports |
+| `@xxm/admin` | Next.js App Router; **Edge middleware** (Redis only, no Prisma) | Member status/role changes, mandate approval, **transaction reversal**, broadcasts, reports |
 | `@xxm/website` | Static-leaning marketing pages | Nothing privileged. No session, no database writes |
 
 **The two authenticated apps share one database and one Redis instance.** They do
 *not* share middleware code. A change to session or role handling in one is not a
 change in the other — this asymmetry has already caused shipped bugs (see §4).
+
+> **Corrected 2026-08-08.** This table previously described the admin middleware
+> as **Node** middleware that "can reach Postgres". It does not: there is no
+> `export const runtime = 'nodejs'` in `apps/admin/middleware.ts`, and the file's
+> own comment says Edge. Both middlewares run on Edge and can reach **Redis
+> only**. This matters because the fail-open role-version policy in admin, and
+> the fail-closed one in web, are both justified by that constraint — a reader
+> who believed the old line would have concluded admin was choosing to fail open
+> when it could have asked the database. It cannot.
 
 ### 1.4 Shared packages
 

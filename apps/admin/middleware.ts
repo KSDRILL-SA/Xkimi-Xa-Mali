@@ -1,6 +1,7 @@
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { Redis } from '@upstash/redis'
+import { verifyCsrfOrigin } from '@xxm/utils/csrf-origin'
 
 /**
  * Role revocation for page views.
@@ -24,6 +25,7 @@ import { Redis } from '@upstash/redis'
  */
 
 const ROLE_VERSION_PREFIX = 'xxm:role-version:'
+const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 const REDIS_CONFIGURED = !!(
   process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
@@ -73,6 +75,22 @@ export default auth(async (req) => {
     loginUrl.searchParams.set('callbackUrl', nextUrl.pathname)
     loginUrl.searchParams.set('reason', 'session_expired')
     return NextResponse.redirect(loginUrl)
+  }
+
+  // Cross-origin state change, refused.
+  //
+  // The member app has done this since #266; this app never did, and it is the
+  // one that approves mandates, reverses transactions and suspends members. An
+  // admin with a live session who loads an attacker's page was one form post
+  // away from any of those.
+  //
+  // Applies to every mutating request rather than only `/api/*`, because almost
+  // nothing here is an API route — the console is server actions, which are
+  // POSTs to the page's own URL. Restricting this to `/api/` as the member app
+  // does would have covered the two export routes and none of the actions that
+  // move money.
+  if (MUTATING_METHODS.has(req.method) && !verifyCsrfOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
   }
 
   return NextResponse.next()
