@@ -25,7 +25,20 @@ const config = [
   },
   {
     files: ['__tests__/**'],
-    rules: { '@typescript-eslint/no-unused-vars': 'off' },
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
+      // Vitest reuses a worker thread across test files. Replacing `process.env`
+      // wholesale detaches it from the object every other file's `vi.stubEnv`
+      // holds a reference to, so their `unstubAllEnvs` restores onto something
+      // nobody reads and their environment leaks into whatever runs next in that
+      // worker. It produced a suite that failed at random, in files that had not
+      // been touched. `vi.stubEnv` / `vi.unstubAllEnvs` mutate keys in place and
+      // are the only safe way to do this.
+      'no-restricted-syntax': ['error', {
+        selector: 'AssignmentExpression > MemberExpression[object.name="process"][property.name="env"]',
+        message: 'Do not assign to process.env in tests — use vi.stubEnv / vi.unstubAllEnvs. Replacing the object leaks environment between test files sharing a worker.',
+      }],
+    },
   },
 ]
 
