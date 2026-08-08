@@ -2,9 +2,10 @@ import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory } from '@/lib/services'
+import { setFounderBadge } from '@/lib/founder-badge'
 import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader, Reveal } from '@xxm/ui'
-import { UserCircle } from 'lucide-react'
+import { UserCircle, Gem } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
 import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 import { requireAdmin } from '@/lib/admin-action'
@@ -33,6 +34,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const STATUS_STYLES = SHARED_STATUS_STYLES.user
   const isLocked = member.lockedUntil && new Date(member.lockedUntil) > new Date()
   const isAdmin  = member.roles.some((r) => r.role.name === 'ADMIN')
+  const founderBadge = member.distinctions.find((d) => d.kind === 'FOUNDER') ?? null
 
   async function handleStatusChange(fd: FormData) {
     'use server'
@@ -61,6 +63,27 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     const { userId, roles: r } = await requireAdmin('member.removeAdmin')
     await setMemberRole(userId, r, id, 'ADMIN', false)
     revalidatePath(`/members/${id}`)
+  }
+
+  async function handleGrantFounder(fd: FormData) {
+    'use server'
+    const { userId, roles: r } = await requireAdmin('member.grantFounder')
+    const note = String(fd.get('note') ?? '').trim()
+    await setFounderBadge(userId, r, id, true, { note: note || undefined })
+    revalidatePath(`/members/${id}`)
+    revalidatePath('/members')
+  }
+
+  async function handleRemoveFounder(fd: FormData) {
+    'use server'
+    const { userId, roles: r } = await requireAdmin('member.removeFounder')
+    // Required by the route, and required for a reason: removal exists as an
+    // erratum for a badge given to the wrong account, not as a way to take an
+    // honour back. Stating why forces the difference to be explicit.
+    const reason = String(fd.get('reason') ?? '').trim()
+    await setFounderBadge(userId, r, id, false, { reason })
+    revalidatePath(`/members/${id}`)
+    revalidatePath('/members')
   }
 
   return (
@@ -137,6 +160,74 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           </form>
         </div>
       )}
+
+      {/*
+        The Founder badge is conferred, not earned, so it is managed here beside
+        status and role rather than on the Badges page — that page is the tier
+        ladder, and putting this there would imply it can be climbed to or lost.
+      */}
+      <Reveal variant="up" delay={50}>
+        <Card>
+          <CardHeader
+            title="Founder badge"
+            description={
+              founderBadge
+                ? `Granted ${formatDate(founderBadge.grantedAt)}. Permanent — it stays if they resign.`
+                : 'Not granted. One of the four who founded the collective.'
+            }
+          />
+          <CardBody>
+            {founderBadge ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-xxm-gold/40 bg-xxm-gold/10 text-[11px] font-bold text-xxm-gold-dark">
+                    <Gem size={12} aria-hidden />
+                    Founder
+                  </span>
+                  {founderBadge.note ? (
+                    <span className="text-xs text-xxm-gray-500">{founderBadge.note}</span>
+                  ) : null}
+                </div>
+                <form action={handleRemoveFounder} className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                  <input
+                    name="reason"
+                    required
+                    minLength={10}
+                    maxLength={500}
+                    placeholder="Why is this being removed? (e.g. granted to the wrong account)"
+                    className="flex-1 rounded-lg border border-xxm-gray-200 px-3 py-1.5 text-sm text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-200"
+                  />
+                  <ConfirmSubmitButton
+                    className="px-4 py-1.5 rounded-lg border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 transition-colors shrink-0"
+                    title="Remove the Founder badge?"
+                    message={`This is for correcting a badge granted to the wrong account. Founding is permanent — if ${member.firstName} is a founder, do not remove it because they resigned.`}
+                    confirmLabel="Remove badge"
+                  >
+                    Remove badge
+                  </ConfirmSubmitButton>
+                </form>
+              </div>
+            ) : (
+              <form action={handleGrantFounder} className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <input
+                  name="note"
+                  maxLength={500}
+                  placeholder="Optional note (kept on the record)"
+                  className="flex-1 rounded-lg border border-xxm-gray-200 px-3 py-1.5 text-sm text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                />
+                <ConfirmSubmitButton
+                  className="px-4 py-1.5 rounded-lg border border-xxm-gold/40 text-xxm-gold-dark text-sm font-medium hover:bg-xxm-gold/5 transition-colors shrink-0"
+                  title="Grant the Founder badge?"
+                  message={`${member.firstName} ${member.lastName} will be marked as a founder on their dashboard, in the community list and on their statements. It is permanent and there are only four.`}
+                  confirmLabel="Grant badge"
+                >
+                  Grant Founder badge
+                </ConfirmSubmitButton>
+              </form>
+            )}
+          </CardBody>
+        </Card>
+      </Reveal>
 
       <Reveal variant="up" delay={100} className="grid md:grid-cols-2 gap-4">
         {/* Profile */}
