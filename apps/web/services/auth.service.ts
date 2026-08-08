@@ -33,9 +33,29 @@ export async function verifyEmail(rawToken: string, ipAddress?: string) {
   await runTransaction(async (tx) => {
     const consumed = await authTokenRepo.consumeVerificationToken(tokenHash, tx)
     if (!consumed) throw new InvalidTokenError('This verification link has already been used')
-    await tx.user.update({
-      where: { id: record.userId },
+
+    // Verifying an address proves the address. It does not decide status.
+    //
+    // This wrote `status: 'ACTIVE'` unconditionally, so a member suspended
+    // between registering and clicking the link came back ACTIVE by clicking
+    // it — the suspension undone by the suspended person, with nothing but an
+    // EMAIL_VERIFIED audit entry to show for it. Activation is only ever the
+    // promotion of a PENDING account.
+    //
+    // `updateMany` with the status in the predicate rather than a read followed
+    // by a write: the status is decided in the same statement that changes it,
+    // so a suspension landing mid-transaction cannot be missed.
+    await tx.user.updateMany({
+      where: { id: record.userId, status: 'PENDING' },
       data: { status: 'ACTIVE', emailVerified: new Date() },
+    })
+
+    // The address is verified either way. A suspended member who confirms their
+    // email has still confirmed it, and should not be asked again if they are
+    // later reinstated.
+    await tx.user.updateMany({
+      where: { id: record.userId, emailVerified: null },
+      data: { emailVerified: new Date() },
     })
   })
 
@@ -96,6 +116,20 @@ export async function resetPassword(rawToken: string, newPassword: string, ipAdd
         // Validated by PasswordResetSchema against the current policy, so this
         // password satisfies it and the account is no longer asked to reset.
         passwordChangedAt: new Date(),
+        // Resetting the password clears the lockout, which it did not before.
+        //
+        // "Too many failed attempts — try again later or reset your password"
+        // was the advice, and resetting did not lift the lock, so the member
+        // did the thing they were told to do and still could not get in. It is
+        // also the only self-service way out: with a single admin, an attacker
+        // who locks that account and keeps it locked otherwise removes the
+        // console from the person who would fix it.
+        //
+        // Safe because reaching here required a token sent to the address on
+        // the account. Whoever cleared it proved control of the mailbox, which
+        // is a stronger claim than the failed guesses that set it.
+        loginAttempts: 0,
+        lockedUntil: null,
       },
     })
   })

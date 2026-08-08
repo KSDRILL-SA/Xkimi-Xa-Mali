@@ -114,11 +114,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null
         }
 
-        if (user.lockedUntil && user.lockedUntil > new Date()) {
-          throw new Error('ACCOUNT_LOCKED')
-        }
-        if (user.status === 'SUSPENDED') throw new Error('ACCOUNT_SUSPENDED')
-        if (user.status === 'PENDING') throw new Error('ACCOUNT_PENDING')
+        // Computed now, disclosed further down. Computing it is not the leak;
+        // answering with it is. Knowing it here is what lets a wrong password
+        // against an already-locked account avoid extending the lock.
+        const isLocked = !!(user.lockedUntil && user.lockedUntil > new Date())
 
         // Always run bcrypt before checking role — prevents timing-based admin email enumeration
         const valid = await bcrypt.compare(parsed.data.password, user.password)
@@ -127,6 +126,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!valid || !roleNames.includes('ADMIN')) {
           if (!roleNames.includes('ADMIN')) {
             // Don't increment attempts for non-admin accounts
+            await recordLoginHistory(user.id, false)
+            return null
+          }
+          // An already-locked account is not counted up further: otherwise
+          // wrong guesses keep crossing the threshold and keep pushing
+          // `lockedUntil` forward, and anyone who knows the address can hold
+          // the only admin out of this console indefinitely.
+          if (isLocked) {
             await recordLoginHistory(user.id, false)
             return null
           }
@@ -147,9 +154,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null
         }
 
-        // The password is correct and the ADMIN role is held from here down.
-        // Checked after both, so an account under this requirement is never
-        // identifiable to someone who has not proved they own it.
+        // ── The password is correct and the ADMIN role is held from here ─────
+        //
+        // Everything below states something about the account: that it exists,
+        // and what it is doing. None of it may be said to somebody who has not
+        // proved they own it. These three used to sit above the comparison, so
+        // any string at all submitted against an address answered "suspended" or
+        // "pending" — which also confirmed the address holds the ADMIN role, the
+        // single most useful fact an attacker could ask this endpoint for.
+        if (isLocked) throw new Error('ACCOUNT_LOCKED')
+        if (user.status === 'SUSPENDED') throw new Error('ACCOUNT_SUSPENDED')
+        if (user.status === 'PENDING') throw new Error('ACCOUNT_PENDING')
+
         if (adminPasswordPolicyResetRequired(user)) {
           logger.info('Admin sign-in refused pending password policy reset', { userId: user.id })
           throw new Error('PASSWORD_RESET_REQUIRED')
