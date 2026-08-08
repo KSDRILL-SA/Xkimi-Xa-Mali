@@ -348,6 +348,57 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
   return { processed: claimed.length, sent, failed }
 }
 
+/** A notification that has run out of retries and will never be sent. */
+export interface AbandonedNotifications {
+  total: number
+  byChannel: Record<string, number>
+  /** One real error, so an alert can say *why* rather than only *how many*. */
+  sampleError: string | null
+  /** The most recent one, for the reader working out when this started. */
+  latestAt: Date | null
+}
+
+/**
+ * Notifications that have exhausted their retries.
+ *
+ * `requeueFailedNotifications` stops promoting a row once `retryCount` reaches
+ * `MAX_RETRIES`, so from that moment it sits `FAILED` forever and nothing says
+ * so. That is the quiet failure: the app is healthy, the jobs run, the queue
+ * drains — and members simply stop being told their debit failed.
+ *
+ * Every cause lands here, which is the point of counting it rather than
+ * guarding one of them: an unverifiable `RESEND_FROM_EMAIL`, a revoked API key,
+ * a BulkSMS outage, a member with a malformed phone number.
+ */
+export async function countAbandonedNotifications(): Promise<AbandonedNotifications> {
+  const abandoned = await notificationRepo.findMany(
+    { status: 'FAILED', retryCount: { gte: MAX_RETRIES } },
+    {
+      // A count would answer "how many" and leave the reader to go and find out
+      // "why". The cap keeps this bounded when something is broken at scale.
+      take: 200,
+      orderBy: { updatedAt: 'desc' },
+      select: { channel: true, errorMessage: true, updatedAt: true },
+    },
+  )
+
+  const rows = abandoned as unknown as Array<{
+    channel: string
+    errorMessage: string | null
+    updatedAt: Date
+  }>
+
+  const byChannel: Record<string, number> = {}
+  for (const row of rows) byChannel[row.channel] = (byChannel[row.channel] ?? 0) + 1
+
+  return {
+    total: rows.length,
+    byChannel,
+    sampleError: rows.find((r) => r.errorMessage && r.errorMessage !== 'in-flight')?.errorMessage ?? null,
+    latestAt: rows[0]?.updatedAt ?? null,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Public: requeue FAILED notifications that haven't exhausted their retries
 // Called by notification-flush before each batch to promote eligible records
