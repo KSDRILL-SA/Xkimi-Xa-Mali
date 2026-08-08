@@ -174,9 +174,11 @@ not.
   with Netcash during onboarding. This is the single highest-consequence
   configuration item in the system.
 - **`ENCRYPTION_KEY` custody.** It decrypts stored bank and ID numbers. Lose it
-  and that data is unreadable forever; rotate it and the same. It needs a home
-  in a password manager *before* it is pasted into Vercel, and staging must
-  never share production's.
+  and that data is unreadable forever. It needs a home in a password manager
+  *before* it is pasted into Vercel, and staging must never share production's.
+  It *can* now be rotated — add the new key, re-encrypt, retire the old — but
+  only in that order: `docs/runbook.md`, "Rotating the encryption key". Editing
+  the variable on its own is the same as losing it.
 - **Upstash is now load-bearing for security**, not just performance. Session
   revocation reads it. It is required for a live build.
 - **CI has not run since 2026-05-25.** Every merge since — including all of
