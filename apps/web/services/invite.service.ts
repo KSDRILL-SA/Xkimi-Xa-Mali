@@ -375,6 +375,11 @@ export async function acceptInviteRegistration(
       idNumber:       encryptedId,
       status:         'PENDING',
       popiaConsentAt: new Date(),
+      // Set here because this password was accepted under the current policy.
+      // A null on an older row is not "never changed" — it is "set under a rule
+      // we no longer consider sufficient", which is what the reset requirement
+      // reads.
+      passwordChangedAt: new Date(),
     }, tx)
 
     await userRepo.createUserRole({ userId: created.id, roleId: memberRole.id }, tx)

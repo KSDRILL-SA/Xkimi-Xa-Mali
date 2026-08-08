@@ -4,6 +4,7 @@ import { getClientIP } from '@/lib/request'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { acceptInviteRegistration } from '@/services/invite.service'
 import { withApiHandler } from '@/lib/api-handler'
+import { PasswordSchema } from '@xxm/utils/schemas'
 
 const SA_PHONE = /^(\+27|0)[6-8][0-9]{8}$/
 const SA_ID    = /^\d{13}$/
@@ -43,13 +44,14 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     if (typeof b.idNumber !== 'string' || !SA_ID.test(b.idNumber) || !validateSAId(b.idNumber))
       return apiError('VAL_006', '"idNumber" must be a valid 13-digit SA ID number', 400)
   }
-  if (
-    typeof b.password !== 'string' ||
-    b.password.length < 8 ||
-    !/[A-Z]/.test(b.password) ||
-    !/[0-9]/.test(b.password)
-  )
-    return apiError('VAL_007', '"password" must be at least 8 characters with 1 uppercase and 1 number', 400)
+  // The shared rule, not a second copy of it. This route hand-rolled eight
+  // characters with one uppercase and one digit while every other password path
+  // in the codebase required twelve — so the only endpoint that creates an
+  // account enforced the weakest rule in the system, and it was the rule
+  // `PasswordSchema`'s own comment argues against.
+  const password = PasswordSchema.safeParse(b.password)
+  if (!password.success)
+    return apiError('VAL_007', password.error.errors[0]?.message ?? 'Password is not strong enough', 400)
   if (b.consentToPopia !== true)
     return apiError('VAL_008', 'You must consent to the privacy policy', 400)
 
@@ -62,7 +64,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
       firstName:      (b.firstName as string).trim(),
       lastName:       (b.lastName  as string).trim(),
       idNumber:       b.idNumber as string | undefined,
-      password:       b.password as string,
+      password:       password.data,
       consentToPopia: true,
     },
     baseUrl,

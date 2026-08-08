@@ -191,6 +191,66 @@ a key you are about to delete.
 
 ---
 
+## Requiring everyone to replace an old password
+
+Registration used to enforce eight characters with one uppercase and one digit,
+while every other password path required twelve. So every account in the system
+was created under the weaker rule, and the stronger one only ever applied to
+replacing a password. Registration now enforces twelve for new accounts
+immediately; existing accounts are asked to catch up only when you decide.
+
+**`REQUIRE_PASSWORD_POLICY_RESET` is off by default. Turning it on is a
+decision, not a deploy.** On, every account whose `passwordChangedAt` is null —
+which is every account that existed before this shipped, **including yours** —
+is refused sign-in until it resets. Both apps enforce it.
+
+### Before you turn it on
+
+1. **Tell the founders first.** They will be signed out with no warning
+   otherwise, and the message they see points at "Forgot password?", which only
+   works if step 2 is done.
+2. **Confirm a reset email actually arrives.** Send yourself one from
+   `/forgot-password` and watch it land. This is the whole recovery path.
+3. **Only then** set `REQUIRE_PASSWORD_POLICY_RESET=true` in both the member and
+   admin Vercel projects and redeploy.
+
+> **The app refuses to enforce this without working email.** If
+> `RESEND_API_KEY` is unset, or `RESEND_FROM_EMAIL` is still a `.invalid`
+> placeholder, the requirement is skipped and this is logged at error level on
+> every sign-in attempt:
+>
+> ```
+> REQUIRE_PASSWORD_POLICY_RESET is on but no reset email can be sent — not enforcing
+> ```
+>
+> That is deliberate. The way out of this requirement is an email; enforcing it
+> without one is not a policy, it is a lockout of every account including the
+> only admin, with the console you would fix it from behind the same door.
+>
+> **The admin app has no email configuration of its own.** Set `RESEND_API_KEY`
+> and `RESEND_FROM_EMAIL` there too, or it will never enforce. Unset is the safe
+> direction and is why it is the default.
+
+### The escape hatch
+
+If someone cannot receive their reset — wrong address on file, mailbox gone —
+clear the requirement for that one account directly. This does **not** change
+their password; it says the one they have is accepted.
+
+```sql
+UPDATE users SET "passwordChangedAt" = NOW() WHERE email = 'someone@example.com';
+```
+
+To lift the requirement for everybody, unset the flag rather than running that
+across the table — `REQUIRE_PASSWORD_POLICY_RESET=false` and redeploy. The
+column keeps its meaning for the next time.
+
+To check who is still outstanding:
+
+```sql
+SELECT email, status FROM users WHERE "passwordChangedAt" IS NULL AND "deletedAt" IS NULL;
+```
+
 ## Monitoring & escalation
 
 | Tool | Check |

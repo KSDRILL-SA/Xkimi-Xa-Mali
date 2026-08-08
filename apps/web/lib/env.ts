@@ -189,6 +189,22 @@ export const env = createEnv({
     // Security tunables — allows per-environment adjustment without code changes
     MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
     LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
+    // Require every account whose password predates the twelve-character policy
+    // to reset before signing in again.
+    //
+    // Off by default, and turning it on is an owner decision taken *after* the
+    // founders have been told — not a consequence of deploying this code. On,
+    // it signs out every account created under the old eight-character rule,
+    // including the single admin's, and the only way back in is an email.
+    //
+    // NOT `z.coerce.boolean()`. That is `Boolean(string)`, so the string
+    // "false" coerces to **true** and the flag could never be turned back off —
+    // the shape of a lockout that cannot be undone by editing an env var.
+    // ENABLE_MANUAL_PAYMENTS and ENABLE_GOAL_LOCKING above have this bug today.
+    REQUIRE_PASSWORD_POLICY_RESET: z
+      .enum(['true', 'false'])
+      .default('false')
+      .transform((v) => v === 'true'),
     // Shared secret for internal admin→web API calls (server-to-server, no
     // session needed). Missing on the live deployment, every admin action that
     // reaches through to the member app fails authentication.
@@ -241,6 +257,7 @@ export const env = createEnv({
     SENTRY_DSN: process.env.SENTRY_DSN,
     MAX_LOGIN_ATTEMPTS: process.env.MAX_LOGIN_ATTEMPTS,
     LOCKOUT_DURATION_MINUTES: process.env.LOCKOUT_DURATION_MINUTES,
+    REQUIRE_PASSWORD_POLICY_RESET: process.env.REQUIRE_PASSWORD_POLICY_RESET,
     ADMIN_API_SECRET: process.env.ADMIN_API_SECRET,
     ALERT_FALLBACK_EMAIL: process.env.ALERT_FALLBACK_EMAIL,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,

@@ -91,7 +91,12 @@ export async function resetPassword(rawToken: string, newPassword: string, ipAdd
     if (!consumed) throw new InvalidTokenError('This reset link has already been used')
     await tx.user.update({
       where: { id: record.userId },
-      data: { password: passwordHash },
+      data: {
+        password: passwordHash,
+        // Validated by PasswordResetSchema against the current policy, so this
+        // password satisfies it and the account is no longer asked to reset.
+        passwordChangedAt: new Date(),
+      },
     })
   })
 
@@ -126,7 +131,7 @@ export async function changePassword(
   const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
 
   await Promise.all([
-    userRepo.update(userId, { password: passwordHash }),
+    userRepo.update(userId, { password: passwordHash, passwordChangedAt: new Date() }),
     bumpRoleVersion(userId),
   ])
 

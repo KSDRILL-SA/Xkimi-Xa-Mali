@@ -147,6 +147,16 @@ model User {
   loginAttempts   Int        @default(0)
   lockedUntil     DateTime?
   roleVersion     Int        @default(0)
+  /// When this password was last set under the current strength policy.
+  ///
+  /// Null means the password predates the policy — set before registration
+  /// began enforcing twelve characters. It is not "never changed": it is
+  /// "changed, if at all, under a rule we no longer consider sufficient".
+  ///
+  /// Only read when REQUIRE_PASSWORD_POLICY_RESET is on. Off, this column is
+  /// recorded and ignored, which is what makes turning the requirement on a
+  /// decision rather than a deploy.
+  passwordChangedAt DateTime?
   /// When this member chose to leave. Null for everyone still in the circle.
   resignedAt      DateTime?
   deletedAt       DateTime?
