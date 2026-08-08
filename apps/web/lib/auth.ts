@@ -90,9 +90,64 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
     return null
   }
 
-  // Account lockout check — checked before bcrypt to short-circuit fast
-  if (user.lockedUntil && user.lockedUntil > new Date()) {
-    const minutesLeft = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000)
+  // Lock state is *computed* here and disclosed further down. Computing it is
+  // not the leak; answering with it is. Knowing it now is what lets a wrong
+  // password on an already-locked account avoid extending the lock.
+  const isLocked = !!(user.lockedUntil && user.lockedUntil > new Date())
+
+  const valid = await bcrypt.compare(parsed.data.password, user.password)
+
+  if (!valid) {
+    // An already-locked account is not counted up further. Without this, wrong
+    // guesses against a locked account keep crossing the threshold and keep
+    // pushing `lockedUntil` forward, so anyone who knows an address can hold its
+    // owner out indefinitely — and with one admin, that is the console.
+    let attempts = user.loginAttempts
+    let lockout = false
+
+    if (!isLocked) {
+      // Atomic increment so parallel failed attempts cannot under-count the
+      // counter (a read-modify-write here would let concurrent guesses share a
+      // single increment and evade the lockout threshold).
+      const updated = await db.user.update({
+        where: { id: user.id },
+        data: { loginAttempts: { increment: 1 } },
+        select: { loginAttempts: true },
+      })
+      attempts = updated.loginAttempts
+      lockout = attempts >= MAX_LOGIN_ATTEMPTS
+      if (lockout) {
+        await db.user.update({
+          where: { id: user.id },
+          data: { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) },
+        })
+      }
+    }
+
+    await recordLoginHistory(user.id, false)
+    logger.warn('Failed login attempt', { userId: user.id, attempts, locked: lockout || isLocked })
+    return null
+  }
+
+  // ── The password is correct from here down ────────────────────────────────
+  //
+  // Everything below tells the caller something about this account: that it
+  // exists, and what state it is in. None of it may be said to somebody who has
+  // not proved they own the account.
+  //
+  // These checks used to sit *above* the comparison, which meant submitting any
+  // string at all against an address returned "account suspended", "pending
+  // activation" or "email not verified" — a plain statement that the address is
+  // registered, and what it is doing. That undid the decoy-hash defence fifteen
+  // lines up, which exists to stop exactly this being learned from timing. The
+  // quiet channel was closed and the loud one left open beside it.
+  //
+  // The cost of moving them: a bcrypt comparison now runs for locked and
+  // suspended accounts too, where it used to short-circuit. That is bounded by
+  // the per-source sign-in throttle added in #301, and it is the price of the
+  // reordering rather than an oversight.
+  if (isLocked) {
+    const minutesLeft = Math.ceil((user.lockedUntil!.getTime() - Date.now()) / 60_000)
     logger.warn('Login blocked — account locked', { userId: user.id, minutesLeft })
     throw new Error('ACCOUNT_LOCKED')
   }
@@ -103,35 +158,8 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
   }
   if (user.status === 'SUSPENDED') throw new Error('ACCOUNT_SUSPENDED')
 
-  const valid = await bcrypt.compare(parsed.data.password, user.password)
-
-  if (!valid) {
-    // Atomic increment so parallel failed attempts cannot under-count the
-    // counter (a read-modify-write here would let concurrent guesses share a
-    // single increment and evade the lockout threshold).
-    const { loginAttempts: attempts } = await db.user.update({
-      where: { id: user.id },
-      data: { loginAttempts: { increment: 1 } },
-      select: { loginAttempts: true },
-    })
-    const lockout = attempts >= MAX_LOGIN_ATTEMPTS
-    if (lockout) {
-      await db.user.update({
-        where: { id: user.id },
-        data: { lockedUntil: new Date(Date.now() + LOCKOUT_DURATION_MS) },
-      })
-    }
-    await recordLoginHistory(user.id, false)
-    logger.warn('Failed login attempt', { userId: user.id, attempts, locked: lockout })
-    return null
-  }
-
-  // The password is correct from here down.
-  //
-  // Checked after the comparison, never before: an account under this
-  // requirement must not be identifiable to someone who has not proved they own
-  // it. No successful login is recorded, because none happened — they proved
-  // the password and were sent to replace it.
+  // No successful login is recorded for this one, because none happened — they
+  // proved the password and were sent to replace it.
   if (passwordPolicyResetRequired(user)) {
     logger.info('Sign-in refused pending password policy reset', { userId: user.id })
     throw new Error('PASSWORD_RESET_REQUIRED')

@@ -125,34 +125,89 @@ describe('authorizeCredentials', () => {
     expect(bcrypt.compare).toHaveBeenCalledTimes(1)
   })
 
-  it('throws ACCOUNT_LOCKED when lockedUntil is in the future', async () => {
+  it('throws ACCOUNT_LOCKED to someone who proves the password', async () => {
     setupValidCredentials()
     const futureDate = new Date(Date.now() + 10 * 60_000) // 10 min from now
     ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
       .mockResolvedValue({ ...ACTIVE_USER, lockedUntil: futureDate } as never)
+    ;(bcrypt.compare as MockedFunction<typeof bcrypt.compare>).mockResolvedValue(true as never)
 
     await expect(authorizeCredentials({ email: 'test@example.com', password: 'pw' }))
       .rejects.toThrow('ACCOUNT_LOCKED')
-    // Should short-circuit before bcrypt (performance: no hash work on locked account)
-    expect(bcrypt.compare).not.toHaveBeenCalled()
+    // bcrypt now runs for a locked account, where it used to short-circuit.
+    // That is the price of not answering "this address is locked" to somebody
+    // who has not shown they own it, and it is bounded by the per-source
+    // sign-in throttle. The old assertion here was the performance note.
+    expect(bcrypt.compare).toHaveBeenCalledTimes(1)
   })
 
-  it('throws EMAIL_NOT_VERIFIED for PENDING user', async () => {
+  it('throws EMAIL_NOT_VERIFIED to someone who proves the password', async () => {
     setupValidCredentials()
     ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
       .mockResolvedValue({ ...ACTIVE_USER, status: 'PENDING' } as never)
+    ;(bcrypt.compare as MockedFunction<typeof bcrypt.compare>).mockResolvedValue(true as never)
 
     await expect(authorizeCredentials({ email: 'test@example.com', password: 'pw' }))
       .rejects.toThrow('EMAIL_NOT_VERIFIED')
   })
 
-  it('throws ACCOUNT_SUSPENDED for SUSPENDED user', async () => {
+  it('throws ACCOUNT_SUSPENDED to someone who proves the password', async () => {
     setupValidCredentials()
     ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
       .mockResolvedValue({ ...ACTIVE_USER, status: 'SUSPENDED' } as never)
+    ;(bcrypt.compare as MockedFunction<typeof bcrypt.compare>).mockResolvedValue(true as never)
 
     await expect(authorizeCredentials({ email: 'test@example.com', password: 'pw' }))
       .rejects.toThrow('ACCOUNT_SUSPENDED')
+  })
+
+  // ─── Nothing is said to somebody who has not proved the password ──────────
+  //
+  // These checks used to sit above the comparison, so submitting any string at
+  // all against an address answered "account suspended", "pending activation"
+  // or "email not verified". That is a plain statement that the address is
+  // registered and what it is doing — and it undid the decoy-hash defence in
+  // the same file, which exists to stop exactly that being learned from timing.
+  // The quiet channel was closed and the loud one left open beside it.
+
+  it.each([
+    ['locked',    { lockedUntil: new Date(Date.now() + 10 * 60_000) }],
+    ['suspended', { status: 'SUSPENDED' }],
+    ['pending',   { status: 'PENDING' }],
+  ])('tells a wrong password nothing about a %s account', async (_label, overrides) => {
+    setupValidCredentials()
+    ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
+      .mockResolvedValue({ ...ACTIVE_USER, ...overrides } as never)
+    ;(bcrypt.compare as MockedFunction<typeof bcrypt.compare>).mockResolvedValue(false as never)
+    ;(db.user.update as MockedFunction<typeof db.user.update>).mockResolvedValue({ loginAttempts: 1 } as never)
+    ;(db.loginHistory.create as MockedFunction<typeof db.loginHistory.create>).mockResolvedValue({} as never)
+
+    // Null, not a throw. Null becomes CredentialsSignin — "incorrect email or
+    // password" — which is all a guesser is entitled to learn.
+    await expect(authorizeCredentials({ email: 'test@example.com', password: 'wrong' }))
+      .resolves.toBeNull()
+  })
+
+  it('does not extend an existing lockout on a wrong guess', async () => {
+    // Without this, wrong guesses against a locked account keep crossing the
+    // threshold and keep pushing `lockedUntil` forward, so anyone who knows an
+    // address can hold its owner out indefinitely. With a single admin, that is
+    // the console — and password reset is the only self-service way back.
+    setupValidCredentials()
+    ;(db.user.findUnique as MockedFunction<typeof db.user.findUnique>)
+      .mockResolvedValue({
+        ...ACTIVE_USER,
+        loginAttempts: 5,
+        lockedUntil: new Date(Date.now() + 10 * 60_000),
+      } as never)
+    ;(bcrypt.compare as MockedFunction<typeof bcrypt.compare>).mockResolvedValue(false as never)
+    ;(db.loginHistory.create as MockedFunction<typeof db.loginHistory.create>).mockResolvedValue({} as never)
+
+    await expect(authorizeCredentials({ email: 'test@example.com', password: 'wrong' }))
+      .resolves.toBeNull()
+
+    // No counter bump and no new lockedUntil — the clock is left to run out.
+    expect(db.user.update).not.toHaveBeenCalled()
   })
 
   it('atomically increments loginAttempts and returns null on wrong password', async () => {
