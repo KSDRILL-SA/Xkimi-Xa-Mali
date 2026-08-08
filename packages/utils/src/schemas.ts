@@ -26,6 +26,31 @@ export const LoginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 })
 
+/**
+ * The password strength rule, in one place.
+ *
+ * It was in three, and they disagreed. `RegisterSchema` and the reset and
+ * change schemas below all required twelve characters. The registration *route*
+ * validated by hand — eight characters, one uppercase, one digit — and never
+ * imported any of them, so the only path that creates an account enforced the
+ * weakest rule in the codebase, and the comment below argued against exactly
+ * the rule it was applying.
+ *
+ * Anything that accepts a new password imports this. A second copy of the rule
+ * is how the first drift happened.
+ */
+export const PASSWORD_MIN_LENGTH = 12
+
+/**
+ * Length over composition. Twelve characters of something a member will
+ * actually remember beats eight with a capital and a digit bolted on, which in
+ * practice produces `Password1` — the shape attackers try first. Current NIST
+ * guidance, and also the kinder rule.
+ */
+export const PasswordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
+
 export const RegisterSchema = z.object({
   email:    z.string().trim().toLowerCase().email('Please enter a valid email address'),
   phone:    z.string().regex(SA_PHONE_REGEX, 'Please enter a valid SA mobile number (e.g. 0821234567)'),
@@ -35,14 +60,10 @@ export const RegisterSchema = z.object({
     .string()
     .regex(SA_ID_REGEX, 'SA ID must be 13 digits')
     .refine(validateSAId, 'Please enter a valid SA ID number'),
-  // Length over composition. Twelve characters of anything a member will
-  // actually remember beats eight with a capital and a digit bolted on, which
-  // in practice produces Password1 — the shape attackers try first. This is
-  // current NIST guidance and it is also the kinder rule.
-  //
-  // Only new and changed passwords are held to it. LoginSchema deliberately
-  // applies no strength rule at all, so every existing password keeps working.
-  password: z.string().min(12, 'Password must be at least 12 characters'),
+  // Only new and changed passwords are held to the policy. LoginSchema
+  // deliberately applies no strength rule at all, so an existing password keeps
+  // working until its owner is asked to replace it.
+  password: PasswordSchema,
   consentToPopia: z.literal(true, {
     errorMap: () => ({ message: 'You must consent to our privacy policy' }),
   }),
@@ -55,7 +76,7 @@ export const RegisterStep2Schema = z.object({
     .string()
     .optional()
     .refine((v) => !v || (SA_ID_REGEX.test(v) && validateSAId(v)), 'Please enter a valid SA ID number'),
-  password: z.string().min(12, 'Password must be at least 12 characters'),
+  password: PasswordSchema,
   consentToPopia: z.boolean().refine((v) => v, 'You must consent to our privacy policy'),
 })
 
@@ -66,7 +87,7 @@ export const PasswordResetRequestSchema = z.object({
 export const PasswordResetSchema = z
   .object({
     token:           z.string().min(1),
-    password:        z.string().min(12, 'Password must be at least 12 characters'),
+    password:        PasswordSchema,
     confirmPassword: z.string(),
   })
   .refine((d) => d.password === d.confirmPassword, {
@@ -77,7 +98,7 @@ export const PasswordResetSchema = z
 export const ChangePasswordSchema = z
   .object({
     currentPassword: z.string().min(1),
-    newPassword:     z.string().min(12, 'Password must be at least 12 characters'),
+    newPassword:     PasswordSchema,
     confirmPassword: z.string(),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {

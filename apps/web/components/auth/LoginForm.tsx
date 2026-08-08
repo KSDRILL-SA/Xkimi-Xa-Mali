@@ -24,6 +24,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   // so "incorrect email or password" would send someone to the reset flow for a
   // problem that clears itself in a few minutes.
   RATE_LIMITED: "Too many sign-in attempts from this connection. Please wait five minutes and try again.",
+  // Their password was correct. The message has to say so, or it reads as a
+  // rejection and they go looking for the wrong problem — and it has to name
+  // the way out, which is the reset link directly below this alert.
+  PASSWORD_RESET_REQUIRED:
+    "Your password was correct, but it is shorter than our current minimum. Please use “Forgot password?” below to set a new one of at least 12 characters.",
   rate_limited: "Too many attempts. Please wait a moment and try again.",
 }
 

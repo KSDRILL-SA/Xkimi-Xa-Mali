@@ -42,6 +42,25 @@ const schema = z.object({
   MAX_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).max(20).default(5),
   LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
 
+  // Require an account whose password predates the twelve-character policy to
+  // replace it before signing in here. Off by default; see the member app's
+  // `env.ts` for why this is not `z.coerce.boolean()`.
+  REQUIRE_PASSWORD_POLICY_RESET: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+
+  // This app sends no email. These are declared, optional, for one purpose: to
+  // establish whether a password-reset email could reach anyone before refusing
+  // an admin entry over a password policy. The reset itself happens in the
+  // member app against the same `User` row.
+  //
+  // Unset, the requirement is not enforced here. That is the safe default and
+  // the deliberate one — the alternative is locking the only admin out of the
+  // console with no way back in, over a policy rather than a compromise.
+  RESEND_API_KEY:    z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().optional(),
+
   // Server-side DSN, falling back to the public one. Both optional: error
   // reporting is off in development and in any environment that has not been
   // given a DSN, which must not stop the app from booting.

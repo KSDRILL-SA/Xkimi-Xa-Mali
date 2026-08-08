@@ -34,6 +34,10 @@ export function AdminLoginForm() {
         // generic "invalid credentials" would be actively misleading here.
         result.error === 'RATE_LIMITED'
           ? 'Too many sign-in attempts from this connection. Please wait five minutes and try again.'
+          // The password was correct. Say so, and name where the reset happens —
+          // it is the member portal, not this console, which is not obvious.
+          : result.error === 'PASSWORD_RESET_REQUIRED'
+          ? 'Your password was correct, but it is shorter than the current minimum. Reset it from the member portal, then sign in here again.'
           : result.error === 'ACCOUNT_SUSPENDED'
           ? 'This account has been suspended. Contact another administrator.'
           : result.error === 'ACCOUNT_LOCKED'

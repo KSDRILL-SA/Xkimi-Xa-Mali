@@ -20,6 +20,52 @@ const LOCKOUT_DURATION_MS = env.LOCKOUT_DURATION_MINUTES * 60 * 1000
 // let an attacker enumerate registered emails (SEC-S07).
 const DECOY_HASH = '$2a$12$0qvDdA8aXMT/QLT7ggsLKess1fpkA0Uy07.gAmSqiJcZy7/AcziCi'
 
+/**
+ * Whether this account must replace its password before signing in again.
+ *
+ * `passwordChangedAt` is null on every account created while registration
+ * enforced eight characters. Null is not "never changed" — it is "set under a
+ * rule we no longer consider sufficient".
+ *
+ * **Enforced only when a reset can actually be delivered.** The way out of this
+ * requirement is a password-reset email, so turning it on without working email
+ * does not enforce a policy — it locks every account out permanently, the
+ * single admin's included, and the console you would fix it from is behind the
+ * same door. `RESEND_FROM_EMAIL` defaults to a `.invalid` address and a live
+ * deploy on an unverified domain is the failure #299 exists to catch, so this
+ * is not a hypothetical. When email is not configured the requirement is
+ * skipped and the reason is logged, loudly, on every attempt.
+ *
+ * Exported for tests: a control that decides who can sign in is worth driving
+ * directly rather than inferring from a login that did or did not happen.
+ */
+export function passwordPolicyResetRequired(user: { passwordChangedAt: Date | null }): boolean {
+  if (!env.REQUIRE_PASSWORD_POLICY_RESET) return false
+  if (user.passwordChangedAt !== null) return false
+
+  if (!canDeliverPasswordReset()) {
+    logger.error(
+      'REQUIRE_PASSWORD_POLICY_RESET is on but no reset email can be sent — not enforcing',
+      { reason: 'RESEND_FROM_EMAIL is unset or still a .invalid placeholder' },
+    )
+    return false
+  }
+
+  return true
+}
+
+/**
+ * Whether a password-reset email would actually reach anyone.
+ *
+ * `.invalid` is the reserved TLD (RFC 2606) this codebase's own env default
+ * uses as its placeholder, so testing the suffix is more durable than matching
+ * the literal default.
+ */
+function canDeliverPasswordReset(): boolean {
+  const from = env.RESEND_FROM_EMAIL
+  return !!env.RESEND_API_KEY && !!from && !from.endsWith('.invalid')
+}
+
 async function recordLoginHistory(userId: string, success: boolean) {
   await db.loginHistory
     .create({ data: { userId, success } })
@@ -78,6 +124,17 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
     await recordLoginHistory(user.id, false)
     logger.warn('Failed login attempt', { userId: user.id, attempts, locked: lockout })
     return null
+  }
+
+  // The password is correct from here down.
+  //
+  // Checked after the comparison, never before: an account under this
+  // requirement must not be identifiable to someone who has not proved they own
+  // it. No successful login is recorded, because none happened — they proved
+  // the password and were sent to replace it.
+  if (passwordPolicyResetRequired(user)) {
+    logger.info('Sign-in refused pending password policy reset', { userId: user.id })
+    throw new Error('PASSWORD_RESET_REQUIRED')
   }
 
   // Successful login — reset lockout counters
