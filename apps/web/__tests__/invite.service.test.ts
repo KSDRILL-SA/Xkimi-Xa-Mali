@@ -25,6 +25,8 @@ vi.mock('@/lib/db', () => ({
   },
 }))
 
+vi.mock('@/services/alert.service', () => ({ raiseOperationalAlert: vi.fn() }))
+
 vi.mock('@/integrations/email', () => ({
   emailProvider: {
     sendInviteEmail:      vi.fn(),
@@ -525,6 +527,71 @@ describe('acceptInviteRegistration', () => {
     })
 
     await expect(acceptInviteRegistration(input, 'http://localhost')).rejects.toThrow(InviteUsedError)
+  })
+
+  it('does not brick the account when the verification email fails to send', async () => {
+    // This was awaited without a catch, so a Resend blip threw *after* the
+    // transaction had committed. The caller got a 500 and believed registration
+    // had failed. It had not: the row existed so the address was taken, the
+    // invitation was spent, the status was PENDING so sign-in was refused, and
+    // the only copy of the token had gone with the message. There was no resend
+    // endpoint. Only a database edit could put it right.
+    mockDb.invitation.findUnique.mockResolvedValue(VALID_INVITE as never)
+    mockDb.role.findUniqueOrThrow.mockResolvedValue({ id: 'role1' } as never)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockDb.$transaction.mockImplementation(async (fn: any) => {
+      const txMock = {
+        user: {
+          create: vi.fn().mockResolvedValue({ id: 'u1', email: 'k@x.co.za', firstName: 'Kurhula' }),
+          count: vi.fn().mockResolvedValue(10),
+        },
+        userRole: { create: vi.fn() },
+        notificationPreference: { create: vi.fn() },
+        emailVerificationToken: { create: vi.fn() },
+        invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      }
+      return fn(txMock as unknown as typeof db)
+    })
+    mockSendVerificationEmail.mockRejectedValue(new Error('Resend: domain not verified') as never)
+    mockWriteAuditLog.mockResolvedValue(undefined)
+
+    const result = await acceptInviteRegistration(input, 'http://localhost')
+
+    // Registration stands, and says plainly that the link did not go out.
+    expect(result.userId).toBe('u1')
+    expect(result.verificationEmailSent).toBe(false)
+  })
+
+  it('tells an admin when a new member could not be sent their link', async () => {
+    // The member cannot report this themselves — they have no account to report
+    // it from. Warning rather than critical: no money moved, and they can ask
+    // for a new link, but somebody invited is sitting outside the door.
+    const { raiseOperationalAlert } = await import('@/services/alert.service')
+
+    mockDb.invitation.findUnique.mockResolvedValue(VALID_INVITE as never)
+    mockDb.role.findUniqueOrThrow.mockResolvedValue({ id: 'role1' } as never)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockDb.$transaction.mockImplementation(async (fn: any) => {
+      const txMock = {
+        user: {
+          create: vi.fn().mockResolvedValue({ id: 'u1', email: 'k@x.co.za', firstName: 'Kurhula' }),
+          count: vi.fn().mockResolvedValue(10),
+        },
+        userRole: { create: vi.fn() },
+        notificationPreference: { create: vi.fn() },
+        emailVerificationToken: { create: vi.fn() },
+        invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+      }
+      return fn(txMock as unknown as typeof db)
+    })
+    mockSendVerificationEmail.mockRejectedValue(new Error('Resend: domain not verified') as never)
+    mockWriteAuditLog.mockResolvedValue(undefined)
+
+    await acceptInviteRegistration(input, 'http://localhost')
+
+    expect(raiseOperationalAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'VERIFICATION_EMAIL_FAILED', severity: 'warning' }),
+    )
   })
 })
 

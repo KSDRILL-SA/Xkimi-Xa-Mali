@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'crypto'
 import { emailProvider } from '@/integrations/email'
 import { smsProvider } from '@/integrations/sms'
 import { writeAuditLog } from './audit.service'
+import { raiseOperationalAlert } from './alert.service'
 import { logger } from '@xxm/observability'
 import { encrypt } from '@/lib/encryption'
 import {
@@ -405,20 +406,71 @@ export async function acceptInviteRegistration(
     return created
   })
 
-  await emailProvider.sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
+  // The send is outside the transaction, and its failure must not become the
+  // registration's.
+  //
+  // This was awaited without a catch, so a Resend blip threw *after* the
+  // transaction had committed. The caller saw a 500 and believed registration
+  // had failed. It had not: the `User` row existed, so the email and phone were
+  // taken and re-registering was impossible; the invitation was `ACCEPTED`, so
+  // the code could not be used again; the status was `PENDING`, so signing in
+  // was refused; and the only copy of the token had gone with the message.
+  // Nothing in the product could undo any of that. The member was finished, and
+  // the one path back was somebody editing the database.
+  //
+  // The invite SMS and the invite email a hundred lines up both catch. This one
+  // did not, and it was the one that mattered.
+  let verificationEmailSent = true
+  try {
+    await emailProvider.sendVerificationEmail(user.email, user.firstName, rawToken, baseUrl)
+  } catch (err) {
+    verificationEmailSent = false
+    logger.error('Verification email failed to send after registration', {
+      userId: user.id,
+      inviteId: invite.id,
+      reason: err instanceof Error ? err.message : String(err),
+    })
+
+    // A member who cannot verify cannot join, and cannot say so from inside the
+    // app — they have no account to say it from. Somebody has to know.
+    await raiseOperationalAlert({
+      code: 'VERIFICATION_EMAIL_FAILED',
+      // Not critical: no money has moved and the member can ask for a new link
+      // themselves. It does need seeing today, because until it is seen a person
+      // who was invited is sitting outside the door.
+      severity: 'warning',
+      title: 'A new member could not be sent their verification email',
+      body: [
+        `${invite.email} completed registration but the verification email did not send.`,
+        '',
+        'Their account exists and is PENDING, so they cannot sign in, and they',
+        'cannot register again because the address is now taken.',
+        '',
+        'They can request a new link from the sign-in page. If the cause is the',
+        'sending domain rather than a blip, fix that first or the new link will',
+        'not send either.',
+      ].join('\n'),
+      entityId: user.id,
+      payload: { userId: user.id, inviteId: invite.id },
+    })
+  }
 
   await writeAuditLog({
     userId: user.id,
     action: 'INVITE_ACCEPTED',
     entity: 'Invitation',
     entityId: invite.id,
-    payload: { email: invite.email, invitedById: invite.invitedById },
+    payload: { email: invite.email, invitedById: invite.invitedById, verificationEmailSent },
     ipAddress: ip,
   })
 
-  logger.info('Registration via invite completed', { userId: user.id, inviteId: invite.id })
+  logger.info('Registration via invite completed', {
+    userId: user.id,
+    inviteId: invite.id,
+    verificationEmailSent,
+  })
 
-  return { userId: user.id, email: user.email }
+  return { userId: user.id, email: user.email, verificationEmailSent }
 }
 
 // ─── Role management ──────────────────────────────────────────────────────────

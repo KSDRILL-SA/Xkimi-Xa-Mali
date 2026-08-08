@@ -64,6 +64,15 @@ export const mandateRatelimit   = makeRatelimit('xxm:ratelimit:mandate',        
 export const statementRatelimit = makeRatelimit('xxm:ratelimit:statement',       Ratelimit.slidingWindow(10, '1 h'))
 export const forgotPasswordRatelimit  = makeRatelimit('xxm:ratelimit:forgot-password', Ratelimit.slidingWindow(5,  '15 m'))
 export const verifyEmailRatelimit     = makeRatelimit('xxm:ratelimit:verify-email',    Ratelimit.slidingWindow(10, '15 m'))
+/**
+ * Asking for the verification link again.
+ *
+ * Tighter than most, because each success sends mail to an address the caller
+ * named rather than one they own — an unthrottled version is a way to have this
+ * system post repeatedly to somebody else's inbox. Three in fifteen minutes
+ * covers a member who clicks twice and then checks their spam folder.
+ */
+export const resendVerificationRatelimit = makeRatelimit('xxm:ratelimit:resend-verification', Ratelimit.slidingWindow(3, '15 m'))
 export const mandateCreateRatelimit   = makeRatelimit('xxm:ratelimit:mandate-create',  Ratelimit.slidingWindow(10, '1 h'))
 export const mandateDelayRatelimit    = makeRatelimit('xxm:ratelimit:mandate-delay',   Ratelimit.slidingWindow(5,  '1 h'))
 // A proposal reaches every leader's inbox, so an unbounded one is a way to

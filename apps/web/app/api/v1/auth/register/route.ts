@@ -70,10 +70,17 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     baseUrl,
     ip,
   )
+  // The account is created either way. What differs is whether the link is on
+  // its way, and telling someone to "check your email" when nothing was sent is
+  // how they end up waiting instead of asking for another one.
   return apiSuccess(
     {
-      message: 'Registration successful. Please check your email to verify your account.',
+      message: result.verificationEmailSent
+        ? 'Registration successful. Please check your email to verify your account.'
+        : 'Your account was created, but the verification email could not be sent. ' +
+          'Use "Resend verification email" on the sign-in page to request a new link.',
       userId: result.userId,
+      verificationEmailSent: result.verificationEmailSent,
     },
     201,
   )

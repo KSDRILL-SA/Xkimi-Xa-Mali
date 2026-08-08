@@ -55,6 +55,14 @@ export function LoginForm() {
   const [serverError, setServerError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // The sign-in page is where somebody who never got their verification email
+  // ends up, so the way out has to be here. Shown only once EMAIL_NOT_VERIFIED
+  // comes back, which means the password was right — offering it to everyone
+  // would hand a guesser a way to post mail to an address they named.
+  const [needsVerification, setNeedsVerification] = useState(false)
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const [lastEmail, setLastEmail] = useState('')
+
   const { register, handleSubmit, formState: { errors } } = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
   })
@@ -73,11 +81,30 @@ export function LoginForm() {
 
     if (res?.error) {
       setServerError(ERROR_MESSAGES[res.error] ?? 'Something went wrong. Please try again.')
+      setNeedsVerification(res.error === 'EMAIL_NOT_VERIFIED')
+      setLastEmail(data.email)
+      setResendState('idle')
       return
     }
 
     router.push(callbackUrl as Route<string>)
     router.refresh()
+  }
+
+  async function resendVerification() {
+    setResendState('sending')
+    try {
+      await fetch('/api/v1/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: lastEmail }),
+      })
+    } catch {
+      // The endpoint answers the same way whatever happens on the server, so
+      // there is nothing here worth reporting differently. A network failure
+      // and a rate limit both mean "try again shortly".
+    }
+    setResendState('sent')
   }
 
   return (
@@ -95,6 +122,25 @@ export function LoginForm() {
         <Alert variant="error">
           {serverError || ERROR_MESSAGES[errorParam ?? ''] || 'An error occurred.'}
         </Alert>
+      )}
+      {needsVerification && (
+        resendState === 'sent' ? (
+          <Alert variant="success">
+            If that account is waiting to be verified, a new link is on its way. It expires in 24 hours.
+          </Alert>
+        ) : (
+          <Alert variant="warning">
+            <span>Didn’t get the email, or has the link expired?</span>{' '}
+            <button
+              type="button"
+              onClick={resendVerification}
+              disabled={resendState === 'sending'}
+              className="font-semibold underline underline-offset-2 disabled:opacity-60"
+            >
+              {resendState === 'sending' ? 'Sending…' : 'Resend verification email'}
+            </button>
+          </Alert>
+        )
       )}
 
       <FormGroup label="Email address" htmlFor="email" required error={errors.email?.message}>
