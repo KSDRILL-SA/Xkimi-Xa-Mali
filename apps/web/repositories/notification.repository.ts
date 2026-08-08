@@ -27,15 +27,17 @@ export const notificationRepo = {
       skip?: number
       take?: number
       include?: Prisma.NotificationInclude
+      // `include` pulls whole rows; a caller that only needs two columns of a
+      // large, JSON-carrying table should be able to say so.
+      select?: Prisma.NotificationSelect
     } = {},
   ) {
-    return db.notification.findMany({
-      where,
-      orderBy: opts.orderBy,
-      skip: opts.skip,
-      take: opts.take,
-      include: opts.include,
-    })
+    // Prisma rejects `select` and `include` together, and the two produce
+    // different row shapes — so they are two calls rather than one spread union.
+    const page = { where, orderBy: opts.orderBy, skip: opts.skip, take: opts.take }
+    return opts.select
+      ? db.notification.findMany({ ...page, select: opts.select })
+      : db.notification.findMany({ ...page, include: opts.include })
   },
 
   /**

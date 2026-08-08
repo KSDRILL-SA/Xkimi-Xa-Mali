@@ -10,6 +10,7 @@ import {
   FileText,
   Handshake,
   Lock,
+  Mail,
   MessageCircle,
   Quote,
   Shield,
@@ -21,7 +22,7 @@ import {
 import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
+import { APP_URL, SUPPORT_EMAIL, adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
 import { FOUNDERS } from '@/lib/founders'
 
@@ -497,6 +498,16 @@ export default async function AboutPage() {
               >
                 <MessageCircle size={14} aria-hidden />
                 Join our WhatsApp group
+              </a>
+              {/* The third option, for the person neither signed in nor in the
+                  group — which is who reads an About page. Both routes above
+                  assume they already belong somewhere. */}
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-white/15 text-white/70 font-semibold text-sm hover:text-white hover:border-white/30 transition-colors"
+              >
+                <Mail size={14} aria-hidden />
+                Email the Foundation
               </a>
             </div>
             <p className="text-white/20 text-xs italic mt-2">

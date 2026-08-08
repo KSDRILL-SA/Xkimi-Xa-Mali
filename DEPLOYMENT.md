@@ -90,9 +90,12 @@ three are addresses that *receive*.
 > [!WARNING]
 > **It cannot be `RESEND_FROM_EMAIL`.** Resend only sends from a domain you have
 > verified, and nobody can verify `gmail.com`. That one must be
-> `noreply@<your-domain>` once the domain is registered. This does not fail the
-> build — Resend rejects the send at run time and **every notification silently
-> stops**, which is the quietest way this system can break.
+> `noreply@<your-domain>` once the domain is registered.
+>
+> **A live build now refuses to start on one**, naming the reason — so this is
+> caught at deploy rather than on the first send. It previously failed at neither:
+> Resend rejected each send at run time and every notification stopped while the
+> app reported itself perfectly healthy.
 
 ## 3. Database (Neon, production)
 
