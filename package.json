@@ -19,7 +19,8 @@
     "db:migrate": "turbo run db:migrate",
     "db:push": "turbo run db:push",
     "db:seed": "turbo run db:seed",
-    "db:studio": "cd packages/database && npx prisma studio"
+    "db:studio": "cd packages/database && npx prisma studio",
+    "secrets:reencrypt": "npm run secrets:reencrypt -w @xxm/database --"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

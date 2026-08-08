@@ -102,7 +102,7 @@ The money path, in order:
 | CSP with per-request nonce | `web/middleware.ts:buildCsp` | `script-src 'unsafe-inline'` turns an XSS from blocked into executed. Costs static prerendering — that trade is deliberate |
 | CSRF origin check | `web/lib/csrf-origin.ts` | Cross-origin state mutation |
 | Constant-time secret compare | `web/middleware.ts:constantTimeEqual` | `ADMIN_API_SECRET` leaks via response timing |
-| Encryption at rest | `web/lib/encryption.ts` (AES-256-GCM) | PII exposure. **No key rotation exists** — see §4 |
+| Encryption at rest | `web/lib/encryption.ts` (AES-256-GCM) + `@xxm/utils/keyring` | PII exposure. Rotation is a three-step runbook procedure, not an env edit — see `docs/runbook.md` |
 | Rate limiting | `web/lib/redis.ts` | Unconfigured Redis = limiter allows everything. Required when live |
 | Config validation | `web/lib/env.ts`, `admin/lib/env.ts` (`requiredWhenLive`) | A live deploy starts without the credentials it needs |
 
@@ -235,7 +235,7 @@ verification (2026-08-07)** that confirmed which of them actually closed.
 | H-2 | **Dependency tree cleanup** | ✅ **Fixed** (2026-08-07). `npm audit` 1 high → **0**. `js-yaml` 4.3.1, `brace-expansion` 2.1.4, `eslint-config-next` 16.3.0 (was linting Next 16 with the Next 15 config), postcss dropped from the apps and nested correctly under Next, root `@vercel/blob` pin removed. Root cause was M-8, not a version mismatch. Two `npm ls` complaints remain and are upstream — see §4.4 | `npm audit` → 0 |
 | H-3 | **CI reliability** | ⚠️ **Build fixed, CI still not verifying.** `npm run build` exits 0 (3/3) and an `npm audit --audit-level=high` gate is now in the workflow. But per `DEPLOYMENT.md` §8 GitHub Actions minutes are exhausted on the free tier, so **the workflow is not executing at all** — every fix in this table was verified locally and nothing automated is checking them | `npm run build` → exit 0 |
 | H-4 | **Seed-flow reliability** — seed required a developer-local env file, breaking CI | ✅ **Fixed** | `packages/database/package.json` chains `--env-file-if-exists` for all three apps; `prisma/seed.ts:22-27` skips the founder block with a log line when `FOUNDER_*` is absent |
-| H-5 | **Encryption key rotation strategy** | ⚠️ **Mitigated, not solved.** `tryDecrypt`/`maskStoredSecret` degrade unreadable ciphertext instead of taking the page down. Rotation itself does not exist: one key, no key identifier in the envelope, no previous-key fallback. Tracked as **P2 · BEFORE REAL DEBITS** in `SECURITY-HARDENING.md:10` | `web/lib/encryption.ts:9-35` |
+| H-5 | **Encryption key rotation strategy** | ✅ **Fixed.** Ciphertext now carries a version and a key id (`v1.<keyId>.<payload>`); retired keys stay readable via `ENCRYPTION_PREVIOUS_KEYS` while `npm run secrets:reencrypt` moves rows across. Values written before this are unversioned and are still read — every key on the ring is tried, which is safe because GCM authenticates. `tryDecrypt`/`maskStoredSecret` still degrade rather than take a page down; the keyring narrows how often that happens, it does not make it impossible. Procedure: `docs/runbook.md`, "Rotating the encryption key" | `packages/utils/src/keyring.ts`, `web/lib/encryption.ts`, `packages/database/scripts/reencrypt-secrets.ts` |
 
 ### 4.3 Medium findings
 
@@ -704,7 +704,7 @@ The repository is working toward:
 | **Financial workflow verification** | Unit-tested only | An end-to-end debit-run test through Inngest; failed collections alert a human (H-1) |
 | **Netcash verification** | Adapter built against the wrong API | Sandbox credentials → rebuild adapter → full dry run in test mode (C-3) |
 | **Complete authorization consistency** | Strong, with one gap | Close M-6; keep `web` and `admin` middleware behaviour deliberately aligned |
-| **Encryption key rotation support** | Absent | Versioned envelope + previous-key fallback + re-encrypt backfill (H-5) |
+| **Encryption key rotation support** | Present | Versioned envelope + previous-key fallback + re-encrypt backfill, all shipped (H-5). Adding an encrypted column means adding it to `reencrypt-secrets.ts` too |
 | **Operational monitoring** | Partial | Alerting on failed debits, ledger drift, and role-version publish failures |
 | **Public launch readiness** | Blocked on Netcash onboarding (weeks) | Soft launch with the four founders through one full debit cycle |
 

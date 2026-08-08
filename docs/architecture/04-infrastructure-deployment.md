@@ -108,7 +108,7 @@ Every tier needs the same core secrets (full list + descriptions in [`.env.examp
 
 | Variable | Note |
 |---|---|
-| `ENCRYPTION_KEY` | 64 hex chars — **set once, never change** (decrypts stored bank/ID numbers) |
+| `ENCRYPTION_KEY` | 64 hex chars — **never change it on its own** (it decrypts stored bank/ID numbers). Rotate via `docs/runbook.md`, "Rotating the encryption key" |
 | `ADMIN_API_SECRET` | Must match on web + admin (admin→web internal calls) |
 | `NETCASH_API_URL` | Defaults to the **test** gateway — override for production |
 | `INNGEST_EVENT_KEY` / `_SIGNING_KEY` | Or no scheduled job fires |
