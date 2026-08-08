@@ -3,7 +3,7 @@
 **Session closed:** 2026-08-08
 **Branch state at close:** `main` is the **only** branch. No open pull requests.
 **Health at close:** typecheck 0 · lint 0 errors (5 warnings, all pre-existing
-files) · test 0 — **1029 passing** (was 941) · build 0 (3/3) · `npm audit` 0.
+files) · test 0 — **1039 passing** (was 941) · build 0 (3/3) · `npm audit` 0.
 
 Everything below was verified locally. **CI is still not executing** — GitHub
 Actions minutes are exhausted on the free tier. Nothing automated is checking
@@ -39,7 +39,7 @@ code — re-run. This happened twice this session.
 
 ## 2. What was done
 
-Seven PRs, all squash-merged to `main`.
+Eight PRs, all squash-merged to `main`.
 
 | PR | What was actually wrong |
 |---|---|
@@ -50,6 +50,7 @@ Seven PRs, all squash-merged to `main`.
 | #296 | The Founder badge — conferred, permanent, kept off the tier ladder |
 | #297 | #296 shipped with no way to grant it. Now managed on the member's own admin page |
 | #298 | The marketing site had no contact address at all — its only public route to the Foundation was a WhatsApp group link, which is useless to someone not yet in the group |
+| #299 | A notification that exhausted its retries sat FAILED forever and nothing said so. The app was healthy, the queue drained, and members simply stopped being told things — including that their money did not move |
 
 Plus `bfa5aac`: `main` became the only long-lived branch, and every workflow
 document was updated to say so.
@@ -103,8 +104,11 @@ is inlined at build time, so setting it after a deploy does nothing.
 
 > **It cannot be `RESEND_FROM_EMAIL`.** Resend only sends from a domain you have
 > verified and nobody can verify `gmail.com`. That must be `noreply@<your-domain>`
-> once the domain is registered. Nothing fails at build time — Resend rejects the
-> send at run time and every notification silently stops.
+> once the domain is registered.
+>
+> **A live build now refuses to start on one** (#299), naming the reason. You will
+> hit this the first time you deploy with a real domain — the fix is the value,
+> not the check.
 
 ### 4.2a Set `ALERT_FALLBACK_EMAIL` before going live
 
@@ -191,6 +195,12 @@ something already went wrong.
 Codes: `DEBIT_RUN_INCOMPLETE`, `LEDGER_DRIFT_DETECTED`, `SCHEDULED_JOB_FAILED`,
 `FINANCIAL_ANOMALY_DETECTED`. Documented in `docs/runbook.md` → "What reaches you
 without you looking", with the three ways alerting can itself be down.
+
+`NOTIFICATIONS_ABANDONED` (#299) covers messages that exhausted every retry and
+will never send — throttled to once per six hours **on the audit log, not
+Redis**, because the cache is a no-op shim when Upstash is unconfigured and a
+Redis throttle would fail open. Recovery is in the runbook: fix the cause first,
+then reset `retryCount`.
 
 **Not covered:** a job that *never fires*. There is no heartbeat, so a cron that
 silently stops scheduling is only visible in the Inngest dashboard.
