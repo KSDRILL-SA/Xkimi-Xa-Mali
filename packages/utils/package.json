@@ -15,6 +15,7 @@
     "./sms": "./src/sms.ts",
     "./deployment": "./src/deployment.ts",
     "./client-ip": "./src/client-ip.ts",
+    "./csrf-origin": "./src/csrf-origin.ts",
     "./keyring": "./src/keyring.ts"
   },
   "main": "./src/index.ts",

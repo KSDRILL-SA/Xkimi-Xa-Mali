@@ -43,8 +43,12 @@ const schema = z.object({
   LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(1440).default(15),
 
   // Require an account whose password predates the twelve-character policy to
-  // replace it before signing in here. Off by default; see the member app's
-  // `env.ts` for why this is not `z.coerce.boolean()`.
+  // replace it before signing in here. Off by default.
+  //
+  // Only the two literal strings are accepted. `z.coerce.boolean()` is
+  // `Boolean(string)`, under which "false" is true — a flag that could be
+  // turned on and never off, which for this one means a lockout no env edit
+  // could undo.
   REQUIRE_PASSWORD_POLICY_RESET: z
     .enum(['true', 'false'])
     .default('false')

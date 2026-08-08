@@ -388,9 +388,19 @@ export async function acceptInviteRegistration(
       { userId: created.id, tokenHash, expiresAt: new Date(Date.now() + VERIF_TTL_MS) },
       tx,
     )
-    await invitationRepo.update(invite.id, {
-      status: 'ACCEPTED', acceptedById: created.id, acceptedAt: new Date(),
-    }, tx)
+    // Conditional on the invitation still being PENDING, so the database is
+    // what refuses a second acceptance rather than the check thirty lines up.
+    //
+    // Two requests carrying the same code both read PENDING, both pass that
+    // check, and both arrive here. It was survivable only because `User.email`
+    // is unique and the second insert happened to violate it — protection by
+    // accident, from a constraint about something else, that would disappear
+    // the day this ever creates a user by any other key.
+    const claimed = await tx.invitation.updateMany({
+      where: { id: invite.id, status: 'PENDING' },
+      data: { status: 'ACCEPTED', acceptedById: created.id, acceptedAt: new Date() },
+    })
+    if (claimed.count === 0) throw new InviteUsedError()
 
     return created
   })
