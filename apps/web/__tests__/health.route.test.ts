@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // The route reads `REDIS_CONFIGURED` and `redis` from '@/lib/redis' and runs
@@ -62,6 +62,21 @@ async function loadRoute(opts: {
 }
 
 beforeEach(() => vi.clearAllMocks())
+
+// `vi.doMock` registrations are not scoped to the file that made them. Vitest
+// reuses a worker thread across files, so `@/lib/db` and `@/lib/redis` stayed
+// mocked for whatever ran next in that worker — which is how `gateway-selection`
+// came to fail in a run where nothing it touches had changed, passing on its own
+// and passing on a re-run.
+//
+// This is §4.12 in a second costume. There the leak was `process.env` replaced
+// wholesale; here it is a module registry left dirty. Same shape: a suite that
+// fails in files nobody edited, roughly one full run in six, and reads as noise.
+afterEach(() => {
+  vi.doUnmock('@/lib/db')
+  vi.doUnmock('@/lib/redis')
+  vi.resetModules()
+})
 
 describe('GET /api/v1/health — honest Redis reporting', () => {
   it('reports ok/200 when the DB and a configured Redis are both reachable', async () => {

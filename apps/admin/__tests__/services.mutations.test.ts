@@ -4,7 +4,9 @@ vi.mock('@/lib/db', () => ({
   db: {
     user:            { findUnique: vi.fn(), update: vi.fn() },
     role:            { findUnique: vi.fn() },
-    userRole:        { upsert: vi.fn(), deleteMany: vi.fn() },
+    // `count` is how a revocation establishes there is another admin to fall
+    // back on. Left off, the policy refuses rather than guessing.
+    userRole:        { upsert: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     paymentMandate:  { findMany: vi.fn() },
     contribution:    { findMany: vi.fn(), createMany: vi.fn() },
     invitation:      { findUnique: vi.fn(), update: vi.fn() },
@@ -126,6 +128,12 @@ describe('setMemberRole', () => {
     mock(db.user.update).mockResolvedValue({ id: 'm1', roleVersion: 2 } as never)
     mock(db.userRole.upsert).mockResolvedValue({} as never)
     mock(db.userRole.deleteMany).mockResolvedValue({ count: 1 } as never)
+    // Three admins, so the revocations below are ordinary ones rather than the
+    // last-admin case. Without this the count reads as undefined, which the
+    // policy treats as "cannot establish there is another admin" and refuses —
+    // deliberately, because a failed count must not read as plenty.
+    // The refusals themselves are covered in role-change-guards.test.ts.
+    mock(db.userRole.count).mockResolvedValue(3 as never)
   })
 
   it('granting admin is idempotent — a second grant does not duplicate the role', async () => {

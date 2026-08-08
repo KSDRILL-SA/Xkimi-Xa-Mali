@@ -18,7 +18,8 @@ import {
   MemberCapReachedError,
 } from '@/lib/errors'
 import { MAX_MEMBERS } from '@xxm/utils'
-import { assertAdmin, assertNotSelf, ROLES } from '@/lib/authorization'
+import { assertAdmin, ROLES } from '@/lib/authorization'
+import { refuseRoleChange, ROLE_CHANGE_REFUSAL_MESSAGE } from '@xxm/utils/role-policy'
 import { bumpRoleVersion } from '@/lib/role-version'
 import { userRepo, runTransaction } from '@/repositories/user.repository'
 import { invitationRepo } from '@/repositories/invitation.repository'
@@ -485,21 +486,28 @@ export async function setMemberRole(
 ) {
   assertAdmin(adminRoles)
 
-  if (!assign && roleName === ROLES.ADMIN) {
-    assertNotSelf(adminId, memberId, 'revoke your own admin role')
+  // The same rule the admin console applies, from the same module.
+  //
+  // These guards used to live here and only here, expressed as two separate
+  // conditionals — while the console called its own copy of this function,
+  // which had neither. The rules were right and were not on the path anyone
+  // took. Sharing the decision is the fix; keeping two that happen to agree
+  // today is how this happened.
+  const adminCount =
+    roleName === ROLES.ADMIN && !assign
+      ? await userRepo
+          .findRole(ROLES.ADMIN)
+          .then((r) => (r ? userRepo.countUserRoles({ roleId: r.id }) : 0))
+      : 0
 
-    const adminRole = await userRepo.findRole(ROLES.ADMIN)
-    if (adminRole) {
-      const adminCount = await userRepo.countUserRoles({ roleId: adminRole.id })
-      if (adminCount <= 1) {
-        throw new ForbiddenError('Cannot remove the last admin — at least one admin must remain')
-      }
-    }
-  }
-
-  if (!assign && roleName === ROLES.MEMBER) {
-    assertNotSelf(adminId, memberId, 'revoke your own member role')
-  }
+  const refusal = refuseRoleChange({
+    actorId: adminId,
+    targetId: memberId,
+    role: roleName,
+    assign,
+    adminCount,
+  })
+  if (refusal) throw new ForbiddenError(ROLE_CHANGE_REFUSAL_MESSAGE[refusal])
 
   const [member, role] = await Promise.all([
     userRepo.findById(memberId),

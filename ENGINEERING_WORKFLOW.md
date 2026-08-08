@@ -537,6 +537,43 @@ Two lessons, and the second is the one that generalises:
 What genuinely remains is a dry run against a provisioned account. That is real,
 and it is the only part credentials were ever needed for.
 
+### 4.13 A safeguard on the path nobody took
+
+`setMemberRole` existed **twice** — once in `apps/web/services/invite.service.ts`,
+once in `apps/admin/lib/services/invitations.ts`. The member app's copy refused
+a self-revoke of ADMIN and refused to remove the last admin. The console's copy
+carried neither guard, and the console's is the one `members/[id]/page.tsx`
+calls.
+
+So the sole admin could open their own member page, click **Remove admin**, and:
+the role row is deleted; `roleVersion` is bumped and published, ending the
+session immediately and correctly; sign-in is refused for want of the role;
+and nothing can grant it back, because granting requires an admin. By decision
+this system has exactly one admin, so it now has **none**, recoverable only by
+editing the database.
+
+Three things worth carrying forward:
+
+- **This is §9 again, inverted.** The usual shape is a *fix* applied to one app
+  and not its sibling. Here it was a *safeguard* — written correctly, tested,
+  and sitting on the copy nobody called. Coverage said the rule existed;
+  nothing said it was reachable from the console.
+- **Two implementations that agree today are not one rule.** The fix is
+  `@xxm/utils/role-policy`, a pure `refuseRoleChange` both apps import, plus a
+  test asserting neither app restates the threshold locally.
+- **The audit trail disagreed too.** Web wrote `ADMIN_ROLE_REVOKED`, admin wrote
+  `ADMIN_ROLE_REMOVED` — so a query filtering the member app's name missed every
+  revocation the console performed, and the console is where revocations happen.
+  Divergent copies diverge in more than one place, and the second place is
+  usually quieter than the first.
+
+Also settled here: **`MEMBER` is not a permission.** Nothing in either app ever
+checks for it — every member-facing service gates on `assertCanAccess`, which
+permits an account to reach its own data whatever roles it holds. Revoking it
+would change nothing while writing an audit entry saying access was removed, so
+it is now refused outright and the message points at suspension, which is the
+thing that actually ends access.
+
 ### 4.11 Two build artefacts that do not follow a branch switch
 
 Both cost time on 2026-08-07 and both present as an error in a file the branch
@@ -585,6 +622,17 @@ rule over `apps/web/__tests__/**` rather than left to be rediscovered.
 The general lesson is the one in §4.10: a failure you have decided is noise is a
 failure you have stopped reading. This one was reproducible, had a single cause,
 and was fixed in four lines.
+
+**It recurred in a second costume on 2026-08-09.** `gateway-selection` failed
+alongside `health.route` in roughly one full run in six, passing standalone and
+passing on re-run — the same signature, and this time the shared state was not
+`process.env` but the **module registry**. `vi.doMock` registrations are not
+scoped to the file that made them, so `health.route.test.ts` left `@/lib/db` and
+`@/lib/redis` mocked for whatever ran next in that worker.
+
+**A file that calls `vi.doMock` must undo it**, in an `afterEach`, with
+`vi.doUnmock` plus `vi.resetModules`. The `no-restricted-syntax` rule added for
+`process.env` does not catch this, and nothing yet does.
 
 ---
 
