@@ -30,7 +30,11 @@ export function AdminLoginForm() {
 
     if (result?.error) {
       setError(
-        result.error === 'ACCOUNT_SUSPENDED'
+        // Throttled, not rejected — the password was never checked, so the
+        // generic "invalid credentials" would be actively misleading here.
+        result.error === 'RATE_LIMITED'
+          ? 'Too many sign-in attempts from this connection. Please wait five minutes and try again.'
+          : result.error === 'ACCOUNT_SUSPENDED'
           ? 'This account has been suspended. Contact another administrator.'
           : result.error === 'ACCOUNT_LOCKED'
           ? 'This account is locked due to too many failed login attempts. Contact another administrator.'

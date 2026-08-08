@@ -5,7 +5,10 @@ import bcrypt from 'bcryptjs'
 import { db } from './db'
 import { env } from './env'
 import { LoginSchema } from '@xxm/utils/schemas'
+import { clientIpFromHeaders } from '@xxm/utils/client-ip'
+import { logger } from '@xxm/observability'
 import { seedRoleVersion } from './role-version'
+import { adminLoginRatelimit } from './rate-limit'
 
 const MAX_LOGIN_ATTEMPTS = env.MAX_LOGIN_ATTEMPTS
 const LOCKOUT_DURATION_MS = env.LOCKOUT_DURATION_MINUTES * 60 * 1000
@@ -19,6 +22,27 @@ async function recordLoginHistory(userId: string, success: boolean) {
   await db.loginHistory
     .create({ data: { userId, success } })
     .catch(() => {})
+}
+
+/**
+ * Refuse a sign-in attempt from a source making too many of them.
+ *
+ * Named and exported rather than inlined into the provider so it can be driven
+ * by a test. A throttle nobody can exercise is a throttle nobody knows is
+ * working — and this one had to be added because the absence of any throttle
+ * here went unnoticed through two security passes.
+ *
+ * Mirrors `assertLoginAllowed` in the member app. The two limits differ; the
+ * shape deliberately does not.
+ */
+export async function assertAdminLoginAllowed(identifier: string): Promise<void> {
+  const { success } = await adminLoginRatelimit.limit(identifier)
+  if (success) return
+
+  logger.warn('Admin sign-in throttled', { identifier })
+  // Thrown rather than returning null: null means "wrong password", and the
+  // password was never checked.
+  throw new Error('RATE_LIMITED')
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -44,7 +68,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers: [
     Credentials({
-      async authorize(credentials) {
+      async authorize(credentials, request) {
+        // Before any account is looked up. The attack this stops never names
+        // the same account twice, so a per-account control cannot see it.
+        await assertAdminLoginAllowed(clientIpFromHeaders(request.headers) ?? 'unknown')
+
         const parsed = LoginSchema.safeParse(credentials)
         if (!parsed.success) return null
 
