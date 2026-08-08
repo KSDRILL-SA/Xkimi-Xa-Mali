@@ -31,6 +31,7 @@ export default async function BadgesPage({
     name: `${b.user.firstName} ${b.user.lastName}`,
     email: b.user.email,
     currentBadge: b.currentBadge,
+    isFounder: b.isFounder,
     overallScore: b.overallScore,
     consistencyScore: b.consistencyScore,
     timelinessScore: b.timelinessScore,

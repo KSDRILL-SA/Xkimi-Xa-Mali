@@ -93,9 +93,22 @@ export async function listAllBadges(
     db.badgeScore.count({ where }),
   ])
 
+  // Conferred, not earned — a separate table that the badge score knows nothing
+  // about. One query for the page rather than one per row; there are at most
+  // four holders, so this reads a table that cannot grow.
+  const founders = new Set(
+    (
+      await db.memberDistinction.findMany({
+        where: { kind: 'FOUNDER' },
+        select: { userId: true },
+      })
+    ).map((d) => d.userId),
+  )
+
   return {
     items: items.map((s) => ({
       userId: s.userId,
+      isFounder: founders.has(s.userId),
       user: { id: s.user.id, firstName: s.user.firstName, lastName: s.user.lastName, email: s.user.email },
       currentBadge: s.currentBadge,
       overallScore: Number(s.overallScore),

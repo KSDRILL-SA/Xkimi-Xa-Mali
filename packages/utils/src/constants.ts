@@ -18,6 +18,20 @@ export const DEFAULT_INVITE_AMOUNT = 200
  * the fifty-first person would be turned away in the moment they tried to join.
  */
 export const MAX_MEMBERS = 50
+
+/**
+ * How many founders there are. Four, and it is not a number that grows.
+ *
+ * Enforced rather than remembered, for the same reason as {@link MAX_MEMBERS}:
+ * a cap that lives only in someone's head is a cap until the day it isn't. The
+ * badge is granted by hand, so without this a mis-click makes a fifth founder
+ * and nothing objects.
+ *
+ * The marketing site's founder roster is checked against this by a test. The two
+ * encode the same fact about the same four people and were otherwise free to
+ * drift apart.
+ */
+export const FOUNDER_COUNT = 4
 export const MAX_TRANSACTION_RETRY = 3
 export const IDEMPOTENCY_TTL_SECONDS = 60 * 60 * 72
 

@@ -13,6 +13,7 @@ import { userRepo } from '@/repositories/user.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
 import { bankAccountRepo } from '@/repositories/bank-account.repository'
 import { maskStoredSecret } from '@/lib/encryption'
+import { isFounder } from '@/services/distinction.service'
 import { embedSignatureInPdf, verifySignatureExists } from './signature.service'
 
 function titleCase(value: string): string {
@@ -197,6 +198,11 @@ async function buildStatementData(
     ? await embedSignatureInPdf(signature.signatureUrl).catch((): null => null)
     : null
 
+  // Conferred, and permanent — so it belongs on a document that is a permanent
+  // record. Read from its own service; the badge tier is not on a statement at
+  // all, so there is nothing here for it to be confused with.
+  const founder = await isFounder(userId)
+
   return {
     member: {
       firstName: user.firstName,
@@ -207,6 +213,7 @@ async function buildStatementData(
       memberSince: user.createdAt.toLocaleDateString('en-ZA', {
         day: 'numeric', month: 'long', year: 'numeric',
       }),
+      isFounder: founder,
     },
     banking,
     period: { month, year, label: periodLabel(month, year) },

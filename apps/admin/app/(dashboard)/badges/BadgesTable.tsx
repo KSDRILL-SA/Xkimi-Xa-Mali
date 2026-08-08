@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { DataTable, type Column, ProgressBar } from '@xxm/ui'
+import { Gem } from 'lucide-react'
 import { BADGE_TIER_LABELS, BADGE_TIER_CLASS } from '@/lib/badge-tier'
 
 export type BadgeRow = {
@@ -9,6 +10,8 @@ export type BadgeRow = {
   name: string
   email: string
   currentBadge: string
+  /** Conferred by an admin, not computed. Sits beside the tier. */
+  isFounder: boolean
   overallScore: number
   consistencyScore: number
   timelinessScore: number
@@ -41,7 +44,20 @@ export function BadgesTable({ rows }: { rows: BadgeRow[] }) {
     { key: 'name', header: 'Member', sortable: true,
       render: (r) => (
         <div>
-          <p className="font-medium text-xxm-green-900">{r.name}</p>
+          <p className="font-medium text-xxm-green-900 flex items-center gap-1.5">
+            {r.name}
+            {/* Beside the name rather than in the Tier column: it is not a tier,
+                and putting it there would imply it can be earned or lost. */}
+            {r.isFounder ? (
+              <span
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-xxm-gold/40 bg-xxm-gold/10 text-[9px] font-bold text-xxm-gold-dark"
+                title="Founder of the collective"
+              >
+                <Gem size={9} aria-hidden />
+                Founder
+              </span>
+            ) : null}
+          </p>
           <p className="text-xs text-xxm-gray-400">{r.email}</p>
         </div>
       ),

@@ -2,6 +2,8 @@ import Link from 'next/link'
 import type { BadgeTier } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { getMyBadge } from '@/services/badge.service'
+import { isFounder } from '@/services/distinction.service'
+import { FounderMark } from '@/components/FounderMark'
 import { BADGE_TIER_CONFIG, BADGE_TIER_ORDER } from '@/lib/badge-tier'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { ArrowUpRight, Crown } from 'lucide-react'
@@ -11,7 +13,13 @@ export async function DashboardBadge() {
   const userId = session!.user.id
   const roles = (session!.user.roles as string[] | undefined) ?? []
 
-  const badge = await getMyBadge(userId, userId, roles)
+  // Two independent facts about the same person, fetched independently. The
+  // badge service never learns that distinctions exist — see
+  // docs/founder-badge-plan.md for why that separation is load-bearing.
+  const [badge, founder] = await Promise.all([
+    getMyBadge(userId, userId, roles),
+    isFounder(userId),
+  ])
   const cfg = BADGE_TIER_CONFIG[badge.currentBadge]
   const Icon = cfg.icon
   const isMax = badge.currentBadge === 'WORLD_CLASS'
@@ -30,7 +38,10 @@ export async function DashboardBadge() {
           <Icon size={26} className="text-xxm-gold-dark" aria-hidden />
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-xxm-gold-dark">My Badge</span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-xxm-gold-dark">My Badge</span>
+            {founder ? <FounderMark size="sm" /> : null}
+          </span>
           <p className="font-display text-lg font-black text-xxm-green-900 leading-tight truncate">{cfg.label}</p>
           <p className="stat-number text-xs text-xxm-gray-400">{badge.overallScore.toFixed(1)} / 100 reputation</p>
         </div>

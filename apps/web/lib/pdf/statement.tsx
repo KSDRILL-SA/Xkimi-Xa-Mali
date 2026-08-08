@@ -22,6 +22,12 @@ export type StatementData = {
     phone: string
     memberId: string
     memberSince: string
+    /**
+     * Conferred, never earned. Printed beside the name, not in place of any
+     * badge tier — the statement does not show a tier at all, so there is
+     * nothing here for it to be confused with.
+     */
+    isFounder?: boolean
   }
   banking: {
     bankName: string
@@ -116,6 +122,22 @@ const s = StyleSheet.create({
   heroLabel: { fontSize: 7, color: C.ink35, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 5 },
   heroName: { fontSize: 21, fontFamily: 'Helvetica-Bold', color: C.green, letterSpacing: 0.2 },
   heroMeta: { fontSize: 7.5, color: C.ink50, marginTop: 5, letterSpacing: 0.3 },
+  founderPill: {
+    marginTop: 5,
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    backgroundColor: C.goldSoft,
+    borderWidth: 0.6,
+    borderColor: C.gold,
+  },
+  founderPillText: {
+    fontSize: 6.5,
+    fontFamily: 'Helvetica-Bold',
+    letterSpacing: 1,
+    color: C.gold,
+  },
   heroRight: { alignItems: 'flex-end' },
   heroAmountLabel: { fontSize: 7, color: C.ink35, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 3 },
   heroAmount: { fontSize: 25, fontFamily: 'Helvetica-Bold', letterSpacing: 0.2 },
@@ -260,6 +282,14 @@ function StatementDocument({ data }: { data: StatementData }) {
             <View>
               <Text style={s.heroLabel}>Account Holder</Text>
               <Text style={s.heroName}>{member.firstName} {member.lastName}</Text>
+              {/* react-pdf has its own element set, so the web FounderMark
+                  component cannot be reused here. The data source is shared;
+                  only the rendering is duplicated. */}
+              {member.isFounder ? (
+                <View style={s.founderPill}>
+                  <Text style={s.founderPillText}>FOUNDER</Text>
+                </View>
+              ) : null}
               <Text style={s.heroMeta}>{member.memberId}  ·  Member since {member.memberSince}</Text>
               <View style={{ marginTop: 8 }}>
                 <View style={[s.pill, { backgroundColor: fullyPaid ? C.okSoft : C.amberSoft }]}>

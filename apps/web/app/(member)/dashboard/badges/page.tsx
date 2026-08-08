@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import type { BadgeTier } from '@prisma/client'
 import { getSession } from '@/lib/session'
 import { getMyBadge } from '@/services/badge.service'
+import { isFounder } from '@/services/distinction.service'
+import { FounderMark } from '@/components/FounderMark'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { formatDate, formatZAR } from '@/lib/formatters'
 import { BADGE_TIER_CONFIG, BADGE_TIER_ORDER } from '@/lib/badge-tier'
@@ -68,7 +70,10 @@ export default async function BadgesPage() {
   const userId = session!.user.id
   const roles = (session!.user.roles as string[] | undefined) ?? []
 
-  const badge = await getMyBadge(userId, userId, roles)
+  const [badge, founder] = await Promise.all([
+    getMyBadge(userId, userId, roles),
+    isFounder(userId),
+  ])
   const cfg = BADGE_TIER_CONFIG[badge.currentBadge]
   const Icon = cfg.icon
   const next = nextTierRequirements(badge.currentBadge, badge)
@@ -90,7 +95,12 @@ export default async function BadgesPage() {
           <Trophy size={22} className="text-xxm-gold-dark" aria-hidden />
         </div>
         <div>
-          <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">My Badge</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">My Badge</h1>
+            {/* Beside the tier, never instead of it: one is what you did, the
+                other is who you are to this collective. */}
+            {founder ? <FounderMark /> : null}
+          </div>
           <p className="text-sm text-xxm-gray-500 mt-1">
             Your reputation tier is based on consistency, timeliness, generosity and streaks.
           </p>

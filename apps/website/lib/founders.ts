@@ -7,6 +7,8 @@
  * (dark studio and light grey). Anything rendering these must show them WHOLE —
  * cropping to fill a landscape frame cuts the name band off the bottom.
  */
+import { FOUNDER_COUNT } from '@xxm/utils'
+
 export interface Founder {
   photo: string
   name: string
@@ -18,7 +20,7 @@ export interface Founder {
   accent: string
 }
 
-export const FOUNDERS: readonly Founder[] = [
+const ROSTER = [
   {
     photo: '/founders/maluleke-kurhula-success.png',
     name: 'Maluleke Kurhula Success',
@@ -52,3 +54,21 @@ export const FOUNDERS: readonly Founder[] = [
     accent: 'from-xxm-green-900/5',
   },
 ] as const
+
+/**
+ * This roster and the Founder badge describe the same four people.
+ *
+ * They are deliberately independent otherwise: this file is public
+ * presentation — photographs, titles, biographies — and the badge is a mark on
+ * an account, granted by an admin. Neither should become the source of truth
+ * for the other.
+ *
+ * What they do share is the number, so the number is checked. Add a fifth
+ * founder here without changing `FOUNDER_COUNT` and the build stops, rather
+ * than the About page and the badge cap quietly disagreeing about how many of
+ * them there are.
+ */
+const rosterSizeMatchesFounderCount: typeof FOUNDER_COUNT = ROSTER.length
+void rosterSizeMatchesFounderCount
+
+export const FOUNDERS: readonly Founder[] = ROSTER
