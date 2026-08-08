@@ -145,6 +145,13 @@ export const env = createEnv({
     // session needed). Missing on the live deployment, every admin action that
     // reaches through to the member app fails authentication.
     ADMIN_API_SECRET: requiredWhenLive(z.string().min(32)),
+    // A standing address for critical operational alerts, independent of any
+    // user account. Every other alert channel routes through an ACTIVE admin's
+    // `User` row and the notification queue; with a single admin, that chain has
+    // no spare link. This one is sent directly — if the queue is what broke,
+    // queueing the alert about it is not a plan. Optional: unset, alerting
+    // behaves exactly as it did before. See `services/alert.service.ts`.
+    ALERT_FALLBACK_EMAIL: z.string().email().optional(),
   },
   client: {
     NEXT_PUBLIC_SENTRY_DSN: z.string().url().optional(),
@@ -187,6 +194,7 @@ export const env = createEnv({
     MAX_LOGIN_ATTEMPTS: process.env.MAX_LOGIN_ATTEMPTS,
     LOCKOUT_DURATION_MINUTES: process.env.LOCKOUT_DURATION_MINUTES,
     ADMIN_API_SECRET: process.env.ADMIN_API_SECRET,
+    ALERT_FALLBACK_EMAIL: process.env.ALERT_FALLBACK_EMAIL,
     NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
     NEXT_PUBLIC_ADMIN_URL: process.env.NEXT_PUBLIC_ADMIN_URL,
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,

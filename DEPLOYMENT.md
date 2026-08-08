@@ -67,6 +67,7 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 | `ENCRYPTION_KEY` | **64 hex chars. Never edit this value on its own** — it decrypts stored bank/ID numbers, and replacing it alone makes all of them unreadable. To change it, follow [Rotating the encryption key](docs/runbook.md#rotating-the-encryption-key): add the new key alongside the old, re-encrypt, then retire the old. |
 | `ENCRYPTION_KEY_ID` / `ENCRYPTION_PREVIOUS_KEYS` | Only set while rotating. Unset behaves as it always has (key id `1`, no previous keys). |
 | `ADMIN_API_SECRET` | 32+ chars. Must be **identical** on web + admin (admin→web internal calls). |
+| `ALERT_FALLBACK_EMAIL` | Standing address for critical alerts, independent of any account. **Set this** — with a single admin, every other alert channel depends on one person's account being active and one worker being alive. See [the runbook](docs/runbook.md#what-reaches-you-without-you-looking). |
 | `WEB_INTERNAL_URL` | (admin) the web app's prod URL, e.g. `https://app.<your-domain>`. |
 | `NEXTAUTH_URL` | each app's own prod URL. |
 | `NETCASH_SERVICE_KEY` | **production** service key. The build **fails without it** — no silent start. |
