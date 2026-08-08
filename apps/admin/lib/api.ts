@@ -61,13 +61,28 @@ export async function internalAdminPost<T = unknown>(
   body: unknown,
   opts: { adminUserId?: string; adminIp?: string } = {},
 ): Promise<InternalResult<T>> {
+  return internalAdminRequest<T>('POST', path, body, opts)
+}
+
+/**
+ * As {@link internalAdminPost}, for the verbs that are not POST.
+ *
+ * Some trusted routes model removal as DELETE with a body — the Founder badge
+ * is one, because the reason for removing it has to travel with the request.
+ */
+export async function internalAdminRequest<T = unknown>(
+  method: 'POST' | 'DELETE' | 'PATCH',
+  path: string,
+  body: unknown,
+  opts: { adminUserId?: string; adminIp?: string } = {},
+): Promise<InternalResult<T>> {
   const base   = WEB_BASE_URL
   const secret = process.env['ADMIN_API_SECRET']
   if (!secret) return { ok: false, status: 500, data: null, error: { message: 'ADMIN_API_SECRET not configured' } }
 
   try {
     const res = await fetch(`${base}${path}`, {
-      method: 'POST',
+      method,
       headers: {
         'Content-Type':      'application/json',
         'x-admin-secret':    secret,

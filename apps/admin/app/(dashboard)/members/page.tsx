@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listMembers } from '@/lib/services'
 import { Reveal, RouterPagination } from '@xxm/ui'
-import { Search, Users, CheckCircle2, Clock, Ban, ArrowRight } from 'lucide-react'
+import { Search, Users, CheckCircle2, Clock, Ban, ArrowRight, Gem } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Members' }
 
@@ -30,6 +30,8 @@ function getAvatarColor(name: string) {
 type RawMember = {
   id: string; firstName: string; lastName: string; email: string;
   phone: string; status: string; createdAt: Date;
+  /** Conferred, never earned. Managed on the member's own page. */
+  distinctions: { kind: string }[]
   _count: { contributions: number; mandates: number }
 }
 
@@ -166,7 +168,20 @@ export default async function MembersPage({
                       {initials}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-xxm-green-900 truncate">{fullName}</p>
+                      <p className="text-sm font-semibold text-xxm-green-900 truncate flex items-center gap-1.5">
+                        <span className="truncate">{fullName}</span>
+                        {/* Beside the name, not in the status column: a founder
+                            badge is not a state the account can move between. */}
+                        {m.distinctions.some((d) => d.kind === 'FOUNDER') ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border border-xxm-gold/40 bg-xxm-gold/10 text-[9px] font-bold text-xxm-gold-dark shrink-0"
+                            title="Founder of the collective"
+                          >
+                            <Gem size={9} aria-hidden />
+                            Founder
+                          </span>
+                        ) : null}
+                      </p>
                       <p className="text-[11px] text-xxm-gray-400 truncate">{m.email}</p>
                     </div>
                   </div>
