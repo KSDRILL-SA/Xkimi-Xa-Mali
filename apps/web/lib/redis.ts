@@ -33,6 +33,31 @@ function makeRatelimit(prefix: string, limiter: ReturnType<typeof Ratelimit.slid
 }
 
 export const authRatelimit      = makeRatelimit('xxm:ratelimit:auth',            Ratelimit.slidingWindow(5,  '1 m'))
+/**
+ * Sign-in attempts, per IP.
+ *
+ * Sign-in had no throttle of any kind. `authRatelimit` guards registration,
+ * reset and invite validation, but NextAuth's `/api/auth/*` is passed straight
+ * through by the middleware before any limiter runs, so the credentials
+ * callback was reachable at whatever rate a client could manage.
+ *
+ * The per-account lockout is not a substitute, for two reasons. It is **per
+ * account**, so one password tried against fifty member emails never trips it —
+ * which is how spraying works, and is the attack this circle's shared surname
+ * conventions make easiest. And it never fires for an address that does not
+ * exist at all, because there is no row to increment, so enumeration by guess
+ * is free.
+ *
+ * Per IP rather than per account **on purpose**: an IP limit throttles the
+ * attacker's source and leaves the real member's next attempt untouched. An
+ * account-keyed limit would do the opposite and hand anyone a way to hold a
+ * member — or the single admin — out of their own account.
+ *
+ * Ten in five minutes: a member who has genuinely forgotten which password they
+ * used gets several honest tries plus fat-finger room, and a spray of any width
+ * from one source dies immediately.
+ */
+export const loginRatelimit     = makeRatelimit('xxm:ratelimit:login',           Ratelimit.slidingWindow(10, '5 m'))
 export const apiRatelimit       = makeRatelimit('xxm:ratelimit:api',             Ratelimit.slidingWindow(60, '1 m'))
 export const paymentRatelimit   = makeRatelimit('xxm:ratelimit:payment',         Ratelimit.slidingWindow(5,  '1 h'))
 export const mandateRatelimit   = makeRatelimit('xxm:ratelimit:mandate',         Ratelimit.slidingWindow(3,  '1 h'))

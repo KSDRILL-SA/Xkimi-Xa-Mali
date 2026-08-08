@@ -20,6 +20,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   PENDING_ACTIVATION: "Your account is pending admin approval. You’ll receive an SMS when it’s activated.",
   ACCOUNT_SUSPENDED: "Your account has been suspended. Contact the admin.",
   CredentialsSignin: "Incorrect email or password.",
+  // Distinct from CredentialsSignin on purpose: the password was never checked,
+  // so "incorrect email or password" would send someone to the reset flow for a
+  // problem that clears itself in a few minutes.
+  RATE_LIMITED: "Too many sign-in attempts from this connection. Please wait five minutes and try again.",
   rate_limited: "Too many attempts. Please wait a moment and try again.",
 }
 

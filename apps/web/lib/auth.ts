@@ -7,6 +7,8 @@ import { env } from './env'
 import { authConfig } from './auth.config'
 import { LoginSchema } from './validation/auth'
 import { seedRoleVersion } from './role-version'
+import { loginRatelimit } from './redis'
+import { clientIpFromHeaders } from '@xxm/utils/client-ip'
 import { logger } from '@xxm/observability'
 
 const MAX_LOGIN_ATTEMPTS = env.MAX_LOGIN_ATTEMPTS
@@ -104,12 +106,43 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
   }
 }
 
+/**
+ * Refuse a sign-in attempt from a source that is making too many of them.
+ *
+ * Separate from {@link authorizeCredentials}, and deliberately so: the throttle
+ * belongs at the boundary, before any account is looked up, because the attack
+ * it stops is one that never names the same account twice. Keeping it out of
+ * `authorizeCredentials` also leaves that function drivable by a test without a
+ * request context.
+ *
+ * Takes the identifier rather than reading it, so a test can drive both sides.
+ */
+export async function assertLoginAllowed(identifier: string): Promise<void> {
+  const { success } = await loginRatelimit.limit(identifier)
+  if (success) return
+
+  logger.warn('Sign-in throttled', { identifier })
+  // Thrown, not returned null: `null` is "wrong password", and telling someone
+  // their password is wrong when it was never checked sends them to the reset
+  // flow for a problem a short wait would fix.
+  throw new Error('RATE_LIMITED')
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   adapter: PrismaAdapter(db),
   providers: [
     Credentials({
-      authorize: authorizeCredentials,
+      async authorize(credentials, request) {
+        // `?? 'unknown'` matches every other rate-limited route in this app: an
+        // IP that cannot be established from a header the front door controls
+        // shares one bucket. On Vercel that header is always set, so this is the
+        // path taken by direct-to-origin traffic, which is exactly the traffic
+        // worth bucketing together.
+        const ip = clientIpFromHeaders(request.headers) ?? 'unknown'
+        await assertLoginAllowed(ip)
+        return authorizeCredentials(credentials)
+      },
     }),
   ],
 })

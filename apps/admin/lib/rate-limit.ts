@@ -31,6 +31,28 @@ function makeRatelimit(prefix: string, limiter: ReturnType<typeof Ratelimit.slid
 }
 
 /**
+ * Sign-in attempts at the admin console, per IP.
+ *
+ * This login had no throttle at all: the middleware matcher excludes
+ * `api/auth`, so the credentials callback was reachable at any rate. The
+ * per-account lockout does not cover it — that never fires for an address with
+ * no row, so guessing at admin email addresses cost nothing.
+ *
+ * **Keyed on IP, unlike every other limiter in this file.** The rest are keyed
+ * on the admin's user id because they sit behind an authenticated session;
+ * there is no session yet at sign-in, and an account-keyed limit here would be
+ * a gift to anyone wanting the single admin locked out of their own console.
+ * Throttling the source does not do that.
+ *
+ * Five in five minutes, against the member app's ten. There is one admin, they
+ * know their password, and this is the console that can reverse a transaction.
+ */
+export const adminLoginRatelimit = makeRatelimit(
+  'xxm:ratelimit:admin-login',
+  Ratelimit.slidingWindow(5, '5 m'),
+)
+
+/**
  * Ordinary admin work — approving a mandate, editing a goal, unlocking a member.
  * Generous enough that nobody working quickly will ever see it, tight enough to
  * stop a stolen session or a runaway client from walking the whole member list.
