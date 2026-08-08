@@ -98,6 +98,99 @@ A **REVERSED** result posts a ledger DEBIT — confirm the balance moved via `GE
 
 ---
 
+## Rotating the encryption key
+
+`ENCRYPTION_KEY` protects stored bank account numbers and ID numbers. Rotate it
+when it may have been exposed — pasted into a terminal, committed, shared, or
+held by someone who has left — and on a schedule if you have one.
+
+**Do not simply change the value.** The key is not a password; it is the only
+thing that can read what it wrote. Replacing it on its own makes every stored
+bank and ID number unreadable in the same instant, and nothing in the app can
+recover them.
+
+A rotation is three steps, and the middle one has to finish before the third.
+
+### Before you start
+
+- Take a database backup. Neon → branch → restore point. This is the step you
+  will wish you had taken.
+- Generate the new key: `openssl rand -hex 32` (64 hex characters).
+- Decide the new id — the next integer. If `ENCRYPTION_KEY_ID` is unset the
+  current key is id `1`, so the new one is `2`.
+- Do one environment at a time, staging first. Keys differ per environment, so
+  nothing about production is proved by staging succeeding — but the *procedure*
+  is, which is what you are rehearsing.
+
+### Step 1 — add the new key, keep the old one for reading
+
+Set all three, together, in the same deploy:
+
+```
+ENCRYPTION_KEY=<the new key>
+ENCRYPTION_KEY_ID=2
+ENCRYPTION_PREVIOUS_KEYS=1:<the old key>
+```
+
+From this deploy on, new values are written under key 2 and stamped with it.
+Everything already stored still reads, under key 1. Nothing is unavailable, and
+members notice nothing.
+
+The app refuses to start on configuration that cannot be a rotation — the same
+id twice, the same key material under two ids, a malformed key. Read the message
+rather than working around it; each one means a step was missed.
+
+### Step 2 — move the stored values across
+
+```
+npm run secrets:reencrypt              # preview; writes nothing
+npm run secrets:reencrypt -- --apply   # rewrite
+```
+
+Run it against the environment you are rotating, with that environment's
+variables set. It walks `users.idNumber` and `bank_accounts.accountNumber`,
+rewrites each value under the active key, and prints a count per column.
+
+Safe to interrupt and safe to re-run: rows already under the active key are
+skipped without being decrypted, and each row is committed on its own.
+
+**It must report zero unreadable before you go further.** A non-zero exit means
+some values are still tied to a key that is about to be deleted. Each one is
+listed with its row id and the key it claims:
+
+| Reported as | What it means | What to do |
+|---|---|---|
+| `key=1` and unreadable | The old key in `ENCRYPTION_PREVIOUS_KEYS` is wrong | Fix the value and re-run. Do not proceed |
+| `key=unversioned`, unreadable | Written under a key not on the ring at all — usually another environment's | Find the key that wrote it, or re-capture the value from the member |
+| `key=unrecognisable` | Never was ciphertext — a fixture, or a test mock that reached a real database | Correct or clear the row. It has no recoverable plaintext |
+
+Re-run the preview until it reports zero.
+
+### Step 3 — retire the old key
+
+Only once step 2 has reported zero unreadable **in that environment**:
+
+```
+ENCRYPTION_PREVIOUS_KEYS=      # removed
+```
+
+Then delete the old key from wherever it is stored. Until you do, an exposed key
+is still an exposed key — steps 1 and 2 restore your ability to remove it, they
+do not remove it.
+
+Keep the old key somewhere retrievable until you are confident, and keep the
+backup from step 0 for as long as your retention policy allows. A key deleted
+one step early is not recoverable from anything the app holds.
+
+### Adding a new encrypted column later
+
+`packages/database/scripts/reencrypt-secrets.ts` carries an explicit list of the
+encrypted columns. A column added to the schema and not added there will be
+missed, and the rotation will report success while leaving that column pinned to
+a key you are about to delete.
+
+---
+
 ## Monitoring & escalation
 
 | Tool | Check |

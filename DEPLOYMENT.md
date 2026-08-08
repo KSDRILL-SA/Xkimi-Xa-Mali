@@ -64,7 +64,8 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 |-----|-------|
 | `DATABASE_URL` | Neon **production** branch, pooled connection string. |
 | `AUTH_SECRET` | 32+ chars, unique per environment. Set on **web + admin**. |
-| `ENCRYPTION_KEY` | **64 hex chars. SET ONCE, NEVER CHANGE.** It decrypts stored bank/ID numbers — rotating it makes existing encrypted data unreadable. |
+| `ENCRYPTION_KEY` | **64 hex chars. Never edit this value on its own** — it decrypts stored bank/ID numbers, and replacing it alone makes all of them unreadable. To change it, follow [Rotating the encryption key](docs/runbook.md#rotating-the-encryption-key): add the new key alongside the old, re-encrypt, then retire the old. |
+| `ENCRYPTION_KEY_ID` / `ENCRYPTION_PREVIOUS_KEYS` | Only set while rotating. Unset behaves as it always has (key id `1`, no previous keys). |
 | `ADMIN_API_SECRET` | 32+ chars. Must be **identical** on web + admin (admin→web internal calls). |
 | `WEB_INTERNAL_URL` | (admin) the web app's prod URL, e.g. `https://app.<your-domain>`. |
 | `NEXTAUTH_URL` | each app's own prod URL. |
