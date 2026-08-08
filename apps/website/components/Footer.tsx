@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { Lock, MessageCircle } from 'lucide-react'
+import { Lock, MessageCircle, Mail } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
-import { APP_URL, ADMIN_URL, adminWhatsAppUrl } from '@/lib/utils'
+import { APP_URL, ADMIN_URL, SUPPORT_EMAIL, adminWhatsAppUrl } from '@/lib/utils'
 
 const year = new Date().getFullYear()
 
@@ -51,6 +51,17 @@ export function Footer() {
             >
               <MessageCircle size={15} aria-hidden />
               Join our WhatsApp group
+            </a>
+
+            {/* WhatsApp was the only way to reach the Foundation from a public
+                page. Not everyone reading it is in the group yet, and that is
+                precisely the person a contact address is for. */}
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="inline-flex items-center gap-2 text-white/45 hover:text-white/70 text-sm font-medium transition-colors w-fit"
+            >
+              <Mail size={15} aria-hidden />
+              {SUPPORT_EMAIL}
             </a>
 
             <p className="text-white/20 text-xs">

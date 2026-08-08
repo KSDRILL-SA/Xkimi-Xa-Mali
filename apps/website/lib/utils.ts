@@ -8,6 +8,7 @@ export const APP_URL         = siteEnv.APP_URL
 export const ADMIN_URL       = siteEnv.ADMIN_URL
 export const WA_LINK         = siteEnv.WA_LINK
 export const ADMIN_WA_NUMBER = siteEnv.ADMIN_WA_NUMBER
+export const SUPPORT_EMAIL   = siteEnv.SUPPORT_EMAIL
 
 export function adminWhatsAppUrl(message: string): string {
   if (ADMIN_WA_NUMBER) {
