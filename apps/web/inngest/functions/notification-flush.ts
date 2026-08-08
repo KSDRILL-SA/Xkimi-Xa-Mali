@@ -4,6 +4,7 @@ import {
   requeueFailedNotifications,
   recoverStalledNotifications,
 } from '@/services/notification.service'
+import { alertOnFailure } from '@/inngest/on-failure'
 
 export const notificationFlush = inngest.createFunction(
   {
@@ -12,6 +13,13 @@ export const notificationFlush = inngest.createFunction(
     concurrency: {
       limit: 1, // one flush at a time — prevents duplicate sends under parallel Inngest replays
     },
+    // The awkward one: this job is what delivers alerts, so its own alert
+    // cannot be delivered by it. Queueing the SMS and the email is still worth
+    // doing — the failure may be transient and the next run drains the queue —
+    // but what actually carries this one out of the building is the
+    // `logger.error` inside the alert service, which reaches Sentry directly.
+    // Nothing else in this system tells you that notifications have stopped.
+    onFailure: alertOnFailure('The notification flush worker'),
   },
   [
     { event: 'xxm/notifications.flush' },
