@@ -5,7 +5,10 @@ import { db, Prisma } from '@/lib/db'
 
 export class AdminForbiddenError extends Error {
   code = 'SYS_003'; status = 403
-  constructor() { super('Admin access required') }
+  // Takes a reason. Refusing a role change and refusing a non-admin are both
+  // 403s, but "admin access required" is the wrong sentence to show somebody
+  // who is an admin and was stopped for a different reason.
+  constructor(message = 'Admin access required') { super(message) }
 }
 export class AdminNotFoundError extends Error {
   code = 'ADM_001'; status = 404
