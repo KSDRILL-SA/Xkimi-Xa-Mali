@@ -60,3 +60,7 @@ packages/database/prisma/dev.db-journal
 # Local agent/editor scratch
 .codex/
 .vscode/
+
+# Playwright MCP run artefacts — console logs and page snapshots from a
+# browser-driven integration pass. Evidence for one sitting, not repository state.
+.playwright-mcp/

@@ -31,6 +31,24 @@ const STATUS_CONFIG: Record<ContribStatus, { label: string; dot: string; badge: 
   WAIVED:  { label: 'Waived',  dot: 'bg-xxm-gray-400',   badge: 'bg-xxm-gray-100 text-xxm-gray-600'     },
 }
 
+/**
+ * Whether a period has not started yet.
+ *
+ * The page lists every contribution period this member has and offered a
+ * download for each. The statement API refuses a future one — "Year too far in
+ * the future" — so a period dated ahead rendered a working-looking button that
+ * returned a 400. Found by clicking it rather than by reading the code: the
+ * page and the endpoint each behaved correctly on their own and disagreed about
+ * what was downloadable.
+ *
+ * Admin contribution generation can create a period ahead of today, so this is
+ * reachable without anything being wrong with the data.
+ */
+function isFuturePeriod(month: number, year: number): boolean {
+  const now = new Date()
+  return year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth() + 1)
+}
+
 export default async function StatementsPage() {
   const session = await getSession()
   if (!session?.user?.id) redirect('/login')
@@ -115,6 +133,14 @@ export default async function StatementsPage() {
                         <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} aria-hidden />
                         {sc.label}
                       </span>
+                      {isFuturePeriod(c.periodMonth, c.periodYear) ? (
+                        <span
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-xxm-gray-100 text-xxm-gray-400 text-xs font-bold shrink-0 cursor-not-allowed"
+                          title="A statement can only be issued once the period has begun"
+                        >
+                          PDF
+                        </span>
+                      ) : (
                       <a
                         href={`/api/v1/transactions/statement?month=${c.periodMonth}&year=${c.periodYear}`}
                         className="group/btn inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-xxm-green text-white text-xs font-bold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm hover:shadow-gold-sm shrink-0"
@@ -125,6 +151,7 @@ export default async function StatementsPage() {
                         <Download size={12} className="group-hover/btn:translate-y-0.5 transition-transform" aria-hidden />
                         PDF
                       </a>
+                      )}
                     </div>
                   )
                 })}
@@ -140,7 +167,7 @@ export default async function StatementsPage() {
         <p className="text-sm font-bold text-indigo-700">About statements</p>
         <p className="text-xs text-indigo-600 leading-relaxed">
           Each PDF statement includes your contribution details, transactions, and a summary for that period.
-          Links expire after 15 minutes — simply click again to generate a fresh download.
+          Each download is generated on request and sent straight to you — nothing is stored anywhere else, and only you can fetch your own.
         </p>
       </Reveal>
     </div>
