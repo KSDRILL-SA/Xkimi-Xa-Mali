@@ -71,14 +71,48 @@ function serializeGoal(goal: GoalRow) {
   }
 }
 
-// Evicts the first few pages across all status filters. Goals are a small
-// dataset (admin-only writes, infrequent mutations) so clearing common pages is
-// sufficient — the TTL handles any long-tail cache entries.
-async function evictGoalsCache(): Promise<void> {
-  const statuses = ['all', 'DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED']
+/**
+ * The status keys `getGoals` can actually write, not the statuses a goal has.
+ *
+ * `'public'` is the one that was missing, and it is the one every ordinary
+ * member uses: a member browsing the goals page with no filter is cached under
+ * `goalsPage('public', ...)`, because that is what the audience is, not what
+ * the status is. It was absent from the eviction sweep, so an admin activating
+ * a goal or recording progress cleared the admin's view and left every member
+ * looking at the old numbers until the TTL expired.
+ *
+ * `'all'` is the admin's unfiltered equivalent. The four `GoalStatus` values
+ * are what either audience gets when it names a filter.
+ */
+const GOAL_CACHE_AUDIENCES = ['all', 'public', 'DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED'] as const
+
+/**
+ * Every page size a caller in this codebase actually asks for.
+ *
+ * 3 is the dashboard's active-goals panel, and it was missing too — so that
+ * panel showed stale progress after any goal change. 20 is the default, 50 the
+ * API's ceiling.
+ *
+ * A caller asking for some other size — the API accepts anything up to 50 —
+ * keeps its entry until the TTL. That is the long tail the TTL is for; what
+ * must not be stale is the view somebody actually looks at.
+ */
+const GOAL_CACHE_LIMITS = [3, 20, 50] as const
+
+/**
+ * Evict the goal list pages a reader is likely to be holding.
+ *
+ * Goals are a small, admin-written dataset, so sweeping the common keys is
+ * enough and the TTL covers the rest. What matters is that the sweep covers
+ * every key the *callers* generate — it did not, and the gap was invisible
+ * because the missing keys belong to members rather than to the admin doing
+ * the writing.
+ */
+export async function evictGoalsCache(): Promise<void> {
   const pages = [1, 2, 3]
-  const limits = [20, 50]
-  const keys = statuses.flatMap((s) => pages.flatMap((p) => limits.map((l) => CACHE_KEYS.goalsPage(s, p, l))))
+  const keys = GOAL_CACHE_AUDIENCES.flatMap((s) =>
+    pages.flatMap((p) => GOAL_CACHE_LIMITS.map((l) => CACHE_KEYS.goalsPage(s, p, l))),
+  )
   await cache.del(...keys)
 }
 

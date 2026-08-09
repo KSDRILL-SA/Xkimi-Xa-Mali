@@ -12,8 +12,13 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 
   const { searchParams } = new URL(req.url)
   const status = searchParams.get('status') as 'DRAFT' | 'ACTIVE' | 'ACHIEVED' | 'FAILED' | null
-  const page = Math.max(1, Number(searchParams.get('page') ?? '1'))
-  const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit') ?? '20')))
+  // Math.max(1, NaN) is NaN, so ?page=abc reached Prisma as skip: NaN and
+  // ?limit=abc as take: NaN — a 500 for a mistyped URL. The third page in this
+  // app with that shape; see the transactions history for the other two.
+  const rawPage = Number(searchParams.get('page') ?? '1')
+  const rawLimit = Number(searchParams.get('limit') ?? '20')
+  const page = Number.isFinite(rawPage) ? Math.max(1, Math.floor(rawPage)) : 1
+  const limit = Number.isFinite(rawLimit) ? Math.min(50, Math.max(1, Math.floor(rawLimit))) : 20
 
   const validStatuses = ['DRAFT', 'ACTIVE', 'ACHIEVED', 'FAILED']
   const statusFilter = status && validStatuses.includes(status) ? status : undefined
