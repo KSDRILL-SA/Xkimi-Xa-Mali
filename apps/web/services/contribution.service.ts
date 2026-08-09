@@ -24,6 +24,7 @@ import {
   BudgetExceededError,
 } from '@/lib/errors'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
+import { toTransactionStatus } from '@/lib/transaction-status'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
 import { subtractZAR } from '@/lib/money'
@@ -262,8 +263,21 @@ export async function submitManualPayment(
     idempotencyKey,
   })
 
-  const txStatus: TransactionStatus =
-    gatewayRes.status === 'SUCCESS' ? 'SUCCESS' : 'PENDING'
+  // The gateway answers with three outcomes and this collapsed them into two,
+  // writing every non-success as PENDING. It is the fourth copy of the defect
+  // recorded in §4.6 — debit-run, transaction-retry-failed and
+  // mandate-delay-handler each had it, each was fixed, and this path was never
+  // looked at, because it is not a job.
+  //
+  // What it cost here is worse than in the jobs, because a person is watching.
+  // A decline was written as PENDING, so: the member was told "Payment
+  // submitted"; the row sat waiting on a webhook that was never coming, because
+  // the bank had already refused; `transaction-retry-failed` queries
+  // `status: 'FAILED'` and so never picked it up; the contribution was never
+  // settled; and no payment-failed message was sent, because those are keyed off
+  // FAILED too. The member believed they had paid and nothing ever contradicted
+  // them.
+  const txStatus: TransactionStatus = toTransactionStatus(gatewayRes.status)
 
   const transaction = await runTransaction(async (tx) => {
     const created = await transactionRepo.create(
@@ -323,7 +337,11 @@ export async function submitManualPayment(
     receiptRef,
   })
 
-  return { contribution, transaction, receiptRef }
+  // `status` is returned so the caller can tell the member what actually
+  // happened. Without it the page had only "the request did not throw", which
+  // it rendered as "Payment submitted!" — the same screen for a collection the
+  // bank accepted and one it refused.
+  return { contribution, transaction, receiptRef, status: txStatus }
 }
 
 // ─── Status engine ─────────────────────────────────────────────────────────

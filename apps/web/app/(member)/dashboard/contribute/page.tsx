@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/Input'
 import { Label } from '@/components/ui/Label'
 import { Select } from '@/components/ui/Select'
 import { Alert } from '@/components/ui/Alert'
-import { api } from '@/lib/api'
+import { api, ApiClientError } from '@/lib/api'
+import { BudgetGuardModal, type BudgetGuardDetails } from '@/components/contribution/BudgetGuardModal'
 import { SkeletonForm } from '@/components/ui/Skeleton'
 import { formatZAR, formatMonth, MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
@@ -38,6 +39,16 @@ export default function ContributePage() {
   const [loading, setLoading] = useState(true)
   const [serverError, setServerError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [budgetGuard, setBudgetGuard] = useState<BudgetGuardDetails | null>(null)
+  const [pending, setPending] = useState<ManualContributionInput | null>(null)
+  const [overriding, setOverriding] = useState(false)
+
+  // Cleared on unmount. A member who navigates away inside the redirect window
+  // otherwise gets pushed to a page they had already left.
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => {
+    if (redirectTimer.current) clearTimeout(redirectTimer.current)
+  }, [])
 
   const {
     register,
@@ -57,7 +68,7 @@ export default function ContributePage() {
   )
   const remaining = selectedPeriod
     ? selectedPeriod.amountDue - selectedPeriod.amountPaid
-    : mandate?.amount ?? 100
+    : mandate?.amount ?? MIN_CONTRIBUTION_ZAR
 
   useEffect(() => {
     if (remaining > 0) setValue('amount', remaining)
@@ -119,15 +130,78 @@ export default function ContributePage() {
     load()
   }, [setValue])
 
+  /**
+   * Submit a payment, and deal with the two answers that are not "done".
+   *
+   * `BUDGET_001` is a refusal the member can resolve, and this page had no way
+   * to. `submitManualPayment` throws it whenever the amount takes them past a
+   * budget they set themselves, unless `budgetOverrideConfirmed` is sent — and
+   * this form never sent it and never offered the modal that collects it. So a
+   * member over their own budget, on the page titled "Make a Payment", was told
+   * they had exceeded it and given nothing to click. `PaymentModal` had handled
+   * this correctly since it was written; this page simply never adopted it.
+   *
+   * A declined collection is the other one. See {@link finish}.
+   */
+  async function pay(data: ManualContributionInput) {
+    const result = await api.post<{ status?: string }>('/api/v1/contributions/pay', data)
+    finish(result?.status)
+  }
+
+  /**
+   * What the member is told once the gateway has answered.
+   *
+   * "Payment submitted!" used to be shown for every response that did not
+   * throw — including a decline, which the service wrote as PENDING and which
+   * nothing would ever have corrected. A refusal by the bank is not a
+   * submission, and the member is standing right here to be told so.
+   */
+  function finish(status?: string) {
+    if (status === 'FAILED') {
+      setServerError(
+        'Your bank refused this payment. Nothing has been taken from your account. ' +
+        'Check your available balance and try again, or contact your bank.',
+      )
+      return
+    }
+    setSuccess(true)
+    redirectTimer.current = setTimeout(() => router.push('/dashboard/contributions'), 1500)
+  }
+
   async function onSubmit(data: ManualContributionInput) {
     setServerError('')
+    setPending(data)
     try {
-      await api.post('/api/v1/contributions/pay', data)
-      setSuccess(true)
-      setTimeout(() => router.push('/dashboard/contributions'), 1500)
+      await pay(data)
     } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'BUDGET_001' && err.details) {
+        setBudgetGuard(err.details as unknown as BudgetGuardDetails)
+        return
+      }
       const e = err as { message?: string }
       setServerError(e.message ?? 'Payment failed. Please try again.')
+    }
+  }
+
+  /** Drop the amount to what is left in the budget, and let them submit again. */
+  function applyRemainingBudget(remainingBudget: number) {
+    setValue('amount', remainingBudget, { shouldValidate: true })
+    setBudgetGuard(null)
+  }
+
+  /** The member has seen what this does to their budget and chosen to go on. */
+  async function confirmOverBudget(reason: string) {
+    if (!pending) return
+    setOverriding(true)
+    try {
+      await pay({ ...pending, budgetOverrideConfirmed: true, budgetOverrideReason: reason })
+      setBudgetGuard(null)
+    } catch (err: unknown) {
+      const e = err as { message?: string }
+      setBudgetGuard(null)
+      setServerError(e.message ?? 'Payment failed. Please try again.')
+    } finally {
+      setOverriding(false)
     }
   }
 
@@ -255,6 +329,19 @@ export default function ContributePage() {
             </div>
           )}
         </>
+      )}
+
+      {/* The way through a budget the member set for themselves. Without this
+          the refusal from `submitManualPayment` was a dead end on the one page
+          whose whole purpose is taking a payment. */}
+      {budgetGuard && (
+        <BudgetGuardModal
+          details={budgetGuard}
+          loading={overriding}
+          onChangeAmount={applyRemainingBudget}
+          onProceed={(reason) => confirmOverBudget(reason ?? '')}
+          onClose={() => setBudgetGuard(null)}
+        />
       )}
     </div>
   )
