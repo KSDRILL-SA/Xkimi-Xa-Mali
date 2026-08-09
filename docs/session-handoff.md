@@ -179,7 +179,52 @@ The one judgement call left open: community posting uses the generic
 3/hour and admin broadcasts 5/hour. Defensible either way on a 50-member wall
 with no notification fan-out. Not treated as a defect.
 
-## 2b. Next piece of work — the statement PDF
+## 2b. The statement PDF — now visible, and partly fixed
+
+**The tooling exists now.** `pdftoppm` is installed (winget, `oschwartz10612.Poppler`)
+at `%LOCALAPPDATA%/Microsoft/WinGet/Packages/oschwartz10612.Poppler_*/poppler-*/Library/bin/`.
+It is not on PATH in this shell — call it by full path. Render with
+`pdftoppm -png -r 90 file.pdf out` and read the PNG.
+
+**`npm run seed:statement --workspace=@xxm/database`** writes one past month
+that exercises every element at once: a successful debit order, a declined
+collection with a reason, a manual payment, and a partial balance so the
+outstanding state renders rather than the settled one. Idempotent on the period.
+
+**Five defects were found by rendering it and fixed in #328** — a masthead
+collision, table headers reading `OUTSTANDINGSTATUS` and `AMOUNTSTATUS` because
+the columns summed to 100% with no padding, a final column holding a date and
+labelled `Due`/`Done`, a notice block splitting across the page break, and a
+U+2726 decorative mark rendering as a fallback box beside the words "Official
+Document". None was visible before because the statement had never been seen
+carrying content.
+
+### What is still open on it
+
+- **Page two is mostly empty.** The notice and authorisation occupy the top
+  fifth and the rest is blank. Keeping the block whole was the right fix for the
+  overflow, but the page balance is now the problem. Either the block belongs on
+  page one when there is room, or page two needs to earn its place.
+- **No reference document.** The owner rates the design as not yet world class
+  and that judgement stands. Ask for a statement they rate and build to it;
+  building to a guess is what produced the current one.
+- **The empty-period case is still poor.** A statement for a month with no
+  activity renders two pages of mostly whitespace. Worth its own treatment.
+
+## 2c. Fixed from a live report — the pending mandate dead end
+
+A member who had just set up a mandate was told to set one up. The contribute
+page recognised only `ACTIVE`; a new mandate is `PENDING` until the bank
+authorises the DebiCheck instruction. So the page said "No active mandate — Set
+up mandate" and sent them to a page where creating a second is refused by the
+one-active-or-pending rule. Fixed in #328: none and pending are now distinct
+states.
+
+**The lesson is the method, not the bug.** Ten pages of code review did not find
+this. One member using the app found it in a minute. Every remaining area should
+get a pass with the app actually running.
+
+
 
 The owner opened a generated statement and judged it not good enough. That
 judgement stands. What follows is what is actually known, so the redesign does
