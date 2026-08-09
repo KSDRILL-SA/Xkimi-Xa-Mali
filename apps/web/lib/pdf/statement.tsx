@@ -78,9 +78,11 @@ const s = StyleSheet.create({
     fontFamily: 'Helvetica',
     fontSize: 9,
     color: C.ink,
-    backgroundColor: C.paper,
+    backgroundColor: C.canvas,
     paddingBottom: 46,
   },
+
+  edge: { position: 'absolute', top: 0, bottom: 0, left: 0, width: 3.5, backgroundColor: C.gold },
 
   // ── Masthead ──────────────────────────────────────────────────────────
   masthead: {
@@ -120,7 +122,7 @@ const s = StyleSheet.create({
     borderBottomColor: C.line,
   },
   heroLabel: { fontSize: 7, color: C.ink35, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 5 },
-  heroName: { fontSize: 21, fontFamily: 'Helvetica-Bold', color: C.green, letterSpacing: 0.2 },
+  heroName: { fontSize: 22, fontFamily: 'Times-Bold', color: C.green, letterSpacing: 0.3 },
   heroMeta: { fontSize: 7.5, color: C.ink50, marginTop: 5, letterSpacing: 0.3 },
   founderPill: {
     marginTop: 5,
@@ -140,7 +142,7 @@ const s = StyleSheet.create({
   },
   heroRight: { alignItems: 'flex-end' },
   heroAmountLabel: { fontSize: 7, color: C.ink35, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 3 },
-  heroAmount: { fontSize: 25, fontFamily: 'Helvetica-Bold', letterSpacing: 0.2 },
+  heroAmount: { fontSize: 26, fontFamily: 'Times-Bold', letterSpacing: 0.2 },
 
   // ── Status pill ───────────────────────────────────────────────────────
   pill: {
@@ -153,7 +155,7 @@ const s = StyleSheet.create({
 
   // ── Info grid ─────────────────────────────────────────────────────────
   grid: { flexDirection: 'row', gap: 14, marginBottom: 14 },
-  card: { flex: 1, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
+  card: { flex: 1, backgroundColor: C.paper, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
   cardHead: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     backgroundColor: C.mist, paddingHorizontal: 12, paddingVertical: 7,
@@ -173,17 +175,17 @@ const s = StyleSheet.create({
   sumCardAccent: { backgroundColor: C.mist, borderColor: C.mistLine },
   sumTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sumLabel: { fontSize: 6.5, color: C.ink50, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.7 },
-  sumValue: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: C.green },
+  sumValue: { fontSize: 15, fontFamily: 'Times-Bold', color: C.green },
   sumSub: { fontSize: 6.5, color: C.ink35, marginTop: 3 },
 
   // ── Section heading ───────────────────────────────────────────────────
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9, marginTop: 2 },
   sectionTick: { width: 3, height: 11, borderRadius: 1.5, backgroundColor: C.gold },
-  sectionHeading: { fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: C.green, letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionHeading: { fontSize: 11, fontFamily: 'Times-Bold', color: C.green, letterSpacing: 0.6 },
   sectionCount: { fontSize: 7, color: C.ink35, marginLeft: 'auto', letterSpacing: 0.3 },
 
   // ── Table ─────────────────────────────────────────────────────────────
-  table: { marginBottom: 13, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
+  table: { marginBottom: 13, backgroundColor: C.paper, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
   tHead: { flexDirection: 'row', backgroundColor: C.green, paddingHorizontal: 13, paddingVertical: 9 },
   tHeadCell: { fontSize: 6.8, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 0.6, textTransform: 'uppercase' },
   tRow: { flexDirection: 'row', paddingHorizontal: 13, paddingVertical: 10, alignItems: 'center' },
@@ -276,6 +278,9 @@ function StatementDocument({ data }: { data: StatementData }) {
     >
       <Page size="A4" style={s.page}>
 
+        {/* The bound edge, as the Founder Guide carries it. `fixed` so a
+            statement that runs to a second page is furnished the same way. */}
+        <View style={s.edge} fixed />
         <Masthead docType="Statement of Account" period={period.label} docRef={docRef} />
 
         <View style={s.content}>

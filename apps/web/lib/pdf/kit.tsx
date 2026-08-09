@@ -1,5 +1,8 @@
 import React from 'react'
-import { View, Text, Svg, Path, Circle, Line, StyleSheet } from '@react-pdf/renderer'
+import {
+  View, Text, Svg, Path, Circle, Line, Rect, Polygon, G,
+  Defs, LinearGradient, RadialGradient, Stop, StyleSheet,
+} from '@react-pdf/renderer'
 import { env } from '@/lib/env'
 
 // Printed on every generated document. Derived from the configured site URL
@@ -20,6 +23,9 @@ export const C = {
   gold:      '#B98A1F',
   goldSoft:  '#FBF4E2',
   paper:     '#FFFFFF',
+  // The page itself, warmer than the cards that sit on it — matching the
+  // Founder Guide rather than the flat white a browser would print.
+  canvas:    '#FBFAF6',
   line:      '#E7EBE9',
   lineSoft:  '#F1F4F3',
   ink70:     '#3B4A44',
@@ -124,6 +130,101 @@ export function StatusPill({ status, label }: { status: string; label?: string }
   )
 }
 
+// ─── The mark ──────────────────────────────────────────────────────────────────
+
+/**
+ * The Foundation's actual logo, drawn as vector.
+ *
+ * Every generated document carried a letter X in a gold circle — a placeholder
+ * standing in for a mark that already exists and is used everywhere else in the
+ * product. A statement is the one artefact a member keeps, forwards, and may
+ * hand to a bank; it should not be the only place the Foundation appears under
+ * a substitute.
+ *
+ * Redrawn from `packages/ui` rather than embedded as an image, so it stays
+ * sharp at any size and adds nothing to the file. The colours are the brand's
+ * own, deliberately not the print-adjusted gold used for rules and labels —
+ * this is the logo, not a decoration tinted to match the page.
+ */
+const MARK = {
+  gold: '#D4AF37',
+  goldLight: '#F5D76E',
+  goldDark: '#8B6914',
+  goldMid: '#BF9B30',
+  green: '#1B4332',
+  canopy: '#2C5F47',
+}
+
+export function XmmMark({ size = 34 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      <Defs>
+        <LinearGradient id="mkRing" x1="25%" y1="0%" x2="75%" y2="100%">
+          <Stop offset="0%" stopColor={MARK.goldLight} />
+          <Stop offset="40%" stopColor={MARK.gold} />
+          <Stop offset="100%" stopColor={MARK.goldDark} />
+        </LinearGradient>
+        <RadialGradient id="mkDisc" cx="38%" cy="32%" r="68%">
+          <Stop offset="0%" stopColor={MARK.canopy} />
+          <Stop offset="100%" stopColor={MARK.green} />
+        </RadialGradient>
+        <LinearGradient id="mkArrow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <Stop offset="0%" stopColor={MARK.goldLight} />
+          <Stop offset="55%" stopColor={MARK.gold} />
+          <Stop offset="100%" stopColor={MARK.goldMid} />
+        </LinearGradient>
+        <LinearGradient id="mkBar" x1="0%" y1="0%" x2="0%" y2="100%">
+          <Stop offset="0%" stopColor={MARK.goldLight} />
+          <Stop offset="100%" stopColor={MARK.gold} />
+        </LinearGradient>
+      </Defs>
+
+      {/* Coin rim, then the green face it holds */}
+      <Circle cx="50" cy="50" r="49" fill="url(#mkRing)" />
+      <Circle cx="50" cy="50" r="45" fill="none" stroke={MARK.goldDark} strokeWidth={0.6} strokeOpacity={0.5} />
+      <Circle cx="50" cy="50" r="43" fill="url(#mkDisc)" />
+
+      {/* Two arrows crossed — money moving both ways within the circle */}
+      <G transform="translate(50,50) rotate(45)">
+        <Polygon
+          points="-30,0 -20,-8.5 -20,-3.5 20,-3.5 20,-8.5 30,0 20,8.5 20,3.5 -20,3.5 -20,8.5"
+          fill={MARK.canopy}
+          fillOpacity={0.85}
+        />
+      </G>
+      <G transform="translate(50,50) rotate(-45)">
+        <Polygon
+          points="-30,0 -20,-8.5 -20,-3.5 20,-3.5 20,-8.5 30,0 20,8.5 20,3.5 -20,3.5 -20,8.5"
+          fill="url(#mkArrow)"
+        />
+        <Polygon points="-30,0 -20,-8.5 -20,-6 20,-6 20,-8.5 30,0" fill={MARK.goldLight} fillOpacity={0.22} />
+      </G>
+
+      {/* Growth */}
+      <Rect x="36.5" y="19" width="4.2" height="8.5" rx="1.2" fill="url(#mkBar)" fillOpacity={0.6} />
+      <Rect x="42.5" y="16" width="4.2" height="11.5" rx="1.2" fill="url(#mkBar)" fillOpacity={0.75} />
+      <Rect x="48.5" y="12.5" width="4.2" height="15" rx="1.2" fill="url(#mkBar)" />
+      <Rect x="54.5" y="16.5" width="4.2" height="11" rx="1.2" fill="url(#mkBar)" fillOpacity={0.7} />
+
+      {/* Medallion: the rand, and the handshake under it */}
+      <Circle cx="50" cy="50" r="14" fill={MARK.green} />
+      <Circle cx="50" cy="50" r="13" fill="none" stroke={MARK.gold} strokeWidth={1.8} />
+      <Circle cx="50" cy="50" r="11.5" fill="none" stroke={MARK.goldLight} strokeWidth={0.4} strokeOpacity={0.3} />
+      <Text x={50} y={55.5} textAnchor="middle" fill={MARK.gold} style={{ fontFamily: 'Times-Bold', fontSize: 15 }}>
+        R
+      </Text>
+      <Path
+        d="M45.5 60 Q50 63.5 54.5 60"
+        stroke={MARK.gold}
+        strokeWidth={1.4}
+        strokeOpacity={0.6}
+        fill="none"
+        strokeLinecap="round"
+      />
+    </Svg>
+  )
+}
+
 // ─── Masthead & footer (shared across documents) ───────────────────────────────
 
 const chrome = StyleSheet.create({
@@ -135,9 +236,7 @@ const chrome = StyleSheet.create({
   // title beside it. At 17pt with 1.5 letter-spacing it did exactly that:
   // "FOUNDATION" and "STATEMENT OF ACCOUNT" touched with no gap at all.
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11, flex: 1, paddingRight: 16 },
-  monogram: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: C.gold, alignItems: 'center', justifyContent: 'center' },
-  monogramText: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: C.gold },
-  orgName: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 0.8 },
+  orgName: { fontSize: 14.5, fontFamily: 'Times-Bold', color: C.paper, letterSpacing: 1.1 },
   orgTagline: { fontSize: 6.5, color: C.greenSoft, marginTop: 3, letterSpacing: 1.2, textTransform: 'uppercase' },
   mastRight: { flexShrink: 0, alignItems: 'flex-end' },
   docType: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 2.5, textTransform: 'uppercase' },
@@ -161,7 +260,7 @@ export function Masthead({ docType, period, docRef }: { docType: string; period:
     <>
       <View style={chrome.masthead} fixed>
         <View style={chrome.brandRow}>
-          <View style={chrome.monogram}><Text style={chrome.monogramText}>X</Text></View>
+          <XmmMark size={34} />
           <View>
             <Text style={chrome.orgName}>XKIMM XA MALI FOUNDATION</Text>
             <Text style={chrome.orgTagline}>Contributing · Growing · Securing</Text>
