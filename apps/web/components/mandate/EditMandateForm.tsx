@@ -79,7 +79,12 @@ export function EditMandateForm({ mandateId, currentDebitDay, currentAmount, onC
           error={errors.amount?.message}
           {...register('amount', { valueAsNumber: true })}
         />
-        <p className="text-xs text-gray-400 mt-1">R{MIN_CONTRIBUTION_ZAR} – R{MAX_CONTRIBUTION_ZAR.toLocaleString()}</p>
+        {/* Locale pinned. A bare toLocaleString() uses the runtime's default,
+            so Node rendered "10,000" and the browser "10 000" — a hydration
+            mismatch that made React throw away this tree and rebuild it on the
+            client. Every other amount in the app goes through formatZAR, which
+            is pinned to en-ZA for exactly this reason. */}
+        <p className="text-xs text-gray-400 mt-1">R{MIN_CONTRIBUTION_ZAR} – R{MAX_CONTRIBUTION_ZAR.toLocaleString('en-ZA')}</p>
       </div>
 
       <div className="flex gap-3 pt-1">
