@@ -21,6 +21,12 @@ const INVITE_ERRORS: Record<string, { message: string; cta: string; showLogin?: 
     message: 'This invite link has expired.',
     cta: 'Ask the admin to resend your invite.',
   },
+  // Deliberately says nothing about the code that was tried. Somebody working
+  // through codes must not learn from this screen whether any of them was real.
+  SYS_005: {
+    message: 'Too many attempts from this connection.',
+    cta: 'Please wait a minute and open your invite link again.',
+  },
 }
 
 export function InviteErrorView({ code }: { code: string }) {
