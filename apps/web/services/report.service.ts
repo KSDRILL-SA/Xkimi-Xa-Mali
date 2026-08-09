@@ -1,4 +1,3 @@
-import { storageProvider } from '@/integrations/storage'
 import { renderStatementPDF } from '@/lib/pdf/statement'
 import type { StatementData } from '@/lib/pdf/statement'
 import { renderContributionReportPDF } from '@/lib/pdf/contribution-report'
@@ -314,27 +313,24 @@ export async function generateMemberStatementPdf(
   return renderStatementPDF(data)
 }
 
-export async function generateMemberStatement(
-  userId: string,
-  requesterId: string,
-  roles: string[],
-  month: number,
-  year: number,
-): Promise<{ url: string; signedUrl: string }> {
-  assertCanAccess(userId, requesterId, roles)
-
-  const data = await buildStatementData(userId, month, year)
-  const pdfBuffer = await renderStatementPDF(data)
-
-  const blobPath = `statements/${userId}/${year}-${String(month).padStart(2, '0')}.pdf`
-  const result = await storageProvider.upload(blobPath, pdfBuffer, {
-    access: 'public',
-    contentType: 'application/pdf',
-    addRandomSuffix: false,
-  })
-
-  return { url: result.url, signedUrl: result.signedUrl }
-}
+/**
+ * Deleted: `generateMemberStatement`, which uploaded a member's statement to
+ * Vercel Blob with `access: 'public'` and `addRandomSuffix: false`.
+ *
+ * The path was `statements/<userId>/<year>-<month>.pdf`, so the URL was fully
+ * derivable from a member id and the store hostname — and the store hostname is
+ * already public in the CSP. A financial document listing contribution history
+ * and a masked account number was one guessed cuid away from anybody, with no
+ * session, no rate limit and no audit trail, permanently.
+ *
+ * Its single caller now streams the PDF through the authenticated route
+ * instead. The function is removed rather than corrected because a helper whose
+ * job is "put this member's statement somewhere the public can read it" has no
+ * safe use, and leaving it exported is an invitation to call it.
+ *
+ * Blob storage is still used for admin signatures and goal outcomes, which are
+ * uploaded through the same adapter and are a separate question.
+ */
 
 // ─── Admin reports ────────────────────────────────────────────────────────────
 
