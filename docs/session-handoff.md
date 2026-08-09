@@ -71,7 +71,7 @@ somebody reads them.
 | Core member | `dashboard` `profile` `notifications` `goals` `goals/[id]` | ✅ #313–#317 |
 | Social | `badges` ✅ #319 · `community` ✅ (clean, no PR) · **`invitations`** · `whatsapp` | 2 of 4 |
 | Auth pages | `login` `register` `forgot-password` `reset-password` `verify-email` `invite/[token]` | audited — five clean, **one open finding**, see below |
-| Public | `/` `about` `privacy` `terms` `support` `offline` | not started |
+| Public | `/` `about` `privacy` `terms` `support` `offline` | ✅ audited — all clean |
 
 **Next: the open invite finding below, then the five public pages.**
 
@@ -136,6 +136,35 @@ precise description of one.
 **Note, not a defect:** the code sits in the URL *path*, so it lands in Vercel
 access logs. The invite email already puts it in a URL (`/register?code=…`), so
 this is the established design rather than a regression.
+
+### Checked and already correct — `SUPPORT_EMAIL` on a live deploy
+
+Raised during the public-pages audit and **found to be a false alarm**, recorded
+so it is not raised again or "fixed" into a regression.
+
+The privacy policy routes POPIA rights requests to the Support page, which
+renders `mailto:${env.SUPPORT_EMAIL}`. The concern was that an unset variable
+would leave that pointing at the `support@example.invalid` placeholder — a dead
+address for a statutory right.
+
+It does not. `configuredWhenLive` reads:
+
+```ts
+(LIVE ? schema : schema.default(devPlaceholder))
+```
+
+When live there is **no default**, so `SUPPORT_EMAIL` is required and the app
+refuses to boot without it. The placeholder applies in development only. The
+protection asked for already exists.
+
+**Do not change this to `requiredWhenLive`.** That helper returns
+`schema.optional()` off a live deploy, which would make the type
+`string | undefined` and render `mailto:undefined` locally — strictly worse than
+what is there.
+
+The address itself is `xkimxamali@gmail.com`, the one mailbox used for
+everything that *receives* — `SUPPORT_EMAIL`, `ALERT_FALLBACK_EMAIL` and
+`NEXT_PUBLIC_SUPPORT_EMAIL`. It still cannot be `RESEND_FROM_EMAIL`; see §4.3.
 
 ### `community` was audited and found clean
 
