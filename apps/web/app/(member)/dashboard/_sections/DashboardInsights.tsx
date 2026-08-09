@@ -11,8 +11,13 @@ const TONE: Record<string, { icon: LucideIcon; ring: string }> = {
 
 export async function DashboardInsights() {
   const session = await getSession()
-  const userId = session!.user.id
-  const roles = (session!.user.roles as string[] | undefined) ?? []
+  // Returns nothing rather than redirecting. A section renders inside a
+  // SectionBoundary, and Next's redirect() works by throwing — an error
+  // boundary would catch it and drop the section instead of navigating. The
+  // page above this one holds the redirect; this is only the assertion removed.
+  if (!session?.user?.id) return null
+  const userId = session.user.id
+  const roles = (session.user.roles as string[] | undefined) ?? []
 
   const data = await getMemberInsights(userId, userId, roles)
 
