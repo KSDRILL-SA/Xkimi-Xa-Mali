@@ -5,6 +5,9 @@ import { roundZAR, subtractZAR } from '@/lib/money'
 import { writeAuditLog } from '@/services/audit.service'
 import { MIN_GOAL_PAYMENT } from '@/lib/validation/goal'
 import { logger } from '@xxm/observability'
+import { queueNotification } from '@/services/notification.service'
+import { payToGoal } from '@/services/goal-payment.service'
+import { isDueOn, periodKey, instalmentFor } from '@/lib/goal-plan-schedule'
 
 /**
  * Standing commitments to fund a goal every month.
@@ -198,4 +201,130 @@ export async function cancelPlan(
   })
 
   return { cancelled: true as const }
+}
+
+// ─── Collection ─────────────────────────────────────────────────────────────
+
+/**
+ * Collect every plan that is due today.
+ *
+ * Called by a daily job. The work is here rather than in the job so it can be
+ * driven directly in a test without an Inngest runtime.
+ *
+ * Nothing about a plan is trusted at collection time. The goal may have been
+ * met, achieved, or passed its deadline since the member set the plan up, and
+ * the mandate they had may be gone. Each is a reason to stop rather than a
+ * reason to charge.
+ */
+export async function collectDuePlans(now = new Date()): Promise<{
+  collected: number
+  failed: number
+  completed: number
+  paused: number
+}> {
+  const candidates = await goalPlanRepo.findDueCandidates(now.getDate())
+  let collected = 0
+  let failed = 0
+  let completed = 0
+  let paused = 0
+
+  for (const plan of candidates) {
+    if (!isDueOn(plan, now)) continue
+
+    const goal = plan.goal
+    const remaining = Math.max(0, subtractZAR(Number(goal.targetAmount), Number(goal.currentAmount)))
+
+    // Reasons to stop rather than collect. Checked in this order because a met
+    // goal is good news and an expired one is not, and the member is told
+    // different things about each.
+    const stop =
+      goal.status !== 'ACTIVE' ? 'The goal is no longer active'
+      // Plain apostrophe, not a right single quote. This string is dropped
+      // into an SMS body, and a single character outside GSM-7 bills the whole
+      // message as UCS-2 — halving the character budget for every plan that
+      // ends this way.
+      : goal.deadline.getTime() <= now.getTime() ? "The goal's deadline passed"
+      : remaining <= 0 ? 'The goal reached its target'
+      : null
+
+    if (stop) {
+      const ended = await goalPlanRepo.updateByVersion(plan.id, plan.version, {
+        status: 'COMPLETED', endedAt: now, endedReason: stop,
+      })
+      if (ended.count > 0) {
+        completed += 1
+        await queueNotification({
+          userId: plan.userId,
+          templateSlug: 'goal-plan-completed',
+          channel: 'SMS',
+          payload: { goalTitle: goal.title, reason: stop },
+        }).catch(() => {})
+      }
+      continue
+    }
+
+    // The debit order may have been revoked since. Pausing keeps the plan so
+    // the member can resume it, rather than throwing away what they set up.
+    const mandate = await mandateRepo.findActiveByUser(plan.userId)
+    if (!mandate?.netcashMandateId) {
+      const stopped = await goalPlanRepo.updateByVersion(plan.id, plan.version, {
+        status: 'PAUSED', endedReason: 'No active debit order to collect from',
+      })
+      if (stopped.count > 0) {
+        paused += 1
+        await queueNotification({
+          userId: plan.userId,
+          templateSlug: 'goal-plan-paused',
+          channel: 'SMS',
+          payload: { goalTitle: goal.title },
+        }).catch(() => {})
+      }
+      continue
+    }
+
+    const period = periodKey(now)
+    const amount = instalmentFor(Number(plan.amount), remaining)
+    if (amount === null) continue // covered by `stop` above; belt and braces
+
+    // Stamped before the charge, not after. A job that dies mid-collection must
+    // not leave the plan looking un-collected — the idempotency key below is
+    // what makes the charge itself safe, and this stops a same-day rerun from
+    // even reaching the gateway.
+    const claimed = await goalPlanRepo.updateByVersion(plan.id, plan.version, {
+      lastCollectedPeriod: period,
+    })
+    if (claimed.count === 0) continue // another run took it, or the member cancelled
+
+    try {
+      // The member is both subject and requester: this is their own standing
+      // instruction being carried out, not an admin acting on their behalf.
+      const res = await payToGoal(
+        plan.goalId, plan.userId, plan.userId, [], amount, undefined,
+        `plan:${plan.id}:${period}`,
+      )
+
+      if (res.status === 'FAILED') {
+        failed += 1
+        await goalPlanRepo.updateByVersion(plan.id, plan.version + 1, {
+          failedRuns: plan.failedRuns + 1,
+        })
+      } else {
+        collected += 1
+        if (plan.failedRuns > 0) {
+          await goalPlanRepo.updateByVersion(plan.id, plan.version + 1, { failedRuns: 0 })
+        }
+      }
+    } catch (err) {
+      failed += 1
+      logger.error('Goal plan collection failed', {
+        planId: plan.id, goalId: plan.goalId, userId: plan.userId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      await goalPlanRepo.updateByVersion(plan.id, plan.version + 1, {
+        failedRuns: plan.failedRuns + 1,
+      })
+    }
+  }
+
+  return { collected, failed, completed, paused }
 }
