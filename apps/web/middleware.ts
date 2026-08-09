@@ -129,7 +129,17 @@ function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://*.public.blob.vercel-storage.com",
     "font-src 'self'",
-    "connect-src 'self' https://*.vercel.app https://*.upstash.io https://o*.ingest.sentry.io https://*.public.blob.vercel-storage.com https://api.inngest.com",
+    // `https://o*.ingest.sentry.io` was here and is not valid CSP: a wildcard
+    // must be a whole leftmost label, not a partial one. Browsers discarded the
+    // source outright — "contains an invalid source ... It will be ignored" —
+    // so Sentry's ingest host was not in connect-src at all and every
+    // client-side error report was blocked by our own policy. Error reporting
+    // looked configured and delivered nothing.
+    //
+    // `*.sentry.io` rather than a list, because the ingest host carries the org
+    // id and the region (`o123.ingest.sentry.io`, `o123.ingest.us.sentry.io`),
+    // so an exact list breaks the day the DSN moves region.
+    "connect-src 'self' https://*.vercel.app https://*.upstash.io https://*.sentry.io https://*.public.blob.vercel-storage.com https://api.inngest.com",
     "worker-src 'self' blob:",
     "frame-ancestors 'none'",
   ].join('; ')
