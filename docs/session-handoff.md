@@ -179,6 +179,54 @@ The one judgement call left open: community posting uses the generic
 3/hour and admin broadcasts 5/hour. Defensible either way on a 50-member wall
 with no notification fan-out. Not treated as a defect.
 
+## 2b. Next piece of work — the statement PDF
+
+The owner opened a generated statement and judged it not good enough. That
+judgement stands. What follows is what is actually known, so the redesign does
+not start by guessing.
+
+**The statement that was judged was empty.** The member's only contribution
+periods are 1/2031 and 3/2031, and the statement API refuses a future period, so
+the one generated was June 2026 — a month with no data. It rendered `R 0.00` in
+every total, "No contributions recorded for this period", "No transactions
+recorded for this period", and still ran to two pages. **Nobody has yet seen this
+design carrying real content.** That is the first thing to fix about the process,
+before a single style is changed.
+
+**What text extraction did show** (`pdftotext -layout` works here; `pdftoppm`
+does not, so pages cannot be rendered to images yet):
+
+- **An empty statement still runs to two pages.** Page two is the notice and
+  terms block. On a statement with nothing in it that is mostly whitespace.
+- **"AUTHORISED BY" renders with nothing beneath it** when no admin signature is
+  configured. On a real document a blank authorisation block reads as unfinished
+  rather than as pending.
+- The banking row showed `Std` / `unavailable` — the first is bad seed data, the
+  second is the H-5 degrade path working correctly.
+
+**What is not wrong, checked so it is not "fixed" into a regression:**
+`localhost:3001` in the page footer is `SITE_HOST`, derived from
+`NEXT_PUBLIC_SITE_URL` on purpose so a statement can never carry a domain the
+Foundation no longer owns. In production it is the real domain.
+
+### How to pick this up
+
+1. **Make it visible.** `pdftoppm` is not installed (`winget install poppler`, or
+   equivalent). Without it the PDF cannot be looked at, only read as text — and a
+   document design cannot be judged from its text.
+2. **Seed one realistic period**: a debit order, a manual payment, a declined
+   collection and a partial balance, so the tables, the status pills and the
+   totals are all exercised at once. A script that writes a sample PDF straight
+   to a file will iterate in seconds where a browser session takes minutes.
+3. **Get a reference.** "World class" needs something to be measured against —
+   ask the owner for a statement they rate. Building to a named standard beats
+   building to a guess.
+
+The template is `apps/web/lib/pdf/statement.tsx` (479 lines) over
+`apps/web/lib/pdf/kit.tsx`, which holds the shared masthead, footer, status pills
+and palette. `contribution-report.tsx` uses the same kit, so kit changes reach
+both documents.
+
 ## 3. Decisions the owner took — do not re-litigate these
 
 | Question | Decision |
