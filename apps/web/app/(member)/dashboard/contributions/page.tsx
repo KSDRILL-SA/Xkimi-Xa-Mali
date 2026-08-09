@@ -27,7 +27,11 @@ export default async function ContributionsPage({
   const userId  = session.user.id
   const roles   = session.user.roles ?? []
   const params  = await searchParams
-  const page    = Math.max(1, Number(params.page ?? '1'))
+  // `?page=abc` produced NaN, which reached Prisma as `skip: NaN` and returned
+  // a 500 to a member who mistyped a URL. Anything that is not a whole number
+  // at or above one is page one.
+  const requestedPage = Number(params.page ?? '1')
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1
 
   const [summary, paginated, allMandates] = await Promise.all([
     getContributionSummary(userId, userId, roles),
@@ -51,19 +55,34 @@ export default async function ContributionsPage({
   type RawContrib = typeof contributions[number]
   type RawTx = RawContrib['transactions'][number]
 
-  // Serialize Decimal/Date fields for client components
+  // Named, not spread — and on the transactions especially.
+  //
+  // Everything handed to a client component is serialised into the RSC payload
+  // and readable in the page source. `...t` sent every column on `Transaction`,
+  // and one of them is `gatewayResponse`: the gateway adapters store the
+  // **entire raw SOAP response** from Netcash under `raw`, so each member's
+  // browser was receiving the full XML for every collection ever attempted on
+  // their account — including whatever a fault echoes back of the request that
+  // caused it.
+  //
+  // `idempotencyKey`, `gatewayRef`, `failureReason`, `mandateId` and
+  // `reversalOfId` went with it. `ContributionRow` declares five fields on a
+  // transaction and renders exactly those five; TypeScript's structural typing
+  // accepts an object carrying thirty, so nothing complained.
   const serialized = contributions.map((c: RawContrib) => ({
-    ...c,
+    id: c.id,
+    periodMonth: c.periodMonth,
+    periodYear: c.periodYear,
+    status: c.status,
     amountDue: c.amountDue.toString(),
     amountPaid: c.amountPaid.toString(),
     dueDate: c.dueDate.toISOString(),
-    createdAt: c.createdAt.toISOString(),
-    updatedAt: c.updatedAt.toISOString(),
     transactions: c.transactions.map((t: RawTx) => ({
-      ...t,
+      id: t.id,
+      type: t.type,
+      status: t.status,
       amount: t.amount.toString(),
       createdAt: t.createdAt.toISOString(),
-      processedAt: t.processedAt?.toISOString() ?? null,
     })),
   }))
 
