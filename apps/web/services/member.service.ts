@@ -8,6 +8,7 @@ import {
   isForeignKeyViolation,
 } from '@/lib/errors'
 import { assertCanAccess } from '@/lib/authorization'
+import { smsProvider } from '@/integrations/sms'
 import { tallyBy } from '@/lib/aggregate'
 import type {
   UpdateProfileInput,
@@ -95,6 +96,12 @@ export async function updateMemberProfile(
     if (clash) throw new BankAccountConflictError('That phone number is already in use', 'MBR_003')
   }
 
+  // Read before the write, because the number being replaced is the one that
+  // has to be warned. See {@link warnPreviousNumber}.
+  const previous = input.phone
+    ? ((await userRepo.findById(targetUserId, { select: { phone: true } })) as { phone: string } | null)
+    : null
+
   const updated = await userRepo.update(targetUserId, {
     ...(input.firstName && { firstName: input.firstName }),
     ...(input.lastName && { lastName: input.lastName }),
@@ -111,8 +118,58 @@ export async function updateMemberProfile(
     ipAddress,
   })
 
+  if (previous?.phone && previous.phone !== input.phone) {
+    await warnPreviousNumber(previous.phone, targetUserId)
+  }
+
   logger.info('Profile updated', { targetUserId, requesterId, fields: Object.keys(input) })
   return updated
+}
+
+/**
+ * Tell the number that just stopped being the member's number.
+ *
+ * A phone change was completely silent. It wrote an audit entry — which no
+ * member can read — and nothing else. The old number heard nothing, the new
+ * number heard nothing, and the member had no signal at all that it had
+ * happened.
+ *
+ * The phone number is where every money-related SMS goes: the morning debit
+ * warning, `mandate-cancelled`, and the `payment-failed-*` pair that was put in
+ * `MANDATORY_SLUGS` precisely so a member could not end up not hearing it. So
+ * anyone holding a session — a borrowed phone, an unlocked laptop — could
+ * quietly redirect the entire channel that would have told the member something
+ * was wrong, and the act of redirecting it was itself unannounced.
+ *
+ * Email cannot be changed on this account at all. The phone, which is the other
+ * identifier the system delivers to, could be changed freely. This closes the
+ * asymmetry from the side that matters: whoever still holds the old number is
+ * the person to tell, because if the change was not theirs, that is where they
+ * are.
+ *
+ * Sent **directly**, not queued, for two reasons. `queueNotification` resolves
+ * the recipient from the user record, and the number that needs this message is
+ * the one that has just been removed from it. And it is not opt-out-able, on the
+ * same reasoning that puts a failed collection in `MANDATORY_SLUGS`.
+ *
+ * Never throws: a member must not be blocked from correcting their own number
+ * because an SMS gateway is down.
+ */
+async function warnPreviousNumber(previousPhone: string, userId: string): Promise<void> {
+  try {
+    await smsProvider.send({
+      to: previousPhone,
+      body:
+        'Xkimm Xa Mali Foundation: the mobile number on your account has been changed. ' +
+        'Future alerts will go to the new number. If this was not you, contact the Foundation now.',
+      userSuppliedId: `phone-change-${userId}-${Date.now()}`,
+    })
+  } catch (err) {
+    logger.error('Could not warn the previous number of a phone change', {
+      userId,
+      reason: err instanceof Error ? err.message : String(err),
+    })
+  }
 }
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
@@ -258,7 +315,30 @@ export async function exportMemberData(
 
 // ─── Bank accounts ────────────────────────────────────────────────────────────
 
-export async function listBankAccounts(userId: string) {
+/**
+ * A member's bank accounts, masked.
+ *
+ * Takes a requester like every other query in this file. It used to take a bare
+ * `userId` and check nothing — the only service here without an authorization
+ * parameter, while sitting beside `getMemberProfile`,
+ * `getNotificationPreferences` and the rest, which all call `assertCanAccess`
+ * and all look identical from the outside.
+ *
+ * Every caller today passes the session's own id, so nothing was reachable. The
+ * problem is what it invites: a function that returns somebody's banking detail
+ * and trusts whatever id it is handed is one careless `?userId=` away from an
+ * IDOR, and it is indistinguishable at the call site from the ones that are
+ * safe. The requester is optional so existing self-service callers are
+ * unchanged, and named so a caller passing an id from a request has to say
+ * whose authority it is acting on.
+ */
+export async function listBankAccounts(
+  userId: string,
+  requesterId?: string,
+  requesterRoles: string[] = [],
+) {
+  assertCanAccess(userId, requesterId ?? userId, requesterRoles)
+
   const accounts = await bankAccountRepo.findByUser(userId, [{ isPrimary: 'desc' }, { createdAt: 'asc' }])
 
   return accounts.map((a) => ({
