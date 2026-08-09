@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { CheckCircle2, ExternalLink, MessageCircle, Phone, Bell } from 'lucide-react'
 import { getSession } from '@/lib/session'
+import { clientIpFromHeaders } from '@xxm/utils/client-ip'
 import { env } from '@/lib/env'
 import { Reveal } from '@xxm/ui'
 import { userRepo } from '@/repositories/user.repository'
@@ -10,10 +11,33 @@ import { getNotificationPreferences, updateNotificationPreferences } from '@/ser
 
 export const metadata: Metadata = { title: 'WhatsApp Notifications' }
 
-async function setWhatsAppPreference(enabled: boolean, userId: string) {
+/**
+ * Switch this member's WhatsApp notifications on or off.
+ *
+ * The member is taken from the session, never from an argument. This used to
+ * accept `userId` as a bound parameter and trust it — and a server action is a
+ * public endpoint, reachable by anyone who can craft the request whether or not
+ * the page that renders the form was ever shown to them. `admin-action.ts` says
+ * exactly that at the top of the admin console's gate, which is why every admin
+ * action there establishes its own caller.
+ *
+ * Nothing downstream would have caught it: `updateNotificationPreferences`
+ * takes a bare `userId` and no requester, so a signed-in member could flip
+ * another member's WhatsApp preference by naming their id.
+ *
+ * The IP goes through `clientIpFromHeaders` rather than reading
+ * `x-forwarded-for` directly. That header is attacker-controlled anywhere the
+ * front door does not overwrite it, and this value lands in the audit trail —
+ * so read raw, the caller chose what got recorded about them. The same fix the
+ * admin console needed.
+ */
+async function setWhatsAppPreference(enabled: boolean) {
   'use server'
-  const ip = (await headers()).get('x-forwarded-for')?.split(',')[0]?.trim() ?? undefined
-  await updateNotificationPreferences(userId, { whatsapp: enabled }, ip)
+  const session = await getSession()
+  if (!session?.user?.id) redirect('/login')
+
+  const ip = clientIpFromHeaders(await headers())
+  await updateNotificationPreferences(session.user.id, { whatsapp: enabled }, ip)
   redirect(`/dashboard/whatsapp?updated=1`)
 }
 
@@ -37,8 +61,8 @@ export default async function WhatsAppPage({
   const phone = user?.phone ?? null
   const showBanner = params.updated === '1'
 
-  const enableAction = setWhatsAppPreference.bind(null, true, userId)
-  const disableAction = setWhatsAppPreference.bind(null, false, userId)
+  const enableAction = setWhatsAppPreference.bind(null, true)
+  const disableAction = setWhatsAppPreference.bind(null, false)
 
   return (
     <div className="space-y-6 max-w-lg">
