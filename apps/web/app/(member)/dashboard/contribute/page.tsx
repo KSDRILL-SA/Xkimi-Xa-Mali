@@ -46,6 +46,16 @@ export default function ContributePage() {
   // Cleared on unmount. A member who navigates away inside the redirect window
   // otherwise gets pushed to a page they had already left.
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // One token per payment the member intends, not per request.
+  //
+  // A double tap, a retried request and a browser back-and-resubmit all carry
+  // this same value, so the server collapses them onto the first debit. A
+  // second, deliberate payment happens after a fresh page load and therefore
+  // carries a new one. Regenerated after a submission that reached the gateway,
+  // so an immediate retry of a *refused* payment is treated as a new intent —
+  // which it is: nothing was taken, and they are choosing to try again.
+  const paymentToken = useRef<string>(crypto.randomUUID())
   useEffect(() => () => {
     if (redirectTimer.current) clearTimeout(redirectTimer.current)
   }, [])
@@ -144,7 +154,10 @@ export default function ContributePage() {
    * A declined collection is the other one. See {@link finish}.
    */
   async function pay(data: ManualContributionInput) {
-    const result = await api.post<{ status?: string }>('/api/v1/contributions/pay', data)
+    const result = await api.post<{ status?: string }>('/api/v1/contributions/pay', {
+      ...data,
+      idempotencyKey: paymentToken.current,
+    })
     finish(result?.status)
   }
 
@@ -158,6 +171,8 @@ export default function ContributePage() {
    */
   function finish(status?: string) {
     if (status === 'FAILED') {
+      // Nothing was taken, so a retry is a new intent rather than a repeat.
+      paymentToken.current = crypto.randomUUID()
       setServerError(
         'Your bank refused this payment. Nothing has been taken from your account. ' +
         'Check your available balance and try again, or contact your bank.',
