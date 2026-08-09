@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   findActiveByUser: vi.fn(),
   findByPeriod: vi.fn(),
   txCreate: vi.fn(),
+  findByKey: vi.fn(),
   runTransaction: vi.fn(),
   checkBudget: vi.fn(),
   recalculate: vi.fn(),
@@ -54,7 +55,7 @@ vi.mock('@/repositories/mandate.repository', () => ({
 }))
 vi.mock('@/repositories/budget.repository', () => ({ budgetRepo: { findActiveByType: vi.fn() } }))
 vi.mock('@/repositories/transaction.repository', () => ({
-  transactionRepo: { create: mocks.txCreate, aggregate: vi.fn().mockResolvedValue({ _sum: { amount: 0 } }) },
+  transactionRepo: { create: mocks.txCreate, findByIdempotencyKey: mocks.findByKey, aggregate: vi.fn().mockResolvedValue({ _sum: { amount: 0 } }) },
   SUCCESSFUL_INFLOW: {},
 }))
 vi.mock('@/repositories/contribution.repository', () => ({
@@ -82,6 +83,7 @@ beforeEach(() => {
     id: 'contrib-1', status: 'PENDING', amountDue: 450, amountPaid: 0,
   })
   mocks.checkBudget.mockResolvedValue({ status: 'OK', budget: 1000 })
+  mocks.findByKey.mockResolvedValue(null)
   mocks.runTransaction.mockImplementation(async (fn: (t: unknown) => Promise<unknown>) =>
     fn({ contribution: { update: vi.fn() } }),
   )
@@ -166,5 +168,68 @@ describe('the page can tell the member which of the three happened', () => {
     expect(source).toContain('BudgetGuardModal')
     expect(source).toContain("err.code === 'BUDGET_001'")
     expect(source).toContain('budgetOverrideConfirmed: true')
+  })
+})
+
+describe('the same payment submitted twice', () => {
+  const TOKEN = '11111111-2222-4333-8444-555555555555'
+
+  it('does not debit again when the token has already been used', async () => {
+    // The old key ended in randomUUID(), so it was unique on every request:
+    // the column named idempotencyKey provided no idempotency and its unique
+    // index could never fire. A double tap took the money twice.
+    mocks.findByKey.mockResolvedValue({ id: 'tx-first', status: 'SUCCESS' })
+
+    const result = await submitManualPayment(
+      'user-1', { ...PAYMENT, idempotencyKey: TOKEN }, 'user-1', [],
+    )
+
+    expect(mocks.submitOnceOffDebit).not.toHaveBeenCalled()
+    expect(mocks.txCreate).not.toHaveBeenCalled()
+    expect(result.transaction).toMatchObject({ id: 'tx-first' })
+  })
+
+  it('checks before calling the gateway, not after', async () => {
+    // The old order submitted first and wrote second, so two concurrent
+    // requests produced two debits and only then collided on the unique
+    // column — too late to prevent anything.
+    mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
+
+    await submitManualPayment('user-1', { ...PAYMENT, idempotencyKey: TOKEN }, 'user-1', [])
+
+    expect(mocks.findByKey.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.submitOnceOffDebit.mock.invocationCallOrder[0])
+  })
+
+  it('namespaces the token by member, so one cannot collide with another', async () => {
+    mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
+
+    await submitManualPayment('user-1', { ...PAYMENT, idempotencyKey: TOKEN }, 'user-1', [])
+
+    const key = mocks.findByKey.mock.calls[0][0]
+    expect(key).toContain('user-1')
+    expect(key).toContain(TOKEN)
+  })
+
+  it('lets a second, deliberate payment through on a fresh token', async () => {
+    // A member may legitimately pay twice in one period — a partial now and
+    // the balance later — so the key cannot be derived from the period.
+    mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
+
+    await submitManualPayment('user-1', { ...PAYMENT, idempotencyKey: TOKEN }, 'user-1', [])
+    await submitManualPayment(
+      'user-1', { ...PAYMENT, idempotencyKey: '99999999-2222-4333-8444-555555555555' }, 'user-1', [],
+    )
+
+    expect(mocks.submitOnceOffDebit).toHaveBeenCalledTimes(2)
+    expect(mocks.findByKey.mock.calls[0][0]).not.toBe(mocks.findByKey.mock.calls[1][0])
+  })
+
+  it('still pays, but says so, when a caller sends no token', async () => {
+    mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
+
+    const result = await submitManualPayment('user-1', PAYMENT, 'user-1', [])
+
+    expect(result.status).toBe('SUCCESS')
   })
 })

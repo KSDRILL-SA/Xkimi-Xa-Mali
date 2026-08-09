@@ -132,6 +132,21 @@ export const ManualContributionSchema = z.object({
   periodYear:  z.number().int().min(2024).max(new Date().getFullYear() + 1, 'Cannot pay for periods too far in the future'),
   budgetOverrideConfirmed: z.boolean().optional(),
   budgetOverrideReason:    z.string().max(200, 'Reason cannot exceed 200 characters').optional(),
+  /**
+   * One token per payment the member *intends*, supplied by the client.
+   *
+   * A member may legitimately pay twice in the same period — a partial now and
+   * the balance later — so the server cannot derive this from the period the way
+   * the debit run does. What it can do is refuse to submit the same *intent*
+   * twice: a double tap, a network retry and a browser back-and-resubmit all
+   * carry the token that was generated when the form was opened, while a
+   * genuinely new payment carries a fresh one.
+   *
+   * Optional, because a caller that omits it gets the previous behaviour — a
+   * unique key per request and therefore no protection. That is stated rather
+   * than silently allowed: see `submitManualPayment`.
+   */
+  idempotencyKey: z.string().uuid().optional(),
 })
 
 export const GenerateContributionsSchema = z.object({

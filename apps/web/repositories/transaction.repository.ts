@@ -48,6 +48,17 @@ export const transactionRepo = {
     })
   },
 
+  /**
+   * Find a transaction by its idempotency key.
+   *
+   * `findUnique` rather than `findFirst`: the column carries a unique index, and
+   * asking for it by that index is what makes a duplicate submission collapse
+   * onto the first attempt instead of becoming a second debit.
+   */
+  findByIdempotencyKey(idempotencyKey: string) {
+    return db.transaction.findUnique({ where: { idempotencyKey } })
+  },
+
   /** Find a transaction by ID. */
   findById(id: string, include?: Prisma.TransactionInclude) {
     return db.transaction.findUnique({ where: { id }, include })
