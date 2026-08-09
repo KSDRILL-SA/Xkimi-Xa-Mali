@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { logger } from '@xxm/observability'
 import { paymentGateway } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
-import { recalculateContributionStatus } from '@/services/contribution.service'
+import { recalculateContributionStatus, emitContributionStatusChange } from '@/services/contribution.service'
 import { writeAuditLog } from '@/services/audit.service'
 import { queueNotification } from '@/services/notification.service'
 import { MAX_TRANSACTION_RETRY } from '@xxm/utils'
@@ -75,7 +75,7 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
         // good, with the reason erased alongside it.
         const newStatus = toTransactionStatus(gatewayRes.status)
 
-        await db.$transaction(async (dbTx) => {
+        const statusChange = await db.$transaction(async (dbTx) => {
           await dbTx.transaction.update({
             where: { id: tx.id },
             data: {
@@ -91,9 +91,14 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
           })
 
           if (newStatus === 'SUCCESS') {
-            await recalculateContributionStatus(tx.contributionId, dbTx)
+            return recalculateContributionStatus(tx.contributionId, dbTx)
           }
+          return null
         })
+
+        // After the commit, never inside it: the announcement is an HTTP call
+        // and the transaction's timeout is five seconds.
+        if (statusChange) await emitContributionStatusChange(statusChange)
 
         // Declined is not retried. The submission was made and refused; saying
         // otherwise put a TRANSACTION_RETRIED entry in the audit log for money
