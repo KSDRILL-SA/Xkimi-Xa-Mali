@@ -9,7 +9,7 @@ import {
 } from '@react-pdf/renderer'
 import {
   C, rands, StatusPill, Masthead, PageFooter,
-  IconUser, IconFile, IconBank, IconScale, IconCoins, IconWallet, IconShield,
+  IconUser, IconBank, IconScale, IconCoins, IconWallet, IconShield,
 } from './kit'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ const s = StyleSheet.create({
     fontSize: 9,
     color: C.ink,
     backgroundColor: C.paper,
-    paddingBottom: 64,
+    paddingBottom: 50,
   },
 
   // ── Masthead ──────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ const s = StyleSheet.create({
   accentBarShade: { height: 1.5, backgroundColor: C.greenMid },
 
   // ── Hero ──────────────────────────────────────────────────────────────
-  content: { paddingHorizontal: 40, paddingTop: 22 },
+  content: { paddingHorizontal: 40, paddingTop: 26 },
   hero: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -161,21 +161,15 @@ const s = StyleSheet.create({
   },
   cardHeadText: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.green, textTransform: 'uppercase', letterSpacing: 1.1 },
   cardBody: { paddingHorizontal: 12, paddingVertical: 11 },
-  kv: { flexDirection: 'row', marginBottom: 6, alignItems: 'flex-start' },
+  kv: { flexDirection: 'row', marginBottom: 8, alignItems: 'flex-start' },
   kvLast: { flexDirection: 'row', alignItems: 'flex-start' },
   kvLabel: { fontSize: 7.5, color: C.ink35, width: 78, letterSpacing: 0.2 },
   kvValue: { fontSize: 8.5, color: C.ink70, flex: 1, fontFamily: 'Helvetica-Bold' },
 
-  // ── Banking band ──────────────────────────────────────────────────────
-  band: { borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden', marginBottom: 18 },
-  bandBody: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 11, gap: 12 },
-  bandCol: { flex: 1 },
-  bandLabel: { fontSize: 6.5, color: C.ink35, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 3 },
-  bandValue: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.green },
 
   // ── Summary cards ─────────────────────────────────────────────────────
-  summaryRow: { flexDirection: 'row', gap: 11, marginBottom: 22 },
-  sumCard: { flex: 1, borderWidth: 1, borderColor: C.line, borderRadius: 6, padding: 11, backgroundColor: C.paper },
+  summaryRow: { flexDirection: 'row', gap: 11, marginBottom: 18 },
+  sumCard: { flex: 1, borderWidth: 1, borderColor: C.line, borderRadius: 6, padding: 14, backgroundColor: C.paper },
   sumCardAccent: { backgroundColor: C.mist, borderColor: C.mistLine },
   sumTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   sumLabel: { fontSize: 6.5, color: C.ink50, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.7 },
@@ -189,10 +183,10 @@ const s = StyleSheet.create({
   sectionCount: { fontSize: 7, color: C.ink35, marginLeft: 'auto', letterSpacing: 0.3 },
 
   // ── Table ─────────────────────────────────────────────────────────────
-  table: { marginBottom: 20, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
-  tHead: { flexDirection: 'row', backgroundColor: C.green, paddingHorizontal: 11, paddingVertical: 7 },
+  table: { marginBottom: 16, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
+  tHead: { flexDirection: 'row', backgroundColor: C.green, paddingHorizontal: 13, paddingVertical: 9 },
   tHeadCell: { fontSize: 6.8, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 0.6, textTransform: 'uppercase' },
-  tRow: { flexDirection: 'row', paddingHorizontal: 11, paddingVertical: 8, alignItems: 'center' },
+  tRow: { flexDirection: 'row', paddingHorizontal: 13, paddingVertical: 11, alignItems: 'center' },
   tRowAlt: { backgroundColor: C.mist },
   tCell: { fontSize: 8.5, color: C.ink70 },
   tCellStrong: { fontSize: 8.5, color: C.green, fontFamily: 'Helvetica-Bold' },
@@ -222,18 +216,24 @@ const s = StyleSheet.create({
   numNeg: { color: C.red, fontFamily: 'Helvetica-Bold' },
 
   // ── Notes + signature ─────────────────────────────────────────────────
-  closeRow: { flexDirection: 'row', gap: 16, marginTop: 2 },
+  closeRow: { flexDirection: 'row', gap: 16, marginTop: 4 },
   notes: {
     flex: 1.5,
     backgroundColor: C.mist,
     borderRadius: 6,
     borderLeftWidth: 2.5,
     borderLeftColor: C.gold,
-    padding: 11,
+    padding: 10,
   },
   notesTitle: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.green, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
-  notesText: { fontSize: 6.8, color: C.ink50, lineHeight: 1.55 },
-  sign: { flex: 1, alignItems: 'flex-end', justifyContent: 'flex-end' },
+  notesText: { fontSize: 6.8, color: C.ink50, lineHeight: 1.45 },
+  // Fixed width and no cross-axis stretch. With `flex: 1` and
+  // `justifyContent: 'flex-end'` this view stretched to the height available
+  // rather than to its content, so the block it sits in *measured* far taller
+  // than it drew — and `wrap={false}` then decided it could not fit and pushed
+  // the whole notice and authorisation onto a page of its own, which is why
+  // every statement ran to two pages with the second one almost empty.
+  sign: { width: 200, alignItems: 'flex-end' },
   signLabel: { fontSize: 6.5, color: C.ink35, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 },
   signImage: { width: 116, height: 42, objectFit: 'contain' },
   signRule: { width: 130, borderBottomWidth: 0.75, borderBottomColor: C.ink35, marginTop: 2, marginBottom: 4 },
@@ -293,7 +293,7 @@ function StatementDocument({ data }: { data: StatementData }) {
                   <Text style={s.founderPillText}>FOUNDER</Text>
                 </View>
               ) : null}
-              <Text style={s.heroMeta}>{member.memberId}  ·  Member since {member.memberSince}</Text>
+              <Text style={s.heroMeta}>{member.memberId}  ·  Issued {generatedAt}</Text>
               <View style={{ marginTop: 8 }}>
                 <View style={[s.pill, { backgroundColor: fullyPaid ? C.okSoft : C.amberSoft }]}>
                   <View style={[s.pillDot, { backgroundColor: fullyPaid ? C.ok : C.amber }]} />
@@ -313,43 +313,43 @@ function StatementDocument({ data }: { data: StatementData }) {
           </View>
 
           {/* ── Info grid ────────────────────────────── */}
+          {/* Two panels, not three.
+              This was Member Details and Statement Details side by side, then
+              a full-width banking band beneath — three bordered boxes of
+              key-values stacked before any of the actual content, which is
+              what made the page feel packed.
+
+              Statement Details is gone: the document reference is already in
+              the masthead, the period is in the masthead and again beneath the
+              headline amount, and "Group Savings — Monthly" is the same
+              sentence on every statement ever issued. Only the issue date
+              carried information, and it now sits with the account holder. */}
           <View style={s.grid}>
             <View style={s.card}>
               <View style={s.cardHead}><IconUser size={9} /><Text style={s.cardHeadText}>Member Details</Text></View>
               <View style={s.cardBody}>
-                <View style={s.kv}><Text style={s.kvLabel}>Member ID</Text><Text style={s.kvValue}>{member.memberId}</Text></View>
                 <View style={s.kv}><Text style={s.kvLabel}>Email</Text><Text style={s.kvValue}>{member.email}</Text></View>
                 <View style={s.kv}><Text style={s.kvLabel}>Mobile</Text><Text style={s.kvValue}>{member.phone}</Text></View>
                 <View style={s.kvLast}><Text style={s.kvLabel}>Member Since</Text><Text style={s.kvValue}>{member.memberSince}</Text></View>
               </View>
             </View>
-            <View style={s.card}>
-              <View style={s.cardHead}><IconFile size={9} /><Text style={s.cardHeadText}>Statement Details</Text></View>
-              <View style={s.cardBody}>
-                <View style={s.kv}><Text style={s.kvLabel}>Period</Text><Text style={s.kvValue}>{period.label}</Text></View>
-                <View style={s.kv}><Text style={s.kvLabel}>Issued On</Text><Text style={s.kvValue}>{generatedAt}</Text></View>
-                <View style={s.kv}><Text style={s.kvLabel}>Document Ref</Text><Text style={s.kvValue}>{docRef}</Text></View>
-                <View style={s.kvLast}><Text style={s.kvLabel}>Product</Text><Text style={s.kvValue}>Group Savings — Monthly</Text></View>
-              </View>
-            </View>
-          </View>
-
-          {/* ── Banking band ─────────────────────────── */}
-          {banking && (
-            <View style={s.band}>
-              <View style={s.cardHead}><IconBank size={9} /><Text style={s.cardHeadText}>Banking Details — Contribution Debit Account</Text></View>
-              <View style={s.bandBody}>
-                <View style={s.bandCol}><Text style={s.bandLabel}>Bank</Text><Text style={s.bandValue}>{banking.bankName}</Text></View>
-                <View style={s.bandCol}><Text style={s.bandLabel}>Account Number</Text><Text style={s.bandValue}>{banking.accountNumberMasked}</Text></View>
-                <View style={s.bandCol}><Text style={s.bandLabel}>Account Type</Text><Text style={s.bandValue}>{banking.accountType}</Text></View>
-                <View style={s.bandCol}><Text style={s.bandLabel}>Branch Code</Text><Text style={s.bandValue}>{banking.branchCode}</Text></View>
-                <View style={s.bandCol}>
-                  <Text style={s.bandLabel}>Status</Text>
-                  <Text style={[s.bandValue, { color: banking.verified ? C.ok : C.red }]}>{banking.verified ? 'Verified' : 'Unverified'}</Text>
+            {banking ? (
+              <View style={s.card}>
+                <View style={s.cardHead}><IconBank size={9} /><Text style={s.cardHeadText}>Debit Account</Text></View>
+                <View style={s.cardBody}>
+                  <View style={s.kv}><Text style={s.kvLabel}>Bank</Text><Text style={s.kvValue}>{banking.bankName}</Text></View>
+                  <View style={s.kv}><Text style={s.kvLabel}>Account</Text><Text style={s.kvValue}>{banking.accountNumberMasked}</Text></View>
+                  <View style={s.kv}><Text style={s.kvLabel}>Branch Code</Text><Text style={s.kvValue}>{banking.branchCode}</Text></View>
+                  <View style={s.kvLast}>
+                    <Text style={s.kvLabel}>Status</Text>
+                    <Text style={[s.kvValue, { color: banking.verified ? C.ok : C.red }]}>
+                      {banking.accountType} · {banking.verified ? 'Verified' : 'Unverified'}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
+            ) : null}
+          </View>
 
           {/* ── Summary cards ────────────────────────── */}
           <View style={s.summaryRow}>
@@ -444,10 +444,9 @@ function StatementDocument({ data }: { data: StatementData }) {
             <View style={s.notes}>
               <Text style={s.notesTitle}>Important Notice</Text>
               <Text style={s.notesText}>
-                This statement reflects your contributions and transactions for the stated period on the Xkimm Xa Mali Foundation
-                private group-savings platform, and is intended solely for the named account holder. All amounts are in
-                South African Rand (ZAR). If any detail appears incorrect, contact your group administrator immediately.
-                Generated electronically and authorised below.
+                This statement covers the period shown and is intended solely for the named account holder.
+                All amounts are in South African Rand (ZAR). If any detail appears incorrect, contact your
+                group administrator immediately.
               </Text>
             </View>
             <View style={s.sign}>
