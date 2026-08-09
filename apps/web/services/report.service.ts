@@ -49,6 +49,37 @@ type TxRow = {
   }
 }
 
+/** The only statuses and types a filter may name. Anything else is dropped. */
+const TRANSACTION_STATUSES = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED'] as const
+const TRANSACTION_TYPES = ['DEBIT_ORDER', 'MANUAL', 'REVERSAL', 'SCHEDULED'] as const
+type TxStatusName = (typeof TRANSACTION_STATUSES)[number]
+type TxTypeName = (typeof TRANSACTION_TYPES)[number]
+
+/**
+ * The largest page anybody may ask for.
+ *
+ * A hundred is well past what any screen shows and far short of what makes the
+ * join expensive. The route defaulted to twenty and accepted anything.
+ */
+const MAX_PAGE_SIZE = 100
+
+function clampPage(value: number | undefined): number {
+  if (!Number.isFinite(value)) return 1
+  return Math.max(1, Math.floor(value as number))
+}
+
+function clampLimit(value: number | undefined): number {
+  if (!Number.isFinite(value)) return 20
+  return Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(value as number)))
+}
+
+/** A date Prisma can use, or nothing. Never an Invalid Date. */
+function usableDate(value: string | undefined): Date | undefined {
+  if (!value) return undefined
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+}
+
 export async function getTransactionHistory(
   userId: string,
   requesterId: string,
@@ -57,19 +88,35 @@ export async function getTransactionHistory(
 ) {
   assertCanAccess(userId, requesterId, roles)
 
-  const { status, type, from, to, page, limit } = filter
+  // Every one of these arrived on trust.
+  //
+  // The transactions *page* allow-lists its status and type filters and the API
+  // route serving the same data does not — so `?limit=1000000` was a million
+  // rows with a join, `?page=abc` reached Prisma as `skip: NaN`, `?page=-5` as a
+  // negative skip, and `?status=nonsense` as an invalid enum. None of them is an
+  // injection; all of them are a 500 or a very expensive query, available to any
+  // signed-in member and, via `?userId=`, to an admin against anybody.
+  //
+  // Clamped here rather than in the route, because the page and the route are
+  // two callers of one function and a rule applied to one of them is the shape
+  // of defect this repository keeps producing.
+  const { from, to } = filter
+  const status = TRANSACTION_STATUSES.includes(filter.status as TxStatusName) ? filter.status : undefined
+  const type = TRANSACTION_TYPES.includes(filter.type as TxTypeName) ? filter.type : undefined
+  const page = clampPage(filter.page)
+  const limit = clampLimit(filter.limit)
+
+  // `new Date('garbage')` is an Invalid Date, which Prisma rejects at the
+  // driver. A filter nobody can parse is no filter, not an error.
+  const gte = usableDate(from)
+  const lte = usableDate(to ? `${to}T23:59:59.999Z` : undefined)
 
   const where = {
     contribution: { userId },
     ...(status && { status }),
     ...(type && { type }),
-    ...(from || to
-      ? {
-          createdAt: {
-            ...(from && { gte: new Date(from) }),
-            ...(to && { lte: new Date(`${to}T23:59:59.999Z`) }),
-          },
-        }
+    ...(gte || lte
+      ? { createdAt: { ...(gte && { gte }), ...(lte && { lte }) } }
       : {}),
   }
 

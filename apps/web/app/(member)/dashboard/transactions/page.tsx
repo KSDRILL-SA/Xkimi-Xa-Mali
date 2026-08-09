@@ -42,7 +42,10 @@ export default async function TransactionsPage({
   const roles   = (session.user.roles as string[] | undefined) ?? []
   const params  = await searchParams
 
-  const page = Math.max(1, Number(params.page ?? '1'))
+  // Clamped by getTransactionHistory as well; done here too so the pagination
+  // links and the "page N of M" text agree with the rows actually shown.
+  const requestedPage = Number(params.page ?? '1')
+  const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1
   const skip = (page - 1) * PAGE_SIZE
 
   const validStatuses: TxStatus[] = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED']
