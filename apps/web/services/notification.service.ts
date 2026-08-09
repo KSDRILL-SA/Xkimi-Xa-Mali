@@ -75,7 +75,14 @@ function interpolate(template: string, payload: Record<string, unknown>): string
 // These are financial events that members must always receive.
 // ---------------------------------------------------------------------------
 
-const MANDATORY_SLUGS = new Set([
+/**
+ * Exported so a test can hold the membership of this set rather than infer it.
+ *
+ * Which messages a member may switch off is a decision about whether they can
+ * end up not knowing their money stopped moving. It is worth stating in one
+ * place and asserting, not discovering by reading two call sites.
+ */
+export const MANDATORY_SLUGS = new Set([
   'debit-success',
   'debit-pending',
   'payment-failed-sms',
@@ -93,6 +100,26 @@ const MANDATORY_SLUGS = new Set([
   // nothing. See `services/alert.service.ts`.
   'admin-alert-sms',
   'admin-alert-email',
+  // The two messages that say money will stop moving and nothing else will.
+  //
+  // `mandate-cancelled` is sent by `mandate-status-sync` when a member's
+  // DebiCheck authorisation is cancelled at their bank, out of band. Its own
+  // comment there states why it exists: "without this the member's
+  // contributions simply stop and the first they hear of it is a gap in their
+  // statement". A preference toggle silently dropped it, which defeated the
+  // entire purpose of sending it — the member kept believing they were
+  // contributing while nothing was being collected.
+  //
+  // `mandate-rejected` is the same failure at the other end: the mandate was
+  // never authorised, so they will never be debited at all, and unheard it
+  // reads to them as a successful application.
+  //
+  // The line this list draws is money that did not move, or is about to stop
+  // moving, as against news about it. A statement being ready is news
+  // (`monthly-statement-notice` says so explicitly and is deliberately absent).
+  // A debit order that no longer exists is not.
+  'mandate-cancelled',
+  'mandate-rejected',
 ])
 
 // ---------------------------------------------------------------------------
