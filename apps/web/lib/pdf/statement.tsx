@@ -79,15 +79,15 @@ const s = StyleSheet.create({
     fontSize: 9,
     color: C.ink,
     backgroundColor: C.paper,
-    paddingBottom: 50,
+    paddingBottom: 46,
   },
 
   // ── Masthead ──────────────────────────────────────────────────────────
   masthead: {
     backgroundColor: C.headerBg,
     paddingHorizontal: 40,
-    paddingTop: 26,
-    paddingBottom: 24,
+    paddingTop: 21,
+    paddingBottom: 19,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -109,13 +109,13 @@ const s = StyleSheet.create({
   accentBarShade: { height: 1.5, backgroundColor: C.greenMid },
 
   // ── Hero ──────────────────────────────────────────────────────────────
-  content: { paddingHorizontal: 40, paddingTop: 26 },
+  content: { paddingHorizontal: 40, paddingTop: 22 },
   hero: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingBottom: 18,
-    marginBottom: 20,
+    paddingBottom: 15,
+    marginBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: C.line,
   },
@@ -152,7 +152,7 @@ const s = StyleSheet.create({
   pillText: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', letterSpacing: 0.4 },
 
   // ── Info grid ─────────────────────────────────────────────────────────
-  grid: { flexDirection: 'row', gap: 14, marginBottom: 16 },
+  grid: { flexDirection: 'row', gap: 14, marginBottom: 14 },
   card: { flex: 1, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
   cardHead: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
@@ -168,7 +168,7 @@ const s = StyleSheet.create({
 
 
   // ── Summary cards ─────────────────────────────────────────────────────
-  summaryRow: { flexDirection: 'row', gap: 11, marginBottom: 18 },
+  summaryRow: { flexDirection: 'row', gap: 11, marginBottom: 14 },
   sumCard: { flex: 1, borderWidth: 1, borderColor: C.line, borderRadius: 6, padding: 14, backgroundColor: C.paper },
   sumCardAccent: { backgroundColor: C.mist, borderColor: C.mistLine },
   sumTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
@@ -183,10 +183,10 @@ const s = StyleSheet.create({
   sectionCount: { fontSize: 7, color: C.ink35, marginLeft: 'auto', letterSpacing: 0.3 },
 
   // ── Table ─────────────────────────────────────────────────────────────
-  table: { marginBottom: 16, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
+  table: { marginBottom: 13, borderWidth: 1, borderColor: C.line, borderRadius: 6, overflow: 'hidden' },
   tHead: { flexDirection: 'row', backgroundColor: C.green, paddingHorizontal: 13, paddingVertical: 9 },
   tHeadCell: { fontSize: 6.8, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 0.6, textTransform: 'uppercase' },
-  tRow: { flexDirection: 'row', paddingHorizontal: 13, paddingVertical: 11, alignItems: 'center' },
+  tRow: { flexDirection: 'row', paddingHorizontal: 13, paddingVertical: 10, alignItems: 'center' },
   tRowAlt: { backgroundColor: C.mist },
   tCell: { fontSize: 8.5, color: C.ink70 },
   tCellStrong: { fontSize: 8.5, color: C.green, fontFamily: 'Helvetica-Bold' },
@@ -216,14 +216,14 @@ const s = StyleSheet.create({
   numNeg: { color: C.red, fontFamily: 'Helvetica-Bold' },
 
   // ── Notes + signature ─────────────────────────────────────────────────
-  closeRow: { flexDirection: 'row', gap: 16, marginTop: 4 },
+  closeRow: { flexDirection: 'row', gap: 16, marginTop: 2 },
   notes: {
     flex: 1.5,
     backgroundColor: C.mist,
     borderRadius: 6,
     borderLeftWidth: 2.5,
     borderLeftColor: C.gold,
-    padding: 10,
+    padding: 9,
   },
   notesTitle: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.green, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
   notesText: { fontSize: 6.8, color: C.ink50, lineHeight: 1.45 },
@@ -444,9 +444,8 @@ function StatementDocument({ data }: { data: StatementData }) {
             <View style={s.notes}>
               <Text style={s.notesTitle}>Important Notice</Text>
               <Text style={s.notesText}>
-                This statement covers the period shown and is intended solely for the named account holder.
-                All amounts are in South African Rand (ZAR). If any detail appears incorrect, contact your
-                group administrator immediately.
+                Issued for the named account holder. All amounts are in South African Rand (ZAR).
+                If any detail appears incorrect, contact your group administrator immediately.
               </Text>
             </View>
             <View style={s.sign}>
@@ -460,7 +459,10 @@ function StatementDocument({ data }: { data: StatementData }) {
                 </>
               ) : (
                 <>
-                  <View style={{ height: 30 }} />
+                  {/* Standing room for a signature. Enough to read as a signing
+                      line, small enough that the closing block clears the page
+                      break — see the note on `sign` above. */}
+                  <View style={{ height: 14 }} />
                   <View style={s.signRule} />
                   <Text style={s.signName}>Xkimm Xa Mali Foundation Administration</Text>
                 </>
