@@ -1,8 +1,10 @@
 import { Suspense } from 'react'
 import type { Metadata, Route } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { SkeletonCard, SkeletonRow } from '@/components/ui/Skeleton'
+import { SectionBoundary } from '@/components/ui/SectionBoundary'
 import { Reveal } from '@xxm/ui'
 import { DashboardStats } from './_sections/DashboardStats'
 import { DashboardBadge } from './_sections/DashboardBadge'
@@ -77,8 +79,14 @@ function SectionHeading({
 }
 
 export default async function DashboardPage() {
+  // Guarded rather than asserted. Every other member page redirects on a
+  // missing session; this one used `session!`, so if the middleware matcher
+  // ever stopped covering `/dashboard` the result was a TypeError and a 500
+  // instead of a trip to the login page. The middleware does cover it — this is
+  // the second lock, not the first.
   const session = await getSession()
-  const firstName = session!.user.name?.split(' ')[0] ?? 'Member'
+  if (!session?.user?.id) redirect('/login')
+  const firstName = session.user.name?.split(' ')[0] ?? 'Member'
 
   return (
     <div className="space-y-8">
@@ -157,24 +165,30 @@ export default async function DashboardPage() {
       <Reveal variant="up" delay={100}>
         <section>
           <SectionHeading icon={Sparkles} title="Your snapshot" subtitle="Contributions at a glance" />
-          <Suspense fallback={<StatsSkeleton />}>
-            <DashboardStats />
-          </Suspense>
+          <SectionBoundary label="stats">
+            <Suspense fallback={<StatsSkeleton />}>
+              <DashboardStats />
+            </Suspense>
+          </SectionBoundary>
         </section>
       </Reveal>
 
       {/* ── Reputation badge — clickable into the badge section ── */}
       <Reveal variant="up" delay={120}>
-        <Suspense fallback={<SkeletonCard />}>
-          <DashboardBadge />
-        </Suspense>
+        <SectionBoundary label="badge">
+          <Suspense fallback={<SkeletonCard />}>
+            <DashboardBadge />
+          </Suspense>
+        </SectionBoundary>
       </Reveal>
 
       {/* ── Smart insights — financial-health intelligence ── */}
       <Reveal variant="up" delay={140}>
-        <Suspense fallback={<SkeletonCard />}>
-          <DashboardInsights />
-        </Suspense>
+        <SectionBoundary label="insights">
+          <Suspense fallback={<SkeletonCard />}>
+            <DashboardInsights />
+          </Suspense>
+        </SectionBoundary>
       </Reveal>
 
       {/* ── Recent contributions ── */}
@@ -186,9 +200,11 @@ export default async function DashboardPage() {
             subtitle="Your latest payments"
             href="/dashboard/contributions"
           />
-          <Suspense fallback={<SkeletonRow cols={5} />}>
-            <DashboardRecentContributions />
-          </Suspense>
+          <SectionBoundary label="recent-contributions">
+            <Suspense fallback={<SkeletonRow cols={5} />}>
+              <DashboardRecentContributions />
+            </Suspense>
+          </SectionBoundary>
         </section>
       </Reveal>
 
@@ -201,9 +217,11 @@ export default async function DashboardPage() {
             subtitle="What the brotherhood is building"
             href="/dashboard/goals"
           />
-          <Suspense fallback={<GoalsSkeleton />}>
-            <DashboardActiveGoals />
-          </Suspense>
+          <SectionBoundary label="active-goals">
+            <Suspense fallback={<GoalsSkeleton />}>
+              <DashboardActiveGoals />
+            </Suspense>
+          </SectionBoundary>
         </section>
       </Reveal>
 
