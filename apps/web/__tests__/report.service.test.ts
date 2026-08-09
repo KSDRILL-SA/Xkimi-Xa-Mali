@@ -66,7 +66,7 @@ import { verifySignatureExists, embedSignatureInPdf } from '@/services/signature
 import { ForbiddenError, ReportNotFoundError } from '@/lib/errors'
 import {
   getTransactionHistory,
-  generateMemberStatement,
+  generateMemberStatementPdf,
   getAdminReport,
   exportAdminReportCSV,
 } from '@/services/report.service'
@@ -182,10 +182,10 @@ describe('getTransactionHistory', () => {
 })
 
 // ---------------------------------------------------------------------------
-// generateMemberStatement
+// generateMemberStatementPdf
 // ---------------------------------------------------------------------------
 
-describe('generateMemberStatement', () => {
+describe('generateMemberStatementPdf', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Reset implementations so a queued mockResolvedValueOnce can't leak between
@@ -201,7 +201,7 @@ describe('generateMemberStatement', () => {
 
   it('throws ReportForbiddenError for cross-user access by member', async () => {
     await expect(
-      generateMemberStatement('user-2', 'user-1', MEMBER_ROLES, 5, 2025),
+      generateMemberStatementPdf('user-2', 'user-1', MEMBER_ROLES, 5, 2025),
     ).rejects.toBeInstanceOf(ReportForbiddenError)
   })
 
@@ -209,7 +209,7 @@ describe('generateMemberStatement', () => {
     mockUserFindMany.mockResolvedValueOnce([])
 
     await expect(
-      generateMemberStatement('user-1', 'user-1', MEMBER_ROLES, 5, 2025),
+      generateMemberStatementPdf('user-1', 'user-1', MEMBER_ROLES, 5, 2025),
     ).rejects.toBeInstanceOf(ReportNotFoundError)
   })
 
@@ -240,20 +240,18 @@ describe('generateMemberStatement', () => {
 
     const fakeBuffer = Buffer.from('PDF_CONTENT')
     mockRenderPDF.mockResolvedValueOnce(fakeBuffer)
-    mockUpload.mockResolvedValueOnce({
-      url: 'https://blob.vercel.com/statements/user-1/2025-05.pdf',
-      signedUrl: 'https://blob.vercel.com/signed-url',
-    })
 
-    const result = await generateMemberStatement('user-1', 'user-1', MEMBER_ROLES, 5, 2025)
+    const result = await generateMemberStatementPdf('user-1', 'user-1', MEMBER_ROLES, 5, 2025)
 
-    expect(mockUpload).toHaveBeenCalledWith(
-      'statements/user-1/2025-05.pdf',
-      fakeBuffer,
-      expect.objectContaining({ access: 'public', contentType: 'application/pdf', addRandomSuffix: false }),
-    )
-    expect(result.url).toBe('https://blob.vercel.com/statements/user-1/2025-05.pdf')
-    expect(result.signedUrl).toBe('https://blob.vercel.com/signed-url')
+    // The PDF is returned to the caller, which streams it through the
+    // authenticated route. It is no longer uploaded anywhere.
+    //
+    // This test used to assert `access: 'public'` and the path
+    // `statements/user-1/2025-05.pdf` as the expected behaviour — it encoded
+    // the exposure rather than catching it. Nothing is uploaded now, and
+    // statement-access.test.ts holds that.
+    expect(result).toBe(fakeBuffer)
+    expect(mockUpload).not.toHaveBeenCalled()
 
     // An ordinary member's statement carries no Founder mark.
     expect(mockRenderPDF.mock.calls[0][0].member.isFounder).toBe(false)
@@ -277,7 +275,7 @@ describe('generateMemberStatement', () => {
     mockRenderPDF.mockResolvedValueOnce(Buffer.from('PDF_CONTENT'))
     mockUpload.mockResolvedValueOnce({ url: 'https://blob/u.pdf', signedUrl: 'https://blob/s' })
 
-    await generateMemberStatement('user-1', 'user-1', MEMBER_ROLES, 5, 2025)
+    await generateMemberStatementPdf('user-1', 'user-1', MEMBER_ROLES, 5, 2025)
 
     expect(mockRenderPDF.mock.calls[0][0].member.isFounder).toBe(true)
   })
