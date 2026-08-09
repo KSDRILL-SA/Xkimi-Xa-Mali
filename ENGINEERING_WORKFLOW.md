@@ -634,6 +634,47 @@ scoped to the file that made them, so `health.route.test.ts` left `@/lib/db` and
 `vi.doUnmock` plus `vi.resetModules`. The `no-restricted-syntax` rule added for
 `process.env` does not catch this, and nothing yet does.
 
+#### Still not solved — what has been eliminated (2026-08-09)
+
+**It recurred again after that fix, as a different pair:** `env-netcash` with
+`whatsapp.preferences`. So the `doUnmock` fix above closed one instance and not
+the cause. An hour of investigation ruled the following **out**, and this list
+exists so nobody spends that hour again:
+
+| Ruled out | Evidence |
+|---|---|
+| `vi.doMock` left registered | Only `health.route.test.ts` ever used it; it now unmocks |
+| `vi.stubEnv` without cleanup | All three stubbing files have `afterEach(() => vi.unstubAllEnvs())` |
+| `process.env` assignment | Enforced by `no-restricted-syntax` over `apps/web/__tests__/**` |
+| Fake timers / `setSystemTime` | Not used anywhere in the suite |
+| `globalThis` / `global.fetch` mutation | Not used anywhere in the suite |
+| `isolate: false` | Not set. The module registry **is** reset per file |
+
+**The common factor across all four victims** — `env-netcash`,
+`gateway-selection`, `health.route`, `whatsapp.preferences` — is that each one
+`await import()`s a Next route handler **inside the test body**. `vitest.config.ts`
+already notes that this cold load pulls in the Prisma client and the whole
+handler chain, and is charged to whichever test imports first.
+
+**It only reproduces under full-monorepo contention.** Nine consecutive clean
+runs of `apps/web` alone, and four clean full runs, failed to reproduce it after
+the last occurrence. Both occurrences were during `npm run test` with all eight
+packages running concurrently.
+
+**The gap in the evidence, stated plainly:** on both occurrences the output was
+filtered to `FAIL`/`Tests` lines, so **the actual assertion text was never
+captured**. It is not known whether those runs failed on an assertion or on a
+timeout, and that single fact would probably decide it — a timeout points at the
+cold import under CPU contention, an assertion points at shared state after all.
+
+**When it next fails, capture the whole output before anything else:**
+
+```bash
+npm run test -- --force > /tmp/vitest-full.log 2>&1
+```
+
+Do not grep it down first. Read the failure.
+
 ---
 
 ## 5. Engineering Workflow
