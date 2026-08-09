@@ -265,7 +265,11 @@ function ReportDocument({ data }: { data: ContributionReportData }) {
                 </>
               )}
               <Text style={s.signMeta}>Generated {generatedAt}</Text>
-              <Text style={s.signSeal}>✦ Official Document</Text>
+              {/* No decorative glyph. U+2726 is outside WinAnsi, which is all the
+                  standard PDF fonts carry, so react-pdf rendered it as a
+                  fallback box — a broken character sitting beside the words
+                  "Official Document" on an authorisation block. */}
+              <Text style={s.signSeal}>Official Document</Text>
             </View>
           </View>
 

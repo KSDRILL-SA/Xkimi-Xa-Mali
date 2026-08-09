@@ -201,19 +201,22 @@ const s = StyleSheet.create({
   tEmptyText: { fontSize: 8, color: C.ink35 },
 
   // Contributions columns
-  cPeriod:  { width: '23%' },
-  cDue:     { width: '17%', textAlign: 'right' },
-  cPaid:    { width: '17%', textAlign: 'right' },
-  cBalance: { width: '18%', textAlign: 'right' },
-  cStatus:  { width: '15%' },
-  cDate:    { width: '10%', textAlign: 'right' },
+  // Every column carries horizontal padding. The widths summed to exactly
+  // 100% with none, so a right-aligned value ended flush against the next
+  // column's left edge and the headers rendered as "OUTSTANDINGSTATUS".
+  cPeriod:  { width: '20%', paddingRight: 6 },
+  cDue:     { width: '15%', textAlign: 'right', paddingRight: 8 },
+  cPaid:    { width: '15%', textAlign: 'right', paddingRight: 8 },
+  cBalance: { width: '17%', textAlign: 'right', paddingRight: 10 },
+  cStatus:  { width: '16%', paddingRight: 6 },
+  cDate:    { width: '17%', textAlign: 'right' },
   // Transactions columns
-  tDate:    { width: '13%' },
-  tDesc:    { width: '27%' },
-  tRef:     { width: '25%' },
-  tAmount:  { width: '13%', textAlign: 'right' },
-  tStatus:  { width: '13%' },
-  tProc:    { width: '9%', textAlign: 'right' },
+  tDate:    { width: '14%', paddingRight: 6 },
+  tDesc:    { width: '22%', paddingRight: 6 },
+  tRef:     { width: '22%', paddingRight: 6 },
+  tAmount:  { width: '14%', textAlign: 'right', paddingRight: 10 },
+  tStatus:  { width: '14%', paddingRight: 6 },
+  tProc:    { width: '14%', textAlign: 'right' },
 
   numPos: { color: C.ok, fontFamily: 'Helvetica-Bold' },
   numNeg: { color: C.red, fontFamily: 'Helvetica-Bold' },
@@ -385,7 +388,7 @@ function StatementDocument({ data }: { data: StatementData }) {
               <Text style={[s.tHeadCell, s.cPaid]}>Paid</Text>
               <Text style={[s.tHeadCell, s.cBalance]}>Outstanding</Text>
               <Text style={[s.tHeadCell, s.cStatus]}>Status</Text>
-              <Text style={[s.tHeadCell, s.cDate]}>Due</Text>
+              <Text style={[s.tHeadCell, s.cDate]}>Due Date</Text>
             </View>
             {contributions.length === 0 ? (
               <View style={s.tEmpty}><Text style={s.tEmptyText}>No contributions recorded for this period.</Text></View>
@@ -417,7 +420,7 @@ function StatementDocument({ data }: { data: StatementData }) {
               <Text style={[s.tHeadCell, s.tRef]}>Reference</Text>
               <Text style={[s.tHeadCell, s.tAmount]}>Amount</Text>
               <Text style={[s.tHeadCell, s.tStatus]}>Status</Text>
-              <Text style={[s.tHeadCell, s.tProc]}>Done</Text>
+              <Text style={[s.tHeadCell, s.tProc]}>Processed</Text>
             </View>
             {transactions.length === 0 ? (
               <View style={s.tEmpty}><Text style={s.tEmptyText}>No transactions recorded for this period.</Text></View>
@@ -434,7 +437,10 @@ function StatementDocument({ data }: { data: StatementData }) {
           </View>
 
           {/* ── Notes + signature ────────────────────── */}
-          <View style={s.closeRow}>
+          {/* Kept whole. Without this the notice and the authorisation split
+              across the page break, so the text ran off the bottom of page one
+              and the signature landed alone on page two. */}
+          <View style={s.closeRow} wrap={false}>
             <View style={s.notes}>
               <Text style={s.notesTitle}>Important Notice</Text>
               <Text style={s.notesText}>
@@ -461,7 +467,11 @@ function StatementDocument({ data }: { data: StatementData }) {
                 </>
               )}
               <Text style={s.signMeta}>Generated {generatedAt}</Text>
-              <Text style={s.signSeal}>✦ Official Document</Text>
+              {/* No decorative glyph. U+2726 is outside WinAnsi, which is all the
+                  standard PDF fonts carry, so react-pdf rendered it as a
+                  fallback box — a broken character sitting beside the words
+                  "Official Document" on an authorisation block. */}
+              <Text style={s.signSeal}>Official Document</Text>
             </View>
           </View>
 
