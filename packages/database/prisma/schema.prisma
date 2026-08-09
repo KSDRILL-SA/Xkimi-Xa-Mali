@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // The app runs through Neon's pooled endpoint. Migrations cannot: a connection
   // pooler multiplexes statements across backends, so the advisory lock and
   // session state `prisma migrate` relies on do not survive. DIRECT_DATABASE_URL
@@ -70,6 +70,18 @@ enum GoalType {
   CUSTOM
 }
 
+/// What a member's standing commitment to a goal is currently doing.
+enum GoalPlanStatus {
+  ACTIVE
+  /// Collections stopped but the plan is kept, so the member can resume it.
+  /// Set when there is no usable mandate to charge, or after repeated failures.
+  PAUSED
+  /// The goal was met or its deadline passed. Terminal.
+  COMPLETED
+  /// The member stopped it themselves. Terminal.
+  CANCELLED
+}
+
 enum GoalStatus {
   DRAFT
   ACTIVE
@@ -132,21 +144,21 @@ enum BudgetType {
 // ─── Identity ─────────────────────────────────────────────────────────────────
 
 model User {
-  id              String     @id @default(cuid())
-  email           String     @unique
-  phone           String     @unique
-  firstName       String
-  lastName        String
-  idNumber        String?
-  address         Json?
-  password        String?
-  emailVerified   DateTime?
-  image           String?
-  status          UserStatus @default(PENDING)
-  popiaConsentAt  DateTime?
-  loginAttempts   Int        @default(0)
-  lockedUntil     DateTime?
-  roleVersion     Int        @default(0)
+  id                String     @id @default(cuid())
+  email             String     @unique
+  phone             String     @unique
+  firstName         String
+  lastName          String
+  idNumber          String?
+  address           Json?
+  password          String?
+  emailVerified     DateTime?
+  image             String?
+  status            UserStatus @default(PENDING)
+  popiaConsentAt    DateTime?
+  loginAttempts     Int        @default(0)
+  lockedUntil       DateTime?
+  roleVersion       Int        @default(0)
   /// When this password was last set under the current strength policy.
   ///
   /// Null means the password predates the policy — set before registration
@@ -158,10 +170,10 @@ model User {
   /// decision rather than a deploy.
   passwordChangedAt DateTime?
   /// When this member chose to leave. Null for everyone still in the circle.
-  resignedAt      DateTime?
-  deletedAt       DateTime?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  resignedAt        DateTime?
+  deletedAt         DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   roles                  UserRole[]
   accounts               Account[]
@@ -173,34 +185,35 @@ model User {
   notificationPreference NotificationPreference?
   auditLogs              AuditLog[]
   loginHistory           LoginHistory[]
-  lockedGoals            Goal[]                  @relation("GoalLocker")
-  createdGoals           Goal[]                  @relation("GoalCreator")
-  documentedGoals        Goal[]                  @relation("GoalOutcomeRecorder")
-  reviewedGoals          Goal[]                  @relation("GoalReviewer")
-  recordedProgress       GoalProgress[]          @relation("ProgressRecorder")
+  lockedGoals            Goal[]                   @relation("GoalLocker")
+  createdGoals           Goal[]                   @relation("GoalCreator")
+  documentedGoals        Goal[]                   @relation("GoalOutcomeRecorder")
+  reviewedGoals          Goal[]                   @relation("GoalReviewer")
+  recordedProgress       GoalProgress[]           @relation("ProgressRecorder")
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
-  invitesSent            Invitation[]            @relation("InvitesSent")
-  inviteAccepted         Invitation?             @relation("InviteAccepted")
-  approvedMandates       PaymentMandate[]        @relation("MandateApprover")
-  revokedInvitations     Invitation[]            @relation("InviteRevoker")
+  invitesSent            Invitation[]             @relation("InvitesSent")
+  inviteAccepted         Invitation?              @relation("InviteAccepted")
+  approvedMandates       PaymentMandate[]         @relation("MandateApprover")
+  revokedInvitations     Invitation[]             @relation("InviteRevoker")
   badgeScore             BadgeScore?
   badgeHistory           BadgeHistory[]
-  communityMessages      CommunityMessage[]      @relation("MessageAuthor")
-  deletedCommunityMsgs   CommunityMessage[]      @relation("MessageDeleter")
-  goalCheers             GoalCheer[]             @relation("GoalCheerUser")
-  goalComments           GoalComment[]           @relation("GoalCommentAuthor")
-  deletedGoalComments    GoalComment[]           @relation("GoalCommentDeleter")
-  inboxMessages          InboxMessage[]          @relation("InboxRecipient")
-  sentInboxMessages      InboxMessage[]          @relation("InboxSender")
-  goalPledges            GoalPledge[]            @relation("GoalPledger")
-  goalPayments           GoalPayment[]           @relation("GoalPaymentUser")
+  communityMessages      CommunityMessage[]       @relation("MessageAuthor")
+  deletedCommunityMsgs   CommunityMessage[]       @relation("MessageDeleter")
+  goalCheers             GoalCheer[]              @relation("GoalCheerUser")
+  goalComments           GoalComment[]            @relation("GoalCommentAuthor")
+  deletedGoalComments    GoalComment[]            @relation("GoalCommentDeleter")
+  inboxMessages          InboxMessage[]           @relation("InboxRecipient")
+  sentInboxMessages      InboxMessage[]           @relation("InboxSender")
+  goalPledges            GoalPledge[]             @relation("GoalPledger")
+  goalPayments           GoalPayment[]            @relation("GoalPaymentUser")
+  goalPlans              GoalPlan[]               @relation("GoalPlanUser")
   budgets                UserBudget[]
   budgetOverrides        BudgetOverride[]
   signature              AdminSignature?
   signatureHistory       AdminSignatureHistory[]
-  distinctions           MemberDistinction[]     @relation("DistinctionHolder")
-  distinctionsGranted    MemberDistinction[]     @relation("DistinctionGranter")
+  distinctions           MemberDistinction[]      @relation("DistinctionHolder")
+  distinctionsGranted    MemberDistinction[]      @relation("DistinctionGranter")
 
   @@index([status])
   @@index([email, status])
@@ -288,8 +301,8 @@ model EmailVerificationToken {
 }
 
 model Role {
-  id    String   @id @default(cuid())
-  name  RoleName @unique
+  id    String     @id @default(cuid())
+  name  RoleName   @unique
   users UserRole[]
 
   @@map("roles")
@@ -478,26 +491,26 @@ model LedgerEntry {
 // ─── Goals ────────────────────────────────────────────────────────────────────
 
 model Goal {
-  id            String     @id @default(cuid())
-  type          GoalType
-  title         String
-  description   String?
-  targetAmount  Decimal    @db.Decimal(12, 2)
-  currentAmount Decimal    @default(0) @db.Decimal(12, 2)
-  currency      String     @default("ZAR")
-  deadline      DateTime
-  status        GoalStatus @default(DRAFT)
+  id                  String     @id @default(cuid())
+  type                GoalType
+  title               String
+  description         String?
+  targetAmount        Decimal    @db.Decimal(12, 2)
+  currentAmount       Decimal    @default(0) @db.Decimal(12, 2)
+  currency            String     @default("ZAR")
+  deadline            DateTime
+  status              GoalStatus @default(DRAFT)
   // The one common yearly fund every monthly contribution flows into. At most
   // one goal may be primary at a time — enforced by a partial unique index
   // (WHERE "isPrimary") created in raw SQL in the migration.
-  isPrimary     Boolean    @default(false)
-  version       Int        @default(0)
-  lockedAt      DateTime?
-  lockedById    String?
+  isPrimary           Boolean    @default(false)
+  version             Int        @default(0)
+  lockedAt            DateTime?
+  lockedById          String?
   /// Who proposed or created this goal. A member for a proposal, an admin for
   /// one leadership raised itself — the two paths are told apart by the roles
   /// of this user, not by a separate column.
-  createdById   String?
+  createdById         String?
   /// Step 6 of the Goal flow: what the money actually bought, shown back to the
   /// circle. The note is the account; the proof is a photo or receipt and is
   /// optional, so a missing receipt can never make a goal impossible to close.
@@ -506,23 +519,24 @@ model Goal {
   outcomeRecordedAt   DateTime?
   outcomeRecordedById String?
   /// Why leadership refused a proposal. Set only alongside status REJECTED.
-  rejectionReason String?
+  rejectionReason     String?
   /// Which leader reviewed the proposal, and when. Empty on every goal created
   /// before proposals existed, which is the honest answer for them.
-  reviewedById  String?
-  reviewedAt    DateTime?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  reviewedById        String?
+  reviewedAt          DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
-  locker   User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
-  creator  User?          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  outcomeRecorder User?   @relation("GoalOutcomeRecorder", fields: [outcomeRecordedById], references: [id], onDelete: SetNull)
-  reviewer User?          @relation("GoalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
-  progress GoalProgress[]
-  cheers   GoalCheer[]
-  comments GoalComment[]
-  pledges  GoalPledge[]
-  payments GoalPayment[]
+  locker          User?          @relation("GoalLocker", fields: [lockedById], references: [id], onDelete: SetNull)
+  creator         User?          @relation("GoalCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  outcomeRecorder User?          @relation("GoalOutcomeRecorder", fields: [outcomeRecordedById], references: [id], onDelete: SetNull)
+  reviewer        User?          @relation("GoalReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  progress        GoalProgress[]
+  cheers          GoalCheer[]
+  comments        GoalComment[]
+  pledges         GoalPledge[]
+  payments        GoalPayment[]
+  plans           GoalPlan[]
 
   @@index([lockedById])
   @@index([createdById])
@@ -554,6 +568,57 @@ model GoalPayment {
   @@index([goalId, status])
   @@index([userId])
   @@map("goal_payments")
+}
+
+/// A member's standing commitment to fund one goal every month.
+///
+/// The monthly contribution is collected by the member's debit order; this is
+/// the same idea aimed at a single goal, for members who would rather commit up
+/// front than remember to pay. Collections are charged against the member's
+/// existing mandate — there is deliberately no mandate per plan, because a
+/// member may hold only one active mandate at a time.
+///
+/// A plan is an instruction, not money. Every rand it moves is still a
+/// GoalPayment, so the goal's derived total and its reversal behaviour are
+/// unchanged by this model existing.
+model GoalPlan {
+  id                  String         @id @default(cuid())
+  userId              String
+  goalId              String
+  /// What to collect each month. Suggested from the goal's remaining amount
+  /// over the months left, then free for the member to change.
+  amount              Decimal        @db.Decimal(12, 2)
+  /// Day of the month to collect, 1–31. A day past the end of a short month is
+  /// clamped to that month's last day rather than skipped, so a plan set to the
+  /// 31st still collects in February.
+  debitDay            Int
+  status              GoalPlanStatus @default(ACTIVE)
+  /// The last period this plan collected for, as YYYY-MM. The collection job
+  /// reads it to know whether this month is already done, and the same value
+  /// forms the idempotency key — so a retried job cannot charge twice.
+  lastCollectedPeriod String?
+  /// Consecutive months whose collection never succeeded. Reset by a success.
+  failedRuns          Int            @default(0)
+  version             Int            @default(0)
+
+  startedAt   DateTime  @default(now())
+  endedAt     DateTime?
+  /// Why the plan stopped — goal met, deadline passed, member cancelled, no
+  /// usable mandate. Kept so a member can be told what happened to it.
+  endedReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  user User @relation("GoalPlanUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// One live plan per member per goal. Enforced as a partial unique index in
+  /// raw SQL (WHERE status = 'ACTIVE'), because a member who cancels and later
+  /// rejoins the same goal must be able to.
+  @@index([userId, status])
+  @@index([status, debitDay])
+  @@map("goal_plans")
 }
 
 model GoalCheer {
@@ -647,7 +712,7 @@ model Notification {
   externalRef  String?
   sentAt       DateTime?
   createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
 
   user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   template NotificationTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
@@ -745,9 +810,9 @@ model Invitation {
   revokedAt     DateTime?
   createdAt     DateTime         @default(now())
 
-  invitedBy  User  @relation("InvitesSent",    fields: [invitedById],  references: [id], onDelete: Restrict)
+  invitedBy  User  @relation("InvitesSent", fields: [invitedById], references: [id], onDelete: Restrict)
   acceptedBy User? @relation("InviteAccepted", fields: [acceptedById], references: [id], onDelete: SetNull)
-  revokedBy  User? @relation("InviteRevoker",  fields: [revokedById],  references: [id], onDelete: SetNull)
+  revokedBy  User? @relation("InviteRevoker", fields: [revokedById], references: [id], onDelete: SetNull)
 
   // "One PENDING invite per contact" is enforced by partial unique indexes
   // (email/phone WHERE status = 'PENDING') in raw SQL — this matches the service,
@@ -813,26 +878,26 @@ model JobHeartbeat {
 // ─── Badges & Community ────────────────────────────────────────────────────────
 
 model BadgeScore {
-  id                String     @id @default(cuid())
-  userId            String     @unique
-  currentBadge      BadgeTier  @default(AMATEUR)
-  overallScore      Decimal    @default(0) @db.Decimal(6, 3)
-  consistencyScore  Decimal    @default(0) @db.Decimal(6, 3)
-  timelinessScore   Decimal    @default(0) @db.Decimal(6, 3)
-  generosityScore   Decimal    @default(0) @db.Decimal(6, 3)
-  streakBonus       Decimal    @default(0) @db.Decimal(6, 3)
-  progressToNext    Decimal    @default(0) @db.Decimal(6, 3)
-  currentStreak     Int        @default(0)
-  longestStreak     Int        @default(0)
-  totalPaidMonths   Int        @default(0)
-  totalOnTimeMonths Int        @default(0)
-  totalOverdue      Int        @default(0)
-  overdueInLast6    Int        @default(0)
-  monthsActive      Int        @default(0)
-  avgContribution   Decimal    @default(0) @db.Decimal(10, 2)
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  currentBadge      BadgeTier @default(AMATEUR)
+  overallScore      Decimal   @default(0) @db.Decimal(6, 3)
+  consistencyScore  Decimal   @default(0) @db.Decimal(6, 3)
+  timelinessScore   Decimal   @default(0) @db.Decimal(6, 3)
+  generosityScore   Decimal   @default(0) @db.Decimal(6, 3)
+  streakBonus       Decimal   @default(0) @db.Decimal(6, 3)
+  progressToNext    Decimal   @default(0) @db.Decimal(6, 3)
+  currentStreak     Int       @default(0)
+  longestStreak     Int       @default(0)
+  totalPaidMonths   Int       @default(0)
+  totalOnTimeMonths Int       @default(0)
+  totalOverdue      Int       @default(0)
+  overdueInLast6    Int       @default(0)
+  monthsActive      Int       @default(0)
+  avgContribution   Decimal   @default(0) @db.Decimal(10, 2)
   graceUntil        DateTime?
-  lastCalculatedAt  DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  lastCalculatedAt  DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
