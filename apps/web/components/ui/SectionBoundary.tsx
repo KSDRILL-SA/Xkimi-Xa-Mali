@@ -37,11 +37,36 @@ interface State {
 export class SectionBoundary extends Component<Props, State> {
   state: State = { failed: false }
 
-  static getDerivedStateFromError(): State {
+  /**
+   * Next signals navigation by throwing, so those throws must pass through.
+   *
+   * `redirect()` and `notFound()` raise errors carrying a `NEXT_REDIRECT` or
+   * `NEXT_HTTP_ERROR_FALLBACK` digest, which the framework catches higher up and
+   * turns into a redirect or a 404. An error boundary that treats every throw as
+   * a failure swallows them — so a section calling `redirect('/login')` would
+   * quietly disappear from the page instead of sending the member to sign in.
+   *
+   * That was live from the moment this component shipped. It is why the
+   * dashboard sections guard by returning null rather than redirecting, and it
+   * is fixed here so the next person is not held to that workaround.
+   */
+  private static isNavigation(error: unknown): boolean {
+    const digest = (error as { digest?: unknown })?.digest
+    return typeof digest === 'string' && (
+      digest === 'NEXT_REDIRECT' ||
+      digest.startsWith('NEXT_REDIRECT') ||
+      digest.startsWith('NEXT_HTTP_ERROR_FALLBACK')
+    )
+  }
+
+  static getDerivedStateFromError(error: unknown): State {
+    if (SectionBoundary.isNavigation(error)) throw error
     return { failed: true }
   }
 
   componentDidCatch(error: Error) {
+    if (SectionBoundary.isNavigation(error)) throw error
+
     // A section vanishing silently is exactly how a broken dashboard goes
     // unnoticed for a month, so the disappearance is always reported even
     // though it is never shown.

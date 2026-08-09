@@ -5,8 +5,13 @@ import { TrendingUp, Calendar, CheckCircle2 } from 'lucide-react'
 
 export async function DashboardStats() {
   const session = await getSession()
-  const userId = session!.user.id
-  const roles = session!.user.roles ?? []
+  // Returns nothing rather than redirecting. A section renders inside a
+  // SectionBoundary, and Next's redirect() works by throwing — an error
+  // boundary would catch it and drop the section instead of navigating. The
+  // page above this one holds the redirect; this is only the assertion removed.
+  if (!session?.user?.id) return null
+  const userId = session.user.id
+  const roles = session.user.roles ?? []
 
   const summary = await getMemberSummary(userId, userId, roles)
   const currentYear = new Date().getFullYear()

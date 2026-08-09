@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { getMessages } from '@/services/community.service'
 import { getCommunityBadges } from '@/services/badge.service'
@@ -12,8 +13,9 @@ export const metadata: Metadata = { title: 'Community' }
 
 export default async function CommunityPage() {
   const session = await getSession()
-  const userId = session!.user.id
-  const roles = (session!.user.roles as string[] | undefined) ?? []
+  if (!session?.user?.id) redirect('/login')
+  const userId = session.user.id
+  const roles = (session.user.roles as string[] | undefined) ?? []
 
   const [messages, badges] = await Promise.all([
     getMessages(1, 20, userId),

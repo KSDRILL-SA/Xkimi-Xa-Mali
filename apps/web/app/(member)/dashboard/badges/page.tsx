@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import type { BadgeTier } from '@prisma/client'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { getMyBadge } from '@/services/badge.service'
 import { isFounder } from '@/services/distinction.service'
@@ -67,8 +68,9 @@ function nextTierRequirements(tier: BadgeTier, m: Metrics): { tier: BadgeTier; r
 
 export default async function BadgesPage() {
   const session = await getSession()
-  const userId = session!.user.id
-  const roles = (session!.user.roles as string[] | undefined) ?? []
+  if (!session?.user?.id) redirect('/login')
+  const userId = session.user.id
+  const roles = (session.user.roles as string[] | undefined) ?? []
 
   const [badge, founder] = await Promise.all([
     getMyBadge(userId, userId, roles),
