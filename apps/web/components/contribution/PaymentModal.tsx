@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -79,8 +79,19 @@ export function PaymentModal({ contribution, mandateBankName, mandateAccountMask
 
   const watchedAmount = watch('amount')
 
+  // One token per payment this modal is offering to make. The same intent
+  // submitted twice — a double tap, a retried request — collapses onto the
+  // first debit, while opening the modal again is a new intent with a new
+  // token. Wired here as well as on the contribute page, because a protection
+  // applied to one of two paths to the same endpoint is the failure this
+  // repository keeps finding.
+  const paymentToken = useRef<string>(crypto.randomUUID())
+
   async function submitPayment(data: ManualContributionInput) {
-    const res = await api.post<PaymentResult>('/api/v1/contributions/pay', data)
+    const res = await api.post<PaymentResult>('/api/v1/contributions/pay', {
+      ...data,
+      idempotencyKey: paymentToken.current,
+    })
     setResult(res)
     router.refresh()
   }

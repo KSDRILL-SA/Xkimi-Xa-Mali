@@ -252,7 +252,52 @@ export async function submitManualPayment(
     }
   }
 
-  const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${randomUUID()}`
+  // The key the member's *intent* maps to.
+  //
+  // This was `...:${randomUUID()}` — unique on every request, so the column
+  // named `idempotencyKey` provided no idempotency at all and the unique index
+  // on it could never fire. A double tap, a retried request or a browser
+  // back-and-resubmit each produced a second real debit off the member's
+  // account, bounded only by the five-per-hour limiter.
+  //
+  // It cannot be derived from the period the way the debit run's is, because a
+  // member may legitimately pay twice in one month — a partial now, the balance
+  // later. So the client supplies one token per payment it is offering to make,
+  // and the same intent submitted twice collapses onto one debit while a second,
+  // deliberate payment carries a new token and goes through.
+  //
+  // `userId` stays in the key, so a token chosen by one member can never
+  // collide with another's.
+  const clientToken = data.idempotencyKey ?? randomUUID()
+  const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${clientToken}`
+
+  if (!data.idempotencyKey) {
+    // Not fatal — the payment is still correct, it is simply unprotected against
+    // a duplicate submission. Logged so a caller that has not been updated is
+    // visible rather than quietly less safe than the others.
+    logger.warn('Manual payment submitted without an idempotency token', { userId })
+  }
+
+  // Claim before submitting, never after.
+  //
+  // The old order called the gateway first and wrote second, so two concurrent
+  // submissions produced two debits and only then collided on the unique
+  // column — by which point the member's account had been hit twice and the
+  // error came too late to prevent anything. This mirrors the debit run:
+  // check what already exists, claim, then submit.
+  const existing = await transactionRepo.findByIdempotencyKey(idempotencyKey)
+  if (existing) {
+    logger.info('Manual payment already submitted under this token — returning the first result', {
+      userId, idempotencyKey, transactionId: existing.id,
+    })
+    return {
+      contribution,
+      transaction: existing,
+      receiptRef: `XXM-${existing.id.slice(-8).toUpperCase()}`,
+      status: existing.status,
+      duplicate: true as const,
+    }
+  }
 
   // Debit the contribution PLUS the Netcash fee buffer so the group nets the
   // full contribution; the transaction/contribution stay at data.amount.
