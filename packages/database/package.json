@@ -10,7 +10,8 @@
     "db:seed": "node --env-file-if-exists=../../apps/web/.env.local --env-file-if-exists=../../apps/admin/.env.local --env-file-if-exists=../../apps/website/.env.local --import tsx/esm prisma/seed.ts",
     "db:studio": "prisma studio",
     "secrets:reencrypt": "node --env-file-if-exists=../../apps/web/.env.local --import tsx/esm scripts/reencrypt-secrets.ts",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "seed:statement": "node --env-file-if-exists=../../apps/web/.env.local --experimental-strip-types scripts/seed-statement-sample.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

@@ -131,13 +131,16 @@ const chrome = StyleSheet.create({
     backgroundColor: C.headerBg, paddingHorizontal: 40, paddingTop: 26, paddingBottom: 24,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  // flex + paddingRight so a long org name cannot run into the document
+  // title beside it. At 17pt with 1.5 letter-spacing it did exactly that:
+  // "FOUNDATION" and "STATEMENT OF ACCOUNT" touched with no gap at all.
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 11, flex: 1, paddingRight: 16 },
   monogram: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.5, borderColor: C.gold, alignItems: 'center', justifyContent: 'center' },
   monogramText: { fontSize: 16, fontFamily: 'Helvetica-Bold', color: C.gold },
-  orgName: { fontSize: 17, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 1.5 },
+  orgName: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 0.8 },
   orgTagline: { fontSize: 6.5, color: C.greenSoft, marginTop: 3, letterSpacing: 1.2, textTransform: 'uppercase' },
-  mastRight: { alignItems: 'flex-end' },
-  docType: { fontSize: 11, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 2.5, textTransform: 'uppercase' },
+  mastRight: { flexShrink: 0, alignItems: 'flex-end' },
+  docType: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 2.5, textTransform: 'uppercase' },
   docPeriod: { fontSize: 8.5, color: C.gold, marginTop: 5, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5 },
   docRef: { fontSize: 6.5, color: C.ink35, marginTop: 3, letterSpacing: 0.5 },
   accentBar: { height: 3, backgroundColor: C.gold },

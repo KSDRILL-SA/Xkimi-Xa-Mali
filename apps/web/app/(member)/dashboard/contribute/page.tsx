@@ -36,6 +36,10 @@ export default function ContributePage() {
   const router = useRouter()
   const [openPeriods, setOpenPeriods] = useState<OpenPeriod[]>([])
   const [mandate, setMandate] = useState<MandateInfo | null>(null)
+  // Three states, not two. A member who has just set a mandate up holds a
+  // PENDING one, and telling them they have none sends them back to create a
+  // second — which the one-active-or-pending rule then refuses. See below.
+  const [mandateState, setMandateState] = useState<'none' | 'pending' | 'active'>('none')
   const [loading, setLoading] = useState(true)
   const [serverError, setServerError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -124,12 +128,17 @@ export default function ContributePage() {
         }
 
         const active = mandates.find((m) => m.status === 'ACTIVE')
+        const pending = mandates.find((m) => m.status === 'PENDING')
+
         if (active) {
+          setMandateState('active')
           setMandate({
             bankName: active.bankAccount.bankName,
             accountNumberMasked: active.bankAccount.accountNumberMasked,
             amount: Number(active.amount),
           })
+        } else if (pending) {
+          setMandateState('pending')
         }
       } catch {
         setServerError('Failed to load data. Please refresh.')
@@ -239,13 +248,34 @@ export default function ContributePage() {
       </Reveal>
 
       {/* ── No mandate error ───────────────────────── */}
-      {!mandate && (
+      {/* A mandate awaiting the bank is not a missing mandate.
+          This said "No active mandate — Set up mandate" for both, so a member
+          who had just created one was sent back to create a second, which the
+          one-active-or-pending rule refuses. They were told to do the thing
+          they had already done and could not do again. */}
+      {mandateState === 'pending' && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
+          <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" aria-hidden />
+          <div>
+            <p className="text-sm font-semibold text-amber-900">Your mandate is awaiting approval</p>
+            <p className="text-xs text-amber-800 mt-0.5">
+              Your bank is still authorising the debit order you set up. Payments can be made
+              once that is done — you do not need to set up another one.{' '}
+              <a href="/dashboard/mandates" className="underline font-bold hover:text-amber-950 transition-colors">
+                View your mandate
+              </a>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {mandateState === 'none' && (
         <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
           <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" aria-hidden />
           <div>
-            <p className="text-sm font-semibold text-red-800">No active mandate</p>
+            <p className="text-sm font-semibold text-red-800">No payment mandate</p>
             <p className="text-xs text-red-700 mt-0.5">
-              You need an active payment mandate before making a payment.{' '}
+              You need a payment mandate before making a payment.{' '}
               <a href="/dashboard/mandates" className="underline font-bold hover:text-red-900 transition-colors">
                 Set up mandate
               </a>
