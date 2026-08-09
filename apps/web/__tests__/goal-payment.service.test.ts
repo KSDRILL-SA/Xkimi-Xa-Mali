@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 vi.mock('@/repositories/goal.repository', () => ({
   goalRepo: {
     findById: vi.fn(),
+    findPaymentByIdempotencyKey: vi.fn().mockResolvedValue(null),
     createPayment: vi.fn(),
     update: vi.fn(),
     findPaymentByGatewayRef: vi.fn(),
