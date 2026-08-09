@@ -1,9 +1,9 @@
 # Session Handoff
 
-**Session closed:** 2026-08-09
+**Session closed:** 2026-08-09 (second sitting — the member-app pass)
 **Branch state at close:** `main` is the **only** branch. No open pull requests.
 **Health at close:** typecheck 0 · lint 0 errors (5 warnings, all pre-existing
-files) · test 0 — **1142 passing** (was 1039) · build 0 (3/3) · `npm audit` 0.
+files) · test 0 — **1252 passing** (was 1039) · build 0 (3/3) · `npm audit` 0.
 
 Everything below was verified locally. **CI is still not executing** — GitHub
 Actions minutes are exhausted on the free tier. Nothing automated is checking
@@ -52,6 +52,72 @@ Seven PRs, all squash-merged to `main`.
 | #306 | `setMemberRole` existed twice and the console called the copy with no guards, so the sole admin could remove his own admin role and leave the system with none |
 
 ---
+
+## 2a. The member-app pass — in progress, 12 of 25 pages
+
+**The method, agreed with the owner:** one page at a time, all five tasks on
+each (check → fix → harden → tighten → improve), each page its own PR with
+tests and all four gates. A page means the page, its components, its API
+routes, its services and the queries underneath — never just `page.tsx`.
+
+**Do not change the method to "audit the whole app for pattern X".** Four
+separate times a defect was fixed on one page and found again, unlooked-for, on
+a later one. The same words in a different file are a different bug until
+somebody reads them.
+
+| Group | Pages | State |
+|---|---|---|
+| Money path | `mandates` `contribute` `contributions` `transactions` `statements` | ✅ #307–#312 |
+| Core member | `dashboard` `profile` `notifications` `goals` `goals/[id]` | ✅ #313–#317 |
+| Social | `badges` ✅ #319 · `community` ✅ (clean, no PR) · **`invitations`** · `whatsapp` | 2 of 4 |
+| Auth pages | `login` `register` `forgot-password` `reset-password` `verify-email` `invite/[token]` | not started |
+| Public | `/` `about` `privacy` `terms` `support` `offline` | not started |
+
+**Next page: `invitations`.**
+
+### The four shapes that kept recurring
+
+1. **A row spread into a client component.** Everything a client component
+   receives is serialised into the RSC payload and readable in page source.
+   `mandates` shipped `netcashMandateId`; `contributions` shipped the **raw
+   Netcash SOAP XML** stored in `gatewayResponse`. TypeScript's structural
+   typing accepts an object carrying more than the consumer declares, so
+   nothing complains. **Name the fields; never spread.**
+2. **The gateway's three answers collapsed onto two.** `§4.6` records three
+   copies. Two more were found here — `submitManualPayment` (#308) and
+   `payToGoal` (#317). Everything must import `toTransactionStatus`.
+3. **`randomUUID()` inside an idempotency key**, making the column and its
+   unique index decorative. Found in the manual contribution path (#309) and
+   the goal payment path (#317). Both now take a client-supplied token and check
+   **before** calling the gateway, never after.
+4. **`Math.max(1, Number(x))` is `NaN` when `x` is not a number**, and reaches
+   Prisma as `skip: NaN`. Three pages had it.
+
+### What is worth knowing before touching these pages again
+
+- **`/api/v1/health` reports `checks.jobs` and a count, never the job names.**
+  It is public and unauthenticated.
+- **Member statements are streamed through the route, never uploaded.** The
+  uploader was deleted; see §4.5a for the two remaining public-blob uses.
+- **`SectionBoundary` rethrows anything with a `NEXT_REDIRECT` digest.** Next
+  signals navigation by throwing, so an error boundary that catches everything
+  swallows redirects. Dashboard sections therefore guard by returning `null`.
+- **`MANDATORY_SLUGS` is exported and asserted in both directions.** Adding or
+  removing one is a decision about whether a member can end up not knowing
+  their money stopped.
+- **No member page may assert `session!`** — a test sweeps `app/(member)` for it.
+
+### `community` was audited and found clean
+
+No PR. No `dangerouslySetInnerHTML` anywhere; edit is owner-only and delete is
+owner-or-admin; admins deliberately cannot rewrite a member's words; content is
+bounded in the service on both paths; the member directory carries no email or
+phone. Recorded so it is not re-audited.
+
+The one judgement call left open: community posting uses the generic
+`apiRatelimit` (60/min) rather than a dedicated bucket, where goal proposals get
+3/hour and admin broadcasts 5/hour. Defensible either way on a 50-member wall
+with no notification fan-out. Not treated as a defect.
 
 ## 3. Decisions the owner took — do not re-litigate these
 
@@ -346,6 +412,13 @@ whatever ran next in that worker.
   revocable role rather than made meaningful. Making it meaningful would mean a
   check in every member-facing service, which is a larger change than the
   problem warranted.
+- **The member-app pass is 12 of 25 pages done.** See §2a for the scoreboard,
+  the method, and the four recurring shapes. `invitations` is next.
+- **The flaky suite is not fixed.** It recurred after the `doUnmock` fix as a
+  different pair. §4.12 records the six mechanisms eliminated and the one
+  question left — and the fact that the assertion text was never captured on
+  either occurrence, which is what would decide it. Capture the whole log next
+  time before grepping it.
 - **The areas not yet audited:** mandates and the money path, contributions and
   goals, notifications, reporting, and the admin console's own surfaces beyond
   roles. Auth and roles were done in full this session; nothing else was.
