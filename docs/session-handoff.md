@@ -3,7 +3,7 @@
 **Session closed:** 2026-08-09 (second sitting — the member-app pass)
 **Branch state at close:** `main` is the **only** branch. No open pull requests.
 **Health at close:** typecheck 0 · lint 0 errors (5 warnings, all pre-existing
-files) · test 0 — **1252 passing** (was 1039) · build 0 (3/3) · `npm audit` 0.
+files) · test 0 — **1258 passing** (was 1039) · build 0 (3/3) · `npm audit` 0.
 
 Everything below was verified locally. **CI is still not executing** — GitHub
 Actions minutes are exhausted on the free tier. Nothing automated is checking
@@ -53,7 +53,7 @@ Seven PRs, all squash-merged to `main`.
 
 ---
 
-## 2a. The member-app pass — in progress, 12 of 25 pages
+## 2a. The member-app pass — in progress, 14 of 25 pages
 
 **The method, agreed with the owner:** one page at a time, all five tasks on
 each (check → fix → harden → tighten → improve), each page its own PR with
@@ -70,10 +70,10 @@ somebody reads them.
 | Money path | `mandates` `contribute` `contributions` `transactions` `statements` | ✅ #307–#312 |
 | Core member | `dashboard` `profile` `notifications` `goals` `goals/[id]` | ✅ #313–#317 |
 | Social | `badges` ✅ #319 · `community` ✅ (clean, no PR) · **`invitations`** · `whatsapp` | 2 of 4 |
-| Auth pages | `login` `register` `forgot-password` `reset-password` `verify-email` `invite/[token]` | not started |
+| Auth pages | `login` `register` `forgot-password` `reset-password` `verify-email` `invite/[token]` | audited — five clean, **one open finding**, see below |
 | Public | `/` `about` `privacy` `terms` `support` `offline` | not started |
 
-**Next page: `invitations`.**
+**Next: the open invite finding below, then the five public pages.**
 
 ### The four shapes that kept recurring
 
@@ -106,6 +106,36 @@ somebody reads them.
   removing one is a decision about whether a member can end up not knowing
   their money stopped.
 - **No member page may assert `session!`** — a test sweeps `app/(member)` for it.
+
+### Open finding, fully specified — the invite page has no rate limit
+
+**Pick this up first.** The auth pages were audited and this is the only defect
+in them; the other five are 14–38 line shells over the components hardened in
+#301–#305 and have nothing in them.
+
+| Path | Calls | Limiter |
+|---|---|---|
+| `POST /api/v1/auth/invitations/validate` | `validateInviteCode` | ✅ `authRatelimit`, 5/min |
+| `GET /invite/[token]` | `validateInviteCode` | ❌ **none** |
+
+`middleware.ts` waves `/invite/` through as a public page, so the page is an
+unthrottled oracle for the same check the API route throttles. That is the §9
+asymmetry — two paths to one check, one hardened — for the fifth time in this
+pass.
+
+Codes are 40 bits (`randomBytes(5)`), so brute-forcing is not practical. The
+finding is the asymmetry, not an imminent break-in.
+
+**Why it was not fixed in the sitting that found it:** a page render cannot
+return a 429, so this needs a limiter check in
+`app/(auth)/invite/[token]/page.tsx`, a new "too many attempts" state on
+`InviteErrorView`, tests, and the four gates. That was more than the remaining
+context allowed, and a half-finished change to an auth path is worse than a
+precise description of one.
+
+**Note, not a defect:** the code sits in the URL *path*, so it lands in Vercel
+access logs. The invite email already puts it in a URL (`/register?code=…`), so
+this is the established design rather than a regression.
 
 ### `community` was audited and found clean
 
@@ -412,7 +442,9 @@ whatever ran next in that worker.
   revocable role rather than made meaningful. Making it meaningful would mean a
   check in every member-facing service, which is a larger change than the
   problem warranted.
-- **The member-app pass is 12 of 25 pages done.** See §2a for the scoreboard,
+- **The invite page has no rate limit** while the API route doing the same check
+  does. Fully specified in §2a, and the first thing to pick up.
+- **The member-app pass is 14 of 25 pages done.** See §2a for the scoreboard,
   the method, and the four recurring shapes. `invitations` is next.
 - **The flaky suite is not fixed.** It recurred after the `doUnmock` fix as a
   different pair. §4.12 records the six mechanisms eliminated and the one
