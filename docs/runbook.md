@@ -334,6 +334,8 @@ delivered.
 | `NOTIFICATIONS_ABANDONED` | Notification flush, after each batch | critical — messages that exhausted every retry and will never send. Throttled to once per 6 hours |
 | `SCHEDULED_JOB_SILENT` | Heartbeat check, every 15 minutes | critical — a money-critical job has **not run at all**. Not the same as `SCHEDULED_JOB_FAILED`; see "A job that never fired" below |
 | `VERIFICATION_EMAIL_FAILED` | Registration, when the link does not send | warning — someone who was invited has an account they cannot sign into. They can request a new link themselves; see "A member who never got their verification email" |
+| `MANDATE_GATEWAY_DESYNC` | Mandate update or cancel, when Netcash refuses | warning — this system and the bank now disagree about a mandate. **Nothing else will find it**: `mandate-status-sync` reads only PENDING/ACTIVE/SUSPENDED. Fix it in the Netcash portal by hand |
+| `MANDATE_DELAY_NOT_SCHEDULED` | Delay request, when the job cannot be scheduled | critical — a member asked to move a debit off a day they said they could not afford, and the skip had to be withdrawn, so it will run on the original date. Contact them before it does |
 
 **Only `ACTIVE` admins are alerted.** A suspended founder is not an escalation
 path. If nothing is delivered, the first thing to check is that at least one

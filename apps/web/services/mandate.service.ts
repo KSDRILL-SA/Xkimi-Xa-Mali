@@ -23,6 +23,7 @@ import { bankAccountRepo } from '@/repositories/bank-account.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { bumpRoleVersion } from '@/lib/role-version'
 import { notifyAdmins } from './inbox.service'
+import { raiseOperationalAlert } from './alert.service'
 
 const mandateBankInclude = {
   bankAccount: {
@@ -219,9 +220,24 @@ export async function updateMandate(
         effectiveDate,
       )
     } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err)
       logger.error('DB mandate updated but Netcash sync failed — manual reconciliation required', {
         mandateId, netcashMandateId: mandate.netcashMandateId, changes: data,
-        error: err instanceof Error ? err.message : String(err),
+        error: reason,
+      })
+      await raiseGatewayDesyncAlert({
+        mandateId,
+        netcashMandateId: mandate.netcashMandateId,
+        operation: 'update',
+        reason,
+        detail: [
+          `This system now holds R${data.amount ?? Number(mandate.amount)} on day ${data.debitDay ?? mandate.debitDay}.`,
+          'The authorisation at the bank still carries the previous values.',
+          '',
+          'The debit run submits the amount held here, so the next collection may be',
+          'refused for exceeding what the member actually authorised. Re-apply the',
+          'change at Netcash, or revert it here, before the next debit day.',
+        ].join('\n'),
       })
     }
   }
@@ -266,9 +282,25 @@ export async function cancelMandate(
     try {
       await paymentGateway.cancelMandate(mandate.netcashMandateId)
     } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err)
       logger.error('DB mandate cancelled but Netcash cancel failed — manual reconciliation required', {
         mandateId, netcashMandateId: mandate.netcashMandateId,
-        error: err instanceof Error ? err.message : String(err),
+        error: reason,
+      })
+      await raiseGatewayDesyncAlert({
+        mandateId,
+        netcashMandateId: mandate.netcashMandateId,
+        operation: 'cancel',
+        reason,
+        detail: [
+          'The member has been told their debit order is cancelled, and this system',
+          'will not collect from them again. The authorisation at their bank is',
+          'still standing.',
+          '',
+          'Nothing here will find this on its own: mandate-status-sync only reads',
+          'mandates that are PENDING, ACTIVE or SUSPENDED, so a locally-cancelled',
+          'one is never looked at again. Cancel it in the Netcash portal by hand.',
+        ].join('\n'),
       })
     }
   }
@@ -325,16 +357,62 @@ export async function requestDelay(
   // ever written to or read from it.
   await mandateRepo.update(mandateId, { delayedUntil: newDate })
 
-  // Emit event so mandate-delay-handler sleeps until the new date and charges then.
-  await inngest.send({
-    name: InngestEvents.MANDATE_DELAY_HANDLER,
-    data: {
-      mandateId,
-      userId: mandate.userId,
-      newDate: data.newDate,
-      reason: data.reason ?? null,
-    },
-  })
+  // The event that will actually charge them, and the reason this is not simply
+  // awaited and forgotten.
+  //
+  // `delayedUntil` is what makes the debit run skip this member. The event is
+  // what makes anything collect from them afterwards. Written in that order they
+  // are two halves of one promise, and if the second half fails the member is
+  // skipped by the debit run and charged by nothing — not late, not failed,
+  // simply never collected for the period, with no failed transaction and no
+  // trace anywhere that money was due.
+  //
+  // So a failed send un-skips them. Being debited on the original date is not
+  // what they asked for and they must be told, but it is a collection that
+  // happened and can be reversed. The alternative is a silent hole in a month's
+  // contributions that nobody would find until reconciliation.
+  try {
+    await inngest.send({
+      name: InngestEvents.MANDATE_DELAY_HANDLER,
+      data: {
+        mandateId,
+        userId: mandate.userId,
+        newDate: data.newDate,
+        reason: data.reason ?? null,
+      },
+    })
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    await mandateRepo.update(mandateId, { delayedUntil: null }).catch(() => {})
+
+    logger.error('Mandate delay could not be scheduled — the skip was withdrawn', {
+      mandateId, userId: mandate.userId, newDate: data.newDate, error: reason,
+    })
+
+    await raiseOperationalAlert({
+      code: 'MANDATE_DELAY_NOT_SCHEDULED',
+      // The member asked not to be debited on a day they said they could not
+      // afford, and will be. That is worth an SMS on the night it matters.
+      severity: 'critical',
+      title: 'A member asked to move their debit and it was not scheduled',
+      body: [
+        'The delay was accepted by the gateway but the job that charges them on the',
+        'new date could not be scheduled. The skip has been withdrawn, so they will',
+        'be debited on their original date instead.',
+        '',
+        'They asked to move it because of that date. Contact them before it runs.',
+        '',
+        `Mandate: ${mandateId}`,
+        `Member: ${mandate.userId}`,
+        `Requested date: ${data.newDate}`,
+        `Reason: ${reason}`,
+      ].join('\n'),
+      entityId: mandateId,
+      payload: { mandateId, userId: mandate.userId, newDate: data.newDate, reason },
+    })
+
+    throw err
+  }
 
   await writeAuditLog({
     userId: mandate.userId,
@@ -445,6 +523,58 @@ export function planDebitWarnings(
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+/**
+ * Say that this system and the bank now disagree about a mandate.
+ *
+ * Both `updateMandate` and `cancelMandate` write locally first and tell Netcash
+ * second — deliberately, so a member who asks to stop being collected from is
+ * never collected from again by us, whatever the gateway does. The cost of that
+ * ordering is a window where the two disagree, and until now the entire response
+ * to landing in that window was one `logger.error` and a comment saying "manual
+ * reconciliation required" addressed to nobody in particular.
+ *
+ * That is the failure this repository keeps finding: silence on the money path.
+ * A divergence between what a member believes and what their bank has been told
+ * does not announce itself, and nothing else in the system is looking — the
+ * nightly `mandate-status-sync` reads only PENDING, ACTIVE and SUSPENDED, so a
+ * cancellation that failed at the gateway is never examined again by anything.
+ *
+ * `warning` rather than `critical`: no money has moved incorrectly at the moment
+ * this fires, and it is a state to correct today rather than tonight. The debit
+ * run's own alerts stay `critical` for the case where money actually did not
+ * move.
+ */
+async function raiseGatewayDesyncAlert(params: {
+  mandateId: string
+  netcashMandateId: string
+  operation: 'update' | 'cancel'
+  reason: string
+  detail: string
+}): Promise<void> {
+  await raiseOperationalAlert({
+    code: 'MANDATE_GATEWAY_DESYNC',
+    severity: 'warning',
+    // Plain ASCII and short — the alert service may put this in an SMS.
+    title: `Mandate ${params.operation} did not reach Netcash`,
+    body: [
+      `A mandate ${params.operation} was applied here but rejected by the gateway.`,
+      '',
+      params.detail,
+      '',
+      `Mandate: ${params.mandateId}`,
+      `Netcash mandate: ${params.netcashMandateId}`,
+      `Reason: ${params.reason}`,
+    ].join('\n'),
+    entityId: params.mandateId,
+    payload: {
+      mandateId: params.mandateId,
+      netcashMandateId: params.netcashMandateId,
+      operation: params.operation,
+      reason: params.reason,
+    },
+  })
+}
 
 function maskBankAccount(encrypted: string, bankAccountId: string): string {
   return maskStoredSecret(encrypted, { field: 'bankAccount.accountNumber', bankAccountId })

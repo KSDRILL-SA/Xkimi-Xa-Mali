@@ -29,11 +29,24 @@ export default async function MandatesPage() {
     accountType: a.accountType,
   }))
 
+  // Named, not spread.
+  //
+  // This was `{ ...m, ... }`, which sends the whole row to a client component —
+  // and everything a client component receives is serialised into the RSC
+  // payload, which is readable in the page source. That included `userId`,
+  // `bankAccountId`, `delayedUntil` and `netcashMandateId`: the handle used to
+  // cancel, amend and delay this mandate at the gateway.
+  //
+  // `MandateCard` declares six fields. TypeScript's structural typing accepts
+  // an object carrying more, so nothing complained and nothing would have. The
+  // fix is to list what crosses the boundary rather than to trust the consumer's
+  // type to narrow it, because it does not.
   const maskedMandates = mandates.map((m) => ({
-    ...m,
+    id: m.id,
+    status: m.status,
     amount: m.amount.toString(),
+    debitDay: m.debitDay,
     createdAt: m.createdAt.toISOString(),
-    updatedAt: m.updatedAt.toISOString(),
     bankAccount: {
       bankName: m.bankAccount.bankName,
       accountNumberMasked: m.bankAccount.accountNumberMasked,

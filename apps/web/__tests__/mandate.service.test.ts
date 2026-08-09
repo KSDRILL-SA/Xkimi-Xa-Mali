@@ -38,6 +38,10 @@ vi.mock('@/repositories/user.repository', () => ({
 }))
 vi.mock('@/lib/role-version', () => ({ bumpRoleVersion: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/services/inbox.service', () => ({ notifyAdmins: vi.fn().mockResolvedValue(0) }))
+// A gateway sync failure now raises an operational alert rather than only
+// logging. Mocked here so this suite does not pull the alert service's whole
+// dependency chain (env, db, email, SMS) in behind it.
+vi.mock('@/services/alert.service', () => ({ raiseOperationalAlert: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/repositories/bank-account.repository', () => ({
   bankAccountRepo: { findById: vi.fn() },
 }))
