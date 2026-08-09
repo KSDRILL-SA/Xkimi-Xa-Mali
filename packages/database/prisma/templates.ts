@@ -56,6 +56,25 @@ export const NOTIFICATION_TEMPLATES: Array<{
     body: 'Xkimm Xa Mali Foundation: {{firstName}}, your {{period}} statement is ready to download: {{url}}',
   },
   {
+    // A member's standing commitment to a goal has run its course. Sent for
+    // every reason a plan stops on its own - target reached, deadline passed,
+    // goal closed - because from the member's side the fact that matters is
+    // the same: nothing more will be collected for it. Plain hyphens, as below.
+    slug: 'goal-plan-completed',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimm Xa Mali Foundation: Your monthly plan for "{{goalTitle}}" has ended. {{reason}}. Nothing further will be collected for it.',
+  },
+  {
+    // The plan could not be collected because the debit order behind it is
+    // gone. Paused rather than ended, so this tells the member how to start it
+    // again rather than that they have lost it.
+    slug: 'goal-plan-paused',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimm Xa Mali Foundation: Your monthly plan for "{{goalTitle}}" is paused - we could not find an active debit order to collect from. Set one up and you can resume it.',
+  },
+  {
     // Sent to the members who pledged toward a Goal that lapsed without
     // reaching target. Plain hyphen, not an em dash: outside GSM-7 the whole
     // message is billed as UCS-2 and halves the character budget.
