@@ -324,7 +324,7 @@ export async function submitManualPayment(
   // them.
   const txStatus: TransactionStatus = toTransactionStatus(gatewayRes.status)
 
-  const transaction = await runTransaction(async (tx) => {
+  const written = await runTransaction(async (tx) => {
     const created = await transactionRepo.create(
       {
         contributionId: contribution.id,
@@ -340,12 +340,16 @@ export async function submitManualPayment(
       tx,
     )
 
-    if (txStatus === 'SUCCESS') {
-      await recalculateContributionStatus(contribution.id, tx)
-    }
+    const change =
+      txStatus === 'SUCCESS' ? await recalculateContributionStatus(contribution.id, tx) : null
 
-    return created
+    return { created, change }
   })
+
+  const { created: transaction, change: statusChange } = written
+
+  // After the commit, never inside it. See recalculateContributionStatus.
+  if (statusChange) await emitContributionStatusChange(statusChange)
 
   await Promise.all([
     cache.del(CACHE_KEYS.DASHBOARD_STATS),
@@ -402,17 +406,62 @@ function deriveContributionStatus(
   return 'PENDING'
 }
 
+/** A status change worth telling the rest of the system about. */
+export type ContributionStatusChange = {
+  userId: string
+  contributionId: string
+  status: string
+}
+
+/**
+ * Announce a contribution status change.
+ *
+ * Separate from the recalculation because it is a network call, and a network
+ * call has no business inside a database transaction — see
+ * {@link recalculateContributionStatus}.
+ */
+export async function emitContributionStatusChange(change: ContributionStatusChange): Promise<void> {
+  await inngest
+    .send({ name: InngestEvents.CONTRIBUTION_STATUS_CHANGED, data: change })
+    .catch((err) => {
+      logger.error('Failed to send contribution.status.changed event', {
+        contributionId: change.contributionId,
+        error: err instanceof Error ? err.message : String(err),
+      })
+    })
+}
+
+/**
+ * Re-derive a contribution's paid total and status from its settled inflows.
+ *
+ * **Returns the status change rather than always announcing it.** This used to
+ * `await inngest.send(...)` inline, and four of its callers run it inside a
+ * database transaction — so an HTTP round trip to Inngest sat in the middle of
+ * an interactive transaction whose timeout is five seconds.
+ *
+ * That is not a theoretical cost. With the event key unset the call took just
+ * under six seconds to fail, the transaction expired, and the whole write rolled
+ * back — *after* `submitManualPayment` had already charged the member at the
+ * gateway. Money left the account and no transaction row existed to show for
+ * it, and because the idempotency key is written in that same rolled-back
+ * transaction, the member's retry would have charged them a second time.
+ *
+ * So: when this owns the connection it announces the change itself. When it is
+ * handed a caller's transaction it returns the change and the caller announces
+ * it after the commit, where a slow third party can cost time but not money.
+ */
 export async function recalculateContributionStatus(
   contributionId: string,
-  tx: TxClient = db as unknown as TxClient,
-) {
+  tx?: TxClient,
+): Promise<ContributionStatusChange | null> {
+  const client = tx ?? (db as unknown as TxClient)
   for (let attempt = 1; attempt <= MAX_OPTIMISTIC_RETRIES; attempt++) {
     const [contribution, aggr] = await Promise.all([
-      contributionRepo.findUniqueWithVersion(contributionId, tx),
-      transactionRepo.aggregate({ contributionId, ...SUCCESSFUL_INFLOW }, tx),
+      contributionRepo.findUniqueWithVersion(contributionId, client),
+      transactionRepo.aggregate({ contributionId, ...SUCCESSFUL_INFLOW }, client),
     ])
 
-    if (!contribution) return
+    if (!contribution) return null
 
     const newAmountPaid = Number(aggr._sum.amount ?? 0)
     const status = deriveContributionStatus(
@@ -425,22 +474,19 @@ export async function recalculateContributionStatus(
       contributionId,
       contribution.version,
       { amountPaid: newAmountPaid, status, version: contribution.version + 1 },
-      tx,
+      client,
     )
 
     if (updated.count > 0) {
-      if (status === 'PAID' || status === 'OVERDUE') {
-        await inngest.send({
-          name: InngestEvents.CONTRIBUTION_STATUS_CHANGED,
-          data: { userId: contribution.userId, contributionId, status },
-        }).catch((err) => {
-          logger.error('Failed to send contribution.status.changed event', {
-            contributionId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        })
-      }
-      return
+      const change =
+        status === 'PAID' || status === 'OVERDUE'
+          ? { userId: contribution.userId, contributionId, status }
+          : null
+
+      // Announced here only when this owns the connection. Inside a caller's
+      // transaction the change is handed back, to be announced after commit.
+      if (change && !tx) await emitContributionStatusChange(change)
+      return change
     }
 
     if (attempt < MAX_OPTIMISTIC_RETRIES) {
@@ -454,6 +500,10 @@ export async function recalculateContributionStatus(
     logger.error('Optimistic lock conflict exhausted retries', { contributionId })
     throw new Error('Concurrent modification detected on contribution — retries exhausted')
   }
+
+  // Unreachable: the final attempt above either returns or throws. Stated so
+  // the signature can promise a change-or-null rather than allowing undefined.
+  return null
 }
 
 // ─── Webhook: transaction settlement ──────────────────────────────────────
@@ -488,7 +538,7 @@ export async function processTransactionWebhook(event: TransactionEvent) {
     }
   }
 
-  await runTransaction(async (tx) => {
+  const settledChange = await runTransaction(async (tx) => {
     await transactionRepo.update(
       transaction.id,
       {
@@ -499,8 +549,11 @@ export async function processTransactionWebhook(event: TransactionEvent) {
       tx,
     )
 
-    await recalculateContributionStatus(transaction.contributionId, tx)
+    return recalculateContributionStatus(transaction.contributionId, tx)
   })
+
+  // After the commit, never inside it. See recalculateContributionStatus.
+  if (settledChange) await emitContributionStatusChange(settledChange)
 
   await Promise.all([
     cache.del(CACHE_KEYS.DASHBOARD_STATS).catch(() => {}),
@@ -621,10 +674,15 @@ export async function createReversal(
 
     await transactionRepo.update(original.id, { status: 'REVERSED' }, tx)
 
-    await recalculateContributionStatus(original.contributionId, tx)
+    const change = await recalculateContributionStatus(original.contributionId, tx)
 
-    return rev
+    return { rev, change }
   })
+
+  const { rev: reversalTx, change: reversalChange } = reversal
+
+  // After the commit, never inside it. See recalculateContributionStatus.
+  if (reversalChange) await emitContributionStatusChange(reversalChange)
 
   // Back the reversed money out of the immutable pool ledger immediately, rather
   // than waiting for the nightly reconciler. Idempotent (unique refType+refId+
@@ -681,7 +739,7 @@ export async function createReversal(
     userId: adminId,
     action: 'TRANSACTION_REVERSED',
     entity: 'Transaction',
-    entityId: reversal.id,
+    entityId: reversalTx.id,
     payload: {
       originalTransactionId: transactionId,
       contributionId: original.contributionId,
@@ -692,12 +750,12 @@ export async function createReversal(
   })
 
   logger.info('Transaction reversed', {
-    reversalId: reversal.id,
+    reversalId: reversalTx.id,
     originalId: transactionId,
     amount: Number(original.amount),
   })
 
-  return reversal
+  return reversalTx
 }
 
 // ─── Overdue sweep ────────────────────────────────────────────────────────
