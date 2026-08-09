@@ -167,6 +167,25 @@ inside this system says so.
 count, over HTTP, which is a different failure domain. Point Better Stack at it
 with a body assertion on `"jobs":"ok"`. Fifteen minutes, needs a deploy.
 
+### 4.5a Public blob uploads — carried forward to the admin console
+
+Member statements were uploaded to Vercel Blob with `access: 'public'` and
+`addRandomSuffix: false`, at `statements/<userId>/<year>-<month>.pdf`. The URL
+was unauthenticated, permanent, and fully derivable from a member id. Fixed in
+#312 by streaming through the route and deleting the uploader.
+
+**The same pattern is still live in two other places**, deliberately left until
+the admin console is audited:
+
+- **Admin signatures** (`apps/admin/lib/signature-storage.ts`)
+- **Goal outcome media** (`apps/admin/lib/outcome-storage.ts`)
+
+`access: 'public'` is the storage adapter's **default** (`options.access ?? 'public'`
+in `vercel-blob.adapter.ts`), so anything uploaded without an explicit choice is
+world-readable by URL. An admin's signature image at a guessable public URL is
+the same class of problem as the statement was, and is the one to look at first
+when that area comes up.
+
 ### 4.6 Staging has no branch
 
 `docs/environment-setup-plan.md` mapped `Dev` → staging. With `Dev` gone,
