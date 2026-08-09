@@ -27,6 +27,9 @@ vi.mock('@/repositories/user.repository', () => ({
 vi.mock('@/repositories/contribution.repository', () => ({ contributionRepo: { findMany: vi.fn(), aggregate: vi.fn() } }))
 vi.mock('@/repositories/mandate.repository', () => ({ mandateRepo: { findActiveByUser: vi.fn(), findByUser: vi.fn() } }))
 vi.mock('@/repositories/notification.repository', () => ({ notificationRepo: { findPreferences: vi.fn(), upsertPreferences: vi.fn() } }))
+// A phone change now warns the number it replaced, so this service reaches the
+// SMS provider — which validates env at module load. Mocked, not exercised.
+vi.mock('@/integrations/sms', () => ({ smsProvider: { send: vi.fn().mockResolvedValue(undefined) } }))
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
