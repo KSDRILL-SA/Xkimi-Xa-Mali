@@ -41,6 +41,7 @@ export const POST = withApiHandler<{ id: string }>(async (
     session.user.roles ?? [],
     parsed.data.amount,
     ip,
+    parsed.data.idempotencyKey,
   )
   return apiSuccess(result, 201)
 })

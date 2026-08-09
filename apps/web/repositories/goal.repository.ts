@@ -112,6 +112,17 @@ export const goalRepo = {
   // ─── GoalPayment methods ────────────────────────────────────────────────
 
   /** Record a directed goal payment. */
+  /**
+   * A goal payment already recorded under this token.
+   *
+   * findUnique on the unique column: asking by the index is what makes a
+   * duplicate submission collapse onto the first payment instead of becoming a
+   * second debit.
+   */
+  findPaymentByIdempotencyKey(idempotencyKey: string) {
+    return db.goalPayment.findUnique({ where: { idempotencyKey } })
+  },
+
   createPayment(data: Prisma.GoalPaymentUncheckedCreateInput) {
     return db.goalPayment.create({ data })
   },
