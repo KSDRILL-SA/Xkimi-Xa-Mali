@@ -64,3 +64,9 @@ packages/database/prisma/dev.db-journal
 # Playwright MCP run artefacts — console logs and page snapshots from a
 # browser-driven integration pass. Evidence for one sitting, not repository state.
 .playwright-mcp/
+
+# Assistant tool config generated locally. AGENTS.md is vendor-neutral and
+# kept; vendor-named equivalents are never committed — see the naming rule in
+# ENGINEERING_WORKFLOW.md §5.4.
+CLAUDE.md
+**/CLAUDE.md
