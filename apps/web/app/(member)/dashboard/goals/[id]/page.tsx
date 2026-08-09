@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
@@ -27,6 +27,7 @@ export default async function GoalDetailPage({
   params: Promise<{ id: string }>
 }) {
   const session = await getSession()
+  if (!session?.user?.id) redirect('/login')
   const roles = (session?.user?.roles as string[] | undefined) ?? []
   const { id } = await params
 
@@ -44,8 +45,8 @@ export default async function GoalDetailPage({
   const canPay = env.ENABLE_MANUAL_PAYMENTS && goal.status === 'ACTIVE'
 
   const [engagement, memberHasMandate] = await Promise.all([
-    getGoalEngagement(id, session!.user.id, roles),
-    canPay ? hasActiveMandate(session!.user.id, session!.user.id, roles) : Promise.resolve(false),
+    getGoalEngagement(id, session.user.id, roles),
+    canPay ? hasActiveMandate(session.user.id, session.user.id, roles) : Promise.resolve(false),
   ])
 
   const st = statusTheme(goal.status)

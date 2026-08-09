@@ -8,7 +8,12 @@ import type { Contribution } from '@xxm/types'
 
 export async function DashboardRecentContributions() {
   const session = await getSession()
-  const userId = session!.user.id
+  // Returns nothing rather than redirecting. A section renders inside a
+  // SectionBoundary, and Next's redirect() works by throwing — an error
+  // boundary would catch it and drop the section instead of navigating. The
+  // page above this one holds the redirect; this is only the assertion removed.
+  if (!session?.user?.id) return null
+  const userId = session.user.id
 
   const recentContributions = await getRecentContributions(userId, 5)
 

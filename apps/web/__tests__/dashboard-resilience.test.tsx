@@ -104,3 +104,42 @@ describe('the dashboard wires every section', () => {
     expect(page).not.toContain('session!.user')
   })
 })
+
+describe('navigation is not an error', () => {
+  /**
+   * Next signals navigation by throwing. `redirect()` and `notFound()` raise
+   * errors carrying a digest the framework catches higher up — so a boundary
+   * that treats every throw as a failure swallows them, and a section calling
+   * `redirect('/login')` disappears from the page instead of sending the member
+   * to sign in.
+   *
+   * That was live from the moment this component shipped in #313.
+   */
+  function navigationError(digest: string) {
+    const err = new Error('NEXT_REDIRECT') as Error & { digest: string }
+    err.digest = digest
+    return err
+  }
+
+  it('rethrows a redirect rather than catching it', () => {
+    expect(() => SectionBoundary.getDerivedStateFromError(navigationError('NEXT_REDIRECT;replace;/login;307')))
+      .toThrow()
+  })
+
+  it('rethrows a not-found', () => {
+    expect(() => SectionBoundary.getDerivedStateFromError(navigationError('NEXT_HTTP_ERROR_FALLBACK;404')))
+      .toThrow()
+  })
+
+  it('still catches an ordinary failure', () => {
+    expect(SectionBoundary.getDerivedStateFromError(new Error('query timed out')))
+      .toEqual({ failed: true })
+  })
+
+  it('does not report a navigation as a broken section', () => {
+    const instance = new SectionBoundary({ label: 'insights' } as never)
+    expect(() => instance.componentDidCatch(navigationError('NEXT_REDIRECT;replace;/login;307')))
+      .toThrow()
+    expect(mocks.logError).not.toHaveBeenCalled()
+  })
+})

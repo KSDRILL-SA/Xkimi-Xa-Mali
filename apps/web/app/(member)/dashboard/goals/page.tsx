@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import type { Route } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
@@ -25,7 +26,8 @@ export default async function GoalsPage({
   searchParams: Promise<{ status?: string }>
 }) {
   const session = await getSession()
-  const roles = (session!.user.roles as string[] | undefined) ?? []
+  if (!session?.user?.id) redirect('/login')
+  const roles = (session.user.roles as string[] | undefined) ?? []
   const admin = isAdmin(roles)
   const params = await searchParams
 
