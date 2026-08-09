@@ -53,6 +53,85 @@ Seven PRs, all squash-merged to `main`.
 
 ---
 
+## 2d. Session of 2026-08-09/10 — the money path, and goal plans
+
+Six PRs, all squash-merged to `main`.
+
+| PR | What was actually wrong |
+|---|---|
+| #331 | **The worst bug found so far.** `recalculateContributionStatus` announced a status change with `await inngest.send(...)`, and four callers run it inside a Prisma interactive transaction (timeout 5s). With the event key unset the call took ~5.9s, the transaction expired, and the whole write rolled back — *after* `submitManualPayment` had already charged the member. Money gone, no transaction row, and the idempotency key was in the same rolled-back transaction, so the member's retry would have charged them again |
+| #332 | Every normal statement ran to two pages with page 2 holding only the notice and signature on an otherwise empty sheet |
+| #333 | `/dashboard/contribute` was the only member route with no browser-tab title — it is the only one written as a client component, and a client component cannot export `metadata` |
+| #334 | The page called "Make a Payment" could only make one kind of payment. Paying a chosen goal existed in the backend, reachable only from that goal's own page |
+| #335 | Goal plans: schema + service |
+| #336 | Goal plans: the daily collection job |
+
+**#331 also explains a second symptom.** Badge recalculation is triggered by
+`xxm/contribution.status.changed` — the very event that was failing. The test
+member's badge had read AMATEUR with every score at 0 since 11 June while they
+had three PAID contributions. Running the real recalculation produced SEMI_PRO,
+overall 80, 86.7% toward PRO. The logic was always right; nothing was ever
+calling it.
+
+### What was verified against the running app, not just tested
+
+- `POST /api/v1/contributions/pay` → 201, contribution PARTIAL 250/400 → PAID 400/400
+- R50 to "E2E Fund" → SUCCESS, goal moved to R50, and the older **REVERSED** R500
+  stayed excluded — the derived total is still reversal-safe (#237 holds)
+- The overfunding warning fired at R2 000 against a goal needing R644
+- Statement re-rendered: `Pages: 1`, footer reads "Page 1 of 1"
+
+### Goal plans — where this got to
+
+A member can commit to funding one goal every month: an amount, a day, and the
+goal. Collections charge the member's **existing** mandate; there is no mandate
+per plan because `findActiveByUser` is singular and the one-active-or-pending
+rule enforces it.
+
+**Owner decisions taken this session:** the monthly amount is *suggested*
+(remaining ÷ months left) but the member may change it; a failed collection
+retries once, then notifies, and the plan stays ACTIVE.
+
+**Shipped:** schema + migration (#335), service, and the daily collection job
+(#336).
+
+**Still to build — PR 3 and PR 4 of four:**
+1. **PR 3 — enrolment UI.** A "set up a monthly plan" path from the goal page
+   and/or Make a Payment. `suggestPlan` already returns `committedMonthly` so
+   the screen can show the member's true total commitment, which matters
+   because each plan is a separate debit with its own fee.
+2. **PR 4 — manage.** List, pause, resume, cancel. `cancelPlan` exists;
+   **resume does not** — a PAUSED plan currently has no way back to ACTIVE.
+   That is the gap to close first, since the collection job pauses plans on its
+   own when a mandate disappears.
+
+There is also **no API route** for any of the plan service functions yet — PR 3
+needs those before the UI can call anything.
+
+### Open findings, not yet fixed
+
+- **The fund-year bug.** `syncPrimaryGoalProgress` derives the primary fund's
+  total using `deadline.getFullYear()` and sums contributions `WHERE periodYear
+  = that year`. A fund whose deadline falls in 2027 therefore counts **nothing**
+  paid during 2026 — it shows R0 while members pay faithfully. The owner was
+  asked and has not yet chosen between "count everything since the fund was
+  designated" and "keep calendar-year behaviour". **Do not change a money
+  derivation without that answer.**
+- **`payToGoal` has no overfunding cap.** #334 warns the member on the way in,
+  but the service still accepts any amount from any other caller.
+- **A R10 goal payment costs R20.** `MIN_GOAL_PAYMENT` is 10 and
+  `NETCASH_FEE_BUFFER` is 10, so the minimum permitted payment doubles at the
+  gateway. Worth an owner decision on the minimum.
+
+### The flaky suite — one more data point
+
+Recurred once as `env-netcash` + `whatsapp.preferences`, the same pair as
+before. Both pass standalone (22/22) and passed on four subsequent full runs, so
+it was not captured with output again. Every full suite run since has been
+green. See §4.12.
+
+---
+
 ## 2a. The member-app pass — all 25 pages audited
 
 **The method, agreed with the owner:** one page at a time, all five tasks on
