@@ -13,6 +13,7 @@ import { postPoolCredit, postPoolDebit } from './ledger.service'
 import { queueNotification } from './notification.service'
 import { syncPrimaryGoalProgress, syncAdditionalGoalProgress } from './goal.service'
 import { logger } from '@xxm/observability'
+import { toTransactionStatus } from '@/lib/transaction-status'
 
 type GoalForPayment = {
   id: string
@@ -111,6 +112,8 @@ export async function payToGoal(
   roles: string[],
   rawAmount: number,
   ip?: string,
+  /** One token per payment the member intends. See the key below. */
+  token?: string,
 ) {
   assertCanAccess(userId, requesterId, roles)
 
@@ -131,7 +134,33 @@ export async function payToGoal(
     throw new MandateConflictError('An active payment mandate is required to contribute to a goal', 'CTR_002')
   }
 
-  const idempotencyKey = `goal:${goalId}:${userId}:${randomUUID()}`
+  // One token per payment the member intends, supplied by the client.
+  //
+  // This ended in randomUUID(), so it was unique on every request and provided
+  // no idempotency at all — a double tap on "contribute to this goal" took the
+  // money twice. Identical to the defect fixed in the contribution path (#309);
+  // this is the sibling path, and it had it too.
+  //
+  // A member may legitimately give to one goal more than once, so the key
+  // cannot be derived from the goal and the member alone. What it can refuse is
+  // the same *intent* submitted twice.
+  const clientToken = token ?? randomUUID()
+  const idempotencyKey = `goal:${goalId}:${userId}:${clientToken}`
+
+  if (!token) {
+    logger.warn('Goal payment submitted without an idempotency token', { userId, goalId })
+  }
+
+  // Checked before the gateway, never after. Submitting first and writing
+  // second means two concurrent requests produce two debits and only then
+  // collide — by which point the member has paid twice.
+  const alreadyPaid = await goalRepo.findPaymentByIdempotencyKey(idempotencyKey)
+  if (alreadyPaid) {
+    logger.info('Goal payment already submitted under this token', {
+      userId, goalId, paymentId: alreadyPaid.id,
+    })
+    return { payment: alreadyPaid, status: alreadyPaid.status, duplicate: true as const }
+  }
 
   const gatewayRes = await paymentGateway.submitOnceOffDebit({
     mandateId: mandate.netcashMandateId,
@@ -140,7 +169,14 @@ export async function payToGoal(
     idempotencyKey,
   })
 
-  const status = gatewayRes.status === 'SUCCESS' ? 'SUCCESS' : 'PENDING'
+  // The gateway answers with three outcomes and this collapsed them onto two.
+  // The fifth copy of §4.6 — debit-run, transaction-retry-failed,
+  // mandate-delay-handler and the manual contribution path each carried it.
+  //
+  // Here a declined goal payment was written PENDING, so the member was told
+  // their contribution to the fund was on its way, the goal's progress waited
+  // on a settlement that was never coming, and nothing retried it.
+  const status = toTransactionStatus(gatewayRes.status)
 
   const payment = await goalRepo.createPayment({
     goalId,

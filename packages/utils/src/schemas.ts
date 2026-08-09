@@ -270,6 +270,8 @@ export const RecordProgressSchema = z.object({
 export const MIN_GOAL_PAYMENT = 10
 
 export const GoalPaymentSchema = z.object({
+  /** One token per payment the member intends. See ManualContributionSchema. */
+  idempotencyKey: z.string().uuid().optional(),
   amount: z
     .number({ required_error: 'Amount is required' })
     .min(MIN_GOAL_PAYMENT, `The minimum payment toward a goal is R${MIN_GOAL_PAYMENT}`)

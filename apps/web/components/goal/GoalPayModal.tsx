@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -28,6 +28,11 @@ const QUICK_AMOUNTS = [50, 100, 250, 500]
 
 export function GoalPayModal({ goalId, goalTitle, remaining, onClose }: Props) {
   const router = useRouter()
+  // One token per payment this modal is offering to make. A double tap or a
+  // retried request carries the same one and collapses onto the first debit;
+  // opening the modal again is a new intent with a new token.
+  const paymentToken = useRef<string>(crypto.randomUUID())
+
   const [serverError, setServerError] = useState('')
   const [needsMandate, setNeedsMandate] = useState(false)
   const [result, setResult] = useState<PayResult | null>(null)
@@ -63,7 +68,10 @@ export function GoalPayModal({ goalId, goalTitle, remaining, onClose }: Props) {
     setServerError('')
     setNeedsMandate(false)
     try {
-      const res = await api.post<PayResult>(`/api/v1/goals/${goalId}/pay`, data)
+      const res = await api.post<PayResult>(`/api/v1/goals/${goalId}/pay`, {
+        ...data,
+        idempotencyKey: paymentToken.current,
+      })
       setResult(res)
       router.refresh()
     } catch (err: unknown) {
