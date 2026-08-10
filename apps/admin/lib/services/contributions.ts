@@ -1,6 +1,7 @@
 import { ContributionStatus, MandateStatus, UserStatus } from '@prisma/client'
+import { refusePeriod, PERIOD_REFUSAL_MESSAGE } from '@xxm/utils/contribution-period'
 import { db, Prisma } from '@/lib/db'
-import { assertAdmin, writeAuditLog } from './shared'
+import { assertAdmin, writeAuditLog, AdminConflictError } from './shared'
 
 // ─── Contributions ────────────────────────────────────────────────────────────
 
@@ -68,6 +69,12 @@ export async function generateContributions(
 ) {
   assertAdmin(adminRoles)
 
+  // The month and year arrive from `parseInt` on a form field. The database
+  // refuses an impossible period, but it does so with a constraint violation
+  // after the press — and it considers every month from 2020 to 2100 possible.
+  const refusal = refusePeriod({ month, year })
+  if (refusal) throw new AdminConflictError(PERIOD_REFUSAL_MESSAGE[refusal])
+
   const mandates = await db.paymentMandate.findMany({
     where: { status: MandateStatus.ACTIVE, user: { status: UserStatus.ACTIVE } },
     select: { userId: true, debitDay: true, amount: true },
@@ -110,4 +117,40 @@ export async function generateContributions(
   })
 
   return { created, skipped, total: mandates.length }
+}
+
+/**
+ * What generating this period would do, without doing it.
+ *
+ * The console offered no confirmation on the widest action it has, while
+ * reversing a single transaction — one member, one amount, and undoable in the
+ * sense that the entry stays visible — asks the admin to confirm in a dialog
+ * that spells out the consequence. The proportion was backwards.
+ *
+ * Cheap enough to run on every render of the page: two counts, both indexed.
+ */
+export async function previewGeneration(
+  adminRoles: string[], month: number, year: number,
+): Promise<{ eligible: number; alreadyHave: number; toCreate: number }> {
+  assertAdmin(adminRoles)
+  if (refusePeriod({ month, year })) return { eligible: 0, alreadyHave: 0, toCreate: 0 }
+
+  const mandates = await db.paymentMandate.findMany({
+    where: { status: MandateStatus.ACTIVE, user: { status: UserStatus.ACTIVE } },
+    select: { userId: true },
+  })
+  if (mandates.length === 0) return { eligible: 0, alreadyHave: 0, toCreate: 0 }
+
+  const alreadyHave = await db.contribution.count({
+    where: {
+      userId: { in: mandates.map((m) => m.userId) },
+      periodMonth: month, periodYear: year,
+    },
+  })
+
+  return {
+    eligible: mandates.length,
+    alreadyHave,
+    toCreate: mandates.length - alreadyHave,
+  }
 }
