@@ -71,3 +71,21 @@ export const adminBulkActionRatelimit = makeRatelimit(
   'xxm:ratelimit:admin-bulk-action',
   Ratelimit.slidingWindow(5, '1 h'),
 )
+
+/**
+ * Taking a copy of the membership's personal information out of the system.
+ *
+ * A member downloading their own statement is held to ten an hour. An admin
+ * downloading every member's name, email address and phone number was held to
+ * nothing at all — the same inverted proportion found on the pages either side
+ * of this one, except that here what leaves the building is other people's
+ * personal information rather than a number.
+ *
+ * Twenty an hour is generous for legitimate use — a report is pulled once for
+ * a period, occasionally re-pulled — while putting a ceiling on how much can be
+ * taken through one session that should not have it.
+ */
+export const adminExportRatelimit = makeRatelimit(
+  'xxm:ratelimit:admin-export',
+  Ratelimit.slidingWindow(20, '1 h'),
+)

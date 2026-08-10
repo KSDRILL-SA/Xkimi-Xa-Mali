@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { writeAuditLog } from '@/lib/services/shared'
+import { adminExportRatelimit } from '@/lib/rate-limit'
+import { clientIpFromHeaders } from '@xxm/utils/client-ip'
 import { auth } from '@/lib/auth'
 import { WEB_BASE_URL } from '@/lib/env'
 
@@ -23,6 +26,24 @@ export async function GET(req: NextRequest) {
   if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2024) {
     return new NextResponse('Missing or invalid month or year', { status: 400 })
   }
+
+  const { success } = await adminExportRatelimit.limit(session.user.id)
+  if (!success) {
+    return new NextResponse('Export limit reached. Please try again later.', { status: 429 })
+  }
+
+  // The same record the CSV route writes, for the same reason: this is a copy
+  // of the membership's personal information leaving the system, and until now
+  // nothing said who took it. Written before the fetch, so an entry exists even
+  // if the report service is the thing that fails.
+  await writeAuditLog({
+    userId: session.user.id,
+    action: 'ADMIN_CONTRIBUTIONS_EXPORTED',
+    entity: 'Contribution',
+    entityId: `${year}-${String(month).padStart(2, '0')}`,
+    payload: { month, year, format: 'pdf' },
+    ipAddress: clientIpFromHeaders(req.headers) ?? 'unknown',
+  })
 
   const base   = WEB_BASE_URL
   const secret = process.env['ADMIN_API_SECRET']
