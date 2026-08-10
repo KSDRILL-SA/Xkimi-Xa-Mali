@@ -275,7 +275,19 @@ export const RecordProgressSchema = z.object({
  * anything less costs more in fees than it adds to the fund. Shared so the
  * schema and the service enforce the same floor.
  */
-export const MIN_GOAL_PAYMENT = 10
+/**
+ * The smallest payment toward a goal worth making.
+ *
+ * Netcash's fee is a flat R10, added to what the member is debited so the goal
+ * still nets the full amount. At a R10 minimum that meant paying R20 to give
+ * R10 — half of it to the gateway — and the same arithmetic applied to a
+ * monthly plan set at the minimum, every month.
+ *
+ * R50 keeps the worst case at a fifth rather than a half. It is deliberately
+ * well below the R100 monthly contribution minimum: chipping in extra is
+ * supposed to be something a member can do with what they have.
+ */
+export const MIN_GOAL_PAYMENT = 50
 
 export const GoalPaymentSchema = z.object({
   /** One token per payment the member intends. See ManualContributionSchema. */
