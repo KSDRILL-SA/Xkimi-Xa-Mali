@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   findActiveByUser: vi.fn(),
   findByKey: vi.fn(),
   createPayment: vi.fn(),
+  updatePayment: vi.fn(),
   submitOnceOffDebit: vi.fn(),
   logWarn: vi.fn(),
 }))
@@ -38,6 +39,7 @@ vi.mock('@/repositories/goal.repository', () => ({
     findById: mocks.findById,
     findPaymentByIdempotencyKey: mocks.findByKey,
     createPayment: mocks.createPayment,
+    updatePayment: mocks.updatePayment,
   },
 }))
 vi.mock('@/repositories/mandate.repository', () => ({
@@ -68,6 +70,7 @@ beforeEach(() => {
   mocks.findActiveByUser.mockResolvedValue({ netcashMandateId: 'NC-1' })
   mocks.findByKey.mockResolvedValue(null)
   mocks.createPayment.mockImplementation(async (d: { status: string }) => ({ id: 'pay-1', ...d }))
+  mocks.updatePayment.mockImplementation(async (id: string, d: object) => ({ id, ...d }))
 })
 
 const pay = (token?: string) => payToGoal('goal-1', 'user-1', 'user-1', [], 500, undefined, token)
@@ -78,7 +81,9 @@ describe('what the bank actually said', () => {
 
     const result = await pay(TOKEN)
 
-    expect(mocks.createPayment.mock.calls[0][0].status).toBe('FAILED')
+    // Written by the update now, not the insert: the row is claimed as PENDING
+    // before the gateway is touched, so the claim can never carry the outcome.
+    expect(mocks.updatePayment.mock.calls[0][1].status).toBe('FAILED')
     expect(result.status).toBe('FAILED')
   })
 
@@ -99,7 +104,7 @@ describe('what the bank actually said', () => {
 
     await pay(TOKEN)
 
-    expect(mocks.createPayment.mock.calls[0][0].processedAt).toBeNull()
+    expect(mocks.updatePayment.mock.calls[0][1].processedAt).toBeNull()
   })
 
   it('uses the shared mapper rather than a fifth copy of the rule', async () => {

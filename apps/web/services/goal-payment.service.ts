@@ -5,7 +5,7 @@ import { mandateRepo } from '@/repositories/mandate.repository'
 import { paymentGateway } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
 import { assertCanAccess } from '@/lib/authorization'
-import { GoalNotFoundError, GoalConflictError, MandateConflictError } from '@/lib/errors'
+import { GoalNotFoundError, GoalConflictError, MandateConflictError, isUniqueViolation } from '@/lib/errors'
 import { MIN_GOAL_PAYMENT } from '@/lib/validation/goal'
 import { roundZAR } from '@/lib/money'
 import { writeAuditLog } from './audit.service'
@@ -162,6 +162,39 @@ export async function payToGoal(
     return { payment: alreadyPaid, status: alreadyPaid.status, duplicate: true as const }
   }
 
+  // Claim the key before the gateway is touched.
+  //
+  // The lookup above protects a member who submits again after the first
+  // request finished. It cannot protect two requests that pass it together —
+  // a double tap does exactly that, both read nothing, both charge, and only
+  // the second collides on the unique index afterwards. Which is the very
+  // thing the comment above was written to prevent: the member is debited
+  // twice at Netcash and left with one payment row and a 500.
+  //
+  // Writing the row first makes the unique index the arbiter instead of the
+  // gap between a read and a write. Exactly one request reaches the gateway;
+  // the loser finds the row it collided with and reports the duplicate it is.
+  let payment
+  try {
+    payment = await goalRepo.createPayment({
+      goalId,
+      userId,
+      amount,
+      status: 'PENDING',
+      idempotencyKey,
+      gatewayRef: null,
+      processedAt: null,
+    })
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err
+    const existing = await goalRepo.findPaymentByIdempotencyKey(idempotencyKey)
+    if (!existing) throw err
+    logger.info('Goal payment already claimed under this token', {
+      userId, goalId, paymentId: existing.id,
+    })
+    return { payment: existing, status: existing.status, duplicate: true as const }
+  }
+
   const gatewayRes = await paymentGateway.submitOnceOffDebit({
     mandateId: mandate.netcashMandateId,
     amount: debitAmountWithFee(amount),
@@ -178,12 +211,12 @@ export async function payToGoal(
   // on a settlement that was never coming, and nothing retried it.
   const status = toTransactionStatus(gatewayRes.status)
 
-  const payment = await goalRepo.createPayment({
-    goalId,
-    userId,
-    amount,
+  // The row already exists — this settles what the gateway said about it. The
+  // result is deliberately not reassigned over `payment`: everything below
+  // needs the id, which the claimed row already carries, and rebinding it makes
+  // the whole function depend on what an update happens to return.
+  await goalRepo.updatePayment(payment.id, {
     status,
-    idempotencyKey,
     gatewayRef: gatewayRes.transactionRef ?? null,
     processedAt: status === 'SUCCESS' ? new Date() : null,
   })
