@@ -219,3 +219,27 @@ export async function getNudgeOutcomes(
     toOutcome('debit-morning-warning', 'Contribution settled this month', debitDay),
   ]
 }
+
+/**
+ * How many people a broadcast would actually reach, per filter.
+ *
+ * Broadcasting is the one action on this console that reaches everybody at
+ * once, costs real money per recipient when SMS is chosen, and cannot be
+ * recalled. It was a plain submit button, and the admin could not see how many
+ * people were behind the filter they had picked until after it had gone.
+ *
+ * Four counts on an indexed column, on a page that is opened to send one
+ * message.
+ */
+export async function getBroadcastAudience(adminRoles: string[]) {
+  assertAdmin(adminRoles)
+
+  const [all, active, pending, suspended] = await Promise.all([
+    db.user.count(),
+    db.user.count({ where: { status: 'ACTIVE' } }),
+    db.user.count({ where: { status: 'PENDING' } }),
+    db.user.count({ where: { status: 'SUSPENDED' } }),
+  ])
+
+  return { ALL: all, ACTIVE: active, PENDING: pending, SUSPENDED: suspended }
+}
