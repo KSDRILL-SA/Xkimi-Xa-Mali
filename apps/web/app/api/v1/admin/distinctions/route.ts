@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, getInternalAdminUserId } from '@/lib/internal-request'
+import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import {
   grantDistinction,
   removeDistinction,
@@ -47,14 +47,15 @@ async function resolveAdmin(req: NextRequest): Promise<
   { ok: true; adminId: string } | { ok: false; response: ReturnType<typeof apiError> }
 > {
   if (isValidInternalRequest(req)) {
-    // The console has already run `requireAdmin`, which includes the
-    // role-version staleness check, so a demoted admin never reaches here. What
-    // it must still hand over is who acted.
-    const forwarded = getInternalAdminUserId(req)
+    // Who acted, confirmed against the database rather than believed. The
+    // console runs `requireAdmin` first, but a distinction is conferred by a
+    // named person and kept forever — so the name is checked here too, which
+    // also closes the window where that person is demoted in between.
+    const forwarded = await resolveInternalAdmin(req)
     if (!forwarded) {
       return {
         ok: false,
-        response: apiError('VAL_004', 'A trusted request must name the acting admin', 400),
+        response: apiError('VAL_004', 'A trusted request must name a current admin', 400),
       }
     }
     return { ok: true, adminId: forwarded }

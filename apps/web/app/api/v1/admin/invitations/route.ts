@@ -6,7 +6,7 @@ import {
   generateInvite, listInvitations,
 } from '@/services/invite.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, getInternalAdminUserId } from '@/lib/internal-request'
+import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 const SA_PHONE = /^(\+27|0)[6-8][0-9]{8}$/
@@ -33,9 +33,12 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   if (!isTrusted && !session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
   // On the trusted server-to-server path the admin app forwards the acting
-  // admin's real user id; it's required because invitedById is a FK to User.
-  const adminId = isTrusted ? (getInternalAdminUserId(req) ?? '') : session!.user.id
-  if (!adminId) return apiError('SYS_002', 'Missing admin identity', 401)
+  // admin's real user id. It is required because invitedById is a FK to User —
+  // and confirmed against the database rather than believed, so an invitation
+  // cannot be recorded against someone who never sent it, or against an admin
+  // who has since been demoted.
+  const adminId = isTrusted ? await resolveInternalAdmin(req) : session!.user.id
+  if (!adminId) return apiError('SYS_002', 'Missing or unrecognised admin identity', 401)
   const roles   = isTrusted ? ['ADMIN'] : (session!.user.roles as string[] | undefined) ?? []
 
   const rlKey = isTrusted ? 'internal-admin-invite' : adminId

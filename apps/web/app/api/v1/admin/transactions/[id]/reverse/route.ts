@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { createReversal } from '@/services/contribution.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, getInternalAdminUserId } from '@/lib/internal-request'
+import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 /**
@@ -44,9 +44,14 @@ export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { pa
     // role-version staleness check — a demoted admin never gets this far. What
     // it must still hand over is who acted, because that is what the audit
     // entry records and "system" would be a lie about a money movement.
-    const forwarded = getInternalAdminUserId(req)
+    // Confirmed against the database rather than believed. The console has
+    // already run `requireAdmin`, but this route's promise is that the history
+    // can be retraced years later — and an actor nobody checked is not that.
+    // It also closes the window where an admin is demoted between the
+    // console's check and this one.
+    const forwarded = await resolveInternalAdmin(req)
     if (!forwarded) {
-      return apiError('VAL_004', 'A trusted reversal must name the acting admin', 400)
+      return apiError('VAL_004', 'A trusted reversal must name a current admin', 400)
     }
     adminId = forwarded
     adminRoles = ['ADMIN']
