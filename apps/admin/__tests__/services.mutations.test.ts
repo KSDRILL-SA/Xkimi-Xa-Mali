@@ -11,6 +11,8 @@ vi.mock('@/lib/db', () => ({
     role:            { findUnique: vi.fn() },
     // `count` is how a revocation establishes there is another admin to fall
     // back on. Left off, the policy refuses rather than guessing.
+    goal:            { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), create: vi.fn(), delete: vi.fn() },
+    goalProgress:    { create: vi.fn() },
     userRole:        { upsert: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
     paymentMandate:  { findMany: vi.fn() },
     contribution:    { findMany: vi.fn(), createMany: vi.fn() },
@@ -36,6 +38,7 @@ import {
   setMemberStatus,
   setMemberRole,
   generateContributions,
+  recordGoalProgress,
   createSignature,
   updateSignature,
   AdminConflictError,
@@ -406,5 +409,42 @@ describe('SignatureLockError', () => {
   it('carries the date the lock lifts', () => {
     const at = new Date('2026-12-01T00:00:00.000Z')
     expect(new SignatureLockError(at).nextChangeAllowedAt).toBe(at.toISOString())
+  })
+})
+
+describe('recordGoalProgress — the figure an admin types', () => {
+  it('refuses zero out loud, rather than doing nothing quietly', async () => {
+    // The page used to `return` on a non-positive amount. The admin pressed the
+    // button, nothing happened, and nothing said why — which is the same thing
+    // as success from where they were standing.
+    await expect(recordGoalProgress('a1', ADMIN, 'g1', 0))
+      .rejects.toThrow(/greater than zero/i)
+    expect(db.goal.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('refuses a negative amount', async () => {
+    // Progress that goes backwards is not progress, and `chk_goal_current_nonneg`
+    // would only catch it once the total had already been driven below zero.
+    await expect(recordGoalProgress('a1', ADMIN, 'g1', -5000))
+      .rejects.toThrow(/greater than zero/i)
+  })
+
+  it('refuses a figure that is not a number at all', async () => {
+    // `Number(fd.get('amount'))` on an empty or malformed field.
+    await expect(recordGoalProgress('a1', ADMIN, 'g1', NaN))
+      .rejects.toThrow(/greater than zero/i)
+    await expect(recordGoalProgress('a1', ADMIN, 'g1', Infinity))
+      .rejects.toThrow(/greater than zero/i)
+  })
+
+  it('still refuses to adjust the primary fund by hand', async () => {
+    // Kept: that total is derived, so a typed figure would be overwritten by
+    // the next sync and leave a phantom progress record behind.
+    mock(db.goal.findUnique).mockResolvedValue({
+      id: 'g1', status: 'ACTIVE', isPrimary: true, currentAmount: 0, targetAmount: 1000, version: 0,
+    } as never)
+
+    await expect(recordGoalProgress('a1', ADMIN, 'g1', 100))
+      .rejects.toThrow(/fills automatically/i)
   })
 })

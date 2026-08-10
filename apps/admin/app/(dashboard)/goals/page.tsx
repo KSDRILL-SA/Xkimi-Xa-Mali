@@ -64,9 +64,9 @@ async function recordGoalProgressAction(fd: FormData) {
   'use server'
   const goalId = fd.get('goalId') as string
   const { userId, roles: sr } = await requireAdmin('goal.recordProgress')
-  const amount = Number(fd.get('amount'))
-  if (!amount || amount <= 0) return
-  await recordGoalProgress(userId, sr, goalId, amount)
+  // The service refuses a bad amount and says so. Returning quietly here left
+  // the admin looking at a button that had apparently done nothing.
+  await recordGoalProgress(userId, sr, goalId, Number(fd.get('amount')))
   revalidatePath('/goals')
 }
 
