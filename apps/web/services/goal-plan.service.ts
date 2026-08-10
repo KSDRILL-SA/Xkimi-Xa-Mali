@@ -328,3 +328,71 @@ export async function collectDuePlans(now = new Date()): Promise<{
 
   return { collected, failed, completed, paused }
 }
+
+/**
+ * Restart a plan that stopped without the member choosing to stop it.
+ *
+ * The collection job pauses a plan itself when the debit order behind it has
+ * gone, and until now there was no way back — the member replaced their mandate
+ * and the plan stayed paused for good, silently, with nothing to click.
+ *
+ * Only PAUSED comes back. CANCELLED and COMPLETED are terminal by intent: one
+ * is the member's decision and the other is a goal that is finished, and
+ * reviving either would take money nobody asked for.
+ */
+export async function resumePlan(
+  planId: string,
+  userId: string,
+  requesterId: string,
+  roles: string[],
+  ip?: string,
+) {
+  assertCanAccess(userId, requesterId, roles)
+
+  const plan = await goalPlanRepo.findById(planId)
+  if (!plan || plan.userId !== userId) throw new GoalNotFoundError()
+  if (plan.status !== 'PAUSED') {
+    throw new GoalConflictError('Only a paused plan can be resumed', 'GPL_008')
+  }
+
+  // Whatever paused it must be fixed first, or the next collection pauses it
+  // straight back and the member learns nothing from having pressed the button.
+  const mandate = await mandateRepo.findActiveByUser(userId)
+  if (!mandate?.netcashMandateId) {
+    throw new MandateConflictError(
+      'An active debit order is required before you can resume a plan',
+      'CTR_002',
+    )
+  }
+
+  const goal = (await goalRepo.findById(plan.goalId)) as GoalForPlan | null
+  if (!goal) throw new GoalNotFoundError()
+  if (goal.status !== 'ACTIVE' || goal.deadline.getTime() <= Date.now()) {
+    throw new GoalConflictError(
+      'This goal is no longer open, so the plan cannot be resumed',
+      'GPL_009',
+    )
+  }
+
+  const updated = await goalPlanRepo.updateByVersion(planId, plan.version, {
+    status: 'ACTIVE',
+    // The pause reason is cleared: it described a state that no longer holds,
+    // and leaving it would show a live plan explaining why it had stopped.
+    endedReason: null,
+    failedRuns: 0,
+  })
+  if (updated.count === 0) {
+    throw new GoalConflictError('This plan was just changed. Refresh and try again.', 'GPL_007')
+  }
+
+  await writeAuditLog({
+    userId: requesterId,
+    action: 'GOAL_PLAN_RESUMED',
+    entity: 'GoalPlan',
+    entityId: planId,
+    payload: { goalId: plan.goalId },
+    ipAddress: ip,
+  })
+
+  return { resumed: true as const }
+}
