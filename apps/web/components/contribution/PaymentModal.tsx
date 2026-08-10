@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -36,7 +37,22 @@ interface Props {
   onClose: () => void
 }
 
-export function PaymentModal({ contribution, mandateBankName, mandateAccountMasked, onClose }: Props) {
+/**
+ * Rendered through a portal, so the dialog is not trapped inside whatever
+ * card opened it. The reveal-on-scroll wrapper keeps a transform after it
+ * animates, and a transformed ancestor makes `position: fixed` position
+ * against that element instead of the viewport — the dialog ended up behind
+ * the cards below it, on a page it had just locked the scrolling of.
+ */
+export function PaymentModal(props: Props) {
+  return (
+    <ModalPortal>
+      <PaymentModalContent {...props} />
+    </ModalPortal>
+  )
+}
+
+function PaymentModalContent({ contribution, mandateBankName, mandateAccountMasked, onClose }: Props) {
   const router = useRouter()
   const [serverError, setServerError] = useState('')
   const [result, setResult] = useState<PaymentResult | null>(null)
