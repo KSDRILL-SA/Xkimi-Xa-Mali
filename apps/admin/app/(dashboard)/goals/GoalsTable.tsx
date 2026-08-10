@@ -213,13 +213,25 @@ export function GoalsTable({
                                 <span className="sr-only">Make primary fund</span>
                               </ConfirmSubmitButton>
                             </form>
+                            {/* Confirmed, and wider than 64px.
+                                A figure typed here is added to the goal's total,
+                                and if it reaches the target the goal becomes
+                                ACHIEVED — which `goal.service` keeps one-way on
+                                purpose — and every member is told. Neither can
+                                be taken back, so a stray zero in a box too
+                                narrow to read was doing rather a lot. */}
                             <form action={progressAction} className="flex items-center gap-1">
                               <input type="hidden" name="goalId" value={r.id} />
-                              <input type="number" name="amount" min={1} step={50} required placeholder="R" aria-label={`Progress amount for ${r.title}`}
-                                className="w-16 rounded-lg border border-xxm-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-xxm-green/30" />
-                              <button type="submit" className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-xxm-green-50 text-xxm-green hover:bg-xxm-green hover:text-white transition-colors" title="Add progress" aria-label="Add progress">
+                              <input type="number" name="amount" min={1} step={50} required placeholder="Amount" aria-label={`Progress amount for ${r.title}`}
+                                className="w-24 rounded-lg border border-xxm-gray-200 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-xxm-green/30" />
+                              <ConfirmSubmitButton
+                                title={`Add progress to "${r.title}"?`}
+                                message={`This goal stands at ${r.current} of ${r.target}. The amount you entered is added to that total by hand. If it reaches the target the goal is marked achieved, every member is told, and neither can be undone.`}
+                                confirmLabel="Record it"
+                                className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-xxm-green-50 text-xxm-green hover:bg-xxm-green hover:text-white transition-colors"
+                              >
                                 <Plus size={12} aria-hidden />
-                              </button>
+                              </ConfirmSubmitButton>
                             </form>
                           </>
                         )}
