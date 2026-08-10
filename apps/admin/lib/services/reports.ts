@@ -17,7 +17,19 @@ export async function getDashboardStats(adminRoles: string[]) {
       where: { periodMonth: month, periodYear: year },
       select: { amountDue: true, amountPaid: true, status: true },
     }),
-    db.contribution.aggregate({ where: { status: 'PAID' }, _sum: { amountPaid: true } }),
+    // Every rand received, not only the rands that finished settling a period.
+    //
+    // This filtered on `status: 'PAID'`, so a member who had paid R250 of R400
+    // contributed nothing as far as the headline figure was concerned — their
+    // contribution is PARTIAL, and PARTIAL was not counted. The label says
+    // "all-time collected", which is a claim about money received.
+    //
+    // The member app has always summed `amountPaid` without a status filter
+    // when deriving the primary fund's total, so the two apps disagreed about
+    // how much money exists. `amountPaid` is itself derived from settled
+    // transactions and comes back down on a reversal, so summing it unfiltered
+    // is the honest figure rather than a looser one.
+    db.contribution.aggregate({ _sum: { amountPaid: true } }),
     db.paymentMandate.count({ where: { status: 'PENDING' } }),
   ])
 
