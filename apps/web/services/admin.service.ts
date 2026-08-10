@@ -4,6 +4,8 @@ import { queueNotification } from './notification.service'
 import { createInboxMessages } from './inbox.service'
 import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { assertAdmin, assertNotSelf } from '@/lib/authorization'
+import { isValidSAId } from '@xxm/utils/sa-id'
+import { encrypt } from '@/lib/encryption'
 import { paymentGateway } from '@/integrations/payment'
 import { raiseGatewayDesyncAlert } from './mandate.service'
 import { logger } from '@xxm/observability'
@@ -731,4 +733,58 @@ export async function getMemberLoginHistory(
   ])
 
   return { items, total, page, limit, totalPages: Math.ceil(total / limit) }
+}
+
+/**
+ * Correct the ID number held against a member.
+ *
+ * There was no way to do this at all — not for the member, whose profile
+ * schema does not include it, and not for an admin, whose service never
+ * touched it. The number was typed once at registration, optionally, and
+ * whatever arrived was held forever. A missing one could never be supplied, a
+ * mistyped one never fixed, on the field that ties a bank account to a person.
+ *
+ * It lives here rather than in the console because the encryption keyring does.
+ * The console has no business holding that key to change one column.
+ */
+export async function correctMemberIdNumber(
+  adminId: string,
+  adminRoles: string[],
+  memberId: string,
+  idNumber: string,
+  reason: string,
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const trimmed = idNumber.trim()
+  if (!isValidSAId(trimmed)) {
+    throw new AdminConflictError('That is not a valid SA ID number — check the digits')
+  }
+
+  const trimmedReason = reason?.trim() ?? ''
+  if (trimmedReason.length < 10) {
+    throw new AdminConflictError(
+      'Give a reason of at least 10 characters — it is recorded against your name',
+    )
+  }
+
+  const member = await userRepo.findById(memberId, { select: { id: true, idNumber: true } })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  await userRepo.update(memberId, { idNumber: encrypt(trimmed) })
+
+  // The number is never written to the audit trail. Encrypting it at rest and
+  // then printing it into an append-only log would undo the point. What is
+  // recorded is that it changed, whether there was one before, and why.
+  await writeAuditLog({
+    userId: adminId,
+    action: 'ADMIN_MEMBER_ID_CORRECTED',
+    entity: 'User',
+    entityId: memberId,
+    payload: { hadPreviousValue: member.idNumber !== null, reason: trimmedReason },
+    ipAddress: ip,
+  })
+
+  return { corrected: true as const }
 }

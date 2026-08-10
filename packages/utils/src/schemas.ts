@@ -1,22 +1,17 @@
 import { z } from 'zod'
+import { isValidSAId } from './sa-id'
+import { MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR } from './constants'
 import { refusePeriod, PERIOD_REFUSAL_MESSAGE } from './contribution-period'
 import { isValidBankName, isValidAccountNumberFormat, isValidBranchCode } from './banks'
 
 const SA_PHONE_REGEX = /^(\+27|0)[6-8][0-9]{8}$/
 const SA_ID_REGEX    = /^\d{13}$/
 
-function validateSAId(id: string): boolean {
-  if (!SA_ID_REGEX.test(id)) return false
-  let sum = 0
-  let alternate = false
-  for (let i = id.length - 1; i >= 0; i--) {
-    let n = parseInt(id[i]!, 10)
-    if (alternate) { n *= 2; if (n > 9) n -= 9 }
-    sum += n
-    alternate = !alternate
-  }
-  return sum % 10 === 0
-}
+// One implementation, in `sa-id`, which also derives the date of birth the
+// number already carries. This file held a second copy of the same checksum —
+// identical today, and the kind of pair that stops being identical the first
+// time somebody improves one of them.
+const validateSAId = isValidSAId
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -73,10 +68,17 @@ export const RegisterSchema = z.object({
 export const RegisterStep2Schema = z.object({
   firstName: z.string().min(2, 'First name must be at least 2 characters').max(50),
   lastName:  z.string().min(2, 'Last name must be at least 2 characters').max(50),
+  // Confirmed, not supplied.
+  //
+  // The admin who invited this person recorded their ID, because they are the
+  // one who knows them. What the member does here is show they are the person
+  // that invitation was for. It was optional and self-reported before, which
+  // left the Foundation trusting an unverified identity for the field that
+  // ties a bank account to a person — and nobody could correct it afterwards.
   idNumber:  z
     .string()
-    .optional()
-    .refine((v) => !v || (SA_ID_REGEX.test(v) && validateSAId(v)), 'Please enter a valid SA ID number'),
+    .regex(SA_ID_REGEX, 'SA ID must be 13 digits')
+    .refine(validateSAId, 'Please enter a valid SA ID number'),
   password: PasswordSchema,
   consentToPopia: z.boolean().refine((v) => v, 'You must consent to our privacy policy'),
 })
@@ -287,6 +289,29 @@ export const RecordProgressSchema = z.object({
  * well below the R100 monthly contribution minimum: chipping in extra is
  * supposed to be something a member can do with what they have.
  */
+/** What an admin records about somebody they are inviting into the circle. */
+export const CreateInvitationSchema = z.object({
+  firstName: z.string().trim().min(2, 'First name must be at least 2 characters').max(50),
+  lastName:  z.string().trim().min(2, 'Last name must be at least 2 characters').max(50),
+  email:     z.string().trim().toLowerCase().email('Please enter a valid email address'),
+  phone:     z.string().regex(SA_PHONE_REGEX, 'Please enter a valid SA mobile number'),
+  // Required, and checked. The admin is vouching for who this person is.
+  idNumber:  z
+    .string()
+    .trim()
+    .regex(SA_ID_REGEX, 'SA ID must be 13 digits')
+    .refine(validateSAId, 'That is not a valid SA ID number — check the digits'),
+  // How they know them. `invitedById` already records who invited; this is the
+  // part that cannot be derived from anything already stored.
+  vouchedFor: z.string().trim().max(200).optional(),
+  minimumAmount: z
+    .number()
+    .min(MIN_CONTRIBUTION_ZAR, `The monthly minimum is R${MIN_CONTRIBUTION_ZAR}`)
+    .max(MAX_CONTRIBUTION_ZAR, `The monthly maximum is R${MAX_CONTRIBUTION_ZAR}`),
+})
+
+export type CreateInvitationInput = z.infer<typeof CreateInvitationSchema>
+
 export const MIN_GOAL_PAYMENT = 50
 
 export const GoalPaymentSchema = z.object({

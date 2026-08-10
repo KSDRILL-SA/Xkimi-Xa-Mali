@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { isValidSAId } from '@xxm/utils/sa-id'
 import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { adminInviteRatelimit } from '@/lib/redis'
@@ -56,6 +57,10 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     return apiError('VAL_003', '"lastName" must be at least 2 characters', 400)
   if (typeof b.email !== 'string' || !b.email.includes('@'))
     return apiError('VAL_004', '"email" must be a valid email address', 400)
+  // Required and checked here, because this is the identity leadership is
+  // vouching for and the member will be asked to confirm it.
+  if (typeof b.idNumber !== 'string' || !isValidSAId(b.idNumber.trim()))
+    return apiError('VAL_007', '"idNumber" must be a valid 13-digit SA ID number', 400)
   if (typeof b.phone !== 'string' || !SA_PHONE.test(b.phone))
     return apiError('VAL_005', '"phone" must be a valid SA mobile number', 400)
   const minAmt = Number(b.minimumAmount)
@@ -73,6 +78,8 @@ export const POST = withApiHandler(async (req: NextRequest) => {
       lastName:      b.lastName.trim(),
       email:         (b.email as string).toLowerCase().trim(),
       phone:         b.phone as string,
+      idNumber: String(b.idNumber ?? ''),
+      vouchedFor: typeof b.vouchedFor === 'string' ? b.vouchedFor : undefined,
       minimumAmount: minAmt,
     },
     baseUrl,
