@@ -257,7 +257,8 @@ export async function collectDuePlans(now = new Date()): Promise<{
           userId: plan.userId,
           templateSlug: 'goal-plan-completed',
           channel: 'SMS',
-          payload: { goalTitle: goal.title, reason: stop },
+          // `goal`, not `goalTitle` — the name every other goal template uses.
+          payload: { goal: goal.title, reason: stop },
         }).catch(() => {})
       }
       continue
@@ -276,7 +277,7 @@ export async function collectDuePlans(now = new Date()): Promise<{
           userId: plan.userId,
           templateSlug: 'goal-plan-paused',
           channel: 'SMS',
-          payload: { goalTitle: goal.title },
+          payload: { goal: goal.title },
         }).catch(() => {})
       }
       continue

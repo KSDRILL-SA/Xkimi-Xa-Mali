@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest'
-import { periodsWithin } from '@/lib/fund-window'
+import { periodsWithin } from '@xxm/utils/fund-window'
 
 // ---------------------------------------------------------------------------
 // Mocks
