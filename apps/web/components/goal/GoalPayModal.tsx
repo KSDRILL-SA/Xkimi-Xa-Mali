@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -26,7 +27,22 @@ interface Props {
 
 const QUICK_AMOUNTS = [50, 100, 250, 500]
 
-export function GoalPayModal({ goalId, goalTitle, remaining, onClose }: Props) {
+/**
+ * Rendered through a portal, so the dialog is not trapped inside whatever
+ * card opened it. The reveal-on-scroll wrapper keeps a transform after it
+ * animates, and a transformed ancestor makes `position: fixed` position
+ * against that element instead of the viewport — the dialog ended up behind
+ * the cards below it, on a page it had just locked the scrolling of.
+ */
+export function GoalPayModal(props: Props) {
+  return (
+    <ModalPortal>
+      <GoalPayModalContent {...props} />
+    </ModalPortal>
+  )
+}
+
+function GoalPayModalContent({ goalId, goalTitle, remaining, onClose }: Props) {
   const router = useRouter()
   // One token per payment this modal is offering to make. A double tap or a
   // retried request carries the same one and collapses onto the first debit;

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import { Button } from '@/components/ui/Button'
 import { Label } from '@/components/ui/Label'
 import { formatZAR } from '@/lib/formatters'
@@ -20,7 +21,22 @@ interface Props {
   onClose: () => void
 }
 
-export function BudgetGuardModal({ details, loading, onChangeAmount, onProceed, onClose }: Props) {
+/**
+ * Rendered through a portal, so the dialog is not trapped inside whatever
+ * card opened it. The reveal-on-scroll wrapper keeps a transform after it
+ * animates, and a transformed ancestor makes `position: fixed` position
+ * against that element instead of the viewport — the dialog ended up behind
+ * the cards below it, on a page it had just locked the scrolling of.
+ */
+export function BudgetGuardModal(props: Props) {
+  return (
+    <ModalPortal>
+      <BudgetGuardModalContent {...props} />
+    </ModalPortal>
+  )
+}
+
+function BudgetGuardModalContent({ details, loading, onChangeAmount, onProceed, onClose }: Props) {
   const [reason, setReason] = useState('')
 
   // Escape closes the guard (returns to the payment form); a disabled control
