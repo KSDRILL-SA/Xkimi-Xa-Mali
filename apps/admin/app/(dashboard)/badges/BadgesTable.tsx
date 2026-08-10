@@ -20,6 +20,22 @@ export type BadgeRow = {
   progressToNext: number
   currentStreak: number
   monthsActive: number
+  /**
+   * When these figures were last worked out.
+   *
+   * A badge is a judgement about how reliable a member has been, and leadership
+   * reads this table to make decisions. The figures are recalculated when a
+   * contribution changes status and once a month by cron — so they are a month
+   * old in ordinary operation, and older than that if the event is ever lost.
+   * That is not hypothetical: one member's badge sat unchanged from 11 June to
+   * 9 August while they were paying, because the event that triggers the
+   * recalculation was failing silently.
+   *
+   * The table cannot be wrong about the numbers. It could be silent about how
+   * old they are, which is its own way of being misleading.
+   */
+  calculatedAt: string | null
+  isStale: boolean
 }
 
 export function BadgesTable({ rows }: { rows: BadgeRow[] }) {
@@ -71,6 +87,15 @@ export function BadgesTable({ rows }: { rows: BadgeRow[] }) {
       ),
     },
     { key: 'overallScore', header: 'Overall', align: 'right', sortable: true, render: (r) => r.overallScore.toFixed(1) },
+    {
+      key: 'calculatedAt', header: 'Worked out', align: 'right', sortable: false,
+      render: (r: BadgeRow) => (
+        <span className={r.isStale ? 'text-amber-700 font-semibold' : 'text-xxm-gray-400'}>
+          {r.calculatedAt ?? 'never'}
+          {r.isStale ? ' · stale' : ''}
+        </span>
+      ),
+    },
     { key: 'consistencyScore', header: 'Consistency', align: 'right', sortable: true, render: (r) => r.consistencyScore.toFixed(1) },
     { key: 'timelinessScore', header: 'Timeliness', align: 'right', sortable: true, render: (r) => r.timelinessScore.toFixed(1) },
     { key: 'generosityScore', header: 'Generosity', align: 'right', sortable: true, render: (r) => r.generosityScore.toFixed(1) },
