@@ -25,11 +25,17 @@ import { NextRequest } from 'next/server'
 const { SECRET } = vi.hoisted(() => ({ SECRET: 'x'.repeat(40) }))
 
 const mocks = vi.hoisted(() => ({
+  findAdmin: vi.fn(),
   auth: vi.fn(),
   createReversal: vi.fn(),
 }))
 
 vi.mock('@/lib/env', () => ({ env: { ADMIN_API_SECRET: SECRET } }))
+// The forwarded admin id is no longer taken on faith — it is looked up, and
+// must name a live ADMIN. These tests forward a real admin, so the lookup
+// finds one; `internal-admin-identity.test.ts` covers the cases where it does
+// not.
+vi.mock('@/lib/db', () => ({ db: { user: { findFirst: mocks.findAdmin } } }))
 vi.mock('@/lib/auth', () => ({ auth: mocks.auth }))
 vi.mock('@/services/contribution.service', () => ({ createReversal: mocks.createReversal }))
 vi.mock('@/lib/redis', () => ({
@@ -66,6 +72,10 @@ function internalHeaders(adminUserId = 'admin-1') {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // The forwarded id names a real, current admin unless a test says otherwise.
+  // Echoes back whichever id was looked up, so a test that forwards a specific
+  // admin still sees that admin credited.
+  mocks.findAdmin.mockImplementation(async (args: { where: { id: string } }) => ({ id: args.where.id }))
   mocks.auth.mockResolvedValue(null)
   mocks.createReversal.mockResolvedValue({ id: 'rev-1', amount: 500 })
 })
