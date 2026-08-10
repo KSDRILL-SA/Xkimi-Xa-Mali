@@ -7,6 +7,7 @@ import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/erro
 import { isAdmin, assertAdmin } from '@/lib/authorization'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
 import { cache, CACHE_KEYS } from '@/lib/cache'
+import { fundWindow, periodsWithin } from '@/lib/fund-window'
 import { roundZAR, sumZAR, subtractZAR } from '@/lib/money'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { createInboxMessages, notifyAdmins } from './inbox.service'
@@ -240,10 +241,14 @@ export async function syncPrimaryGoalProgress(): Promise<void> {
   if (!primary) return
   const g = primary as GoalRow
 
-  const year = g.deadline.getFullYear()
+  // The fund's own span, not the calendar year its deadline happens to land in.
+  // For a January-to-December fund the two are the same; for one that crosses a
+  // year boundary they are not, and the calendar year both missed the months
+  // before it and swept up months after the deadline. See `fundWindow`.
+  const { from, to } = fundWindow(g.createdAt, g.deadline)
   const [agg, paymentsAgg] = await Promise.all([
-    // Monthly contributions in the fund's year...
-    db.contribution.aggregate({ where: { periodYear: year }, _sum: { amountPaid: true } }),
+    // Monthly contributions in the fund's window...
+    db.contribution.aggregate({ where: periodsWithin(from, to), _sum: { amountPaid: true } }),
     // ...plus any directed extra payments members made to the primary fund.
     goalRepo.sumSuccessfulPayments(g.id),
   ])

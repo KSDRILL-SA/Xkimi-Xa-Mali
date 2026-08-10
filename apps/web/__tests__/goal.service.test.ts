@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest'
+import { periodsWithin } from '@/lib/fund-window'
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -595,7 +596,18 @@ describe('syncPrimaryGoalProgress', () => {
     ;(db.goalPayment.aggregate as MockedFunction<typeof db.goalPayment.aggregate>).mockResolvedValue({ _sum: { amount: 0 } } as never)
   })
 
-  const PRIMARY = { ...ACTIVE_GOAL, isPrimary: true, currentAmount: 5000, targetAmount: 120000, deadline: new Date('2026-12-31') }
+  // An explicit January-to-December fund. The dates matter now: the total is
+  // derived from the fund's own window rather than the calendar year its
+  // deadline lands in, and for a fund like this the two are the same set —
+  // which is exactly what these tests hold in place.
+  const PRIMARY = {
+    ...ACTIVE_GOAL,
+    isPrimary: true,
+    currentAmount: 5000,
+    targetAmount: 120000,
+    createdAt: new Date('2026-01-01'),
+    deadline: new Date('2026-12-31'),
+  }
 
   it('does nothing when no primary goal is designated', async () => {
     ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue([] as never)
@@ -606,15 +618,20 @@ describe('syncPrimaryGoalProgress', () => {
     expect(db.goal.update).not.toHaveBeenCalled()
   })
 
-  it('re-derives the primary fund from contributions in its year', async () => {
+  it('re-derives the primary fund from contributions in its window', async () => {
     ;(db.goal.findMany as MockedFunction<typeof db.goal.findMany>).mockResolvedValue([PRIMARY] as never)
     ;(db.contribution.aggregate as MockedFunction<typeof db.contribution.aggregate>).mockResolvedValue({ _sum: { amountPaid: 48200 } } as never)
     ;(db.goal.update as MockedFunction<typeof db.goal.update>).mockResolvedValue({} as never)
 
     await syncPrimaryGoalProgress()
 
+    // Every month of 2026 and nothing either side — the same set the old
+    // `periodYear: 2026` filter produced, now expressed as the fund's span.
     expect(db.contribution.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { periodYear: 2026 }, _sum: { amountPaid: true } }),
+      expect.objectContaining({
+        where: periodsWithin({ year: 2026, month: 1 }, { year: 2026, month: 12 }),
+        _sum: { amountPaid: true },
+      }),
     )
     expect(db.goal.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'goal-1' }, data: expect.objectContaining({ currentAmount: 48200 }) }),
