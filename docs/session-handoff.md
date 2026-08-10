@@ -198,6 +198,35 @@ for "no such message" as for "not yours", so no existence oracle.
    empty body and looked like a regression; the DOM had 6kB of content. Check
    the DOM, or read twice, before calling a page broken.
 
+### Goal plans are complete (#345)
+
+The last piece was the one that mattered: schema, service, routes and the
+collection job had all shipped and **a member could not reach any of it**. The
+goal page now carries an enrolment card beside "Chip in extra" — amount, day,
+the total monthly commitment across every plan, and every state handled (no
+mandate, not enrolled, running, paused-with-resume).
+
+A defect found while verifying it: the card returned `null` while loading, so it
+was absent from the server-rendered HTML and popped in after hydration, shoving
+the page around. It draws a placeholder now.
+
+**Not verified by click-through.** Every node process was killed while clearing
+a stuck dev server, which took the Playwright server with it. The card is
+verified by compile, by its rendered HTML against the production build, and by
+exhaustive testing of the API it calls — but nobody has clicked it. Worth five
+minutes with a browser before trusting it in front of members.
+
+### Two environment traps that cost time
+
+- **Never blanket-kill node.** `Stop-Process` across all node processes takes
+  the MCP browser server with it and ends browser testing for the session. Scope
+  the filter to `*next*dev*`.
+- **Turbopack dev can die with `0xc0000142`** (Windows failing to spawn its
+  PostCSS worker) and then fail on every request while `next build` and
+  `next start` work perfectly. If dev serves 500s on a page you did not touch,
+  check whether the build passes before hunting the code — and use
+  `npm run start` against the production build to verify pages.
+
 ### Final integration state
 
 13/13 member pages render real content · contributions paid R400 = successful
