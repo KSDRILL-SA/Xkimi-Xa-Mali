@@ -42,7 +42,7 @@ export function ChangePasswordForm() {
       </div>
       <div>
         <Label htmlFor="newPassword" required>New password</Label>
-        <Input id="newPassword" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" error={errors.newPassword?.message} {...register('newPassword')} />
+        <Input id="newPassword" type="password" autoComplete="new-password" placeholder="At least 12 characters" error={errors.newPassword?.message} {...register('newPassword')} />
       </div>
       <div>
         <Label htmlFor="confirmPassword" required>Confirm new password</Label>

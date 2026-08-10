@@ -360,7 +360,7 @@ describe('the fifty-member cap', () => {
       armAccept(10)
 
       await expect(
-        acceptInviteRegistration({ ...input, idNumber: '8801015800080' }, 'http://localhost'),
+        acceptInviteRegistration({ ...input, idNumber: '8801015800082' }, 'http://localhost'),
       ).rejects.toThrow(/does not match/i)
     })
 
@@ -370,7 +370,7 @@ describe('the fifty-member cap', () => {
       armAccept(10)
 
       await expect(
-        acceptInviteRegistration({ ...input, idNumber: '8801015800080' }, 'http://localhost'),
+        acceptInviteRegistration({ ...input, idNumber: '8801015800082' }, 'http://localhost'),
       ).rejects.toMatchObject({ code: 'INV_007' })
     })
 
