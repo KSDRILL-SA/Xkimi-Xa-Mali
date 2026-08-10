@@ -7,7 +7,7 @@ import { GoalNotFoundError, GoalConflictError, ForbiddenError } from '@/lib/erro
 import { isAdmin, assertAdmin } from '@/lib/authorization'
 import type { CreateGoalInput, UpdateGoalInput, RecordProgressInput } from '@/lib/validation/goal'
 import { cache, CACHE_KEYS } from '@/lib/cache'
-import { fundWindow, periodsWithin } from '@/lib/fund-window'
+import { fundWindow, periodsWithin } from '@xxm/utils/fund-window'
 import { roundZAR, sumZAR, subtractZAR } from '@/lib/money'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { createInboxMessages, notifyAdmins } from './inbox.service'

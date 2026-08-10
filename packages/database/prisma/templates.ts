@@ -63,7 +63,7 @@ export const NOTIFICATION_TEMPLATES: Array<{
     slug: 'goal-plan-completed',
     channel: 'SMS',
     subject: null,
-    body: 'Xkimm Xa Mali Foundation: Your monthly plan for "{{goalTitle}}" has ended. {{reason}}. Nothing further will be collected for it.',
+    body: 'Xkimm Xa Mali Foundation: Your monthly plan for "{{goal}}" has ended. {{reason}}. Nothing further will be collected for it.',
   },
   {
     // The plan could not be collected because the debit order behind it is
@@ -72,7 +72,7 @@ export const NOTIFICATION_TEMPLATES: Array<{
     slug: 'goal-plan-paused',
     channel: 'SMS',
     subject: null,
-    body: 'Xkimm Xa Mali Foundation: Your monthly plan for "{{goalTitle}}" is paused - we could not find an active debit order to collect from. Set one up and you can resume it.',
+    body: 'Xkimm Xa Mali Foundation: Your monthly plan for "{{goal}}" is paused - we could not find an active debit order to collect from. Set one up and you can resume it.',
   },
   {
     // Sent to the members who pledged toward a Goal that lapsed without

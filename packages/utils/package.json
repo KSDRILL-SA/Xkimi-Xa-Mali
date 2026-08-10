@@ -16,6 +16,7 @@
     "./deployment": "./src/deployment.ts",
     "./client-ip": "./src/client-ip.ts",
     "./csrf-origin": "./src/csrf-origin.ts",
+    "./fund-window": "./src/fund-window.ts",
     "./role-policy": "./src/role-policy.ts",
     "./keyring": "./src/keyring.ts"
   },

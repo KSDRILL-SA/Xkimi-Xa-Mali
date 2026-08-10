@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { fundWindow, periodInWindow, periodsWithin } from '@/lib/fund-window'
+import { fundWindow, periodInWindow, periodsWithin } from '@xxm/utils/fund-window'
 
 /**
  * The primary fund's total was derived from every contribution whose period fell

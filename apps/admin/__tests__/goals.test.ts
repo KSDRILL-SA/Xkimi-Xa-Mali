@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest'
+import { periodsWithin } from '@xxm/utils/fund-window'
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -51,6 +52,10 @@ const activeGoal = (over: Record<string, unknown> = {}) => ({
   targetAmount: 120_000,
   currentAmount: 0,
   deadline: new Date('2026-12-01T00:00:00.000Z'),
+  // An explicit January-to-December fund. The dates matter: the total derives
+  // from the fund's own span, and for a fund like this that span is exactly the
+  // calendar year — which is what keeps this assertion meaningful.
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
   version: 0,
   ...over,
 })
@@ -106,7 +111,7 @@ describe('setPrimaryGoal', () => {
     )
   })
 
-  it('fills the new fund from contributions already paid in its deadline-year', async () => {
+  it('fills the new fund from contributions already paid inside its window', async () => {
     mock(db.goal.findUnique).mockResolvedValue(activeGoal() as never)
     tx.goal.update.mockResolvedValue(activeGoal({ isPrimary: true }) as never)
     mock(db.contribution.aggregate).mockResolvedValue({ _sum: { amountPaid: 4200.5 } } as never)
@@ -114,8 +119,13 @@ describe('setPrimaryGoal', () => {
 
     await setPrimaryGoal('a1', ADMIN, 'g1')
 
+    // Every month of 2026 and nothing either side — the same set the old
+    // `periodYear: 2026` filter produced, now expressed as the fund's span and
+    // shared with the member app so the two cannot drift apart again.
     expect(db.contribution.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { periodYear: 2026 } }),
+      expect.objectContaining({
+        where: periodsWithin({ year: 2026, month: 1 }, { year: 2026, month: 12 }),
+      }),
     )
     expect(db.goalPayment.aggregate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { goalId: 'g1', status: 'SUCCESS' } }),

@@ -1,4 +1,5 @@
 import { UserStatus } from '@prisma/client'
+import { fundWindow, periodsWithin } from '@xxm/utils/fund-window'
 import { db } from '@/lib/db'
 import { logger } from '@xxm/observability'
 import { assertAdmin, roundZAR, writeAuditLog, notifyInbox, AdminNotFoundError, AdminConflictError } from './shared'
@@ -299,10 +300,19 @@ export async function lockGoal(adminId: string, adminRoles: string[], goalId: st
  * celebration is never silently skipped.
  *
  */
-async function derivePrimaryFundTotal(goal: { id: string; currentAmount: unknown; deadline: Date }) {
-  const year = goal.deadline.getFullYear()
+async function derivePrimaryFundTotal(
+  goal: { id: string; currentAmount: unknown; deadline: Date; createdAt: Date },
+) {
+  // The fund's own span, shared with the member app rather than restated here.
+  //
+  // This used `deadline.getFullYear()` and summed that calendar year, which is
+  // what the member app used to do. When that was corrected the two apps began
+  // disagreeing about the same fund: whichever wrote last won, so the total
+  // moved depending on which app an admin had touched. A second copy of a money
+  // rule does not stay a copy — that is why it now lives in @xxm/utils.
+  const { from, to } = fundWindow(goal.createdAt, goal.deadline)
   const [contributions, directPayments] = await Promise.all([
-    db.contribution.aggregate({ where: { periodYear: year }, _sum: { amountPaid: true } }),
+    db.contribution.aggregate({ where: periodsWithin(from, to), _sum: { amountPaid: true } }),
     db.goalPayment.aggregate({ where: { goalId: goal.id, status: 'SUCCESS' }, _sum: { amount: true } }),
   ])
 
