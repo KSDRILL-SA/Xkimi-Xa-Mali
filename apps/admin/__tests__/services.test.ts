@@ -9,8 +9,9 @@ vi.mock('@/lib/api', () => ({ internalAdminPost: apiMocks.internalAdminPost }))
 
 vi.mock('@/lib/db', () => ({
   db: {
-    user: { findUnique: vi.fn(), update: vi.fn() },
-    paymentMandate: { findUnique: vi.fn(), update: vi.fn() },
+    user: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn() },
+    paymentMandate: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn() },
+    contribution: { findMany: vi.fn(), aggregate: vi.fn() },
     inboxMessage: { create: vi.fn().mockResolvedValue({}) },
     auditLog: { create: vi.fn().mockResolvedValue({}) },
   },
@@ -29,6 +30,7 @@ import {
   AdminForbiddenError,
   AdminNotFoundError,
   AdminConflictError,
+  getDashboardStats,
 } from '@/lib/services'
 
 const mock = <T extends (...a: never[]) => unknown>(fn: unknown) => fn as MockedFunction<T>
@@ -141,5 +143,25 @@ describe('unlockMember', () => {
   it('throws not-found for an unknown member', async () => {
     mock(db.user.findUnique).mockResolvedValue(null as never)
     await expect(unlockMember('a1', ADMIN, 'nope')).rejects.toBeInstanceOf(AdminNotFoundError)
+  })
+})
+
+describe('the pool total on the dashboard', () => {
+  it('counts money paid against a part-settled contribution', async () => {
+    // It filtered on `status: 'PAID'`, so a member who had paid R250 of R400
+    // contributed nothing as far as the headline figure was concerned — their
+    // contribution is PARTIAL. The label says "all-time collected", and the
+    // member app's fund derivation has always summed `amountPaid` unfiltered,
+    // so the two apps disagreed about how much money exists.
+    mock(db.user.count).mockResolvedValue(3 as never)
+    mock(db.contribution.findMany).mockResolvedValue([] as never)
+    mock(db.contribution.aggregate).mockResolvedValue({ _sum: { amountPaid: 4650 } } as never)
+    mock(db.paymentMandate.count).mockResolvedValue(1 as never)
+
+    const stats = await getDashboardStats(ADMIN)
+
+    expect(stats.poolTotal).toBe(4650)
+    // No status filter: the sum is of everything received.
+    expect(db.contribution.aggregate).toHaveBeenCalledWith({ _sum: { amountPaid: true } })
   })
 })
