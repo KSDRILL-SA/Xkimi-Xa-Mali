@@ -58,6 +58,28 @@ function makeReq(body?: unknown) {
   } as never
 }
 
+/**
+ * Imported once, at the top, rather than dynamically inside each test.
+ *
+ * Every test used `await import(...)` to reach the route. That buys nothing
+ * here — `vi.mock` is hoisted, so a static import already receives the mocked
+ * `@/lib/auth`, and `mockAuth.mockResolvedValue(...)` acts on the mock function
+ * whenever the module was loaded.
+ *
+ * What it cost was a dependency on the module registry still holding those
+ * mocks at the moment each test ran. This file is half of a pair that has
+ * failed together in a full run and passed alone every time; the other half
+ * calls `vi.resetModules()` in three places. A fresh import of this route after
+ * such a reset resolves a `@/lib/auth` that is no longer the mock, `auth()`
+ * stops returning null, and "returns 401 when not authenticated" sees something
+ * that is not 401 — which is exactly the failure that was observed.
+ *
+ * That mechanism is not proven: the failure has never been captured in full,
+ * and nine hunts since have come back clean. What is certain is that the
+ * dependency was unnecessary, and it is now gone.
+ */
+import { GET, PATCH } from '@/app/api/v1/notifications/preferences/whatsapp/route'
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -67,7 +89,6 @@ beforeEach(() => {
 describe('GET /api/v1/notifications/preferences/whatsapp', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as never)
-    const { GET } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
     const res = await GET(makeReq())
     expect((res as { status: number }).status).toBe(401)
   })
@@ -76,8 +97,6 @@ describe('GET /api/v1/notifications/preferences/whatsapp', () => {
     mockAuth.mockResolvedValue({ user: { id: 'u1' } } as never)
     mockDb.user.findUnique.mockResolvedValue({ phone: '+27821234567' } as never)
     mockDb.notificationPreference.findUnique.mockResolvedValue({ whatsapp: true } as never)
-
-    const { GET } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
     const res = await GET(makeReq())
     const body = await (res as Response).json()
     expect(body.data).toMatchObject({ enabled: true, phone: '+27821234567' })
@@ -87,8 +106,6 @@ describe('GET /api/v1/notifications/preferences/whatsapp', () => {
     mockAuth.mockResolvedValue({ user: { id: 'u2' } } as never)
     mockDb.user.findUnique.mockResolvedValue({ phone: '+27821234567' } as never)
     mockDb.notificationPreference.findUnique.mockResolvedValue(null as never)
-
-    const { GET } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
     const res = await GET(makeReq())
     const body = await (res as Response).json()
     expect(body.data.enabled).toBe(true)
@@ -100,7 +117,6 @@ describe('GET /api/v1/notifications/preferences/whatsapp', () => {
 describe('PATCH /api/v1/notifications/preferences/whatsapp', () => {
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null as never)
-    const { PATCH } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
     const res = await PATCH(makeReq({ enabled: false }))
     expect((res as { status: number }).status).toBe(401)
   })
@@ -109,8 +125,6 @@ describe('PATCH /api/v1/notifications/preferences/whatsapp', () => {
     mockAuth.mockResolvedValue({ user: { id: 'u3' } } as never)
     mockDb.notificationPreference.upsert.mockResolvedValue({ whatsapp: false } as never)
     mockDb.auditLog.create.mockResolvedValue({} as never)
-
-    const { PATCH } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
     const res = await PATCH(makeReq({ enabled: false }))
     const body = await (res as Response).json()
 
@@ -122,7 +136,6 @@ describe('PATCH /api/v1/notifications/preferences/whatsapp', () => {
 
   it('returns 400 for invalid body', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'u4' } } as never)
-    const { PATCH } = await import('@/app/api/v1/notifications/preferences/whatsapp/route')
     const res = await PATCH(makeReq({ enabled: 'yes' }))
     expect((res as { status: number }).status).toBe(400)
   })

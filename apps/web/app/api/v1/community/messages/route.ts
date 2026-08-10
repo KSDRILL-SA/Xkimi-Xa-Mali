@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
-import { apiRatelimit } from '@/lib/redis'
+import { apiRatelimit, communityPostRatelimit } from '@/lib/redis'
 import { getMessages, postMessage } from '@/services/community.service'
 import { PostMessageSchema } from '@/lib/validation/community'
 import { withApiHandler } from '@/lib/api-handler'
@@ -28,6 +28,17 @@ export const POST = withApiHandler(async (req: NextRequest) => {
 
   const { success } = await apiRatelimit.limit(session.user.id)
   if (!success) return apiError('SYS_005', 'Too many requests. Please try again later.', 429)
+
+  // Ten a day, which is what the Founder Guide promises members. The limit
+  // above stops a script; this one is the sentence four founders signed.
+  const daily = await communityPostRatelimit.limit(session.user.id)
+  if (!daily.success) {
+    return apiError(
+      'SYS_005',
+      'You have posted ten times today — that is the daily limit. Come back tomorrow.',
+      429,
+    )
+  }
 
   let body: unknown
   try {
