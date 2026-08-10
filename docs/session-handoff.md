@@ -137,15 +137,49 @@ PAID with `amountPaid` 400 and **zero transactions**. Written straight to the
 database — impossible through the app, since `amountPaid` derives from
 transactions. They inflate contribution totals against transaction totals.
 
+### Closed in #341 — the fund window, and goal plans finished
+
+**The fund-year finding was half wrong when first written down.** The schema
+calls the primary "the one common *yearly* fund", so calendar-year behaviour was
+deliberate. The real defect was narrower and had **two** halves: a fund crossing
+a year boundary missed the months before its deadline year, *and* counted months
+**after** its own deadline. Only the first was noticed originally.
+
+Owner decision taken: the total derives from the fund's own window — the month
+it was created through the month it is due. A January-to-December fund produces
+exactly the old set, which is what makes it safe for funds already running.
+Shown against the real database: a fund opened 2026-06 due 2027-03 gives R400
+under the new rule, R0 under the old.
+
+**Goal plans are now complete** (PRs 3 and 4 of the four). API routes exist at
+`/api/v1/goal-plans` and `/[id]`; `resumePlan` closes the gap where the
+collection job could pause a plan with no way back. Resume accepts only PAUSED
+and refuses while the mandate is still missing. Driven end to end through the
+real routes, and the collection job driven against a real plan — collected once,
+a second run the same day collected nothing, one payment row.
+
+**Test data cleared:** three contributions (not two) marked PAID with money and
+zero transactions. `2031-02` at R500 had been missed.
+
+### Still not solved: the flaky pair
+
+Two false starts this session, both worth knowing:
+
+1. A hunt that reported "CAUGHT on run 1" was a **false positive** — the
+   detector grepped for `FAIL` and matched *passing* tests whose names contain
+   "FAILED".
+2. The corrected detector (vitest's exit code) then caught a genuine failure —
+   which was a **regression introduced by the fund-window change**, not the
+   flake. Fixed, test updated.
+
+Seven clean runs followed before the hunt was stopped. The detector is now
+correct; the flake itself remains unexplained. The hunting script is worth
+rebuilding as `for i in $(seq 1 20); do npx vitest run --reporter=verbose >
+run.log 2>&1; [ $? -ne 0 ] && cp run.log CAUGHT.log && break; done` — **exit
+code, never a text match**.
+
 ### Open findings, not yet fixed
 
-- **The fund-year bug.** `syncPrimaryGoalProgress` derives the primary fund's
-  total using `deadline.getFullYear()` and sums contributions `WHERE periodYear
-  = that year`. A fund whose deadline falls in 2027 therefore counts **nothing**
-  paid during 2026 — it shows R0 while members pay faithfully. The owner was
-  asked and has not yet chosen between "count everything since the fund was
-  designated" and "keep calendar-year behaviour". **Do not change a money
-  derivation without that answer.**
 - **`payToGoal` has no overfunding cap.** #334 warns the member on the way in,
   but the service still accepts any amount from any other caller.
 - **A R10 goal payment costs R20.** `MIN_GOAL_PAYMENT` is 10 and
