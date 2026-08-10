@@ -1,7 +1,9 @@
 import type { Metadata } from 'next'
+import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { internalAdminPost } from '@/lib/api'
+import { getBroadcastAudience } from '@/lib/services'
 import { Alert, Reveal } from '@xxm/ui'
 import { Megaphone, MessageSquare, Mail, Layers, Inbox, Users, UserCheck, Clock, Ban, Send } from 'lucide-react'
 import { requireAdmin } from '@/lib/admin-action'
@@ -45,11 +47,17 @@ export default async function NotificationsPage({
     { value: 'BOTH',   label: 'SMS + Email', icon: Layers,        description: 'Both channels' },
   ]
 
+  // How many people each choice actually reaches, shown while choosing rather
+  // than discovered afterwards. A broadcast cannot be recalled and, on SMS,
+  // costs money for every one of them.
+  const audience = await getBroadcastAudience(roles)
+  const people = (n: number) => `${n} member${n === 1 ? '' : 's'}`
+
   const filters: { value: Filter; label: string; icon: React.FC<{ size?: number; className?: string }>; description: string }[] = [
-    { value: 'ALL',       label: 'All members',     icon: Users,      description: 'Every registered member' },
-    { value: 'ACTIVE',    label: 'Active only',     icon: UserCheck,  description: 'Active members only' },
-    { value: 'PENDING',   label: 'Pending only',    icon: Clock,      description: 'Pending approval' },
-    { value: 'SUSPENDED', label: 'Suspended only',  icon: Ban,        description: 'Suspended accounts' },
+    { value: 'ALL',       label: 'All members',     icon: Users,      description: `Every registered member · ${people(audience.ALL)}` },
+    { value: 'ACTIVE',    label: 'Active only',     icon: UserCheck,  description: `Active members only · ${people(audience.ACTIVE)}` },
+    { value: 'PENDING',   label: 'Pending only',    icon: Clock,      description: `Pending approval · ${people(audience.PENDING)}` },
+    { value: 'SUSPENDED', label: 'Suspended only',  icon: Ban,        description: `Suspended accounts · ${people(audience.SUSPENDED)}` },
   ]
 
   return (
@@ -128,13 +136,18 @@ export default async function NotificationsPage({
           </Reveal>
 
           {/* ── Submit ───────────────────────────────────────── */}
-          <button
-            type="submit"
+          {/* Confirmed. This is the one action that reaches everybody at once,
+              costs money for each of them on SMS, and cannot be recalled — and
+              it was a plain submit button. */}
+          <ConfirmSubmitButton
+            title="Send this to the members?"
+            message={`A broadcast cannot be unsent. On SMS or SMS + Email it is charged for every recipient — up to ${audience.ALL} of them depending on the filter you chose. Check the message and the audience before sending.`}
+            confirmLabel="Send it"
             className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-xxm-green text-white text-sm font-bold hover:bg-xxm-canopy hover:-translate-y-0.5 transition-all duration-fast ease-smooth shadow-xxm-sm"
           >
             <Send size={16} aria-hidden />
             Send Broadcast
-          </button>
+          </ConfirmSubmitButton>
 
         </form>
       </div>
