@@ -40,6 +40,31 @@ function ModalContent({
   const [copied, setCopied] = useState(false)
   const [state, formAction, isPending] = useActionState(createAction, {})
 
+  /**
+   * What is about to be sent, shown back before it is.
+   *
+   * An invitation is a credential: whoever receives the code can register into
+   * a circle that holds real money, and the invite carries the intended
+   * person's name and phone number with it. One wrong character in an address
+   * hands all of that to a stranger, and the admin's first hint is somebody
+   * they do not know appearing in the members list.
+   *
+   * The fields stay mounted while this shows — hidden inputs are still
+   * submitted, only disabled ones are not — so the form the review describes is
+   * exactly the form that gets sent.
+   */
+  const [review, setReview] = useState<null | { name: string; email: string; phone: string }>(null)
+
+  function openReview(form: HTMLFormElement) {
+    if (!form.reportValidity()) return
+    const fd = new FormData(form)
+    setReview({
+      name: `${String(fd.get('firstName') ?? '')} ${String(fd.get('lastName') ?? '')}`.trim(),
+      email: String(fd.get('email') ?? ''),
+      phone: String(fd.get('phone') ?? ''),
+    })
+  }
+
   // Portal target only exists on the client — wait for mount before rendering.
   //
   // Read as external state rather than set from an effect. The effect version
@@ -131,13 +156,42 @@ function ModalContent({
               />
             </div>
 
+            {review && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
+                <p className="text-sm font-semibold text-amber-900">Send this invitation?</p>
+                <p className="text-xs text-amber-800">
+                  The code goes to <span className="font-bold">{review.email}</span> and{' '}
+                  <span className="font-bold">{review.phone}</span>. Whoever receives it can
+                  register as <span className="font-bold">{review.name}</span> and join the
+                  Foundation. Check the address before sending — an invitation sent to the
+                  wrong person can be revoked, but only once somebody notices.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-1">
-              <Button type="button" variant="outline" fullWidth onClick={onClose} disabled={isPending}>
-                Cancel
+              <Button
+                type="button"
+                variant="outline"
+                fullWidth
+                onClick={() => (review ? setReview(null) : onClose())}
+                disabled={isPending}
+              >
+                {review ? 'Back' : 'Cancel'}
               </Button>
-              <Button type="submit" fullWidth loading={isPending}>
-                Create invite
-              </Button>
+              {review ? (
+                <Button type="submit" fullWidth loading={isPending}>
+                  Send invitation
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  fullWidth
+                  onClick={(e) => openReview((e.currentTarget as HTMLElement).closest('form') as HTMLFormElement)}
+                >
+                  Review
+                </Button>
+              )}
             </div>
           </form>
         )}

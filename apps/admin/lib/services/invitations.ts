@@ -61,7 +61,14 @@ export async function revokeInvitation(
   assertAdmin(adminRoles)
   const invite = await db.invitation.findUnique({ where: { id: invitationId }, select: { id: true, status: true, email: true } })
   if (!invite) throw new AdminNotFoundError('Invitation not found')
-  if (invite.status !== 'PENDING') throw new AdminConflictError(`Invitation is already ${invite.status}`)
+  // Matches the member app, which refuses only what is genuinely finished.
+  // This refused anything that was not PENDING, so an invitation that had
+  // simply lapsed could not be revoked here while it could be revoked there —
+  // the same rule answering differently depending on which app you opened.
+  // Revoking a lapsed invitation is not pointless either: it says somebody
+  // decided, rather than leaving a row that merely ran out of time.
+  if (invite.status === 'ACCEPTED') throw new AdminConflictError('That invitation has already been accepted')
+  if (invite.status === 'REVOKED') throw new AdminConflictError('That invitation is already revoked')
 
   await db.invitation.update({
     where: { id: invitationId },
