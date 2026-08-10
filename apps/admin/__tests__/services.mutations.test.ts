@@ -50,6 +50,18 @@ import {
 const mock = <T extends (...a: never[]) => unknown>(fn: unknown) => fn as MockedFunction<T>
 const ADMIN = ['ADMIN']
 
+/**
+ * The eight bytes every PNG begins with, plus filler.
+ *
+ * The signature tests passed `Buffer.from('png')` — three letters spelling the
+ * word. That was fine while nothing looked at the bytes; it stopped being fine
+ * when something did, which is the point of looking.
+ */
+const VALID_PNG = Buffer.concat([
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  Buffer.alloc(40, 1),
+])
+
 beforeEach(() => {
   vi.clearAllMocks()
   mock(db.inboxMessage.create).mockResolvedValue({} as never)
@@ -345,7 +357,7 @@ describe('generateContributions', () => {
 describe('admin signature', () => {
   it('refuses a second signature rather than silently replacing the first', async () => {
     mock(db.adminSignature.findUnique).mockResolvedValue({ id: 's1' } as never)
-    await expect(createSignature('a1', ADMIN, Buffer.from('png'), 'K M'))
+    await expect(createSignature('a1', ADMIN, VALID_PNG, 'K M'))
       .rejects.toBeInstanceOf(AdminConflictError)
   })
 
@@ -356,7 +368,7 @@ describe('admin signature', () => {
       isActive: true, nextChangeAllowedAt: new Date(), createdAt: new Date(), updatedAt: new Date(),
     } as never)
 
-    await createSignature('a1', ADMIN, Buffer.from('png'), 'K M')
+    await createSignature('a1', ADMIN, VALID_PNG, 'K M')
 
     const [{ data }] = mock(db.adminSignature.create).mock.calls[0] as unknown as [{ data: { nextChangeAllowedAt: Date } }]
     expect(data.nextChangeAllowedAt.getTime()).toBeGreaterThan(Date.now())
@@ -368,7 +380,7 @@ describe('admin signature', () => {
       id: 's1', signatureUrl: 'u', signatureHash: 'h', nextChangeAllowedAt: lifts,
     } as never)
 
-    await expect(updateSignature('a1', ADMIN, Buffer.from('png'), 'K M'))
+    await expect(updateSignature('a1', ADMIN, VALID_PNG, 'K M'))
       .rejects.toMatchObject({ nextChangeAllowedAt: lifts.toISOString() })
     expect(db.$transaction).not.toHaveBeenCalled()
   })
@@ -387,7 +399,7 @@ describe('admin signature', () => {
     }
     mock(db.$transaction).mockImplementation((async (fn: (c: typeof tx) => unknown) => fn(tx)) as never)
 
-    await updateSignature('a1', ADMIN, Buffer.from('png'), 'K M')
+    await updateSignature('a1', ADMIN, VALID_PNG, 'K M')
 
     // The superseded signature is archived, not overwritten — signed statements
     // must stay verifiable against the signature that actually signed them.
@@ -400,7 +412,7 @@ describe('admin signature', () => {
 
   it('throws not-found when replacing a signature that was never uploaded', async () => {
     mock(db.adminSignature.findUnique).mockResolvedValue(null as never)
-    await expect(updateSignature('a1', ADMIN, Buffer.from('png'), 'K M'))
+    await expect(updateSignature('a1', ADMIN, VALID_PNG, 'K M'))
       .rejects.toBeInstanceOf(AdminNotFoundError)
   })
 })
@@ -474,5 +486,59 @@ describe('revokeInvitation — what counts as already finished', () => {
 
     await expect(revokeInvitation('a1', ADMIN, 'i1')).resolves.toBeUndefined()
     expect(db.invitation.update).toHaveBeenCalled()
+  })
+})
+
+describe('a signature is drawn onto member statements', () => {
+  beforeEach(() => {
+    mock(db.adminSignature.findUnique).mockResolvedValue(null as never)
+    mock(db.adminSignature.create).mockResolvedValue({
+      id: 'sig1', signatureUrl: 'u', signatureHash: 'h', displayName: 'K S Drill',
+      isActive: true, nextChangeAllowedAt: new Date(), createdAt: new Date(), updatedAt: new Date(),
+    } as never)
+  })
+
+  it('accepts a real PNG', async () => {
+    await expect(createSignature('a1', ADMIN, VALID_PNG, 'K S Drill')).resolves.toBeDefined()
+  })
+
+  it('refuses a file that is not a PNG, whatever it is called', async () => {
+    // Nothing checked the bytes. The storage path is named `.png` and the
+    // helper is called `storeSignaturePng`, and both simply believed the
+    // upload. A non-image does not fail on this page — it fails later, inside
+    // statement generation, for every member asking for a statement.
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(40, 1)])
+
+    await expect(createSignature('a1', ADMIN, jpeg, 'K S Drill'))
+      .rejects.toThrow(/not a PNG/i)
+    expect(db.adminSignature.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses an empty file', async () => {
+    // The page checks `file.size === 0`, which a request not made by that page
+    // does not have to honour.
+    await expect(createSignature('a1', ADMIN, Buffer.alloc(0), 'K S Drill'))
+      .rejects.toThrow(/empty/i)
+  })
+
+  it('refuses something far too large to be a signature', async () => {
+    const huge = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.alloc(3 * 1024 * 1024, 1),
+    ])
+
+    await expect(createSignature('a1', ADMIN, huge, 'K S Drill'))
+      .rejects.toThrow(/too large/i)
+  })
+
+  it('holds an update to the same standard as a first upload', async () => {
+    mock(db.adminSignature.findUnique).mockResolvedValue({
+      id: 'sig1', adminUserId: 'a1', signatureUrl: 'u', signatureHash: 'h', displayName: 'x',
+      isActive: true, nextChangeAllowedAt: new Date('2020-01-01'),
+      createdAt: new Date('2020-01-01'), updatedAt: new Date('2020-01-01'),
+    } as never)
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(40, 1)])
+
+    await expect(updateSignature('a1', ADMIN, jpeg, 'K S Drill')).rejects.toThrow(/not a PNG/i)
   })
 })

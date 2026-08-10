@@ -53,6 +53,42 @@ export async function getSignatureHistory(adminId: string, adminRoles: string[])
 }
 
 /** Upload the admin's first signature. */
+/**
+ * Refuse anything that is not a real PNG, and anything absurdly large.
+ *
+ * Nothing checked either. The storage path is named `.png` and the helper is
+ * called `storeSignaturePng`, but the bytes were whatever the admin chose —
+ * a JPEG, a PDF, a text file — stored under a PNG name and trusted.
+ *
+ * The blast radius is not this page. A signature is rendered into member
+ * statements, so a file that is not an image does not fail here where somebody
+ * would see it; it fails later, inside statement generation, for every member
+ * asking for a statement. An admin uploading the wrong file would break a
+ * member-facing document and have no reason to connect the two.
+ *
+ * Magic bytes rather than the browser's content-type, because that is a claim
+ * made by the client and this is the one place the claim can be checked
+ * against the thing itself.
+ */
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+/** Generous for a signature — a scanned one runs to tens of kilobytes. */
+const MAX_SIGNATURE_BYTES = 2 * 1024 * 1024
+
+function assertUsableSignature(pngBuffer: Buffer): void {
+  if (pngBuffer.length === 0) {
+    throw new AdminConflictError('That file is empty. Upload a PNG image of your signature.')
+  }
+  if (pngBuffer.length > MAX_SIGNATURE_BYTES) {
+    throw new AdminConflictError('That image is too large. Use a PNG under 2 MB.')
+  }
+  if (!pngBuffer.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC)) {
+    throw new AdminConflictError(
+      'That file is not a PNG. Signatures are rendered onto member statements, so the format has to be one those documents can draw.',
+    )
+  }
+}
+
 export async function createSignature(
   adminId: string, adminRoles: string[], pngBuffer: Buffer, displayName: string,
 ) {
@@ -60,6 +96,8 @@ export async function createSignature(
 
   const existing = await db.adminSignature.findUnique({ where: { adminId } })
   if (existing) throw new AdminConflictError('Signature already exists — use update instead')
+
+  assertUsableSignature(pngBuffer)
 
   const signatureHash = createHash('sha256').update(pngBuffer).digest('hex')
   const path = `signatures/${adminId}/${Date.now()}.png`
@@ -95,6 +133,8 @@ export async function updateSignature(
   if (existing.nextChangeAllowedAt.getTime() > Date.now()) {
     throw new SignatureLockError(existing.nextChangeAllowedAt)
   }
+
+  assertUsableSignature(pngBuffer)
 
   const signatureHash = createHash('sha256').update(pngBuffer).digest('hex')
   const path = `signatures/${adminId}/${Date.now()}.png`
