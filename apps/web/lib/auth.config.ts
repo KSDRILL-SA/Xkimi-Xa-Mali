@@ -33,6 +33,7 @@ export const authConfig = {
         token.id = user.id
         token.roles = (user as { roles?: string[] }).roles ?? []
         token.roleVersion = (user as { roleVersion?: number }).roleVersion ?? 0
+        token.status = (user as { status?: string }).status ?? 'ACTIVE'
       }
       return token
     },
@@ -40,6 +41,7 @@ export const authConfig = {
       session.user.id = token.id as string
       session.user.roles = token.roles as string[]
       session.user.roleVersion = token.roleVersion as number
+      session.user.status = token.status as string
       return session
     },
   },

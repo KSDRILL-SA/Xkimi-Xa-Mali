@@ -4,6 +4,7 @@ import { verifyCsrfOrigin } from '@xxm/utils/csrf-origin'
 import { getCachedRoleVersion, setCachedRoleVersion } from '@/lib/role-version-cache'
 import { mustReauthenticate, type RoleVersionVerdict } from '@/lib/role-version-policy'
 import { NextResponse } from 'next/server'
+import { refuseForStanding, standingRefusalMessage } from '@xxm/utils/membership-standing'
 import { Redis } from '@upstash/redis'
 
 // Built from the Edge-safe config slice only — importing the full @/lib/auth
@@ -288,6 +289,29 @@ async function handleRequest(
     loginUrl.searchParams.set('callbackUrl', pathname + req.nextUrl.search)
     loginUrl.searchParams.set('reason', 'session_expired')
     return NextResponse.redirect(loginUrl)
+  }
+
+  // Somebody who has left keeps their history, not their participation.
+  //
+  // Sign-in lets a RESIGNED member through on purpose — the promise is "leave
+  // at any time, with your history intact". But every member-facing service
+  // gates on `assertCanAccess`, which asks whether the data is yours and never
+  // whether you are still a member. So a resigned member could still pay a
+  // contribution, set up a debit order, fund a goal, commit to a plan, propose,
+  // cheer, comment and post to the circle.
+  //
+  // Enforced here rather than in each service because a per-service rule is one
+  // somebody has to remember on a surface that grows, and it fails silently
+  // when they do not. Reads are untouched; only state changes are gated, and
+  // the few a departed member must still make are named in the policy.
+  if (pathname.startsWith('/api/') && !pathname.startsWith('/api/v1/admin')) {
+    const standing = (session.user as { status?: string }).status ?? 'ACTIVE'
+    if (refuseForStanding(standing, req.method, pathname)) {
+      return NextResponse.json(
+        { error: { code: 'SYS_008', message: standingRefusalMessage(standing), traceId } },
+        { status: 403, headers: { 'x-trace-id': traceId } },
+      )
+    }
   }
 
   // CSRF origin validation for all state-mutating requests on authenticated routes
