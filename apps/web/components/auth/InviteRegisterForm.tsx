@@ -113,7 +113,7 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
           id="password"
           type="password"
           autoComplete="new-password"
-          placeholder="Min. 8 chars, 1 uppercase, 1 number"
+          placeholder="At least 12 characters"
           icon={Lock}
           {...register('password')}
         />

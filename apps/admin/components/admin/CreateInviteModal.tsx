@@ -136,7 +136,7 @@ function ModalContent({
 
             <div className="space-y-1.5">
               <Label htmlFor="invite-email">Email address *</Label>
-              <Input id="invite-email" name="email" type="email" required />
+              <Input id="invite-email" name="email" type="email" placeholder="name@gmail.com" required />
             </div>
 
             {/* The identity leadership is vouching for.

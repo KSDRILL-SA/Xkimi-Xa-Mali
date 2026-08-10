@@ -43,7 +43,7 @@ export function ResetPasswordForm({ token }: Props) {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
       {serverError && <Alert variant="error">{serverError}</Alert>}
       <FormGroup label="New password" htmlFor="password" required error={errors.password?.message} hint="At least 12 characters. A short phrase you will remember works well.">
-        <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" icon={Lock} {...register('password')} />
+        <Input id="password" type="password" autoComplete="new-password" placeholder="At least 12 characters" icon={Lock} {...register('password')} />
       </FormGroup>
       <FormGroup label="Confirm password" htmlFor="confirmPassword" required error={errors.confirmPassword?.message}>
         <Input id="confirmPassword" type="password" autoComplete="new-password" placeholder="Repeat your password" icon={Lock} {...register('confirmPassword')} />
