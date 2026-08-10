@@ -70,7 +70,7 @@ beforeEach(() => {
   mocks.findById.mockResolvedValue({ id: 'g1', status: 'ACTIVE', isPrimary: false, title: 'E2E Fund', targetAmount: 5000 })
   mocks.mandate.mockResolvedValue({ netcashMandateId: 'NC-1' })
   mocks.submit.mockResolvedValue({ status: 'SUCCESS', transactionRef: 'REF-1' })
-  mocks.updatePayment.mockImplementation((id: string, d: object) => Promise.resolve({ id, amount: 25, ...d }))
+  mocks.updatePayment.mockImplementation((id: string, d: object) => Promise.resolve({ id, amount: 60, ...d }))
 })
 
 describe('a double tap on the same intent', () => {
@@ -81,19 +81,19 @@ describe('a double tap on the same intent', () => {
     mocks.findByKey
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
-      .mockResolvedValue({ id: 'pay-1', status: 'SUCCESS', amount: 25 })
+      .mockResolvedValue({ id: 'pay-1', status: 'SUCCESS', amount: 60 })
 
     // The database decides: the first insert wins, the second is refused.
     let inserted = false
     mocks.createPayment.mockImplementation(() => {
       if (inserted) return Promise.reject(uniqueViolation())
       inserted = true
-      return Promise.resolve({ id: 'pay-1', amount: 25, status: 'PENDING' })
+      return Promise.resolve({ id: 'pay-1', amount: 60, status: 'PENDING' })
     })
 
     const [a, b] = await Promise.allSettled([
-      payToGoal('g1', 'u1', 'u1', [], 25, undefined, 'tok'),
-      payToGoal('g1', 'u1', 'u1', [], 25, undefined, 'tok'),
+      payToGoal('g1', 'u1', 'u1', [], 60, undefined, 'tok'),
+      payToGoal('g1', 'u1', 'u1', [], 60, undefined, 'tok'),
     ])
 
     // The whole point: the member's account is touched once.
@@ -107,10 +107,10 @@ describe('a double tap on the same intent', () => {
     // nothing went wrong from the member's side, they simply tapped twice.
     mocks.findByKey
       .mockResolvedValueOnce(null)
-      .mockResolvedValue({ id: 'pay-1', status: 'SUCCESS', amount: 25 })
+      .mockResolvedValue({ id: 'pay-1', status: 'SUCCESS', amount: 60 })
     mocks.createPayment.mockRejectedValue(uniqueViolation())
 
-    const res = await payToGoal('g1', 'u1', 'u1', [], 25, undefined, 'tok')
+    const res = await payToGoal('g1', 'u1', 'u1', [], 60, undefined, 'tok')
 
     expect(res.duplicate).toBe(true)
     expect(res.payment).toMatchObject({ id: 'pay-1' })
@@ -119,9 +119,9 @@ describe('a double tap on the same intent', () => {
 
   it('claims the key before it charges', async () => {
     mocks.findByKey.mockResolvedValue(null)
-    mocks.createPayment.mockResolvedValue({ id: 'pay-1', amount: 25, status: 'PENDING' })
+    mocks.createPayment.mockResolvedValue({ id: 'pay-1', amount: 60, status: 'PENDING' })
 
-    await payToGoal('g1', 'u1', 'u1', [], 25, undefined, 'tok')
+    await payToGoal('g1', 'u1', 'u1', [], 60, undefined, 'tok')
 
     expect(mocks.createPayment.mock.invocationCallOrder[0]!)
       .toBeLessThan(mocks.submit.mock.invocationCallOrder[0]!)
@@ -133,10 +133,10 @@ describe('a double tap on the same intent', () => {
     // The guard is on the intent, not on the member and the goal. Someone who
     // means to give twice must be able to.
     mocks.findByKey.mockResolvedValue(null)
-    mocks.createPayment.mockResolvedValue({ id: 'pay-2', amount: 25, status: 'PENDING' })
+    mocks.createPayment.mockResolvedValue({ id: 'pay-2', amount: 60, status: 'PENDING' })
 
-    await payToGoal('g1', 'u1', 'u1', [], 25, undefined, 'tok-a')
-    await payToGoal('g1', 'u1', 'u1', [], 25, undefined, 'tok-b')
+    await payToGoal('g1', 'u1', 'u1', [], 60, undefined, 'tok-a')
+    await payToGoal('g1', 'u1', 'u1', [], 60, undefined, 'tok-b')
 
     expect(mocks.submit).toHaveBeenCalledTimes(2)
   })
@@ -145,7 +145,7 @@ describe('a double tap on the same intent', () => {
     mocks.findByKey.mockResolvedValue(null)
     mocks.createPayment.mockRejectedValue(new Error('database is down'))
 
-    await expect(payToGoal('g1', 'u1', 'u1', [], 25, undefined, 'tok'))
+    await expect(payToGoal('g1', 'u1', 'u1', [], 60, undefined, 'tok'))
       .rejects.toThrow(/database is down/)
     expect(mocks.submit).not.toHaveBeenCalled()
   })
