@@ -173,6 +173,25 @@ export class InviteBindingError extends AppError {
   constructor() { super('Email or phone does not match the invite', 'INV_005', 403) }
 }
 
+/**
+ * The ID typed at registration is not the one the invitation was issued for.
+ *
+ * Deliberately not `InviteBindingError`, whose message names the email and
+ * phone. Telling somebody their email does not match when the mismatch is
+ * their ID number sends them looking at the wrong field — and the person best
+ * placed to spot an admin's mistyped digit is the one being asked to confirm
+ * it, so the message has to say which field it means.
+ */
+export class InviteIdMismatchError extends AppError {
+  constructor() {
+    super(
+      'That ID number does not match the one on your invitation. Check the digits, or ask your group admin to correct it.',
+      'INV_007',
+      403,
+    )
+  }
+}
+
 export class InviteDuplicateError extends ConflictError {
   constructor() { super('An active invite or account already exists for this email or phone', 'INV_006') }
 }

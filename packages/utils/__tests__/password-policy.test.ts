@@ -33,7 +33,9 @@ describe('new passwords: length, not composition', () => {
   const cases: Array<[string, (p: string) => boolean]> = [
     ['PasswordResetSchema',  (p) => PasswordResetSchema.safeParse(pw(p)).success],
     ['ChangePasswordSchema', (p) => ChangePasswordSchema.safeParse({ currentPassword: 'x', newPassword: p, confirmPassword: p }).success],
-    ['RegisterStep2Schema',  (p) => RegisterStep2Schema.safeParse({ firstName: 'Ku', lastName: 'Ma', password: p, consentToPopia: true }).success],
+    // The ID is required now: the admin records it on the invitation and the
+    // member confirms it here, rather than supplying their own optionally.
+    ['RegisterStep2Schema',  (p) => RegisterStep2Schema.safeParse({ firstName: 'Ku', lastName: 'Ma', idNumber: '9001015800088', password: p, consentToPopia: true }).success],
   ]
 
   for (const [name, check] of cases) {

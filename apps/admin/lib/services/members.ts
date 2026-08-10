@@ -1,4 +1,5 @@
 import { UserStatus } from '@prisma/client'
+import { internalAdminPost } from '@/lib/api'
 import {
   refuseStatusChange,
   STATUS_CHANGE_REFUSAL_MESSAGE,
@@ -205,4 +206,33 @@ export async function unlockMember(
   })
 
   return updated
+}
+
+/**
+ * Correct the ID number held against a member.
+ *
+ * There was no way to do this — not for the member, whose profile schema does
+ * not include it, and not for an admin, whose service never touched it. The
+ * number was typed once at registration, optionally, and whatever arrived was
+ * held forever: a missing one could never be supplied, a mistyped one never
+ * fixed, on the field that ties a bank account to a person.
+ *
+ * Handed to the member app, which owns the encryption keyring. This console
+ * has no business holding that key in order to change one column.
+ */
+export async function correctMemberIdNumber(
+  adminId: string, adminRoles: string[],
+  memberId: string, idNumber: string, reason: string, ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const res = await internalAdminPost(`/api/v1/admin/members/${memberId}/id-number`, {
+    idNumber: idNumber.trim(),
+    reason: reason?.trim() ?? '',
+  }, { adminUserId: adminId, adminIp: ip })
+
+  if (!res.ok) {
+    throw new AdminConflictError(res.error?.message ?? 'Could not update this ID number')
+  }
+  return { corrected: true as const }
 }
