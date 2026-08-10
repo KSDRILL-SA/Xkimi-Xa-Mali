@@ -55,8 +55,30 @@ export async function getUnreadInboxCount(userId: string): Promise<number> {
   return db.inboxMessage.count({ where: { userId, readAt: null } })
 }
 
-export async function markInboxRead(userId: string, id: string): Promise<void> {
-  await db.inboxMessage.updateMany({ where: { id, userId, readAt: null }, data: { readAt: new Date() } })
+/**
+ * Mark one of the member's own messages read.
+ *
+ * Returns whether a message of theirs was actually found. It used to return
+ * nothing, and the route reported `{ read: true }` either way — so a request
+ * for a message that did not exist, or belonged to somebody else, was answered
+ * "done". Nothing was ever written to another member's row (the filter has
+ * always been scoped by `userId`), but an endpoint that claims to have acted
+ * when it has not is a bad thing to build a UI on: the client marks the item
+ * read, and it comes back unread on the next load.
+ *
+ * Already-read messages return true and are left alone, so a repeated call is
+ * idempotent rather than re-stamping the time it was first seen.
+ */
+export async function markInboxRead(userId: string, id: string): Promise<boolean> {
+  const existing = await db.inboxMessage.findFirst({
+    where: { id, userId },
+    select: { id: true, readAt: true },
+  })
+  if (!existing) return false
+  if (existing.readAt) return true
+
+  await db.inboxMessage.update({ where: { id: existing.id }, data: { readAt: new Date() } })
+  return true
 }
 
 export async function markAllInboxRead(userId: string): Promise<number> {
@@ -64,8 +86,10 @@ export async function markAllInboxRead(userId: string): Promise<number> {
   return res.count
 }
 
-export async function deleteInboxMessage(userId: string, id: string): Promise<void> {
-  await db.inboxMessage.deleteMany({ where: { id, userId } })
+/** Delete one of the member's own messages. False when they had no such message. */
+export async function deleteInboxMessage(userId: string, id: string): Promise<boolean> {
+  const res = await db.inboxMessage.deleteMany({ where: { id, userId } })
+  return res.count > 0
 }
 
 /**
