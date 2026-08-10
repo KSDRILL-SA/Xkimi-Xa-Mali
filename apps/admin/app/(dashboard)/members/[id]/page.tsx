@@ -39,7 +39,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   async function handleStatusChange(fd: FormData) {
     'use server'
     const { userId, roles: r } = await requireAdmin('member.changeStatus')
-    await setMemberStatus(userId, r, id, fd.get('status') as string)
+    await setMemberStatus(userId, r, id, String(fd.get('status') ?? ''), undefined, String(fd.get('reason') ?? ''))
     revalidatePath(`/members/${id}`)
     revalidatePath('/members')
   }
@@ -103,6 +103,15 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                 <option value="PENDING">Pending</option>
                 <option value="SUSPENDED">Suspended</option>
               </select>
+              {/* Only suspension takes access away, and only suspension has to
+                  say why — the service enforces that, this asks for it. */}
+              <input
+                name="reason"
+                type="text"
+                maxLength={500}
+                placeholder="Reason (required to suspend)"
+                className="rounded-lg border border-xxm-gray-200 px-2 py-1.5 text-sm text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25 min-w-[16rem]"
+              />
               <ConfirmSubmitButton
                 className="px-4 py-1.5 rounded-lg bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors"
                 title="Change member status?"

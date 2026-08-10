@@ -1,4 +1,9 @@
 import { UserStatus } from '@prisma/client'
+import {
+  refuseStatusChange,
+  STATUS_CHANGE_REFUSAL_MESSAGE,
+  type AdminSettableStatus,
+} from '@xxm/utils/status-policy'
 import { db, Prisma } from '@/lib/db'
 import { publishRoleVersion } from '@/lib/role-version'
 import { assertAdmin, notifyInbox, writeAuditLog, AdminNotFoundError, AdminConflictError } from './shared'
@@ -97,15 +102,57 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
 export async function setMemberStatus(
   adminId: string, adminRoles: string[],
   memberId: string, newStatus: string, ip?: string,
+  /**
+   * Why, when access is being taken away.
+   *
+   * Required for suspension and ignored otherwise. The reversal route already
+   * holds this line for money — "a reversing entry with no stated cause is a
+   * hole in that history" — and cutting a member off is no smaller an act. The
+   * audit recorded from and to, which says what changed and nothing about why.
+   */
+  reason?: string,
 ) {
   assertAdmin(adminRoles)
-  const member = await db.user.findUnique({ where: { id: memberId }, select: { id: true, status: true } })
+  const member = await db.user.findUnique({
+    where: { id: memberId },
+    select: { id: true, status: true, roles: { select: { role: { select: { name: true } } } } },
+  })
   if (!member) throw new AdminNotFoundError('Member not found')
   if (member.status === newStatus) throw new AdminConflictError(`Member is already ${newStatus}`)
 
+  const targetIsAdmin = member.roles.some((r) => r.role.name === 'ADMIN')
+
+  // Admins who could still undo this. Counted only when it could matter, so the
+  // ordinary case does not pay for a query about a rule it cannot trip.
+  const activeAdminCount = targetIsAdmin && newStatus === 'SUSPENDED'
+    ? await db.user.count({
+        where: { status: 'ACTIVE', deletedAt: null, roles: { some: { role: { name: 'ADMIN' } } } },
+      })
+    : 0
+
+  // The status arrives from a form field. The dropdown offers three values, but
+  // the server is not entitled to assume the client sent one of them — and one
+  // of the values it does not offer, RESIGNED, would record that a member chose
+  // to leave when leadership removed them.
+  const refusal = refuseStatusChange({
+    actorId: adminId,
+    targetId: memberId,
+    requestedStatus: newStatus,
+    targetIsAdmin,
+    activeAdminCount,
+  })
+  if (refusal) throw new AdminConflictError(STATUS_CHANGE_REFUSAL_MESSAGE[refusal])
+
+  const trimmedReason = reason?.trim() ?? ''
+  if (newStatus === 'SUSPENDED' && trimmedReason.length < 10) {
+    throw new AdminConflictError(
+      'Give a reason of at least 10 characters for suspending this member — it is recorded in the audit trail.',
+    )
+  }
+
   const updated = await db.user.update({
     where: { id: memberId },
-    data: { status: newStatus as 'ACTIVE' | 'PENDING' | 'SUSPENDED', roleVersion: { increment: 1 } },
+    data: { status: newStatus as AdminSettableStatus, roleVersion: { increment: 1 } },
     select: { id: true, status: true, firstName: true, lastName: true, roleVersion: true },
   })
 
@@ -117,7 +164,12 @@ export async function setMemberStatus(
   await writeAuditLog({
     userId: adminId, action: 'ADMIN_MEMBER_STATUS_CHANGED',
     entity: 'User', entityId: memberId,
-    payload: { from: member.status, to: newStatus }, ipAddress: ip,
+    payload: {
+      from: member.status,
+      to: newStatus,
+      ...(trimmedReason && { reason: trimmedReason }),
+    },
+    ipAddress: ip,
   })
 
   if (newStatus === 'ACTIVE') {
