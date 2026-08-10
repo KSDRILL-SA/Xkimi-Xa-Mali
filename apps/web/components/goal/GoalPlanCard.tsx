@@ -12,6 +12,7 @@ import { Alert } from '@/components/ui/Alert'
 import { formatZAR } from '@/lib/formatters'
 import { api, ApiClientError } from '@/lib/api'
 import { NETCASH_FEE_BUFFER, debitAmountWithFee } from '@/lib/group-account'
+import { MIN_GOAL_PAYMENT } from '@/lib/validation/goal'
 
 type Suggestion = {
   goalTitle: string
@@ -209,7 +210,7 @@ export function GoalPlanCard({ goalId, hasActiveMandate }: Props) {
           <div className="grid grid-cols-2 gap-3 mt-4">
             <div>
               <Label htmlFor="plan-amount" required>Monthly amount</Label>
-              <Input id="plan-amount" type="number" min={10} step={10} value={amount || ''}
+              <Input id="plan-amount" type="number" min={MIN_GOAL_PAYMENT} step={10} value={amount || ''}
                 onChange={(e) => setAmount(Number(e.target.value))} />
               {suggestion && suggestion.remaining > 0 && (
                 <p className="text-[10px] text-xxm-gray-400 mt-1.5">
@@ -254,7 +255,7 @@ export function GoalPlanCard({ goalId, hasActiveMandate }: Props) {
             )}
           </div>
 
-          <Button className="w-full mt-4" size="lg" loading={busy} disabled={!amount || amount < 10}
+          <Button className="w-full mt-4" size="lg" loading={busy} disabled={!amount || amount < MIN_GOAL_PAYMENT}
             onClick={() => act(() => api.post('/api/v1/goal-plans', { goalId, amount, debitDay }))}>
             Start this plan
           </Button>

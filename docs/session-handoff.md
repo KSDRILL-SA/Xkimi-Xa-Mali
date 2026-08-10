@@ -251,13 +251,22 @@ rebuilding as `for i in $(seq 1 20); do npx vitest run --reporter=verbose >
 run.log 2>&1; [ $? -ne 0 ] && cp run.log CAUGHT.log && break; done` — **exit
 code, never a text match**.
 
-### Open findings, not yet fixed
+### Both former open findings are closed
 
-- **`payToGoal` has no overfunding cap.** #334 warns the member on the way in,
-  but the service still accepts any amount from any other caller.
-- **A R10 goal payment costs R20.** `MIN_GOAL_PAYMENT` is 10 and
-  `NETCASH_FEE_BUFFER` is 10, so the minimum permitted payment doubles at the
-  gateway. Worth an owner decision on the minimum.
+- **The minimum goal payment was half fees.** `NETCASH_FEE_BUFFER` is a flat
+  R10 and `MIN_GOAL_PAYMENT` was R10, so the smallest permitted payment cost
+  R20 to give R10 — and a monthly plan set at the minimum paid that every
+  month. Raised to R50, which keeps the worst case at a fifth rather than a
+  half, and is deliberately well under the R100 monthly contribution minimum
+  because chipping in extra should stay something a member can do with what
+  they have.
+
+- **"`payToGoal` has no overfunding cap" was overstated by the note that
+  recorded it.** `GoalPaymentSchema` caps a payment at R50 000, so nobody can
+  be debited an absurd amount. Capping at the *goal's target* would contradict
+  the owner's decision in #334 — warn, and let the member choose — and the
+  collection job already trims its last instalment through `instalmentFor`.
+  Nothing to fix; the entry was wrong, not the code.
 
 ### The flaky suite — one more data point
 
