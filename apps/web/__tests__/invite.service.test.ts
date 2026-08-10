@@ -43,6 +43,9 @@ vi.mock('@/integrations/sms', () => ({
 
 vi.mock('@/lib/encryption', () => ({
   encrypt: vi.fn((v: string) => `enc:${v}`),
+  // Registration compares the ID the member typed against the one the admin
+  // recorded on the invitation, and the stored form is encrypted.
+  decrypt: vi.fn((v: string) => v.replace(/^enc:/, '')),
 }))
 
 vi.mock('@/services/audit.service', () => ({
@@ -103,6 +106,8 @@ const VALID_INVITE = {
   expiresAt: new Date(Date.now() + 3_600_000),
   firstName: 'Kurhula', lastName: 'Maluleke',
   email: 'k@x.co.za', phone: '+27821234567',
+  // Stored encrypted, as the real column is.
+  idNumber: 'enc:9001015800088',
   minimumAmount: { toNumber: () => 200 },
   invitedById: 'a1',
 }
@@ -320,6 +325,8 @@ describe('the fifty-member cap', () => {
       inviteCode: 'XKM-ABCD-1234',
       firstName: 'Kurhula', lastName: 'Maluleke',
       email: 'k@x.co.za', phone: '+27821234567',
+      // Matches the ID recorded on VALID_INVITE — confirmed, not supplied.
+      idNumber: '9001015800088',
       password: 'Password1',
       consentToPopia: true as const,
     }
@@ -343,6 +350,29 @@ describe('the fifty-member cap', () => {
       mockWriteAuditLog.mockResolvedValue(undefined)
       return { userCreate }
     }
+
+    it('refuses an ID that is not the one the invitation was issued for', async () => {
+      // The point of the design. The admin recorded this person's ID because
+      // they know them; the member confirms they are that person. Two mistakes
+      // are caught by the same check — an admin who mistyped a digit hears
+      // about it from the one person who would notice, and somebody holding an
+      // invitation cannot register under an identity nobody vouched for.
+      armAccept(10)
+
+      await expect(
+        acceptInviteRegistration({ ...input, idNumber: '8801015800080' }, 'http://localhost'),
+      ).rejects.toThrow(/does not match/i)
+    })
+
+    it('says which field is wrong, not the wrong one', async () => {
+      // `InviteBindingError` names the email and phone. Telling somebody their
+      // email does not match when it is their ID sends them to the wrong field.
+      armAccept(10)
+
+      await expect(
+        acceptInviteRegistration({ ...input, idNumber: '8801015800080' }, 'http://localhost'),
+      ).rejects.toMatchObject({ code: 'INV_007' })
+    })
 
     it('refuses to create the fifty-first member', async () => {
       const { userCreate } = armAccept(50)
@@ -458,6 +488,8 @@ describe('acceptInviteRegistration', () => {
     inviteCode: 'XKM-ABCD-1234',
     firstName: 'Kurhula', lastName: 'Maluleke',
     email: 'k@x.co.za', phone: '+27821234567',
+    // Confirmed by the member, and it has to match the invitation.
+    idNumber: '9001015800088',
     password: 'Password1',
     consentToPopia: true as const,
   }

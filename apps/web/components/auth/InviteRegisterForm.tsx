@@ -50,7 +50,7 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
         phone:          invite.phone,
         firstName:      data.firstName.trim(),
         lastName:       data.lastName.trim(),
-        idNumber:       data.idNumber || undefined,
+        idNumber:       data.idNumber,
         password:       data.password,
         consentToPopia: true,
       })
@@ -88,8 +88,18 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
         <Input id="phoneDisplay" value={invite.phone} readOnly disabled />
       </FormGroup>
 
-      <FormGroup label="SA ID number" htmlFor="idNumber" hint="Optional" error={errors.idNumber?.message}>
-        <Input id="idNumber" placeholder="13-digit ID number" icon={IdCard} maxLength={13} {...register('idNumber')} />
+      {/* Confirmed, not supplied.
+          The admin who invited you recorded this because they know you. Typing
+          it back proves you are the person that invitation was for — and it
+          catches an admin's mistyped digit, from the one person who would
+          notice. */}
+      <FormGroup
+        label="Confirm your SA ID number"
+        htmlFor="idNumber"
+        hint="The admin who invited you has this on file"
+        error={errors.idNumber?.message}
+      >
+        <Input id="idNumber" placeholder="13-digit ID number" icon={IdCard} maxLength={13} inputMode="numeric" {...register('idNumber')} />
       </FormGroup>
 
       <FormGroup

@@ -5,7 +5,7 @@ import { smsProvider } from '@/integrations/sms'
 import { writeAuditLog } from './audit.service'
 import { raiseOperationalAlert } from './alert.service'
 import { logger } from '@xxm/observability'
-import { encrypt } from '@/lib/encryption'
+import { encrypt, decrypt } from '@/lib/encryption'
 import {
   ForbiddenError,
   AdminNotFoundError,
@@ -14,6 +14,7 @@ import {
   InviteRevokedError,
   InviteExpiredError,
   InviteBindingError,
+  InviteIdMismatchError,
   InviteDuplicateError,
   MemberCapReachedError,
 } from '@/lib/errors'
@@ -167,6 +168,10 @@ export type CreateInviteParams = {
   lastName: string
   email: string
   phone: string
+  /** Plain on the way in; encrypted before it is stored, like the member's own. */
+  idNumber: string
+  /** How the inviting admin knows this person. Optional, free text. */
+  vouchedFor?: string
   minimumAmount: number
 }
 
@@ -185,7 +190,7 @@ export async function generateInvite(
   const places = await countMemberPlaces()
   if (places.isFull) throw new MemberCapReachedError(MAX_MEMBERS)
 
-  const { firstName, lastName, email, phone, minimumAmount } = params
+  const { firstName, lastName, email, phone, idNumber, vouchedFor, minimumAmount } = params
   const normPhone = smsProvider.normalisePhone(phone)
 
   const [existingInvite, existingUser] = await Promise.all([
@@ -205,7 +210,8 @@ export async function generateInvite(
 
   const invite = await invitationRepo.create({
     codeHash, codePrefix, firstName, lastName,
-    email, phone: normPhone, minimumAmount, expiresAt,
+    email, phone: normPhone, idNumber: encrypt(idNumber), vouchedFor: vouchedFor ?? null,
+    minimumAmount, expiresAt,
     invitedById: adminId,
   })
 
@@ -335,6 +341,7 @@ export async function acceptInviteRegistration(
   const codeHash = hashCode(input.inviteCode)
   const invite = await invitationRepo.findByCodeHash(codeHash, {
     id: true, status: true, expiresAt: true, email: true, phone: true, invitedById: true,
+    idNumber: true,
   })
 
   if (!invite) throw new InviteNotFoundError()
@@ -352,7 +359,20 @@ export async function acceptInviteRegistration(
     userRepo.findRoleOrThrow('MEMBER'),
   ])
 
-  const encryptedId = input.idNumber ? encrypt(input.idNumber) : null
+  // The member confirms the identity their invitation was issued for.
+  //
+  // The admin recorded it because they know this person. Comparing rather than
+  // trusting catches two different mistakes: an admin who mistyped a digit
+  // hears about it from the one person who would notice, and somebody holding
+  // an invitation cannot quietly register under an identity nobody vouched for.
+  //
+  // Compared decrypted, because the stored form is encrypted with a nonce and
+  // two encryptions of the same number do not match as ciphertext.
+  if (decrypt(invite.idNumber) !== input.idNumber) {
+    throw new InviteIdMismatchError()
+  }
+
+  const encryptedId = encrypt(input.idNumber)
   const rawToken    = generateToken()
   const tokenHash   = hashToken(rawToken)
 

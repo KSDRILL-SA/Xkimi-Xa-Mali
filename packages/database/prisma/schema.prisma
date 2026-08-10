@@ -799,6 +799,19 @@ model Invitation {
   lastName      String
   email         String
   phone         String
+  /// The invitee's SA ID, encrypted, set by the admin who knows them.
+  ///
+  /// Leadership vouches for who this person is; the member confirms they are
+  /// the one holding the invitation. Before this the member typed their own ID
+  /// at registration and it was optional — so the Foundation trusted a
+  /// self-reported identity for the thing that ties a bank account to a person,
+  /// and nobody could correct it afterwards.
+  idNumber      String
+  /// How the inviting admin knows this person. Free text, optional.
+  ///
+  /// `invitedById` already records *who* invited them. This records *why* they
+  /// could vouch, which is the part that cannot be derived from anything else.
+  vouchedFor    String?
   minimumAmount Decimal          @db.Decimal(12, 2)
   currency      String           @default("ZAR")
   status        InvitationStatus @default(PENDING)

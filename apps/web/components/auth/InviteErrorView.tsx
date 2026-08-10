@@ -21,6 +21,10 @@ const INVITE_ERRORS: Record<string, { message: string; cta: string; showLogin?: 
     message: 'This invite link has expired.',
     cta: 'Ask the admin to resend your invite.',
   },
+  INV_007: {
+    message: 'That ID number does not match your invitation.',
+    cta: 'Check the digits. If they are right, ask your group admin to correct the invitation.',
+  },
   // Deliberately says nothing about the code that was tried. Somebody working
   // through codes must not learn from this screen whether any of them was real.
   SYS_005: {

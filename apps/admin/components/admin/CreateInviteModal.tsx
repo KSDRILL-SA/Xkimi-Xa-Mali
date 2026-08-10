@@ -53,7 +53,7 @@ function ModalContent({
    * submitted, only disabled ones are not — so the form the review describes is
    * exactly the form that gets sent.
    */
-  const [review, setReview] = useState<null | { name: string; email: string; phone: string }>(null)
+  const [review, setReview] = useState<null | { name: string; email: string; phone: string; idNumber: string }>(null)
 
   function openReview(form: HTMLFormElement) {
     if (!form.reportValidity()) return
@@ -62,6 +62,7 @@ function ModalContent({
       name: `${String(fd.get('firstName') ?? '')} ${String(fd.get('lastName') ?? '')}`.trim(),
       email: String(fd.get('email') ?? ''),
       phone: String(fd.get('phone') ?? ''),
+      idNumber: String(fd.get('idNumber') ?? ''),
     })
   }
 
@@ -138,6 +139,32 @@ function ModalContent({
               <Input id="invite-email" name="email" type="email" required />
             </div>
 
+            {/* The identity leadership is vouching for.
+                Recorded here because the admin is the one who knows this
+                person. The member confirms it at registration rather than
+                supplying it — it used to be theirs to type, optionally, and
+                nobody could correct it afterwards. */}
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-id">SA ID number *</Label>
+              <Input
+                id="invite-id"
+                name="idNumber"
+                inputMode="numeric"
+                pattern="\d{13}"
+                maxLength={13}
+                placeholder="13 digits"
+                required
+              />
+              <p className="text-[11px] text-xxm-gray-400">
+                They will be asked to confirm this when they register, so check the digits.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="invite-vouched">How do you know them?</Label>
+              <Input id="invite-vouched" name="vouchedFor" maxLength={200} placeholder="Optional — e.g. cousin, worked together since 2019" />
+            </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="invite-phone">SA mobile number *</Label>
               <Input id="invite-phone" name="phone" type="tel" placeholder="0821234567" required />
@@ -162,7 +189,8 @@ function ModalContent({
                 <p className="text-xs text-amber-800">
                   The code goes to <span className="font-bold">{review.email}</span> and{' '}
                   <span className="font-bold">{review.phone}</span>. Whoever receives it can
-                  register as <span className="font-bold">{review.name}</span> and join the
+                  register as <span className="font-bold">{review.name}</span>, ID{' '}
+                  <span className="font-bold">{review.idNumber}</span>, and join the
                   Foundation. Check the address before sending — an invitation sent to the
                   wrong person can be revoked, but only once somebody notices.
                 </p>

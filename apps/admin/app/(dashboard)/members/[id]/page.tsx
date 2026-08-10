@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory } from '@/lib/services'
+import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory, correctMemberIdNumber } from '@/lib/services'
 import { setFounderBadge } from '@/lib/founder-badge'
 import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader, Reveal } from '@xxm/ui'
@@ -42,6 +42,17 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     await setMemberStatus(userId, r, id, String(fd.get('status') ?? ''), undefined, String(fd.get('reason') ?? ''))
     revalidatePath(`/members/${id}`)
     revalidatePath('/members')
+  }
+
+  async function handleCorrectId(fd: FormData) {
+    'use server'
+    const { userId, roles: r } = await requireAdmin('member.correctIdNumber')
+    await correctMemberIdNumber(
+      userId, r, id,
+      String(fd.get('idNumber') ?? ''),
+      String(fd.get('reason') ?? ''),
+    )
+    revalidatePath(`/members/${id}`)
   }
 
   async function handleUnlock() {
@@ -96,6 +107,41 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         icon={<UserCircle size={22} className="text-xxm-green" aria-hidden />}
         action={
           <div className="flex items-center gap-2 flex-wrap">
+            {/* The ID could never be corrected — not by the member, whose
+                profile schema does not include it, and not by an admin, whose
+                service never touched it. A missing or mistyped number was
+                permanent, on the field that ties a bank account to a person. */}
+            <form action={handleCorrectId} className="flex items-center gap-2">
+              <input
+                name="idNumber"
+                inputMode="numeric"
+                pattern="\d{13}"
+                maxLength={13}
+                required
+                placeholder="Correct ID number"
+                aria-label={`Correct ID number for ${member.firstName} ${member.lastName}`}
+                className="rounded-lg border border-xxm-gray-200 px-2 py-1.5 text-sm text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25 w-40"
+              />
+              <input
+                name="reason"
+                type="text"
+                maxLength={500}
+                required
+                minLength={10}
+                placeholder="Reason (required)"
+                aria-label="Reason for correcting this ID number"
+                className="rounded-lg border border-xxm-gray-200 px-2 py-1.5 text-sm text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25 min-w-[14rem]"
+              />
+              <ConfirmSubmitButton
+                title="Correct this member's ID number?"
+                message={`This replaces the SA ID number held against ${member.firstName} ${member.lastName}. It is the field that ties their bank account to them, so check the digits. Your name and reason are recorded permanently.`}
+                confirmLabel="Correct it"
+                className="px-4 py-1.5 rounded-lg bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors"
+              >
+                Correct ID
+              </ConfirmSubmitButton>
+            </form>
+
             <form action={handleStatusChange} className="flex items-center gap-2">
               <select name="status" defaultValue={member.status}
                 className="rounded-lg border border-xxm-gray-200 px-2 py-1.5 text-sm text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25">
