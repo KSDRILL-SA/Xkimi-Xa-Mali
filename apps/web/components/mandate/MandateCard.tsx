@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 import { useRouter } from 'next/navigation'
 import { formatZAR } from '@/lib/formatters'
 import { api } from '@/lib/api'
@@ -161,7 +162,11 @@ export function MandateCard({ mandate }: Props) {
 }
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
+  // Through a portal, for the same reason as the other dialogs: a card that
+  // carries a transform makes `position: fixed` position against itself, and
+  // the dialog disappears behind whatever follows it on the page.
   return (
+    <ModalPortal>
     <div
       role="dialog"
       aria-modal="true"
@@ -183,5 +188,6 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
         <div className="px-6 py-5 overflow-y-auto max-h-[80dvh]">{children}</div>
       </div>
     </div>
+    </ModalPortal>
   )
 }
