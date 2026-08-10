@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest'
 
+// The mandate service hands rejection to the member app, and that client
+// reads validated env at import time — which a test process does not have.
+const apiMocks = vi.hoisted(() => ({ internalAdminPost: vi.fn().mockResolvedValue({ ok: true, status: 200, data: null }) }))
+vi.mock('@/lib/api', () => ({ internalAdminPost: apiMocks.internalAdminPost }))
+
 vi.mock('@/lib/db', () => ({
   db: {
     user:            { findUnique: vi.fn(), update: vi.fn(), count: vi.fn()},
