@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   planFindActive: vi.fn(),
   planCreate: vi.fn(),
   planSumActive: vi.fn(),
+  planFindById: vi.fn(),
+  planUpdate: vi.fn(),
   mandateFindActive: vi.fn(),
   audit: vi.fn(),
 }))
@@ -21,10 +23,12 @@ vi.mock('@/repositories', () => ({
     findActive: mocks.planFindActive,
     create: mocks.planCreate,
     sumActiveAmounts: mocks.planSumActive,
+    findById: mocks.planFindById,
+    updateByVersion: mocks.planUpdate,
   },
 }))
 
-import { enrolInPlan, suggestPlan, monthsUntil } from '@/services/goal-plan.service'
+import { enrolInPlan, suggestPlan, monthsUntil, resumePlan } from '@/services/goal-plan.service'
 
 const FUTURE = new Date(Date.now() + 120 * 86_400_000) // ~4 months out
 
@@ -111,5 +115,66 @@ describe('starting a plan', () => {
 
   it('refuses an amount below the minimum', async () => {
     await expect(enrolInPlan('g1', 'u1', 'u1', [], 1, 25)).rejects.toThrow(/minimum/i)
+  })
+})
+
+describe('resuming a paused plan', () => {
+  beforeEach(() => {
+    mocks.planFindById.mockResolvedValue({
+      id: 'p1', userId: 'u1', goalId: 'g1', status: 'PAUSED', version: 3,
+    })
+    mocks.planUpdate.mockResolvedValue({ count: 1 })
+  })
+
+  it('brings it back to ACTIVE and clears why it stopped', async () => {
+    // The collection job pauses a plan itself when the mandate behind it is
+    // gone. Before this there was no way back — the member replaced their debit
+    // order and the plan stayed paused for good, with nothing to click.
+    await resumePlan('p1', 'u1', 'u1', [])
+
+    expect(mocks.planUpdate).toHaveBeenCalledWith('p1', 3, {
+      status: 'ACTIVE', endedReason: null, failedRuns: 0,
+    })
+  })
+
+  it('refuses while there is still no debit order to collect from', async () => {
+    // Otherwise the next collection pauses it straight back and the member
+    // learns nothing from having pressed the button.
+    mocks.mandateFindActive.mockResolvedValue(null)
+
+    await expect(resumePlan('p1', 'u1', 'u1', [])).rejects.toThrow(/debit order/i)
+    expect(mocks.planUpdate).not.toHaveBeenCalled()
+  })
+
+  it('refuses a plan the member cancelled themselves', async () => {
+    // Terminal by intent. Reviving it would take money nobody asked for.
+    mocks.planFindById.mockResolvedValue({ id: 'p1', userId: 'u1', goalId: 'g1', status: 'CANCELLED', version: 1 })
+
+    await expect(resumePlan('p1', 'u1', 'u1', [])).rejects.toThrow(/only a paused plan/i)
+  })
+
+  it('refuses a plan whose goal has closed', async () => {
+    mocks.goalFindById.mockResolvedValue({
+      id: 'g1', title: 'Done', targetAmount: 3000, currentAmount: 3000,
+      deadline: FUTURE, status: 'ACHIEVED',
+    })
+
+    await expect(resumePlan('p1', 'u1', 'u1', [])).rejects.toThrow(/no longer open/i)
+    expect(mocks.planUpdate).not.toHaveBeenCalled()
+  })
+
+  it('refuses another member’s plan', async () => {
+    mocks.planFindById.mockResolvedValue({ id: 'p1', userId: 'someone-else', goalId: 'g1', status: 'PAUSED', version: 1 })
+
+    await expect(resumePlan('p1', 'u1', 'u1', [])).rejects.toThrow()
+    expect(mocks.planUpdate).not.toHaveBeenCalled()
+  })
+
+  it('reports a race rather than silently doing nothing', async () => {
+    // updateByVersion matching nothing means the collection job moved the plan
+    // between the read and the write.
+    mocks.planUpdate.mockResolvedValue({ count: 0 })
+
+    await expect(resumePlan('p1', 'u1', 'u1', [])).rejects.toThrow(/just changed/i)
   })
 })
