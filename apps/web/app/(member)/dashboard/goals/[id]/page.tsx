@@ -14,6 +14,7 @@ import { ProgressRing } from '@/components/goal/ProgressRing'
 import { MilestoneBar } from '@/components/goal/MilestoneBar'
 import { GoalEngagement } from '@/components/goal/GoalEngagement'
 import { GoalPayCard } from '@/components/goal/GoalPayCard'
+import { GoalPlanCard } from '@/components/goal/GoalPlanCard'
 import { GoalHistory, type ProgressEntry } from '@/components/goal/GoalHistory'
 import { statusTheme, typeTheme, Trophy } from '@/components/goal/goal-theme'
 
@@ -242,6 +243,15 @@ export default async function GoalDetailPage({
       {canPay && (
         <Reveal variant="up" delay={165}>
           <GoalPayCard goalId={id} goalTitle={goal.title} remaining={remaining} hasActiveMandate={memberHasMandate} />
+        </Reveal>
+      )}
+
+      {/* ── Fund it every month ────────────────────────────────── */}
+      {/* Beside the one-off card on purpose: one gives now, the other commits.
+          Both are only offered on a goal that can still take money. */}
+      {canPay && (
+        <Reveal variant="up" delay={170}>
+          <GoalPlanCard goalId={id} hasActiveMandate={memberHasMandate} />
         </Reveal>
       )}
 
