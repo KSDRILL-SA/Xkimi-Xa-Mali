@@ -213,7 +213,26 @@ async function handleRequest(
     pathname === '/api/v1/auth/invitations/validate'
 
   if (isPublicPage || isPublicApi) {
-    if (session && (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password')) {
+    // Someone already signed in has no business on the sign-in pages — unless
+    // they were just sent here *because* their session was rejected.
+    //
+    // Without that exception the two rules chase each other. The check further
+    // down sends a session it cannot verify to `/login`; this one sends anyone
+    // holding a session back to `/dashboard`. A session that exists but is not
+    // trusted satisfies both, and the browser bounces until it gives up with
+    // ERR_TOO_MANY_REDIRECTS, never showing a login form.
+    //
+    // It bit admins hardest: `mustReauthenticate` forces re-auth for a
+    // privileged session whose role version is merely *unverifiable*, which is
+    // what happens whenever the role-version cache cannot be reached. A Redis
+    // outage therefore did not degrade the console, it locked every admin into
+    // a loop with no way out but clearing cookies by hand.
+    //
+    // Clearing the cookie here instead does not work: `auth()` rolls the
+    // session cookie onto the response after the middleware body returns, so
+    // its `Set-Cookie` lands after ours and the session survives.
+    const wasSentHere = req.nextUrl.searchParams.get('reason') === 'session_expired'
+    if (session && !wasSentHere && (pathname === '/login' || pathname === '/register' || pathname === '/forgot-password')) {
       return NextResponse.redirect(new URL('/dashboard', req.url))
     }
     return passThrough()
