@@ -120,6 +120,19 @@ export async function listAllBadges(
       currentStreak: s.currentStreak,
       monthsActive: s.monthsActive,
       totalOverdue: s.totalOverdue,
+      // Carried so the console can say how old these figures are. They move on
+      // a contribution status change and once a month by cron, so a badge is a
+      // month old in ordinary operation — and stays put indefinitely if the
+      // event is lost, which has happened.
+      lastCalculatedAt: s.lastCalculatedAt,
+      // Decided here rather than while rendering. A component that reads the
+      // clock produces output depending on when it happened to run, which is
+      // what React's purity rule forbids and what `serializeGoal` says in the
+      // member app for the same reason. A month plus slack: recalculation runs
+      // on the first, so older than this means the monthly pass did not reach
+      // this member and nothing of theirs has changed status since.
+      isStale: !s.lastCalculatedAt
+        || (Date.now() - new Date(s.lastCalculatedAt).getTime()) > 35 * 86_400_000,
     })),
     total, page, limit, totalPages: Math.ceil(total / limit),
   }

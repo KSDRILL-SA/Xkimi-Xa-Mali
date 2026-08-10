@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { formatDate } from '@xxm/utils'
 import type { BadgeTier } from '@prisma/client'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -36,6 +37,8 @@ export default async function BadgesPage({
     consistencyScore: b.consistencyScore,
     timelinessScore: b.timelinessScore,
     generosityScore: b.generosityScore,
+    calculatedAt: b.lastCalculatedAt ? formatDate(b.lastCalculatedAt) : null,
+    isStale: b.isStale,
     streakBonus: b.streakBonus,
     progressToNext: b.progressToNext,
     currentStreak: b.currentStreak,
