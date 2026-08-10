@@ -39,6 +39,7 @@ import {
   setMemberRole,
   generateContributions,
   recordGoalProgress,
+  revokeInvitation,
   createSignature,
   updateSignature,
   AdminConflictError,
@@ -446,5 +447,32 @@ describe('recordGoalProgress — the figure an admin types', () => {
 
     await expect(recordGoalProgress('a1', ADMIN, 'g1', 100))
       .rejects.toThrow(/fills automatically/i)
+  })
+})
+
+describe('revokeInvitation — what counts as already finished', () => {
+  it('refuses one that has been accepted', async () => {
+    mock(db.invitation.findUnique).mockResolvedValue({ id: 'i1', status: 'ACCEPTED', email: 'a@b.co' } as never)
+
+    await expect(revokeInvitation('a1', ADMIN, 'i1')).rejects.toThrow(/already been accepted/i)
+    expect(db.invitation.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses one already revoked', async () => {
+    mock(db.invitation.findUnique).mockResolvedValue({ id: 'i1', status: 'REVOKED', email: 'a@b.co' } as never)
+
+    await expect(revokeInvitation('a1', ADMIN, 'i1')).rejects.toThrow(/already revoked/i)
+  })
+
+  it('allows revoking one that merely lapsed', async () => {
+    // The member app has always allowed this; the console refused anything that
+    // was not PENDING, so the same rule answered differently depending on which
+    // app was open. Revoking a lapsed invitation says somebody decided, rather
+    // than leaving a row that only ran out of time.
+    mock(db.invitation.findUnique).mockResolvedValue({ id: 'i1', status: 'EXPIRED', email: 'a@b.co' } as never)
+    mock(db.invitation.update).mockResolvedValue({ id: 'i1' } as never)
+
+    await expect(revokeInvitation('a1', ADMIN, 'i1')).resolves.toBeUndefined()
+    expect(db.invitation.update).toHaveBeenCalled()
   })
 })
