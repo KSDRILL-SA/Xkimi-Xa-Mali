@@ -18,7 +18,10 @@ function avatar(name: string) {
   return { initials, color: AVATAR_COLORS[(name.charCodeAt(0) || 0) % AVATAR_COLORS.length] }
 }
 
-const GRID = 'grid grid-cols-[2fr_1.3fr_1fr_84px_120px_140px] gap-3'
+// The actions column carries a reason box now, not just two buttons. At 140px
+// the box filled the column and left the buttons stacked on top of it; the
+// extra room lets Approve sit on one line and the reason on the next.
+const GRID = 'grid grid-cols-[1.7fr_1.2fr_1fr_84px_110px_200px] gap-3'
 
 export function MandatesTable({
   rows, approveAction, rejectAction,
@@ -105,8 +108,21 @@ export function MandatesTable({
                             <Check size={12} aria-hidden /> Approve
                           </button>
                         </form>
-                        <form action={rejectAction}>
+                        {/* A rejection stops somebody's contributions, and the
+                            member is told why — so the reason is asked for here
+                            rather than left to a message that guessed. */}
+                        <form action={rejectAction} className="flex items-center gap-1.5">
                           <input type="hidden" name="mandateId" value={r.mandateId} />
+                          <input
+                            name="reason"
+                            type="text"
+                            maxLength={500}
+                            required
+                            minLength={10}
+                            placeholder="Reason"
+                            aria-label="Reason for rejecting this mandate"
+                            className="w-[118px] rounded-lg border border-xxm-gray-200 px-2 py-1 text-xs text-xxm-green-900 bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                          />
                           <button type="submit" className="inline-flex items-center justify-center w-6 h-6 rounded-lg text-red-500 hover:bg-red-50 transition-colors" title="Reject" aria-label="Reject">
                             <X size={13} aria-hidden />
                           </button>

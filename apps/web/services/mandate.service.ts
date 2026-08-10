@@ -545,7 +545,7 @@ export function planDebitWarnings(
  * run's own alerts stay `critical` for the case where money actually did not
  * move.
  */
-async function raiseGatewayDesyncAlert(params: {
+export async function raiseGatewayDesyncAlert(params: {
   mandateId: string
   netcashMandateId: string
   operation: 'update' | 'cancel'
