@@ -234,7 +234,35 @@ transactions R400 · statement generates as a valid PDF · every guard refuses
 (future statement 400, admin 403, other member's export 403, other member's
 inbox 404) · 983 tests green.
 
-### Still not solved: the flaky pair
+### The flaky pair — 30 clean runs, and a tool for next time
+
+Hunted properly on 2026-08-10: thirty consecutive full-suite runs of `apps/web`
+with nothing else on the machine, detection by exit code, no reproduction. With
+the earlier attempts that is roughly forty-six clean runs since the last
+sighting.
+
+**It is not fixed and it is not claimed to be.** What changed is that the next
+occurrence will be captured rather than lost: `scripts/hunt-flake.sh` runs a
+suite until it fails and keeps the whole log of the failing run.
+
+**A hypothesis that did not survive.** `env-netcash` stubs environment
+variables, which would leak to any file sharing its worker — except it uses
+`vi.stubEnv` and restores with `vi.unstubAllEnvs()` in `afterEach`, and the file
+already carries a comment explaining why. Worth recording so the next person
+does not spend the same hour on it.
+
+**Three ways this investigation went wrong, all avoidable:**
+
+1. Detection by text match. Grepping for `FAIL` matched *passing* tests whose
+   names contain FAILED — this suite tests failure handling, so there are
+   several. It reported a catch on run 1 and had caught nothing.
+2. Hunting beside a running dev server. The machine ran out of room to spawn
+   processes, Turbopack died with `0xc0000142`, and the dev server looked broken
+   when it was a casualty.
+3. Re-running to "confirm" a sighting. Green tells you nothing you did not
+   already know, and the evidence is gone. A flake is caught once.
+
+### Superseded: earlier notes on the flaky pair
 
 Two false starts this session, both worth knowing:
 
