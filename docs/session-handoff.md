@@ -161,6 +161,50 @@ a second run the same day collected nothing, one payment row.
 **Test data cleared:** three contributions (not two) marked PAID with money and
 zero transactions. `2031-02` at R500 had been missed.
 
+### The autonomous member sweep (#343) — what was probed and what held
+
+An adversarial pass over the whole member API, driven against the running app.
+
+**One defect found and fixed (#343).** The inbox item endpoint answered
+`{ read: true }` whatever happened — for a message that did not exist, one
+already read, and one belonging to another member. It is **not** an IDOR: the
+service filters on `{ id, userId }` and the other member's `readAt` was still
+null after probing, which was checked in the database before writing any of this
+down. The answer was wrong, not the write. Both operations now report what
+happened and answer 404 when nothing of the member's matched — the same answer
+for "no such message" as for "not yours", so no existence oracle.
+
+**Everything else held.** Worth recording so the next audit does not repeat it:
+
+- Another member's profile, summary, POPIA export → 403; bank account, goal
+  plan, inbox message → 404
+- Every admin route as a member → 403
+- `PATCH /members/:me` carrying `roles: ['ADMIN']` → 200 but **stripped**; the
+  roles column was still MEMBER afterwards. No mass assignment
+- Password change refuses without, or with a wrong, current password
+- Validation solid across contributions, goals, comments, community messages,
+  budgets, mandates, bank accounts and plans
+- `createMandate` **does** check bank-account ownership
+  (`mandate.service.ts:116`). A probe was refused by the existing-mandate rule
+  first, so the ownership check was verified by reading it, not by the probe
+
+**Two traps for anyone auditing this system:**
+
+1. **Rate limiters are no-ops when Redis is unconfigured** — `makeRatelimit`
+   returns a shim whose `limit()` always succeeds. A burst test locally proves
+   nothing. This is safe: both Upstash vars are `requiredWhenLive`, so a live
+   deployment cannot boot without them.
+2. **`innerText` races hydration.** A read of the contribute page returned an
+   empty body and looked like a regression; the DOM had 6kB of content. Check
+   the DOM, or read twice, before calling a page broken.
+
+### Final integration state
+
+13/13 member pages render real content · contributions paid R400 = successful
+transactions R400 · statement generates as a valid PDF · every guard refuses
+(future statement 400, admin 403, other member's export 403, other member's
+inbox 404) · 983 tests green.
+
 ### Still not solved: the flaky pair
 
 Two false starts this session, both worth knowing:
