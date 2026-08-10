@@ -108,6 +108,35 @@ retries once, then notifies, and the plan stays ACTIVE.
 There is also **no API route** for any of the plan service functions yet — PR 3
 needs those before the UI can call anything.
 
+### The integration pass — and the second money bug it found
+
+Driven as a member against the running app, not asserted in a test runner.
+
+Passed: sign-out; a protected route bouncing to `/login` with `callbackUrl`
+intact; sign-in returning to the blocked page; statement download (real PDF,
+right content-type and filename); future period, invalid month and all three
+admin endpoints refused (403). Cross-endpoint data agreed — insights `ytdPaid`
+counts 2026 only, streak 3, on-time 100%, badge SEMI_PRO at 80.
+
+**#339 — found by firing two concurrent goal payments.** `payToGoal` read the
+idempotency key, found nothing, and went to the gateway. Two requests that pass
+that lookup together both charge, and only the second collides on the unique
+index — the member is debited **twice at Netcash** and left with one row and a
+500. Live evidence: `statuses [500, 201]`, goal moved once. The row is now
+claimed PENDING before the gateway is touched, so the unique index arbitrates:
+`[201, 201]`, one charge. Restoring the old order fails four of the five new
+tests.
+
+**Same lesson as #331, twice in one session:** a check that runs before the
+gateway protects a *sequential* retry and nothing else. Any other money path
+that reads-then-charges has this bug. Worth auditing the contribution path the
+same way.
+
+**Data to clear before go-live:** the test member's two 2031 contributions are
+PAID with `amountPaid` 400 and **zero transactions**. Written straight to the
+database — impossible through the app, since `amountPaid` derives from
+transactions. They inflate contribution totals against transaction totals.
+
 ### Open findings, not yet fixed
 
 - **The fund-year bug.** `syncPrimaryGoalProgress` derives the primary fund's
