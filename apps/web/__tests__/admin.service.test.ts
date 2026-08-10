@@ -249,18 +249,47 @@ describe('approveMandate', () => {
 // ─── rejectMandate ────────────────────────────────────────────────────────────
 
 describe('rejectMandate', () => {
-  it('cancels mandate and writes audit log', async () => {
+  it('turns down a waiting request, and records why', async () => {
     mockDb.paymentMandate.findUnique.mockResolvedValue({ id: 'm2', status: 'PENDING', userId: 'u2' } as never)
     mockDb.paymentMandate.update.mockResolvedValue({ id: 'm2', status: 'CANCELLED' } as never)
     mockWriteAuditLog.mockResolvedValue(undefined)
 
-    const result = await rejectMandate('admin1', ADMIN_ROLES, 'm2')
+    const result = await rejectMandate('admin1', ADMIN_ROLES, 'm2', undefined, 'Account name does not match')
+
     expect(result.status).toBe('CANCELLED')
+    expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'ADMIN_MANDATE_REJECTED',
+      payload: expect.objectContaining({ reason: 'Account name does not match' }),
+    }))
+  })
+
+  it('calls a live one a cancellation, because that is what it is', async () => {
+    // The member had been approved. Telling them it "was not approved" and to
+    // check their bank details is false twice over, so the two acts are
+    // recorded and announced differently.
+    mockDb.paymentMandate.findUnique.mockResolvedValue({ id: 'm4', status: 'ACTIVE', userId: 'u4' } as never)
+    mockDb.paymentMandate.update.mockResolvedValue({ id: 'm4', status: 'CANCELLED' } as never)
+    mockWriteAuditLog.mockResolvedValue(undefined)
+
+    await rejectMandate('admin1', ADMIN_ROLES, 'm4', undefined, 'Account closed at the bank')
+
+    expect(mockWriteAuditLog).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'ADMIN_MANDATE_CANCELLED',
+    }))
+  })
+
+  it('refuses without a reason the member can act on', async () => {
+    mockDb.paymentMandate.findUnique.mockResolvedValue({ id: 'm2', status: 'PENDING', userId: 'u2' } as never)
+
+    await expect(rejectMandate('admin1', ADMIN_ROLES, 'm2', undefined, 'no'))
+      .rejects.toBeInstanceOf(AdminConflictError)
+    expect(mockDb.paymentMandate.update).not.toHaveBeenCalled()
   })
 
   it('throws AdminConflictError when already CANCELLED', async () => {
     mockDb.paymentMandate.findUnique.mockResolvedValue({ id: 'm3', status: 'CANCELLED', userId: 'u3' } as never)
-    await expect(rejectMandate('a', ADMIN_ROLES, 'm3')).rejects.toBeInstanceOf(AdminConflictError)
+    await expect(rejectMandate('a', ADMIN_ROLES, 'm3', undefined, 'Duplicate of an earlier request'))
+      .rejects.toBeInstanceOf(AdminConflictError)
   })
 })
 

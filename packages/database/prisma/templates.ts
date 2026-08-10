@@ -114,10 +114,20 @@ export const NOTIFICATION_TEMPLATES: Array<{
     body: 'Xkimm Xa Mali Foundation: Your debit order has been approved. R{{amount}} will be collected on the {{debitDay}}th of each month.',
   },
   {
+    // Stopping a debit order that was already running. Deliberately not the
+    // rejection wording: that one says the request "was not approved", which is
+    // false for a mandate leadership had approved and later had to stop, and it
+    // sends the member off to check bank details that were never wrong.
+    slug: 'mandate-cancelled-by-admin',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimm Xa Mali Foundation: Your debit order has been stopped by the group admin. Reason: {{reason}}. Contact the group admin if you need help.',
+  },
+  {
     slug: 'mandate-rejected',
     channel: 'SMS',
     subject: null,
-    body: 'Xkimm Xa Mali Foundation: Your debit order request was not approved. Please contact the group admin.',
+    body: 'Xkimm Xa Mali Foundation: Your debit order request was not approved. Reason: {{reason}}. Contact the group admin if you need help.',
   },
   // ── SMS templates (reserved — for financial mandatory events) ────────────
   {

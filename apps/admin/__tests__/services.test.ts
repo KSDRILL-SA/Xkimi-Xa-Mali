@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest'
 
+const apiMocks = vi.hoisted(() => ({ internalAdminPost: vi.fn() }))
+vi.mock('@/lib/api', () => ({ internalAdminPost: apiMocks.internalAdminPost }))
+
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -70,18 +73,56 @@ describe('approveMandate — status guard', () => {
 describe('rejectMandate — terminal-state guard', () => {
   it('refuses to reject an already-cancelled mandate', async () => {
     mock(db.paymentMandate.findUnique).mockResolvedValue({ id: 'm1', status: 'CANCELLED', userId: 'u1' } as never)
-    await expect(rejectMandate('a1', ADMIN, 'm1')).rejects.toBeInstanceOf(AdminConflictError)
+    await expect(rejectMandate('a1', ADMIN, 'm1', undefined, 'Duplicate of an earlier request'))
+      .rejects.toBeInstanceOf(AdminConflictError)
     expect(db.paymentMandate.update).not.toHaveBeenCalled()
   })
 
-  it('cancels an active mandate and notifies the member', async () => {
+  it('stops a live mandate — leadership needs to be able to', async () => {
+    // Kept deliberately. An account closes, somebody leaves, a debit order has
+    // to stop. What changed is not whether this is allowed but what the member
+    // is told: "not approved, check your bank details" was false for a mandate
+    // that had been approved and then stopped.
     mock(db.paymentMandate.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE', userId: 'u1' } as never)
-    mock(db.paymentMandate.update).mockResolvedValue({ id: 'm1', status: 'CANCELLED' } as never)
+    apiMocks.internalAdminPost.mockResolvedValue({ ok: true, status: 200, data: null })
 
-    const res = await rejectMandate('a1', ADMIN, 'm1')
+    const res = await rejectMandate('a1', ADMIN, 'm1', undefined, 'Account closed at the bank')
 
     expect(res.status).toBe('CANCELLED')
-    expect(db.inboxMessage.create).toHaveBeenCalled()
+  })
+
+  it('hands the work to the app that owns the gateway', async () => {
+    // This app cannot reach Netcash at all. Writing CANCELLED locally and
+    // stopping left the bank still holding permission to debit the member.
+    mock(db.paymentMandate.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING', userId: 'u1' } as never)
+    apiMocks.internalAdminPost.mockResolvedValue({ ok: true, status: 200, data: null })
+
+    await rejectMandate('a1', ADMIN, 'm1', '41.0.0.9', 'Account name does not match')
+
+    expect(apiMocks.internalAdminPost).toHaveBeenCalledWith(
+      '/api/v1/admin/mandates/m1/reject',
+      { reason: 'Account name does not match' },
+      { adminUserId: 'a1', adminIp: '41.0.0.9' },
+    )
+    expect(db.paymentMandate.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses without a reason', async () => {
+    mock(db.paymentMandate.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING', userId: 'u1' } as never)
+
+    await expect(rejectMandate('a1', ADMIN, 'm1', undefined, 'nope'))
+      .rejects.toThrow(/at least 10 characters/i)
+    expect(apiMocks.internalAdminPost).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a failure from the other side rather than claiming success', async () => {
+    mock(db.paymentMandate.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING', userId: 'u1' } as never)
+    apiMocks.internalAdminPost.mockResolvedValue({
+      ok: false, status: 409, data: null, error: { message: 'Mandate is already cancelled' },
+    })
+
+    await expect(rejectMandate('a1', ADMIN, 'm1', undefined, 'Account name does not match'))
+      .rejects.toThrow(/already cancelled/i)
   })
 })
 

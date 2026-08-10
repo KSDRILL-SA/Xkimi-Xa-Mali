@@ -4,6 +4,9 @@ import { queueNotification } from './notification.service'
 import { createInboxMessages } from './inbox.service'
 import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { assertAdmin, assertNotSelf } from '@/lib/authorization'
+import { paymentGateway } from '@/integrations/payment'
+import { raiseGatewayDesyncAlert } from './mandate.service'
+import { logger } from '@xxm/observability'
 import { smsProvider } from '@/integrations/sms'
 import { emailProvider } from '@/integrations/email'
 import { generateMonthlyContributions } from './contribution.service'
@@ -264,37 +267,105 @@ export async function approveMandate(
   return updated
 }
 
+/**
+ * Enough of the reason to be useful in one message, cut on a word boundary.
+ *
+ * Three dots rather than an ellipsis character. U+2026 is outside GSM-7, and a
+ * single character outside it bills the whole message as UCS-2 — halving the
+ * budget for the very reason it was added to carry. The templates make this
+ * point about em dashes; it applies just as much to text substituted at
+ * runtime, which no template test can see.
+ */
+function shortenForSms(reason: string, max = 90): string {
+  if (reason.length <= max) return reason
+  const cut = reason.slice(0, max)
+  const lastSpace = cut.lastIndexOf(' ')
+  return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`
+}
+
 export async function rejectMandate(
   adminId: string,
   adminRoles: string[],
   mandateId: string,
   ip?: string,
+  /** Why it was refused. Told to the member, and kept in the audit trail. */
+  reason?: string,
 ) {
   assertAdmin(adminRoles)
 
-  const mandate = await mandateRepo.findByIdWithSelect(mandateId, { id: true, status: true, userId: true })
+  const mandate = await mandateRepo.findByIdWithSelect(mandateId, {
+    id: true, status: true, userId: true, netcashMandateId: true,
+  })
   if (!mandate) throw new AdminNotFoundError('Mandate not found')
+
   if (mandate.status === 'CANCELLED') throw new AdminConflictError('Mandate is already cancelled')
+
+  // Two different acts share this one path, and they are not the same thing.
+  //
+  // Turning down a request that is still waiting is a rejection. Stopping a
+  // mandate that is already live is a cancellation — leadership needs both (an
+  // account closes, somebody leaves, a debit order has to stop) and there is a
+  // test that has always said so. What was wrong was telling the member the
+  // same thing either way: that their mandate "was not approved" and they
+  // should check their bank details. For a live mandate that is false twice
+  // over — it had been approved, and their details were fine.
+  const wasLive = mandate.status !== 'PENDING'
+
+  const trimmedReason = reason?.trim() ?? ''
+  if (trimmedReason.length < 10) {
+    throw new AdminConflictError(
+      'Give a reason of at least 10 characters — the member is told why, and it is recorded.',
+    )
+  }
 
   const updated = await mandateRepo.update(mandateId, { status: 'CANCELLED' }, {
     select: { id: true, status: true },
   })
 
+  // The authorisation exists at Netcash before the local row does — the member
+  // app registers it first and only then writes. Flipping the local status
+  // without telling Netcash leaves the bank still holding permission to debit
+  // this member while our records say it is cancelled. The member's own
+  // cancellation path has always done this; rejection never did.
+  if (mandate.netcashMandateId) {
+    try {
+      await paymentGateway.cancelMandate(mandate.netcashMandateId)
+    } catch (err) {
+      const failure = err instanceof Error ? err.message : String(err)
+      logger.error('Mandate rejected but Netcash cancel failed — manual reconciliation required', {
+        mandateId, netcashMandateId: mandate.netcashMandateId, error: failure,
+      })
+      await raiseGatewayDesyncAlert({
+        mandateId,
+        netcashMandateId: mandate.netcashMandateId,
+        operation: 'cancel',
+        reason: failure,
+        detail: [
+          'An admin stopped this mandate and the member has been told so, but the',
+          'authorisation could not be cancelled at Netcash. Until it is, the bank',
+          'still holds permission to debit this member. Cancel it by hand.',
+        ].join(' '),
+      })
+    }
+  }
+
   await Promise.all([
     writeAuditLog({
       userId: adminId,
-      action: 'ADMIN_MANDATE_REJECTED',
+      action: wasLive ? 'ADMIN_MANDATE_CANCELLED' : 'ADMIN_MANDATE_REJECTED',
       entity: 'PaymentMandate',
       entityId: mandateId,
-      payload: { memberId: mandate.userId, previousStatus: mandate.status },
+      payload: { memberId: mandate.userId, previousStatus: mandate.status, reason: trimmedReason },
       ipAddress: ip,
     }),
     cache.del(CACHE_KEYS.DASHBOARD_STATS),
     queueNotification({
       userId: mandate.userId,
-      templateSlug: 'mandate-rejected',
+      templateSlug: wasLive ? 'mandate-cancelled-by-admin' : 'mandate-rejected',
       channel: 'SMS',
-      payload: { mandateId },
+      // Shortened for the message rather than sent whole: a reason may run to
+      // 500 characters, and one long SMS is billed as several.
+      payload: { mandateId, reason: shortenForSms(trimmedReason) },
     }),
   ])
 

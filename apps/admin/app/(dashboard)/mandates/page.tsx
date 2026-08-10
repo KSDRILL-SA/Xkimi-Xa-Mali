@@ -31,7 +31,7 @@ async function rejectMandateAction(fd: FormData) {
   'use server'
   const mandateId = fd.get('mandateId') as string
   const { userId, roles: sr } = await requireAdmin('mandate.reject')
-  await rejectMandate(userId, sr, mandateId)
+  await rejectMandate(userId, sr, mandateId, undefined, String(fd.get('reason') ?? ''))
   revalidatePath('/mandates')
 }
 
