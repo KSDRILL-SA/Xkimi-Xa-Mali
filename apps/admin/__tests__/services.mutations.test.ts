@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 
 vi.mock('@/lib/db', () => ({
   db: {
-    user:            { findUnique: vi.fn(), update: vi.fn() },
+    user:            { findUnique: vi.fn(), update: vi.fn(), count: vi.fn()},
     role:            { findUnique: vi.fn() },
     // `count` is how a revocation establishes there is another admin to fall
     // back on. Left off, the policy refuses rather than guessing.
@@ -53,13 +53,76 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('setMemberStatus', () => {
+  it('refuses a status the console does not offer', async () => {
+    // The value comes from a form field. RESIGNED is a real enum member meaning
+    // the member chose to leave — an admin writing it would put words in
+    // somebody's mouth, and leave `resignedAt` null so the row disagrees with
+    // itself.
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roles: [] } as never)
+
+    await expect(setMemberStatus('a1', ADMIN, 'm1', 'RESIGNED', undefined, 'they asked to go'))
+      .rejects.toThrow(/not a status leadership can set/i)
+    expect(db.user.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses an admin suspending their own account', async () => {
+    mock(db.user.findUnique).mockResolvedValue({ id: 'a1', status: 'ACTIVE', roles: [] } as never)
+
+    await expect(setMemberStatus('a1', ADMIN, 'a1', 'SUSPENDED', undefined, 'stepping back for a while'))
+      .rejects.toThrow(/cannot suspend your own account/i)
+    expect(db.user.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses suspending the last admin who can sign in', async () => {
+    // The circle would be left with a console nobody can open.
+    mock(db.user.findUnique).mockResolvedValue({
+      id: 'm1', status: 'ACTIVE', roles: [{ role: { name: 'ADMIN' } }],
+    } as never)
+    mock(db.user.count).mockResolvedValue(1 as never)
+
+    await expect(setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED', undefined, 'handing over to new leadership'))
+      .rejects.toThrow(/last admin/i)
+    expect(db.user.update).not.toHaveBeenCalled()
+  })
+
+  it('requires a reason before taking access away', async () => {
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roles: [] } as never)
+
+    await expect(setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED', undefined, 'bad'))
+      .rejects.toThrow(/at least 10 characters/i)
+    expect(db.user.update).not.toHaveBeenCalled()
+  })
+
+  it('records the reason with the transition', async () => {
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roles: [] } as never)
+    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'SUSPENDED', roleVersion: 2 } as never)
+
+    await setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED', '41.0.0.1', '  Repeated failed collections  ')
+
+    expect(db.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        action: 'ADMIN_MEMBER_STATUS_CHANGED',
+        payload: expect.objectContaining({
+          from: 'ACTIVE', to: 'SUSPENDED', reason: 'Repeated failed collections',
+        }),
+      }),
+    }))
+  })
+
+  it('asks for no reason when giving access back', async () => {
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'SUSPENDED', roles: [] } as never)
+    mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roleVersion: 3 } as never)
+
+    await expect(setMemberStatus('a1', ADMIN, 'm1', 'ACTIVE')).resolves.toBeDefined()
+  })
+
   it('bumps roleVersion, which is what forces the member back through login', async () => {
     // Suspending someone whose session stays valid suspends nothing. The version
     // bump is what invalidates the token they are already holding.
-    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE' } as never)
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roles: [] } as never)
     mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'SUSPENDED', roleVersion: 2 } as never)
 
-    await setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED', '41.0.0.1')
+    await setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED', '41.0.0.1', 'Repeated failed collections, agreed with the member')
 
     expect(db.user.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -70,7 +133,7 @@ describe('setMemberStatus', () => {
   })
 
   it('refuses a change that changes nothing', async () => {
-    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE' } as never)
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roles: [] } as never)
     await expect(setMemberStatus('a1', ADMIN, 'm1', 'ACTIVE')).rejects.toBeInstanceOf(AdminConflictError)
     expect(db.user.update).not.toHaveBeenCalled()
   })
@@ -81,7 +144,7 @@ describe('setMemberStatus', () => {
   })
 
   it('welcomes a member on activation', async () => {
-    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING' } as never)
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING', roles: [] } as never)
     mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roleVersion: 3 } as never)
 
     await setMemberStatus('a1', ADMIN, 'm1', 'ACTIVE')
@@ -91,16 +154,16 @@ describe('setMemberStatus', () => {
   })
 
   it('does not welcome anyone on suspension', async () => {
-    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE' } as never)
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roles: [] } as never)
     mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'SUSPENDED', roleVersion: 2 } as never)
 
-    await setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED')
+    await setMemberStatus('a1', ADMIN, 'm1', 'SUSPENDED', undefined, 'Repeated failed collections, agreed with the member')
 
     expect(db.inboxMessage.create).not.toHaveBeenCalled()
   })
 
   it('records the transition it made, both ends of it', async () => {
-    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING' } as never)
+    mock(db.user.findUnique).mockResolvedValue({ id: 'm1', status: 'PENDING', roles: [] } as never)
     mock(db.user.update).mockResolvedValue({ id: 'm1', status: 'ACTIVE', roleVersion: 3 } as never)
 
     await setMemberStatus('a1', ADMIN, 'm1', 'ACTIVE', '41.0.0.1')
