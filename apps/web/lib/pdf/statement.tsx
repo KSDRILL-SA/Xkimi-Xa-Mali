@@ -266,7 +266,15 @@ function txDescription(type: string): string {
 
 function StatementDocument({ data }: { data: StatementData }) {
   const { member, banking, period, contributions, transactions, summary, generatedAt, docRef, signature } = data
-  const fullyPaid = summary.outstanding <= 0
+  // A period in which nothing was ever due is not a period that was paid.
+  //
+  // `outstanding <= 0` is true both when a member has settled what they owed
+  // and when they owed nothing at all, so a month with no contribution rendered
+  // as ACCOUNT SETTLED, PERIOD STATUS PAID, fully settled. That is a statement
+  // of account telling a member they paid something they were never billed for
+  // — and it is the kind of thing somebody could reasonably show as proof.
+  const nothingDue = contributions.length === 0 && summary.totalDue <= 0
+  const fullyPaid = !nothingDue && summary.outstanding <= 0
 
   return (
     <Document
@@ -300,10 +308,10 @@ function StatementDocument({ data }: { data: StatementData }) {
               ) : null}
               <Text style={s.heroMeta}>{member.memberId}  ·  Issued {generatedAt}</Text>
               <View style={{ marginTop: 8 }}>
-                <View style={[s.pill, { backgroundColor: fullyPaid ? C.okSoft : C.amberSoft }]}>
-                  <View style={[s.pillDot, { backgroundColor: fullyPaid ? C.ok : C.amber }]} />
-                  <Text style={[s.pillText, { color: fullyPaid ? C.ok : C.amber }]}>
-                    {fullyPaid ? 'ACCOUNT SETTLED' : 'BALANCE OUTSTANDING'}
+                <View style={[s.pill, { backgroundColor: nothingDue ? C.lineSoft : fullyPaid ? C.okSoft : C.amberSoft }]}>
+                  <View style={[s.pillDot, { backgroundColor: nothingDue ? C.ink35 : fullyPaid ? C.ok : C.amber }]} />
+                  <Text style={[s.pillText, { color: nothingDue ? C.ink50 : fullyPaid ? C.ok : C.amber }]}>
+                    {nothingDue ? 'NO ACTIVITY THIS PERIOD' : fullyPaid ? 'ACCOUNT SETTLED' : 'BALANCE OUTSTANDING'}
                   </Text>
                 </View>
               </View>
@@ -371,11 +379,13 @@ function StatementDocument({ data }: { data: StatementData }) {
             <View style={[s.sumCard, fullyPaid ? {} : { borderColor: C.redSoft, backgroundColor: C.redSoft }]}>
               <View style={s.sumTop}><Text style={s.sumLabel}>Outstanding</Text><IconWallet size={11} color={fullyPaid ? C.greenSoft : C.red} /></View>
               <Text style={[s.sumValue, fullyPaid ? {} : { color: C.red }]}>{rands(summary.outstanding)}</Text>
-              <Text style={s.sumSub}>{fullyPaid ? 'fully settled' : 'balance due'}</Text>
+              <Text style={s.sumSub}>{nothingDue ? 'nothing was due' : fullyPaid ? 'fully settled' : 'balance due'}</Text>
             </View>
             <View style={[s.sumCard, s.sumCardAccent]}>
               <View style={s.sumTop}><Text style={s.sumLabel}>Period Status</Text><IconShield size={11} color={C.gold} /></View>
-              <Text style={[s.sumValue, { color: fullyPaid ? C.green : C.amber }]}>{fullyPaid ? 'PAID' : 'OPEN'}</Text>
+              <Text style={[s.sumValue, { color: nothingDue ? C.ink50 : fullyPaid ? C.green : C.amber }]}>
+                {nothingDue ? 'NONE DUE' : fullyPaid ? 'PAID' : 'OPEN'}
+              </Text>
               <Text style={s.sumSub}>{period.label}</Text>
             </View>
           </View>

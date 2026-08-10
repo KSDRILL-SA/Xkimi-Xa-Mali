@@ -423,17 +423,26 @@ U+2726 decorative mark rendering as a fallback box beside the words "Official
 Document". None was visible before because the statement had never been seen
 carrying content.
 
-### What is still open on it
+### All three are now closed
 
-- **Page two is mostly empty.** The notice and authorisation occupy the top
-  fifth and the rest is blank. Keeping the block whole was the right fix for the
-  overflow, but the page balance is now the problem. Either the block belongs on
-  page one when there is room, or page two needs to earn its place.
-- **No reference document.** The owner rates the design as not yet world class
-  and that judgement stands. Ask for a statement they rate and build to it;
-  building to a guess is what produced the current one.
-- **The empty-period case is still poor.** A statement for a month with no
-  activity renders two pages of mostly whitespace. Worth its own treatment.
+This section described the statement before #332 and #338 and was left stale,
+which is its own small lesson: a handoff that is not corrected as work lands
+sends the next session chasing things that are already done.
+
+- **Page two is mostly empty** — closed by #332. Space was reclaimed from
+  chrome rather than from the gaps between content, so a normal month is one
+  page.
+- **No reference document** — closed in spirit by #338. The Founder Guide was
+  taken as the standard: its ivory ground, display serif, gold bound edge, and
+  the Foundation's real mark in place of the placeholder letter X.
+- **The empty-period case** — closed here, and it was hiding something worse
+  than whitespace. It renders on one page now, but it also said ACCOUNT
+  SETTLED, PERIOD STATUS PAID and "fully settled" for a month in which nothing
+  was ever billed. `outstanding <= 0` is true both when a member has paid what
+  they owed and when they owed nothing, and the document could not tell the two
+  apart. A statement of account claiming a member paid something they were
+  never billed for is the kind of thing somebody could reasonably show as
+  proof. It now reads NO ACTIVITY THIS PERIOD, NONE DUE, and "nothing was due".
 
 ## 2c. Fixed from a live report — the pending mandate dead end
 
