@@ -18,6 +18,7 @@
     "./csrf-origin": "./src/csrf-origin.ts",
     "./fund-window": "./src/fund-window.ts",
     "./status-policy": "./src/status-policy.ts",
+    "./contribution-period": "./src/contribution-period.ts",
     "./role-policy": "./src/role-policy.ts",
     "./keyring": "./src/keyring.ts"
   },

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next'
+import { isPastPeriod } from '@xxm/utils/contribution-period'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { listAllContributions, generateContributions, listTransactionsForContributions } from '@/lib/services'
+import { listAllContributions, generateContributions, listTransactionsForContributions, previewGeneration } from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
 import { Alert, Reveal, RouterPagination } from '@xxm/ui'
 import { Wallet, ChevronDown, Zap, Undo2 } from 'lucide-react'
@@ -141,6 +142,25 @@ export default async function ContributionsPage({
     redirect(`/contributions?month=${m}&year=${y}&generated=1&created=${result.created}&skipped=${result.skipped}&total=${result.total}`)
   }
 
+  const preview = await previewGeneration(roles, month, year)
+
+  // Said before the press, not discovered after it. A period already behind us
+  // is allowed — catching up on a missed month is a real thing leadership does
+  // — but the obligations it writes are overdue the moment they exist, and that
+  // is worth knowing while the button is still unpressed.
+  const generateWarning = [
+    preview.toCreate === 0
+      ? `Every eligible member already has a contribution for ${MONTHS[month - 1]} ${year}. Nothing new would be created.`
+      : `This creates ${preview.toCreate} contribution${preview.toCreate === 1 ? '' : 's'} of real money owed, one for each active member with an active debit order.`,
+    preview.alreadyHave > 0 && preview.toCreate > 0
+      ? `${preview.alreadyHave} member${preview.alreadyHave === 1 ? '' : 's'} already ha${preview.alreadyHave === 1 ? 's' : 've'} one and will be skipped.`
+      : '',
+    isPastPeriod({ month, year })
+      ? 'This period has already passed, so every contribution created will be overdue immediately.'
+      : '',
+    'There is no undo.',
+  ].filter(Boolean).join(' ')
+
   const yearOpts = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
 
   return (
@@ -154,16 +174,22 @@ export default async function ContributionsPage({
             <span className="stat-number font-semibold text-xxm-green">{total}</span> records for {MONTHS[month - 1]} {year}
           </p>
         </div>
+        {/* Confirmed, and it says how many people it touches.
+            Reversing one transaction already asked the admin to confirm; this
+            writes an obligation for every active member at once and asked
+            nothing. The proportion was backwards. */}
         <form action={generate} className="flex items-center gap-2">
           <input type="hidden" name="month" value={month} />
           <input type="hidden" name="year"  value={year} />
-          <button
-            type="submit"
+          <ConfirmSubmitButton
+            title={`Generate contributions for ${MONTHS[month - 1]} ${year}?`}
+            message={generateWarning}
+            confirmLabel={preview.toCreate > 0 ? `Generate ${preview.toCreate}` : 'Generate'}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-xxm-gold text-xxm-green-900 text-sm font-bold hover:bg-xxm-gold-light transition-colors shadow-gold-sm"
           >
             <Zap size={14} aria-hidden />
             Generate {MONTHS[month - 1]}
-          </button>
+          </ConfirmSubmitButton>
         </form>
       </Reveal>
 
