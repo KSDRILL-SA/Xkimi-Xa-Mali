@@ -207,7 +207,7 @@ export function RegisterForm() {
         </FormGroup>
 
         <FormGroup label="Password" htmlFor="password" required error={e2.password?.message} hint="At least 12 characters. A short phrase you will remember works well.">
-          <Input id="password" type="password" autoComplete="new-password" placeholder="Min. 8 chars, 1 uppercase, 1 number" icon={Lock} {...reg2('password')} />
+          <Input id="password" type="password" autoComplete="new-password" placeholder="At least 12 characters" icon={Lock} {...reg2('password')} />
         </FormGroup>
 
         <div className="flex items-start gap-2 pt-1">
