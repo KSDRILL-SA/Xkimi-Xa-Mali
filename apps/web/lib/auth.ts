@@ -188,6 +188,11 @@ export async function authorizeCredentials(credentials: Record<string, unknown>)
     name: `${user.firstName} ${user.lastName}`,
     roles: user.roles.map((ur) => ur.role.name),
     roleVersion: user.roleVersion,
+    // Carried so the middleware can tell a participant from somebody who has
+    // left without asking the database on every request. It cannot go stale:
+    // changing a member's status bumps `roleVersion`, and a stale role version
+    // already forces re-authentication.
+    status: user.status,
   }
 }
 
