@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { refusePeriod, PERIOD_REFUSAL_MESSAGE } from './contribution-period'
 import { isValidBankName, isValidAccountNumberFormat, isValidBranchCode } from './banks'
 
 const SA_PHONE_REGEX = /^(\+27|0)[6-8][0-9]{8}$/
@@ -152,7 +153,14 @@ export const ManualContributionSchema = z.object({
 export const GenerateContributionsSchema = z.object({
   month: z.number().int().min(1, 'Month must be 1–12').max(12, 'Month must be 1–12'),
   year:  z.number().int().min(2024, 'Year must be 2024 or later'),
-})
+}).refine(
+  // A year of 2024-or-later still accepts 2099. Generating is the widest action
+  // there is — one press writes an obligation for every active member, with no
+  // undo — so the period has to be one somebody could plausibly mean. Shared
+  // with the console, which had no check at all.
+  (v) => refusePeriod(v) === null,
+  { message: PERIOD_REFUSAL_MESSAGE.OUTSIDE_WINDOW, path: ['year'] },
+)
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 

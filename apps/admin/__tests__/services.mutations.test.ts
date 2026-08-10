@@ -243,6 +243,41 @@ describe('setMemberRole', () => {
 // Bulk contribution generation — running this twice must not bill anyone twice.
 // ---------------------------------------------------------------------------
 
+describe('generateContributions — the period it is given', () => {
+  it('refuses a period nobody could mean, before touching anything', async () => {
+    // The database would refuse 2099 only via `chk_contribution_year`'s upper
+    // bound of 2100 — which is to say, it would accept it. Eighty years of
+    // "valid" periods, on the one action that writes to every member at once.
+    await expect(generateContributions('a1', ADMIN, 1, 2099))
+      .rejects.toThrow(/more than a year away/i)
+    expect(db.contribution.createMany).not.toHaveBeenCalled()
+  })
+
+  it('refuses what parseInt makes of an empty field', async () => {
+    // The console read the period with `parseInt(fd.get('month'))`.
+    await expect(generateContributions('a1', ADMIN, NaN, 2026))
+      .rejects.toThrow(/choose a month and a year/i)
+    expect(db.paymentMandate.findMany).not.toHaveBeenCalled()
+  })
+
+  it('refuses a month that is not one', async () => {
+    await expect(generateContributions('a1', ADMIN, 13, 2026))
+      .rejects.toThrow(/not a month/i)
+  })
+
+  it('still allows catching up on a month that was missed', async () => {
+    // Overdue on arrival, which the confirmation says — not something to forbid.
+    const now = new Date()
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    mock(db.paymentMandate.findMany).mockResolvedValue([] as never)
+    mock(db.contribution.findMany).mockResolvedValue([] as never)
+
+    await expect(
+      generateContributions('a1', ADMIN, lastMonth.getMonth() + 1, lastMonth.getFullYear()),
+    ).resolves.toMatchObject({ created: 0 })
+  })
+})
+
 describe('generateContributions', () => {
   const mandates = [
     { userId: 'u1', debitDay: 25, amount: 100 },
