@@ -369,6 +369,16 @@ export async function recordGoalProgress(
   adminId: string, adminRoles: string[], goalId: string, amount: number, note?: string,
 ) {
   assertAdmin(adminRoles)
+  // Checked here and not only in the page action.
+  //
+  // The action refused a non-positive amount by returning early — so the admin
+  // pressed the button, nothing happened, and nothing said so. A refusal that
+  // is silent is indistinguishable from success. This function is exported and
+  // covered by the authz sweep besides, so it is the right place for the rule.
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new AdminConflictError('Enter an amount greater than zero.')
+  }
+
   const goal = await db.goal.findUnique({ where: { id: goalId } })
   if (!goal) throw new AdminNotFoundError('Goal not found')
   if (goal.status !== 'ACTIVE') throw new AdminConflictError('Progress can only be recorded on ACTIVE goals')
