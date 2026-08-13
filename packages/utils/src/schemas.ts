@@ -314,13 +314,23 @@ export type CreateInvitationInput = z.infer<typeof CreateInvitationSchema>
 
 export const MIN_GOAL_PAYMENT = 50
 
+/**
+ * The ceiling on a single gift to a goal.
+ *
+ * Named rather than written inline because the Founder Guide quotes it. A
+ * figure typed into a document and typed again into a validator is the same
+ * rule in two places, which is how the guide came to promise a daily posting
+ * limit nothing enforced.
+ */
+export const MAX_GOAL_PAYMENT = 50_000
+
 export const GoalPaymentSchema = z.object({
   /** One token per payment the member intends. See ManualContributionSchema. */
   idempotencyKey: z.string().uuid().optional(),
   amount: z
     .number({ required_error: 'Amount is required' })
     .min(MIN_GOAL_PAYMENT, `The minimum payment toward a goal is R${MIN_GOAL_PAYMENT}`)
-    .max(50_000, 'Maximum payment is R50,000'),
+    .max(MAX_GOAL_PAYMENT, `Maximum payment is R${MAX_GOAL_PAYMENT.toLocaleString('en-ZA')}`),
 })
 
 export type CreateGoalInput      = z.infer<typeof CreateGoalSchema>
