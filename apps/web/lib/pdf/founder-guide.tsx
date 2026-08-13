@@ -112,10 +112,9 @@ const RAW_PARTS: {
     label: 'Yours to see, always',
     sections: [
       { num: 8, title: 'Goals — What the Pool Builds' },
-      { num: 9, title: 'Your Badge' },
+      { num: 9, title: 'Your Dashboard, Badge and Statement' },
       { num: 10, title: 'Community & Notifications' },
-      { num: 11, title: 'Your Member Dashboard' },
-      { num: 12, title: 'What Leadership Can and Cannot Do' },
+      { num: 11, title: 'What Leadership Can and Cannot Do' },
     ],
   },
   {
@@ -124,13 +123,10 @@ const RAW_PARTS: {
     convictionTail: 'including the rules that bind the four of us.',
     label: 'The pact between us',
     sections: [
-      { num: 13, title: 'Your Rights & Responsibilities' },
-      { num: 14, title: 'Security' },
-      { num: 15, title: 'Risks We Have Considered' },
-      { num: 16, title: 'What We Collect, and Why' },
-      { num: 17, title: 'Foundation Values' },
-      { num: 18, title: 'How the Foundation Fits Together' },
-      { num: 19, title: 'How the Circle Grows' },
+      { num: 12, title: 'Your Rights, and Leaving' },
+      { num: 13, title: 'Security & Your Information' },
+      { num: 14, title: 'Risks We Have Considered' },
+      { num: 15, title: 'Our Values, and How the Circle Grows' },
     ],
   },
   {
@@ -139,13 +135,11 @@ const RAW_PARTS: {
     convictionTail: 'There is no deadline and no pressure, only clarity.',
     label: 'Take your time',
     sections: [
-      { num: 20, title: 'Frequently Asked Questions' },
-      { num: 21, title: 'Glossary' },
-      { num: 22, title: 'Your Journey at a Glance' },
-      { num: 23, title: 'Joining, Step by Step' },
-      { num: 24, title: 'Important Notice' },
-      { num: 25, title: 'Founder Declaration' },
-      { num: 26, title: 'Signature Page' },
+      { num: 16, title: 'Joining, Step by Step' },
+      { num: 17, title: 'Frequently Asked Questions' },
+      { num: 18, title: 'The Words We Use' },
+      { num: 19, title: 'Important Notice' },
+      { num: 20, title: 'Founder Declaration & Signature' },
     ],
   },
 ]
@@ -255,7 +249,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         <PartDivider {...RAW_PARTS[0]!} plain={RAW_PARTS[0]!.title} />
       </Page>
 
-      {/* ── 01 ──────────────────────────────────────────────────────────── */}
+      {/* ── 01 ──────────────────────────────────────────────────────────────── */}
       <Section num={1} title="A Word From the Chairman" kicker="WELCOME"
         plain="A Word From" italic="the Chairman">
         <P>
@@ -313,7 +307,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         <DiamondRule />
       </Section>
 
-      {/* ── 02 ──────────────────────────────────────────────────────────── */}
+      {/* ── 02 ──────────────────────────────────────────────────────────────── */}
       <Section num={2} title="What Xkimm Xa Mali Is" kicker="THE SHAPE OF THE THING"
         plain="A Closed Circle," italic="Not a Product">
         <Lede>
@@ -355,7 +349,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         </Advice>
       </Section>
 
-      {/* ── 03 ──────────────────────────────────────────────────────────── */}
+      {/* ── 03 ──────────────────────────────────────────────────────────────── */}
       <Section num={3} title="Your Leadership" kicker="GOVERNANCE"
         plain="Your" italic="Leadership">
         <FounderGrid founders={founders} />
@@ -374,7 +368,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         <PartDivider {...RAW_PARTS[1]!} plain={RAW_PARTS[1]!.title} />
       </Page>
 
-      {/* ── 04 ──────────────────────────────────────────────────────────── */}
+      {/* ── 04 ──────────────────────────────────────────────────────────────── */}
       <Section num={4} title="How Your Contribution Works" kicker="THE MONTHLY RHYTHM"
         plain="One Amount," italic="Once a Month">
         <Lede>
@@ -421,7 +415,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         />
       </Section>
 
-      {/* ── 05 ──────────────────────────────────────────────────────────── */}
+      {/* ── 05 ──────────────────────────────────────────────────────────────── */}
       <Section num={5} title="The Journey of One Rand" kicker="FOLLOW THE MONEY"
         plain="The Journey of" italic="One Rand">
         <P>
@@ -455,7 +449,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         </Advice>
       </Section>
 
-      {/* ── 06 ──────────────────────────────────────────────────────────── */}
+      {/* ── 06 ──────────────────────────────────────────────────────────────── */}
       <Section num={6} title="Where the Money Actually Sits" kicker="THE MOST IMPORTANT DISTINCTION"
         plain="The App Never" italic="Holds Your Money">
         <HeroPanel title="Not one rand ever sits inside the app" glyph="lock">
@@ -503,7 +497,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         ]} />
       </Section>
 
-      {/* ── 07 ──────────────────────────────────────────────────────────── */}
+      {/* ── 07 ──────────────────────────────────────────────────────────────── */}
       <Section num={7} title="The One Rule" kicker="READ THIS CAREFULLY"
         plain="The One Rule Every" italic="Member Agrees To">
         <HeroPanel title="Contributions Are Not Refundable" glyph="seed" centred>
@@ -540,7 +534,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         <PartDivider {...RAW_PARTS[2]!} plain={RAW_PARTS[2]!.title} />
       </Page>
 
-      {/* ── 08 ──────────────────────────────────────────────────────────── */}
+      {/* ── 08 ──────────────────────────────────────────────────────────────── */}
       <Section num={8} title="Goals — What the Pool Builds" kicker="WHAT THE MONEY IS FOR"
         plain="Goals — What" italic="the Pool Builds">
         <Lede>
@@ -590,13 +584,38 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         />
       </Section>
 
-      {/* ── 09 ──────────────────────────────────────────────────────────── */}
-      <Section num={9} title="Your Badge" kicker="STANDING"
-        plain="Your Badge, and" italic="What It Says">
+      {/* ── 09 ──────────────────────────────────────────────────────────────── */}
+      <Section num={9} title="Your Dashboard, Badge and Statement" kicker="WHAT YOU SEE"
+        plain="Your Dashboard," italic="Badge and Statement">
         <Lede>
-          Your badge is a picture of your reliability — nothing more and nothing less. It reflects
-          how consistently you have met what you committed to, and it is visible to the circle.
+          One screen that answers four questions without you having to go looking for any of them.
         </Lede>
+
+        <Table
+          head={['The question', 'Where the answer is']}
+          widths={[0.34, 0.66]}
+          rows={[
+            ['Am I up to date?', 'The card at the top, showing this month and where it stands. Overdue is unmissable by design.'],
+            ['What have I put in altogether?', 'Your total, across every month since you joined.'],
+            ['What is the circle working toward?', 'The main Goal, with what it needs and what it has.'],
+            ['Is anything waiting for me?', 'A debit order to confirm, a shortfall you can settle, an unread message.'],
+          ]}
+        />
+
+        <H2>Your statement</H2>
+        <P>
+          A proper PDF, for any month you choose, that you generate yourself whenever you want
+          without asking anybody. It carries the Foundation{"'"}s mark, your name, and a line for
+          every movement in that month. It is made to be handed to someone — a bank, a family
+          member, anyone asking what this is that comes off your account — and to answer them
+          without a conversation.
+        </P>
+
+        <H2>Your badge</H2>
+        <P>
+          A picture of your reliability — nothing more and nothing less. It reflects how
+          consistently you have met what you committed to, and it is visible to the circle.
+        </P>
 
         <P>
           It exists because in a group this size, reputation is the real security. Nobody is chasing
@@ -611,21 +630,9 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           against you at all, and you will not even hear about it as though it were.
         </Advice>
 
-        <H2>The Founder badge</H2>
-        <P>
-          Separate from the reliability badge, and it is not earned. The {FOUNDER_COUNT} of us hold
-          it because of when we arrived, and that is a fact about history rather than a ranking. It
-          carries no extra vote, no larger share of anything, and no authority over another member.
-          It is granted by hand and there will never be a fifth.
-        </P>
-
-        <Advice tone="gold" label="What a badge does not do">
-          It does not change what you pay, what you may see, or what the Foundation owes you. Two
-          members with different badges have exactly the same rights in this document.
-        </Advice>
       </Section>
 
-      {/* ── 10 ──────────────────────────────────────────────────────────── */}
+      {/* ── 10 ──────────────────────────────────────────────────────────────── */}
       <Section num={10} title="Community & Notifications" kicker="STAYING IN TOUCH"
         plain="How the Circle" italic="Talks">
         <Lede>
@@ -662,47 +669,8 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         </Advice>
       </Section>
 
-      {/* ── 11 ──────────────────────────────────────────────────────────── */}
-      <Section num={11} title="Your Member Dashboard" kicker="WHAT YOU SEE"
-        plain="Your" italic="Dashboard">
-        <Lede>
-          One screen that answers four questions without you having to go looking for any of them.
-        </Lede>
-
-        <Table
-          head={['The question', 'Where the answer is']}
-          widths={[0.34, 0.66]}
-          rows={[
-            ['Am I up to date?', 'The card at the top, showing this month and where it stands. Overdue is unmissable by design.'],
-            ['What have I put in altogether?', 'Your total, across every month since you joined.'],
-            ['What is the circle working toward?', 'The main Goal, with what it needs and what it has.'],
-            ['Is anything waiting for me?', 'A debit order to confirm, a shortfall you can settle, an unread message.'],
-          ]}
-        />
-
-        <H2>Your statement</H2>
-        <P>
-          A proper PDF, for any month you choose, that you generate yourself whenever you want
-          without asking anybody. It carries the Foundation{"'"}s mark, your name, and a line for
-          every movement in that month. It is made to be handed to someone — a bank, a family
-          member, anyone asking what this is that comes off your account — and to answer them
-          without a conversation.
-        </P>
-
-        <IconList items={[
-          { glyph: 'file', title: 'Every figure opens', text: <>No total is something you are asked to take on trust. Each one opens into the individual entries it was built from.</> },
-          { glyph: 'clock', title: 'Yours after you leave', text: <>You keep the right to generate statements for every month you were a member, for as long as the Foundation exists.</> },
-        ]} />
-
-        <Advice tone="green" label="If two numbers disagree">
-          If a figure on your dashboard ever disagrees with your statement, raise it that day. They
-          are built from the same record, so a disagreement is a real problem worth reporting
-          rather than a display quirk.
-        </Advice>
-      </Section>
-
-      {/* ── 12 ──────────────────────────────────────────────────────────── */}
-      <Section num={12} title="What Leadership Can and Cannot Do" kicker="POWER, AND ITS LIMITS"
+      {/* ── 11 ──────────────────────────────────────────────────────────────── */}
+      <Section num={11} title="What Leadership Can and Cannot Do" kicker="POWER, AND ITS LIMITS"
         plain="What Leadership" italic="Can and Cannot Do">
         <P>
           Leadership runs the Foundation day to day. Every power below is real, and every one of
@@ -760,8 +728,8 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         <PartDivider {...RAW_PARTS[3]!} plain={RAW_PARTS[3]!.title} />
       </Page>
 
-      {/* ── 13 ──────────────────────────────────────────────────────────── */}
-      <Section num={13} title="Your Rights & Responsibilities" kicker="THE PACT"
+      {/* ── 12 ──────────────────────────────────────────────────────────────── */}
+      <Section num={12} title="Your Rights, and Leaving" kicker="THE PACT"
         plain="What You Are Owed," italic="What You Owe">
         <Compare
           yes={{
@@ -815,9 +783,9 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         </Advice>
       </Section>
 
-      {/* ── 14 ──────────────────────────────────────────────────────────── */}
-      <Section num={14} title="Security" kicker="KEEPING IT SAFE"
-        plain="How Your Account" italic="Is Protected">
+      {/* ── 13 ──────────────────────────────────────────────────────────────── */}
+      <Section num={13} title="Security & Your Information" kicker="KEEPING IT SAFE"
+        plain="How You and Your" italic="Details Are Protected">
         <IconList items={[
           {
             glyph: 'key', title: `A password of at least ${PASSWORD_MIN_LENGTH} characters`,
@@ -843,10 +811,29 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           Foundation are never sent to you in a message; they are shown inside the app, where
           nobody can have changed them along the way.
         </Advice>
+
+        <Table
+          head={['What we hold', 'Why we need it']}
+          widths={[0.28, 0.72]}
+          rows={[
+            ['Your name and contact details', 'To reach you, and so the circle knows who is in it.'],
+            ['Your ID number', 'It is what ties a bank account to a person. A collective that cannot establish who a member is cannot protect the rest from somebody pretending to be them.'],
+            ['Your banking details', 'To collect what you committed. Used for nothing else, ever.'],
+            ['Your money history', 'Because it is the record, and the record is the whole point.'],
+          ]}
+        />
+
+        <H2>About your ID number</H2>
+        <P>
+          It is written on your invitation by the leader inviting you, from a document, before you
+          have an account — and you confirm it matches yours when you register. Afterwards neither
+          of you can change it from an ordinary screen. That is inconvenient once and right
+          forever: an ID a member can edit is not an identity check, it is a text box.
+        </P>
       </Section>
 
-      {/* ── 15 ──────────────────────────────────────────────────────────── */}
-      <Section num={15} title="Risks We Have Considered" kicker="HONESTLY"
+      {/* ── 14 ──────────────────────────────────────────────────────────────── */}
+      <Section num={14} title="Risks We Have Considered" kicker="HONESTLY"
         plain="What Could Go Wrong," italic="and What We Did">
         <P>
           Every arrangement involving money carries risk. Pretending otherwise is how people get
@@ -875,56 +862,9 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         </Advice>
       </Section>
 
-      {/* ── 16 ──────────────────────────────────────────────────────────── */}
-      <Section num={16} title="What We Collect, and Why" kicker="YOUR INFORMATION"
-        plain="What We Hold," italic="and Why">
-        <Table
-          head={['What we hold', 'Why we need it']}
-          widths={[0.28, 0.72]}
-          rows={[
-            ['Your name and contact details', 'To reach you, and so the circle knows who is in it.'],
-            ['Your ID number', 'It is what ties a bank account to a person. A collective that cannot establish who a member is cannot protect the rest from somebody pretending to be them.'],
-            ['Your banking details', 'To collect what you committed. Used for nothing else, ever.'],
-            ['Your money history', 'Because it is the record, and the record is the whole point.'],
-          ]}
-        />
-
-        <H2>About your ID number</H2>
-        <P>
-          It is written on your invitation by the leader inviting you, from a document, before you
-          have an account — and you confirm it matches yours when you register. Afterwards neither
-          of you can change it from an ordinary screen. That is inconvenient once and right
-          forever: an ID a member can edit is not an identity check, it is a text box.
-        </P>
-        <P>
-          Leaders only ever see the last four digits of it on screen — enough to tell which number
-          is on file, without putting the whole thing where somebody could be standing behind them.
-          We do not ask for your date of birth separately, because it is already inside the number.
-        </P>
-
-        <Compare
-          yes={{
-            title: 'What we do',
-            items: [
-              'Hold it only as long as you are part of this record',
-              'Share banking details only with the collector, which needs them',
-              'Show other members your name and that you are a member',
-            ],
-          }}
-          no={{
-            title: 'What we never do',
-            items: [
-              'Sell it, or share it with anyone outside the Foundation',
-              'Use it to judge you for anything but membership here',
-              'Show other members your ID, your bank, your amount or your gifts',
-            ],
-          }}
-        />
-      </Section>
-
-      {/* ── 17 ──────────────────────────────────────────────────────────── */}
-      <Section num={17} title="Foundation Values" kicker="WHAT WE STAND ON"
-        plain="Five Things We" italic="Will Not Trade">
+      {/* ── 15 ──────────────────────────────────────────────────────────────── */}
+      <Section num={15} title="Our Values, and How the Circle Grows" kicker="WHAT WE STAND ON"
+        plain="What We Stand On," italic="and How We Grow">
         <IconList items={[
           { glyph: 'scale', title: 'Discipline', text: <>The amount, the day, the record. A collective survives on people doing the ordinary thing repeatedly, not on anybody{"'"}s enthusiasm in month one.</> },
           { glyph: 'file', title: 'Transparency', text: <>Every figure traceable, every decision named. Nobody should ever have to take a number here on trust — including the four of us.</> },
@@ -933,56 +873,10 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           { glyph: 'seed', title: 'Patience', text: <>We are not trying to grow. Fifty people, done properly, for years, is the whole ambition.</> },
         ]} />
 
-        <Quote attr="The standard we hold ourselves to">
-          A circle where raising a problem is uncomfortable will eventually have a problem nobody
-          raised.
-        </Quote>
-
-        <Advice tone="green" label="Asking about money is never rude">
-          Asking where a figure came from, why a Goal changed, or what a waiver was for is exactly
-          the behaviour this Foundation is built to make easy. Anybody made to feel awkward for
-          asking is being failed by the group, not the other way round.
-        </Advice>
-      </Section>
-
-      {/* ── 18 ──────────────────────────────────────────────────────────── */}
-      <Section num={18} title="How the Foundation Fits Together" kicker="THE WHOLE PICTURE"
-        plain="How It All" italic="Fits Together">
-        <JourneyRail stops={[
-          { glyph: 'invite', title: 'A leader invites', text: 'Names a person, records who vouched for them.' },
-          { glyph: 'users', title: 'They join', text: 'Confirm who they are, set a password, get activated.' },
-          { glyph: 'cycle', title: 'They contribute', text: 'One amount, one day, every month.' },
-          { glyph: 'flag', title: 'The circle builds', text: 'The pool funds Goals the circle agreed on.' },
-        ]} />
-
-        <H2>The four moving parts</H2>
-        <IconList items={[
-          { glyph: 'users', title: 'The members', text: <>Up to {MAX_MEMBERS} people who each committed an amount. Everything else exists to serve them.</> },
-          { glyph: 'wallet', title: 'The pool', text: <>One bank account in the Foundation{"'"}s name, holding everything contributed and not yet spent on a Goal.</> },
-          { glyph: 'flag', title: 'The Goals', text: <>The only way money leaves the pool. Named, with a target and a date, visible to everybody.</> },
-          { glyph: 'file', title: 'The record', text: <>Every rand and every decision, written as it happens, checkable against the bank, deletable by nobody.</> },
-        ]} />
-
-        <Advice tone="gold" label="If you only remember one thing">
-          Money moves bank to bank. The app is the book that records it. Goals are the only door
-          out of the pool, and every door has a name on it.
-        </Advice>
-      </Section>
-
-      {/* ── 19 ──────────────────────────────────────────────────────────── */}
-      <Section num={19} title="How the Circle Grows" kicker="SLOWLY, ON PURPOSE"
-        plain="How the Circle" italic="Grows">
         <Lede>
           From {FOUNDER_COUNT} to {MAX_MEMBERS}, and no further. Not quickly, and never by
           advertising.
         </Lede>
-
-        <P>
-          The four of us join first and prove the arrangement on ourselves. Only then does anybody
-          else get invited, one person at a time, each vouched for by name. A seat is taken the
-          moment an invitation is sent — so if somebody decides not to join, ask us to cancel it
-          and the seat comes back straight away.
-        </P>
 
         <Table
           head={['Stage', 'Who is in it', 'What we are proving']}
@@ -1000,10 +894,6 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           administration problem with a committee attached.
         </Advice>
 
-        <Advice tone="green" label="Who to invite">
-          Someone you would be comfortable sitting across from if a month went badly. That is the
-          whole test, and it is a better one than any amount they can afford.
-        </Advice>
       </Section>
 
       {/* ═══ PART V ═══════════════════════════════════════════════════════ */}
@@ -1011,72 +901,8 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         <PartDivider {...RAW_PARTS[4]!} plain={RAW_PARTS[4]!.title} />
       </Page>
 
-      {/* ── 20 ──────────────────────────────────────────────────────────── */}
-      <Section num={20} title="Frequently Asked Questions" kicker="THE THINGS PEOPLE ASK"
-        plain="Questions People" italic="Actually Ask">
-        <Table
-          head={['Question', 'Answer']}
-          widths={[0.33, 0.67]}
-          rows={[
-            ['Can I get my money back?', `No. Contributions are not refundable — that is the one rule, and Section 07 is entirely about it. Money leaves the pool only through a Goal.`],
-            ['What if I cannot pay one month?', 'Tell us before the day. A month agreed in advance is an ordinary thing; a month discovered later is a harder conversation for everyone. There is no interest and no penalty either way.'],
-            ['Why is my bank showing more than I committed?', `${zar(NETCASH_FEE_BUFFER)} is added to cover the cost of collecting, so the full amount you committed reaches the pool. Section 04.`],
-            ['Can I change my monthly amount?', 'Yes, by speaking to a leader. It is a decision, not a slider — the circle plans around what everyone committed.'],
-            ['Who can see what I contribute?', 'Leadership, and you. Other members see your name and that you are a member, not your amount.'],
-            ['Can I be removed?', 'Leadership can suspend an account, which stops participation and keeps your record and your seat. It is for serious things, not for one missed month or for disagreeing with us.'],
-            ['What happens if the app disappears?', 'Your money is not in it. It is with your bank or the Foundation’s bank, and the record can be rebuilt from both.'],
-          ]}
-        />
-      </Section>
-
-      {/* ── 21 ──────────────────────────────────────────────────────────── */}
-      <Section num={21} title="Glossary" kicker="PLAIN MEANINGS"
-        plain="The Words" italic="We Use">
-        <Table
-          head={['Word', 'What it means here']}
-          widths={[0.26, 0.74]}
-          rows={[
-            ['The pool', 'One bank account in the Foundation’s name, holding everything contributed and not yet spent. Also called the collective or the circle.'],
-            ['Contribution', 'The amount you agreed to put in each month.'],
-            ['Debit order', 'The standing permission you gave your own bank to release your amount on your day. You can withdraw it.'],
-            ['The collector', 'The licensed company your bank pays, which settles the money into the Foundation’s account. It never holds it.'],
-            ['Goal', 'A named thing the circle is funding, with an amount and a date. The only way money leaves the pool.'],
-            ['Monthly plan', 'A standing commitment to one Goal, collected each month until you stop it.'],
-            ['Gift', 'A one-off amount you send to a Goal yourself, separate from your monthly contribution.'],
-            ['Waiver', 'A month leadership released you from, with their name on the decision.'],
-            ['Statement', 'A PDF of everything that happened on your account in a month, which you generate yourself.'],
-            ['Suspended', 'Participation stopped by leadership. Your record and your seat stay yours.'],
-            ['Resigned', 'You chose to leave — only you can say this about yourself.'],
-          ]}
-        />
-      </Section>
-
-      {/* ── 22 ──────────────────────────────────────────────────────────── */}
-      <Section num={22} title="Your Journey at a Glance" kicker="WHAT THE FIRST YEAR LOOKS LIKE"
-        plain="Your Journey" italic="at a Glance">
-        <Table
-          head={['When', 'What happens', 'What you do']}
-          widths={[0.19, 0.42, 0.39]}
-          rows={[
-            ['The invitation', 'A leader sends you a private link with your details already on it.', 'Check every detail is right. Say so immediately if not.'],
-            ['Registering', 'You confirm your ID matches and set a password.', 'Choose a password you use nowhere else.'],
-            ['Activation', 'A leader activates your account.', 'Nothing. You can sign in and look around.'],
-            ['Your debit order', 'You give your bank details; your bank asks you to confirm.', 'Confirm it on your banking app. Nothing can be collected until you do.'],
-            ['Month one', 'Your first amount is collected on your day.', 'Check your bank statement against Section 04.'],
-            ['Month one ends', 'Your first statement is available.', 'Generate it, before you ever need it.'],
-            ['Ongoing', 'The pool grows. Goals open and get funded.', 'Contribute, watch the Goals, speak up on the board.'],
-          ]}
-        />
-
-        <Advice tone="green" label="The one thing that holds everything up">
-          Your debit order. Until your bank has your confirmation, nothing can be collected and
-          your first month will sit unpaid through no fault of anyone. It is the first thing to do
-          and the easiest to forget.
-        </Advice>
-      </Section>
-
-      {/* ── 23 ──────────────────────────────────────────────────────────── */}
-      <Section num={23} title="Joining, Step by Step" kicker="HOW SOMEBODY COMES IN"
+      {/* ── 16 ──────────────────────────────────────────────────────────────── */}
+      <Section num={16} title="Joining, Step by Step" kicker="HOW SOMEBODY COMES IN"
         plain="Joining," italic="Step by Step">
         <H2>What is on your invitation before you ever see it</H2>
         <Table
@@ -1104,10 +930,56 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           registration stops rather than creating an account against the wrong person — which is
           the check working, not a fault.
         </Advice>
+
+        <Advice tone="green" label="The one thing that holds everything up">
+          Your debit order. Until your bank has your confirmation, nothing can be collected and
+          your first month will sit unpaid through no fault of anyone. It is the first thing to do
+          and the easiest to forget.
+        </Advice>
       </Section>
 
-      {/* ── 24 ──────────────────────────────────────────────────────────── */}
-      <Section num={24} title="Important Notice" kicker="PLEASE READ BEFORE SIGNING"
+      {/* ── 17 ──────────────────────────────────────────────────────────────── */}
+      <Section num={17} title="Frequently Asked Questions" kicker="THE THINGS PEOPLE ASK"
+        plain="Questions People" italic="Actually Ask">
+        <Table
+          head={['Question', 'Answer']}
+          widths={[0.33, 0.67]}
+          rows={[
+            ['Can I get my money back?', `No. Contributions are not refundable — that is the one rule, and Section 07 is entirely about it. Money leaves the pool only through a Goal.`],
+            ['What if I cannot pay one month?', 'Tell us before the day. A month agreed in advance is an ordinary thing; a month discovered later is a harder conversation for everyone. There is no interest and no penalty either way.'],
+            ['Why is my bank showing more than I committed?', `${zar(NETCASH_FEE_BUFFER)} is added to cover the cost of collecting, so the full amount you committed reaches the pool. Section 04.`],
+            ['Can I change my monthly amount?', 'Yes, by speaking to a leader. It is a decision, not a slider — the circle plans around what everyone committed.'],
+            ['Who can see what I contribute?', 'Leadership, and you. Other members see your name and that you are a member, not your amount.'],
+            ['Can I be removed?', 'Leadership can suspend an account, which stops participation and keeps your record and your seat. It is for serious things, not for one missed month or for disagreeing with us.'],
+            ['What happens if the app disappears?', 'Your money is not in it. It is with your bank or the Foundation’s bank, and the record can be rebuilt from both.'],
+          ]}
+        />
+      </Section>
+
+      {/* ── 18 ──────────────────────────────────────────────────────────────── */}
+      <Section num={18} title="The Words We Use" kicker="PLAIN MEANINGS"
+        plain="The Words" italic="We Use">
+        <Table
+          head={['Word', 'What it means here']}
+          widths={[0.26, 0.74]}
+          rows={[
+            ['The pool', 'One bank account in the Foundation’s name, holding everything contributed and not yet spent. Also called the collective or the circle.'],
+            ['Contribution', 'The amount you agreed to put in each month.'],
+            ['Debit order', 'The standing permission you gave your own bank to release your amount on your day. You can withdraw it.'],
+            ['The collector', 'The licensed company your bank pays, which settles the money into the Foundation’s account. It never holds it.'],
+            ['Goal', 'A named thing the circle is funding, with an amount and a date. The only way money leaves the pool.'],
+            ['Monthly plan', 'A standing commitment to one Goal, collected each month until you stop it.'],
+            ['Gift', 'A one-off amount you send to a Goal yourself, separate from your monthly contribution.'],
+            ['Waiver', 'A month leadership released you from, with their name on the decision.'],
+            ['Statement', 'A PDF of everything that happened on your account in a month, which you generate yourself.'],
+            ['Suspended', 'Participation stopped by leadership. Your record and your seat stay yours.'],
+            ['Resigned', 'You chose to leave — only you can say this about yourself.'],
+          ]}
+        />
+      </Section>
+
+      {/* ── 19 ──────────────────────────────────────────────────────────────── */}
+      <Section num={19} title="Important Notice" kicker="PLEASE READ BEFORE SIGNING"
         plain="Important" italic="Notice">
         <HeroPanel title="What this Foundation is not" glyph="shield">
           Xkimm Xa Mali is <HB>not a bank, not an investment product and not a lender</HB>. It is
@@ -1142,9 +1014,9 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         </P>
       </Section>
 
-      {/* ── 25 ──────────────────────────────────────────────────────────── */}
-      <Section num={25} title="Founder Declaration" kicker="WHAT THE FOUR OF US AGREE"
-        plain="Founder" italic="Declaration">
+      {/* ── 20 ──────────────────────────────────────────────────────────────── */}
+      <Section num={20} title="Founder Declaration & Signature" kicker="WHAT WE AGREE, AND SIGN"
+        plain="Declaration" italic="& Signature">
         <Lede>
           We, the {FOUNDER_COUNT} founding members of Xkimm Xa Mali Foundation, declare the
           following to each other and to every member who follows us.
@@ -1159,36 +1031,15 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           { glyph: 'heart', title: 'We will treat a hard month as a conversation', text: <>Not as a debt to be collected. No interest, no penalty, no chasing — for anybody, ever.</> },
         ]} />
 
-        <Quote attr="Signed in the founding of it">
-          We are not building something for strangers. We are building something for our own
-          people, and we are the first ones bound by it.
-        </Quote>
-      </Section>
-
-      {/* ── 26 ──────────────────────────────────────────────────────────── */}
-      <Section num={26} title="Signature Page" kicker="AGREEMENT"
-        plain="Signature" italic="Page">
         <P>
           By signing below I confirm that I have read this guide in full, that I understand how the
           Foundation works and how money moves, and that I accept the one rule: that contributions
           are not refundable and leave the pool only through a Goal the circle has agreed on.
         </P>
-        <P>
-          I confirm that I am joining freely, that nobody has pressured me, and that every question
-          I had has been answered to my satisfaction.
-        </P>
-
         <SignatureGrid people={FOUNDERS.map((f) => ({ name: f.name, role: f.role }))} />
-
-        <View style={{ marginTop: 16 }}>
-          <Advice tone="gold" label="For a member joining after the founders">
-            Your signature belongs on a copy of this page issued with your own name on it. Ask the
-            leader who invited you for one — do not sign a page carrying somebody else{"'"}s name.
-          </Advice>
-        </View>
-
-        <DiamondRule />
       </Section>
+
+
 
       {/* ═══ BACK ═════════════════════════════════════════════════════════ */}
       <Page size="A4" style={styles.dark}>
