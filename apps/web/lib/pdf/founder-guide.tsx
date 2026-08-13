@@ -6,8 +6,9 @@ import {
   PASSWORD_MIN_LENGTH, MAX_TRANSACTION_RETRY,
 } from '@xxm/utils'
 import { NETCASH_FEE_BUFFER } from '@/lib/group-account'
+import { registerGuideFonts, loadPortraits, type Portrait } from './guide-assets'
 import {
-  G, PAGE, founderPhoto, RunningHead, RunningFoot, GhostNumeral, EdgeTab,
+  G, PAGE, RunningHead, RunningFoot, GhostNumeral, EdgeTab,
   Cover, Contents, PartDivider, Kicker, Heading, H2, Lede, P, B, HB,
   HeroPanel, Advice, Stats, IconList, JourneyRail, Table, Compare, Quote,
   DiamondRule, FounderGrid, SignatureGrid, NightGround, Guilloche, Diamond,
@@ -52,22 +53,22 @@ const zar = (n: number) => `R${n.toLocaleString('en-ZA').replace(/,/g, ' ')}`
 
 const FOUNDERS = [
   {
-    photo: founderPhoto('maluleke-kurhula-success.png'),
+    file: 'maluleke-kurhula-success.png',
     name: 'Kurhula Maluleke', role: 'Founder & Chairman', glyph: 'gem',
     bio: 'Brought the idea to the other three and built the platform that carries it. Chairs the Foundation and answers for it.',
   },
   {
-    photo: founderPhoto('maluleke-ntwanano-glen.png'),
+    file: 'maluleke-ntwanano-glen.png',
     name: 'Ntwanano Maluleke', role: 'Co-Founder & Secretary', glyph: 'file',
     bio: 'Keeper of records and governance. Maintains the standards of the collective and holds every member to the pact.',
   },
   {
-    photo: founderPhoto('maluleke-risima-blessing.png'),
+    file: 'maluleke-risima-blessing.png',
     name: 'Risima Maluleke', role: 'Co-Founder & Treasurer', glyph: 'scale',
     bio: 'Financial custodian of the collective. Sees that every contribution is accounted for and guards the pool with discipline.',
   },
   {
-    photo: founderPhoto('nkuna-rito-blessing.png'),
+    file: 'nkuna-rito-blessing.png',
     name: 'Rito Nkuna', role: 'Co-Founder & Welfare Officer', glyph: 'heart',
     bio: 'The heart of the brotherhood. Champions member welfare and keeps the Foundation rooted in human trust.',
   },
@@ -194,6 +195,10 @@ function Section({
   italic?: string
   children: React.ReactNode
 }) {
+  // Debug aid: render one section on its own so a page-count of two names the
+  // section that overflows. Costs nothing when the variable is unset.
+  if (process.env.GUIDE_ONLY && Number(process.env.GUIDE_ONLY) !== num) return null
+
   return (
     <Page size="A4" style={styles.body}>
       <RunningHead where={`${String(num).padStart(2, '0')} · ${title}`} />
@@ -202,14 +207,15 @@ function Section({
       <Kicker>{kicker}</Kicker>
       <Heading plain={plain} italic={italic} />
       {children}
-      <RunningFoot page={pg(num)} total={TOTAL} />
+      <RunningFoot />
     </Page>
   )
 }
 
 // ─── The document ──────────────────────────────────────────────────────────────
 
-export function FounderGuideDocument({ holder }: { holder: string }) {
+export function FounderGuideDocument({ holder, portraits }: { holder: string; portraits: Portrait[] }) {
+  const founders = FOUNDERS.map((f, i) => ({ ...f, photo: portraits[i]! }))
   return (
     <Document
       title="Xkimm Xa Mali Foundation — The Founder Guide"
@@ -224,7 +230,7 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
           released={RELEASED}
           nextReview={NEXT_REVIEW}
           blurb={`A private savings collective built by four brothers, for four brothers and the people closest to them. This guide explains what the Foundation is, exactly how money moves, what your account holds, and the one rule every member agrees to before joining.`}
-          photos={FOUNDERS.map((f) => f.photo)}
+          photos={portraits}
         />
       </Page>
 
@@ -235,14 +241,13 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
         <Kicker>WHAT IS INSIDE</Kicker>
         <Heading plain="Contents" />
         <Contents parts={CONTENTS_PARTS} />
-        <View style={{ marginTop: 18 }}>
+        <View style={{ marginTop: 12 }}>
           <Advice tone="green" label="About the figures in this guide">
-            Every amount printed here — the monthly minimum, the size of the circle, the fee on a
-            collection — is taken straight from the system that enforces it. Nothing in this
-            document was typed in by hand and left to go out of date. Prepared for {holder}.
+            Every amount printed here is taken straight from the system that enforces it, so
+            nothing in this document can quietly go out of date. Prepared for {holder}.
           </Advice>
         </View>
-        <RunningFoot page={2} total={TOTAL} />
+        <RunningFoot />
       </Page>
 
       {/* ═══ PART I ═══════════════════════════════════════════════════════ */}
@@ -297,11 +302,11 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
           flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <View>
             <Text style={{ fontSize: 12, fontFamily: 'Times-Bold', color: G.green }}>Kurhula Maluleke</Text>
-            <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.4, marginTop: 4 }}>
+            <Text style={{ fontSize: 6, fontFamily: 'Geist', fontWeight: 600, color: G.goldInk, letterSpacing: 1.4, marginTop: 4 }}>
               FOUNDER &amp; CHAIRMAN
             </Text>
           </View>
-          <Text style={{ fontSize: 5.8, color: G.ink35, letterSpacing: 1.3, textAlign: 'right' }}>
+          <Text style={{ fontFamily: 'Geist', fontSize: 5.8, color: G.ink35, letterSpacing: 1.3, textAlign: 'right' }}>
             XKIMM XA MALI FOUNDATION{'\n'}{RELEASED.toUpperCase()}
           </Text>
         </View>
@@ -353,7 +358,7 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
       {/* ── 03 ──────────────────────────────────────────────────────────── */}
       <Section num={3} title="Your Leadership" kicker="GOVERNANCE"
         plain="Your" italic="Leadership">
-        <FounderGrid founders={FOUNDERS} />
+        <FounderGrid founders={founders} />
         <View style={{ marginTop: 13 }}>
           <Advice tone="gold" label="The rules that protect members also bind us">
             Every leader contributes under the same rules as every other member — no special
@@ -402,11 +407,6 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
             [zar(MIN_CONTRIBUTION_ZAR), zar(MIN_CONTRIBUTION_ZAR + NETCASH_FEE_BUFFER), zar(MIN_CONTRIBUTION_ZAR)],
           ]}
         />
-        <P>
-          The Foundation is not better off by a cent for that fee, and neither is anybody in
-          leadership. It is the price of moving money, shown to you rather than hidden in it.
-        </P>
-
         <H2>What your month can say</H2>
         <Table
           head={['Your month reads', 'What it means']}
@@ -1025,7 +1025,6 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
             ['Who can see what I contribute?', 'Leadership, and you. Other members see your name and that you are a member, not your amount.'],
             ['Can I be removed?', 'Leadership can suspend an account, which stops participation and keeps your record and your seat. It is for serious things, not for one missed month or for disagreeing with us.'],
             ['What happens if the app disappears?', 'Your money is not in it. It is with your bank or the Foundation’s bank, and the record can be rebuilt from both.'],
-            ['Can I join twice, or hold two seats?', 'No. One person, one seat.'],
           ]}
         />
       </Section>
@@ -1037,8 +1036,7 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
           head={['Word', 'What it means here']}
           widths={[0.26, 0.74]}
           rows={[
-            ['Collective / circle', 'All the members together. Never more than fifty.'],
-            ['The pool', 'One bank account in the Foundation’s name, holding everything contributed and not yet spent.'],
+            ['The pool', 'One bank account in the Foundation’s name, holding everything contributed and not yet spent. Also called the collective or the circle.'],
             ['Contribution', 'The amount you agreed to put in each month.'],
             ['Debit order', 'The standing permission you gave your own bank to release your amount on your day. You can withdraw it.'],
             ['The collector', 'The licensed company your bank pays, which settles the money into the Foundation’s account. It never holds it.'],
@@ -1048,7 +1046,7 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
             ['Waiver', 'A month leadership released you from, with their name on the decision.'],
             ['Statement', 'A PDF of everything that happened on your account in a month, which you generate yourself.'],
             ['Suspended', 'Participation stopped by leadership. Your record and your seat stay yours.'],
-            ['Resigned', 'You chose to leave. Only you can say this about yourself.'],
+            ['Resigned', 'You chose to leave — only you can say this about yourself.'],
           ]}
         />
       </Section>
@@ -1202,17 +1200,17 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
             <Text style={{ fontSize: 15, fontFamily: 'Times-Bold', color: '#FFFFFF', letterSpacing: 1.6, textAlign: 'center' }}>
               XKIMM XA MALI FOUNDATION
             </Text>
-            <Text style={{ fontSize: 6.2, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 2.4, marginTop: 9 }}>
+            <Text style={{ fontSize: 6.2, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 2.4, marginTop: 9 }}>
               CONTRIBUTING  ·  GROWING  ·  SECURING
             </Text>
             <View style={{ height: 1.4, width: 78, backgroundColor: G.gold, marginVertical: 26 }} />
             <Text style={{ fontSize: 10, fontFamily: 'Times-Italic', color: '#C6D9CF', textAlign: 'center', lineHeight: 1.6 }}>
               “It is more blessed to give than to receive.”
             </Text>
-            <Text style={{ fontSize: 5.8, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 1.8, marginTop: 8 }}>
+            <Text style={{ fontSize: 5.8, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 1.8, marginTop: 8 }}>
               ACTS 20:35
             </Text>
-            <Text style={{ fontSize: 6.2, color: G.greenSoft, letterSpacing: 1.3, marginTop: 44, textAlign: 'center', lineHeight: 1.8 }}>
+            <Text style={{ fontFamily: 'Geist', fontSize: 6.2, color: G.greenSoft, letterSpacing: 1.3, marginTop: 44, textAlign: 'center', lineHeight: 1.8 }}>
               VERSION {VERSION}  ·  {RELEASED.toUpperCase()}  ·  NEXT REVIEW {NEXT_REVIEW.toUpperCase()}{'\n'}
               PRIVATE &amp; CONFIDENTIAL  ·  PREPARED FOR {holder.toUpperCase()}
             </Text>
@@ -1224,9 +1222,37 @@ export function FounderGuideDocument({ holder }: { holder: string }) {
 }
 
 /**
+ * Every section must occupy exactly one page.
+ *
+ * It is what lets the contents print a page number beside each entry without
+ * laying the document out twice. When a section overflows, every entry after it
+ * points one page early — and nothing says so, because an overflowed page looks
+ * like an ordinary page. This turns that into a failure at the moment it
+ * happens, which is the only time it is cheap to fix.
+ */
+export function assertPagination(pdf: Buffer, expected = TOTAL): void {
+  // A single-section render is deliberately not the whole document.
+  if (process.env.GUIDE_ONLY) return
+  const actual = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+  if (actual !== expected) {
+    throw new Error(
+      `The guide laid out ${actual} pages but its contents describes ${expected}. ` +
+      `${actual - expected} section(s) overflowed onto a second sheet — find the fullest ` +
+      `page and cut it, or the contents will point at the wrong page from there on.`,
+    )
+  }
+}
+
+/**
  * The guide as bytes. `holder` is the only thing not read from the system — it
  * is whose copy this is.
  */
 export async function generateFounderGuidePdf(opts?: { holder?: string }): Promise<Buffer> {
-  return renderToBuffer(<FounderGuideDocument holder={opts?.holder ?? 'The Founding Members'} />)
+  registerGuideFonts()
+  const portraits = await loadPortraits(FOUNDERS.map((f) => f.file))
+  const pdf = await renderToBuffer(
+    <FounderGuideDocument holder={opts?.holder ?? 'The Founding Members'} portraits={portraits} />,
+  )
+  assertPagination(pdf)
+  return pdf
 }
