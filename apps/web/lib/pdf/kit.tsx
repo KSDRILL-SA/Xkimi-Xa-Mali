@@ -3,12 +3,26 @@ import {
   View, Text, Svg, Path, Circle, Line, Rect, Polygon, G,
   Defs, LinearGradient, RadialGradient, Stop, StyleSheet,
 } from '@react-pdf/renderer'
-import { env } from '@/lib/env'
-
 // Printed on every generated document. Derived from the configured site URL
 // rather than written in, so a statement can never carry a domain the
 // foundation no longer owns.
-const SITE_HOST = new URL(env.NEXT_PUBLIC_SITE_URL).host
+//
+// Read when a footer is rendered rather than when this module is imported. The
+// palette and the mark live in here too, and a document that uses those but no
+// footer — the Founder Guide is one — should not have to satisfy the whole
+// environment schema to be drawn.
+function siteHost(): string {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL
+  if (!raw) return 'xkimmxamali.co.za'
+  try {
+    return new URL(raw).host
+  } catch {
+    // A malformed URL is a configuration problem, not a reason to refuse
+    // somebody their statement. `lib/env` validates this at boot; here it is a
+    // string on a footer.
+    return raw
+  }
+}
 
 // ─── Shared design tokens for all Xkimm Xa Mali Foundation PDF documents ──────────────────
 
@@ -285,7 +299,7 @@ export function PageFooter({ docRef }: { docRef: string }) {
       <Text style={chrome.fCenter} render={({ pageNumber, totalPages }) => (
         `Confidential · ${docRef} · Page ${pageNumber} of ${totalPages}`
       )} />
-      <Text style={chrome.fRight}>{SITE_HOST}</Text>
+      <Text style={chrome.fRight}>{siteHost()}</Text>
     </View>
   )
 }
