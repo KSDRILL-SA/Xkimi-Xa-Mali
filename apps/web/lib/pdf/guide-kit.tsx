@@ -3,9 +3,8 @@ import {
   View, Text, Image, Svg, Path, Circle, Rect, G as SvgG,
   Defs, LinearGradient, Stop, StyleSheet,
 } from '@react-pdf/renderer'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { XmmMark } from './kit'
+import type { Portrait } from './guide-assets'
 
 /**
  * The Founder Guide's design system.
@@ -76,28 +75,7 @@ export const G = {
 
 export const PAGE = { width: 595.28, height: 841.89, gutter: 52 }
 
-/**
- * A founder's portrait, read off disk as bytes.
- *
- * Handed to `<Image>` as a buffer rather than a path. Given a bare string
- * @react-pdf treats it as a URL and tries to fetch it, which in Node means
- * every portrait fails with "fetch failed" and the document renders with four
- * holes in it — quietly, because a missing image is not an error.
- */
-export type Portrait = { data: Buffer; format: 'png' }
-
-const portraits = new Map<string, Portrait>()
-
-export function founderPhoto(file: string): Portrait {
-  const cached = portraits.get(file)
-  if (cached) return cached
-  // Read once. The same four portraits appear on the cover and again on the
-  // leadership page, and re-reading a 1.6 MB file eight times per render is
-  // work nobody asked for.
-  const p: Portrait = { data: readFileSync(join(process.cwd(), 'public', 'founders', file)), format: 'png' }
-  portraits.set(file, p)
-  return p
-}
+export type { Portrait } from './guide-assets'
 
 // ─── Glyphs, all drawn ─────────────────────────────────────────────────────────
 // The standard PDF fonts are WinAnsi, so a tick, a cross or a warning triangle
@@ -238,11 +216,11 @@ const chrome = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
   },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  org: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: G.green, letterSpacing: 0.85 },
-  tagline: { fontSize: 5.4, color: G.goldInk, letterSpacing: 1.5, marginTop: 3.5 },
+  org: { fontSize: 10, fontFamily: 'Geist', fontWeight: 600, color: G.green, letterSpacing: 0.85 },
+  tagline: { fontFamily: 'Geist', fontSize: 5.4, color: G.goldInk, letterSpacing: 1.5, marginTop: 3.5 },
   right: { alignItems: 'flex-end', maxWidth: 210 },
-  eyebrow: { fontSize: 5.4, color: G.goldInk, letterSpacing: 1.6 },
-  where: { fontSize: 7.4, fontFamily: 'Helvetica-Bold', color: G.green, letterSpacing: 0.7, marginTop: 3.5, textAlign: 'right' },
+  eyebrow: { fontFamily: 'Geist', fontSize: 5.4, color: G.goldInk, letterSpacing: 1.6 },
+  where: { fontSize: 7.4, fontFamily: 'Geist', fontWeight: 600, color: G.green, letterSpacing: 0.7, marginTop: 3.5, textAlign: 'right' },
   rule: { position: 'absolute', top: 68, left: PAGE.gutter },
 
   foot: {
@@ -250,9 +228,9 @@ const chrome = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderTopWidth: 0.6, borderTopColor: G.line, paddingTop: 9,
   },
-  footL: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.green, letterSpacing: 1.1 },
-  footC: { fontSize: 5.5, color: G.ink35, letterSpacing: 1.1 },
-  footR: { fontSize: 6.4, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 1 },
+  footL: { fontSize: 5.7, fontFamily: 'Geist', fontWeight: 600, color: G.green, letterSpacing: 1.1 },
+  footC: { fontFamily: 'Geist', fontSize: 5.5, color: G.ink35, letterSpacing: 1.1 },
+  footR: { fontSize: 6.4, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 1 },
 })
 
 export function RunningHead({ where }: { where: string }) {
@@ -278,12 +256,25 @@ export function RunningHead({ where }: { where: string }) {
   )
 }
 
-export function RunningFoot({ page, total }: { page: number; total: number }) {
+/**
+ * The page number comes from the renderer, not from the structure.
+ *
+ * It used to be computed and passed in, which is right only while every section
+ * fits on one page. A section that overflowed printed its own number twice and
+ * the document quietly went one page longer than it said it was — a footer
+ * reading "17 / 34" on the eighteenth sheet. Asking the renderer means the
+ * footer is true whatever the layout does; `assertPagination` is what keeps the
+ * layout honest as well.
+ */
+export function RunningFoot() {
   return (
     <View style={chrome.foot} fixed>
       <Text style={chrome.footL}>XKIMM XA MALI FOUNDATION</Text>
       <Text style={chrome.footC}>PRIVATE &amp; CONFIDENTIAL  ·  FOUNDER GUIDE</Text>
-      <Text style={chrome.footR}>{String(page).padStart(2, '0')} / {total}</Text>
+      <Text
+        style={chrome.footR}
+        render={({ pageNumber, totalPages }) => `${String(pageNumber).padStart(2, '0')} / ${totalPages}`}
+      />
     </View>
   )
 }
@@ -309,7 +300,7 @@ export function EdgeTab() {
 
 const type = StyleSheet.create({
   kicker: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9 },
-  kickerText: { fontSize: 6.6, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 2 },
+  kickerText: { fontSize: 6.6, fontFamily: 'Geist', fontWeight: 600, color: G.goldInk, letterSpacing: 2 },
 
   h1: { fontSize: 23, fontFamily: 'Times-Bold', color: G.green, lineHeight: 1.2 },
   h1Gold: { fontFamily: 'Times-BoldItalic', color: G.gold },
@@ -317,9 +308,9 @@ const type = StyleSheet.create({
 
   h2: { fontSize: 12.5, fontFamily: 'Times-Bold', color: G.green, marginTop: 3, marginBottom: 8 },
 
-  lede: { fontSize: 9.8, color: G.ink, lineHeight: 1.6, marginBottom: 11 },
-  p: { fontSize: 8.7, color: G.ink70, lineHeight: 1.62, marginBottom: 8 },
-  strong: { fontFamily: 'Helvetica-Bold', color: G.ink },
+  lede: { fontFamily: 'Geist', fontSize: 9.8, color: G.ink, lineHeight: 1.6, marginBottom: 11 },
+  p: { fontFamily: 'Geist', fontSize: 8.7, color: G.ink70, lineHeight: 1.62, marginBottom: 8 },
+  strong: { fontFamily: 'Geist', fontWeight: 600, color: G.ink },
 })
 
 export function Kicker({ children }: { children: React.ReactNode }) {
@@ -363,13 +354,13 @@ const box = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   heroTitle: { fontSize: 13.5, fontFamily: 'Times-Bold', color: G.goldLight, marginBottom: 6 },
-  heroText: { fontSize: 8.3, color: '#CFE0D7', lineHeight: 1.62 },
-  heroStrong: { fontFamily: 'Helvetica-Bold', color: '#FFFFFF' },
+  heroText: { fontFamily: 'Geist', fontSize: 8.3, color: '#CFE0D7', lineHeight: 1.62 },
+  heroStrong: { fontFamily: 'Geist', fontWeight: 600, color: '#FFFFFF' },
 
   advice: { borderRadius: 4, borderLeftWidth: 3, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 11 },
   adviceHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  adviceLabel: { fontSize: 6.3, fontFamily: 'Helvetica-Bold', letterSpacing: 1.7 },
-  adviceText: { fontSize: 8.3, lineHeight: 1.6 },
+  adviceLabel: { fontSize: 6.3, fontFamily: 'Geist', fontWeight: 600, letterSpacing: 1.7 },
+  adviceText: { fontFamily: 'Geist', fontSize: 8.3, lineHeight: 1.6 },
 })
 
 /** Emphasis inside a dark panel, where the body colour is already light. */
@@ -389,7 +380,7 @@ export function HeroPanel({
       {centred ? (
         <View style={{ paddingHorizontal: 26, paddingVertical: 18, alignItems: 'center' }}>
           {glyph && <View style={{ marginBottom: 9 }}><Glyph name={glyph} size={20} color={G.gold} /></View>}
-          <Text style={[box.heroTitle, { textAlign: 'center', fontSize: 14.5 }]}>{title}</Text>
+          <Text style={[box.heroTitle, { textAlign: 'center', fontFamily: 'Geist', fontSize: 14.5 }]}>{title}</Text>
           <Text style={[box.heroText, { textAlign: 'center' }]}>{children}</Text>
         </View>
       ) : (
@@ -435,7 +426,7 @@ const tile = StyleSheet.create({
   cell: { flex: 1, alignItems: 'center', paddingVertical: 13, paddingHorizontal: 5, borderLeftWidth: 0.7, borderLeftColor: G.line },
   value: { fontSize: 20, fontFamily: 'Times-Bold', color: G.green },
   prefix: { fontSize: 11.5, fontFamily: 'Times-Bold', color: G.gold },
-  label: { fontSize: 5.7, color: G.ink50, letterSpacing: 1.15, marginTop: 5, textAlign: 'center' },
+  label: { fontFamily: 'Geist', fontSize: 5.7, color: G.ink50, letterSpacing: 1.15, marginTop: 5, textAlign: 'center' },
 })
 
 export function Stats({ items }: { items: { value: string; prefix?: string; label: string }[] }) {
@@ -461,8 +452,8 @@ const il = StyleSheet.create({
     width: 22, height: 22, borderRadius: 4, borderWidth: 0.8, borderColor: G.line,
     backgroundColor: G.paper, alignItems: 'center', justifyContent: 'center',
   },
-  title: { fontSize: 8.9, fontFamily: 'Helvetica-Bold', color: G.ink, marginBottom: 3 },
-  text: { fontSize: 8.2, color: G.ink70, lineHeight: 1.55 },
+  title: { fontSize: 8.9, fontFamily: 'Geist', fontWeight: 600, color: G.ink, marginBottom: 3 },
+  text: { fontFamily: 'Geist', fontSize: 8.2, color: G.ink70, lineHeight: 1.55 },
 })
 
 export function IconList({ items }: { items: { glyph: string; title: string; text: React.ReactNode }[] }) {
@@ -492,9 +483,9 @@ const rail = StyleSheet.create({
     width: 34, height: 34, borderRadius: 17, backgroundColor: G.green,
     borderWidth: 1.6, borderColor: G.gold, alignItems: 'center', justifyContent: 'center',
   },
-  n: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 1, marginTop: 8 },
-  t: { fontSize: 8.1, fontFamily: 'Helvetica-Bold', color: G.ink, textAlign: 'center', marginTop: 4 },
-  d: { fontSize: 6.9, color: G.ink50, textAlign: 'center', lineHeight: 1.45, marginTop: 3, paddingHorizontal: 4 },
+  n: { fontSize: 5.7, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 1, marginTop: 8 },
+  t: { fontSize: 8.1, fontFamily: 'Geist', fontWeight: 600, color: G.ink, textAlign: 'center', marginTop: 4 },
+  d: { fontFamily: 'Geist', fontSize: 6.9, color: G.ink50, textAlign: 'center', lineHeight: 1.45, marginTop: 3, paddingHorizontal: 4 },
 })
 
 export function JourneyRail({ stops }: { stops: { glyph: string; title: string; text: string }[] }) {
@@ -520,11 +511,11 @@ export function JourneyRail({ stops }: { stops: { glyph: string; title: string; 
 const tb = StyleSheet.create({
   frame: { borderWidth: 0.7, borderColor: G.line, borderRadius: 4, overflow: 'hidden', marginBottom: 12, backgroundColor: G.paper },
   head: { flexDirection: 'row', backgroundColor: G.green, paddingVertical: 7, paddingHorizontal: 12 },
-  headCell: { fontSize: 5.8, fontFamily: 'Helvetica-Bold', color: G.paper, letterSpacing: 1.4 },
+  headCell: { fontSize: 5.8, fontFamily: 'Geist', fontWeight: 600, color: G.paper, letterSpacing: 1.4 },
   row: { flexDirection: 'row', paddingVertical: 7.5, paddingHorizontal: 12, borderTopWidth: 0.6, borderTopColor: G.lineSoft },
   alt: { backgroundColor: G.altRow },
-  cell: { fontSize: 8, color: G.ink70, lineHeight: 1.5 },
-  first: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: G.ink, lineHeight: 1.5 },
+  cell: { fontFamily: 'Geist', fontSize: 8, color: G.ink70, lineHeight: 1.5 },
+  first: { fontSize: 8, fontFamily: 'Geist', fontWeight: 600, color: G.ink, lineHeight: 1.5 },
 })
 
 export function Table({
@@ -556,8 +547,8 @@ const cmp = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10, marginBottom: 12 },
   col: { flex: 1, borderWidth: 0.7, borderRadius: 4, paddingHorizontal: 13, paddingVertical: 12 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  title: { fontSize: 6.3, fontFamily: 'Helvetica-Bold', letterSpacing: 1.4 },
-  item: { fontSize: 7.7, lineHeight: 1.5, marginBottom: 5 },
+  title: { fontSize: 6.3, fontFamily: 'Geist', fontWeight: 600, letterSpacing: 1.4 },
+  item: { fontFamily: 'Geist', fontSize: 7.7, lineHeight: 1.5, marginBottom: 5 },
 })
 
 export function Compare({
@@ -582,7 +573,7 @@ export function Compare({
 const pq = StyleSheet.create({
   wrap: { borderLeftWidth: 2.5, borderLeftColor: G.gold, paddingLeft: 14, paddingVertical: 3, marginTop: 3, marginBottom: 12 },
   text: { fontSize: 10.2, fontFamily: 'Times-Italic', color: G.green, lineHeight: 1.52 },
-  attr: { fontSize: 5.9, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.6, marginTop: 7 },
+  attr: { fontSize: 5.9, fontFamily: 'Geist', fontWeight: 600, color: G.goldInk, letterSpacing: 1.6, marginTop: 7 },
 })
 
 export function Quote({ children, attr }: { children: React.ReactNode; attr?: string }) {
@@ -608,7 +599,7 @@ export function DiamondRule() {
 // ─── The founders ──────────────────────────────────────────────────────────────
 
 const fc = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  row: { flexDirection: 'row', gap: 12, marginBottom: 10 },
   card: { flex: 1, borderWidth: 0.7, borderColor: G.line, borderRadius: 5, overflow: 'hidden', backgroundColor: G.paper },
   // The portraits are finished cards: the role and the name are part of the
   // artwork. `contain` because cropping to fill would cut the name band off,
@@ -617,12 +608,12 @@ const fc = StyleSheet.create({
   // band sits at the foot; cropping to fill a frame either cuts the band off or,
   // anchored to the bottom, cuts their faces off instead. A fixed height with
   // `contain` keeps every card whole and keeps the four the same size.
-  photo: { width: '100%', height: 196, objectFit: 'contain' },
+  photo: { width: '100%', height: 168, objectFit: 'contain' },
   photoFrame: { backgroundColor: '#0C0C0C' },
   body: { paddingHorizontal: 11, paddingVertical: 9, borderTopWidth: 0.7, borderTopColor: G.lineSoft },
   role: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
-  roleText: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.2 },
-  bio: { fontSize: 7.3, color: G.ink70, lineHeight: 1.5 },
+  roleText: { fontSize: 5.7, fontFamily: 'Geist', fontWeight: 600, color: G.goldInk, letterSpacing: 1.2 },
+  bio: { fontFamily: 'Geist', fontSize: 7.2, color: G.ink70, lineHeight: 1.45 },
 
   strip: { flexDirection: 'row', gap: 9 },
   stripCard: { flex: 1, height: 152, borderWidth: 0.8, borderColor: 'rgba(212,175,55,0.4)', borderRadius: 3, overflow: 'hidden' },
@@ -681,27 +672,27 @@ const cv = StyleSheet.create({
   inner: { flex: 1, paddingHorizontal: 52, paddingTop: 44, paddingBottom: 38 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   conf: { alignItems: 'flex-end' },
-  confA: { fontSize: 6.3, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 2 },
-  confB: { fontSize: 5.5, color: G.greenSoft, letterSpacing: 1.6, marginTop: 4 },
+  confA: { fontSize: 6.3, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 2 },
+  confB: { fontFamily: 'Geist', fontSize: 5.5, color: G.greenSoft, letterSpacing: 1.6, marginTop: 4 },
 
-  eyebrow: { fontSize: 6.6, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 3, marginBottom: 13 },
+  eyebrow: { fontSize: 6.6, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 3, marginBottom: 13 },
   title: { fontSize: 42, fontFamily: 'Times-Bold', color: '#FFFFFF', lineHeight: 1.1 },
   titleGold: { fontFamily: 'Times-BoldItalic', color: G.gold },
   rule: { height: 1.6, width: 128, backgroundColor: G.gold, marginTop: 19, marginBottom: 17 },
-  blurb: { fontSize: 8.5, color: '#C6D9CF', lineHeight: 1.78, maxWidth: 392 },
+  blurb: { fontFamily: 'Geist', fontSize: 8.5, color: '#C6D9CF', lineHeight: 1.78, maxWidth: 392 },
 
   scripture: {
     borderWidth: 0.8, borderColor: 'rgba(212,175,55,0.45)', borderRadius: 3,
     paddingHorizontal: 16, paddingVertical: 13, marginTop: 21, maxWidth: 404,
   },
   scriptureText: { fontSize: 9.4, fontFamily: 'Times-Italic', color: '#FFFFFF' },
-  scriptureRef: { fontSize: 5.9, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 1.8, marginTop: 7 },
+  scriptureRef: { fontSize: 5.9, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 1.8, marginTop: 7 },
 
   plinth: {
     borderTopWidth: 0.7, borderTopColor: 'rgba(212,175,55,0.35)', paddingTop: 13,
     flexDirection: 'row', justifyContent: 'space-between', marginTop: 19,
   },
-  pLabel: { fontSize: 5.5, color: G.greenSoft, letterSpacing: 1.6, marginBottom: 5 },
+  pLabel: { fontFamily: 'Geist', fontSize: 5.5, color: G.greenSoft, letterSpacing: 1.6, marginBottom: 5 },
   pValue: { fontSize: 9, fontFamily: 'Times-Bold', color: '#FFFFFF', letterSpacing: 0.4 },
 })
 
@@ -768,21 +759,21 @@ const dv = StyleSheet.create({
   inner: { flex: 1, paddingHorizontal: 62, paddingTop: 92 },
   numeral: { fontSize: 92, fontFamily: 'Times-Bold', color: 'rgba(255,255,255,0.10)', lineHeight: 1 },
   kicker: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 20, marginBottom: 11 },
-  kickerText: { fontSize: 6.8, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 2.4 },
+  kickerText: { fontSize: 6.8, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 2.4 },
   title: { fontSize: 30, fontFamily: 'Times-Bold', color: '#FFFFFF', lineHeight: 1.18 },
   titleGold: { fontFamily: 'Times-BoldItalic', color: G.gold },
   rule: { height: 1.6, width: 94, backgroundColor: G.gold, marginTop: 17, marginBottom: 19 },
   conviction: { fontSize: 10.8, fontFamily: 'Times-Italic', color: '#D8E6DF', lineHeight: 1.62, maxWidth: 396 },
   convictionGold: { fontFamily: 'Times-BoldItalic', color: G.goldLight },
-  label: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.greenSoft, letterSpacing: 2, marginTop: 15 },
+  label: { fontSize: 5.7, fontFamily: 'Geist', fontWeight: 600, color: G.greenSoft, letterSpacing: 2, marginTop: 15 },
   foot: {
     position: 'absolute', left: 62, right: 62, bottom: 50,
     borderTopWidth: 0.7, borderTopColor: 'rgba(212,175,55,0.3)', paddingTop: 12,
     flexDirection: 'row', flexWrap: 'wrap', gap: 15,
   },
   footItem: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
-  footN: { fontSize: 6.3, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 0.8 },
-  footT: { fontSize: 7.5, color: 'rgba(255,255,255,0.72)' },
+  footN: { fontSize: 6.3, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 0.8 },
+  footT: { fontFamily: 'Geist', fontSize: 7.5, color: 'rgba(255,255,255,0.72)' },
 })
 
 export function PartDivider({
@@ -830,15 +821,15 @@ export function PartDivider({
 // ─── Contents ──────────────────────────────────────────────────────────────────
 
 const tc = StyleSheet.create({
-  part: { flexDirection: 'row', alignItems: 'baseline', marginTop: 14, marginBottom: 7 },
-  partRoman: { fontSize: 6.1, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.6 },
+  part: { flexDirection: 'row', alignItems: 'baseline', marginTop: 11, marginBottom: 6 },
+  partRoman: { fontSize: 6.1, fontFamily: 'Geist', fontWeight: 600, color: G.goldInk, letterSpacing: 1.6 },
   partLine: { flex: 1, height: 0.6, backgroundColor: G.line, marginHorizontal: 10 },
   partName: { fontSize: 9, fontFamily: 'Times-Bold', color: G.green },
-  row: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 4.6 },
-  num: { fontSize: 6.7, fontFamily: 'Helvetica-Bold', color: G.gold, width: 19, letterSpacing: 0.6 },
-  name: { fontSize: 8.3, color: G.ink70 },
+  row: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 4 },
+  num: { fontSize: 6.7, fontFamily: 'Geist', fontWeight: 600, color: G.gold, width: 19, letterSpacing: 0.6 },
+  name: { fontFamily: 'Geist', fontSize: 8.3, color: G.ink70 },
   leader: { flex: 1, borderBottomWidth: 0.6, borderBottomColor: G.line, borderBottomStyle: 'dotted', marginHorizontal: 6, marginBottom: 2.3 },
-  page: { fontSize: 6.9, fontFamily: 'Helvetica-Bold', color: G.ink50, letterSpacing: 0.6 },
+  page: { fontSize: 6.9, fontFamily: 'Geist', fontWeight: 600, color: G.ink50, letterSpacing: 0.6 },
 })
 
 export function Contents({
@@ -878,9 +869,9 @@ const sg = StyleSheet.create({
     backgroundColor: G.paper, paddingHorizontal: 14, paddingVertical: 13,
   },
   name: { fontSize: 10, fontFamily: 'Times-Bold', color: G.green },
-  role: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.3, marginTop: 3 },
+  role: { fontSize: 5.7, fontFamily: 'Geist', fontWeight: 600, color: G.goldInk, letterSpacing: 1.3, marginTop: 3 },
   line: { borderBottomWidth: 0.8, borderBottomColor: G.ink35, marginTop: 28 },
-  cap: { fontSize: 5.5, color: G.ink35, letterSpacing: 1.2, marginTop: 5 },
+  cap: { fontFamily: 'Geist', fontSize: 5.5, color: G.ink35, letterSpacing: 1.2, marginTop: 5 },
   dateLine: { borderBottomWidth: 0.8, borderBottomColor: G.ink35, marginTop: 18, width: '60%' },
 })
 
