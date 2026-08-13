@@ -1,317 +1,479 @@
 import React from 'react'
-import { View, Text, Svg, Path, Circle, Rect, StyleSheet } from '@react-pdf/renderer'
-import type { Style } from '@react-pdf/types'
-import { C, XmmMark } from './kit'
+import {
+  View, Text, Image, Svg, Path, Circle, Rect, G as SvgG,
+  Defs, LinearGradient, Stop, StyleSheet,
+} from '@react-pdf/renderer'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { XmmMark } from './kit'
 
 /**
- * The Founder Guide's own furniture.
+ * The Founder Guide's design system.
  *
- * The statement and the contribution report share `kit.tsx` because they are the
- * same kind of artefact: one page of figures, a masthead, a footer. The guide is
- * not that. It is a long-form document that a member reads once and returns to,
- * so it needs a running head rather than a masthead, a contents page, part
- * dividers, and a set of blocks — rules, notes, warnings, steps — that a
- * statement has no use for.
+ * ── What this is a rebuild of ───────────────────────────────────────────────
  *
- * The palette, the mark and the money formatting still come from `kit`, so the
- * guide and the statement remain visibly the same organisation. Everything that
- * is only the guide's lives here.
+ * The first edition is a beautiful document, and the second edition briefly was
+ * not: it was rebuilt from nothing in plain type, which lost the guilloche
+ * cover, the founders' portraits, the dark panels carrying the two statements
+ * that matter most, and the whole two-tone display voice. It also began
+ * describing the system in the system's own words — file names and all — to
+ * four people who do not work in software.
+ *
+ * So this is the first edition's design language rebuilt properly and extended,
+ * not a replacement for it. Every device below is taken from that document: the
+ * ghost numeral in the corner, the green tab on the outer edge, the gold
+ * diamond opening a kicker, the gradient rule under the running head, the dark
+ * hero panel, the three tinted advice boxes, the stat tiles, the journey rail.
+ *
+ * ── One section, one page ───────────────────────────────────────────────────
+ *
+ * The first edition gives each section exactly one page, which is why its
+ * contents can print real page numbers and why nothing trails onto a half-empty
+ * leaf. That constraint is kept, and the page numbers are computed from the
+ * same structure the document is built from, so the contents cannot point at
+ * the wrong page.
  */
 
-// ─── Guide-specific tones ──────────────────────────────────────────────────────
+// ─── Palette ───────────────────────────────────────────────────────────────────
 
 export const G = {
-  /** The dark ground of the cover and the part dividers. */
-  night: '#082016',
-  /** A step lighter, for the band beneath a divider numeral. */
-  nightSoft: '#0F3125',
-  /** Paper for long reading — warmer than the statement's white cards. */
-  page: '#FCFBF7',
-  /** The rule block's ground. Deliberately not the note's. */
-  ruleBg: '#F2F7F4',
-  quoteBg: '#FAF6EC',
+  night:      '#0B2E20',
+  nightDeep:  '#071B12',
+  nightLift:  '#12452F',
+
+  page:       '#FDFCF7',
+  paper:      '#FFFFFF',
+
+  ink:        '#1A2721',
+  ink70:      '#3D4A44',
+  ink50:      '#6B7772',
+  ink35:      '#9BA5A0',
+
+  green:      '#14432F',
+  greenMid:   '#2D6A4F',
+  greenSoft:  '#7FA894',
+  greenPale:  '#EDF6F1',
+  greenLine:  '#BFDCCB',
+
+  gold:       '#C9A227',
+  goldLight:  '#E8CC72',
+  goldDeep:   '#8B6914',
+  goldPale:   '#FDF6E9',
+  goldLine:   '#E5C07B',
+  goldInk:    '#8A6A1F',
+
+  rose:       '#C2410C',
+  rosePale:   '#FCF0EC',
+  roseLine:   '#EFCFC2',
+  roseInk:    '#A03A0A',
+
+  /** The oversized page number set behind each heading. */
+  ghost:      '#EFEDE3',
+  line:       '#E6E3D8',
+  lineSoft:   '#F2F0E8',
+  altRow:     '#FAF8F1',
 }
 
-// ─── Page geometry ─────────────────────────────────────────────────────────────
-
-/** A4, and the margins the whole document is set to. */
-export const PAGE = {
-  width: 595.28,
-  height: 841.89,
-  /** Left and right margin of body text. Wide, because the measure matters. */
-  gutter: 56,
-  headHeight: 34,
-  footHeight: 40,
-}
-
-// ─── Marks and glyphs ──────────────────────────────────────────────────────────
+export const PAGE = { width: 595.28, height: 841.89, gutter: 52 }
 
 /**
- * Drawn rather than typed.
+ * A founder's portrait, read off disk as bytes.
  *
- * The standard PDF fonts are WinAnsi-encoded, so a tick, a cross or an arrow
- * renders as a hollow box. Every non-Latin glyph in this document is vector.
+ * Handed to `<Image>` as a buffer rather than a path. Given a bare string
+ * @react-pdf treats it as a URL and tries to fetch it, which in Node means
+ * every portrait fails with "fetch failed" and the document renders with four
+ * holes in it — quietly, because a missing image is not an error.
  */
-export function Tick({ size = 9, color = C.ok }: { size?: number; color?: string }) {
+export type Portrait = { data: Buffer; format: 'png' }
+
+const portraits = new Map<string, Portrait>()
+
+export function founderPhoto(file: string): Portrait {
+  const cached = portraits.get(file)
+  if (cached) return cached
+  // Read once. The same four portraits appear on the cover and again on the
+  // leadership page, and re-reading a 1.6 MB file eight times per render is
+  // work nobody asked for.
+  const p: Portrait = { data: readFileSync(join(process.cwd(), 'public', 'founders', file)), format: 'png' }
+  portraits.set(file, p)
+  return p
+}
+
+// ─── Glyphs, all drawn ─────────────────────────────────────────────────────────
+// The standard PDF fonts are WinAnsi, so a tick, a cross or a warning triangle
+// renders as a hollow box. Everything non-Latin in this document is vector.
+
+type GlyphProps = { size?: number; color?: string }
+
+export const Diamond = ({ size = 6, color = G.gold }: GlyphProps) => (
+  <Svg width={size} height={size} viewBox="0 0 10 10"><Path d="M5 0 10 5 5 10 0 5Z" fill={color} /></Svg>
+)
+
+export const Tick = ({ size = 9, color = G.greenMid }: GlyphProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path d="M20 6 9 17l-5-5" stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+)
+
+export const Ban = ({ size = 9, color = G.rose }: GlyphProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={2.2} fill="none" />
+    <Path d="m4.9 4.9 14.2 14.2" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+  </Svg>
+)
+
+export const Warning = ({ size = 9, color = G.goldInk }: GlyphProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"
+      stroke={color} strokeWidth={2} fill="none" strokeLinejoin="round" />
+    <Path d="M12 9v4" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    <Circle cx="12" cy="17" r="0.9" fill={color} />
+  </Svg>
+)
+
+export const Hand = ({ size = 9, color = G.roseInk }: GlyphProps) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v7M10 10.5V6a2 2 0 0 0-4 0v9"
+      stroke={color} strokeWidth={1.9} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8v-1a2 2 0 1 1 4 0"
+      stroke={color} strokeWidth={1.9} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+)
+
+const GLYPHS: Record<string, string[]> = {
+  bank:   ['M3 22h18', 'M6 18v-7', 'M10 18v-7', 'M14 18v-7', 'M18 18v-7', 'M12 2 21 7 3 7Z'],
+  shield: ['M20 13c0 5-3.5 7.5-7.7 9a1 1 0 0 1-.6 0C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.2-2.7a1.2 1.2 0 0 1 1.6 0C14.5 3.8 17 5 19 5a1 1 0 0 1 1 1Z', 'm9 12 2 2 4-4'],
+  cycle:  ['M21 12a9 9 0 0 1-9 9 9 9 0 0 1-8-5', 'M3 12a9 9 0 0 1 9-9 9 9 0 0 1 8 5', 'M21 3v5h-5', 'M3 21v-5h5'],
+  wallet: ['M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a2 2 0 0 1-2-2V5', 'M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4'],
+  book:   ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20', 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z'],
+  users:  ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M22 21v-2a4 4 0 0 0-3-3.9'],
+  lock:   ['M5 11h14v10H5z', 'M8 11V7a4 4 0 0 1 8 0v4'],
+  seed:   ['M12 22V10', 'M12 10c0-3 2-6 6-6 0 3-2 6-6 6Z', 'M12 13c0-3-2-5-5-5 0 3 2 5 5 5Z'],
+  flag:   ['M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1Z', 'M4 22v-7'],
+  invite: ['M4 4h16v16H4z', 'm4 7 8 5 8-5'],
+  scale:  ['M12 3v18', 'M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2', 'M7 21h10', 'm16 16 3-8 3 8a5 5 0 0 1-6 0Z', 'm2 16 3-8 3 8a5 5 0 0 1-6 0Z'],
+  chart:  ['M12 20V10', 'M18 20V4', 'M6 20v-4'],
+  clock:  ['M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z', 'M12 6v6l4 2'],
+  gem:    ['M6 3h12l4 6-10 12L2 9Z', 'M11 3 8 9l4 12 4-12-3-6', 'M2 9h20'],
+  heart:  ['M19 14c1.5-1.5 3-3.4 3-5.5A5.5 5.5 0 0 0 12 5.4 5.5 5.5 0 0 0 2 8.5c0 2.1 1.5 4 3 5.5l7 7Z'],
+  phone:  ['M5 2h14v20H5z', 'M11 18h2'],
+  card:   ['M2 5h20v14H2z', 'M2 10h20'],
+  file:   ['M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z', 'M14 2v5h5', 'M8 13h8', 'M8 17h8'],
+  key:    ['M15 2a7 7 0 1 0-6.6 9.3L3 17v4h4l6-6a7 7 0 0 0 2-13Z', 'M16.5 7.5h.01'],
+}
+
+export function Glyph({ name, size = 11, color = G.green }: { name: string; size?: number; color?: string }) {
+  const paths = GLYPHS[name] ?? GLYPHS.book!
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M20 6 9 17l-5-5" stroke={color} strokeWidth={3} fill="none"
-        strokeLinecap="round" strokeLinejoin="round" />
+      {paths.map((d, i) => (
+        <Path key={i} d={d} stroke={color} strokeWidth={1.7} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      ))}
     </Svg>
   )
 }
 
-export function Cross({ size = 9, color = C.red }: { size?: number; color?: string }) {
+// ─── Backdrops ─────────────────────────────────────────────────────────────────
+
+/**
+ * The concentric line-work behind the cover and the dividers.
+ *
+ * Guilloche, in the sense a share certificate uses it: rings struck from a
+ * point off the page so they read as arcs rather than as a target. Faint enough
+ * that at reading distance it is a texture and not a picture.
+ */
+export function Guilloche({
+  cx = 690, cy = 300, rings = 28, gap = 25, color = '#2F7452', opacity = 0.5,
+}: { cx?: number; cy?: number; rings?: number; gap?: number; color?: string; opacity?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M18 6 6 18M6 6l12 12" stroke={color} strokeWidth={3} fill="none"
-        strokeLinecap="round" />
+    <Svg width={PAGE.width} height={PAGE.height} viewBox={`0 0 ${PAGE.width} ${PAGE.height}`}
+      style={{ position: 'absolute', top: 0, left: 0 }}>
+      <SvgG opacity={opacity}>
+        {Array.from({ length: rings }, (_, i) => (
+          <Circle key={i} cx={cx} cy={cy} r={36 + i * gap} fill="none" stroke={color} strokeWidth={0.45} />
+        ))}
+      </SvgG>
     </Svg>
   )
 }
 
-export function Arrow({ size = 9, color = C.gold }: { size?: number; color?: string }) {
+/** The dark ground, as a gradient rather than a flat fill. */
+export function NightGround() {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path d="M5 12h13M13 6l6 6-6 6" stroke={color} strokeWidth={2.4} fill="none"
-        strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={PAGE.width} height={PAGE.height} viewBox={`0 0 ${PAGE.width} ${PAGE.height}`}
+      style={{ position: 'absolute', top: 0, left: 0 }}>
+      <Defs>
+        <LinearGradient id="ng" x1="0%" y1="0%" x2="65%" y2="100%">
+          <Stop offset="0%" stopColor={G.nightLift} />
+          <Stop offset="42%" stopColor={G.night} />
+          <Stop offset="100%" stopColor={G.nightDeep} />
+        </LinearGradient>
+      </Defs>
+      <Rect x={0} y={0} width={PAGE.width} height={PAGE.height} fill="url(#ng)" />
     </Svg>
   )
 }
 
-/** The small gold lozenge that opens a sub-heading. */
-export function Lozenge({ size = 5, color = C.gold }: { size?: number; color?: string }) {
+/** The green-to-gold hairline that closes the running head. */
+function GradientRule({ width, height = 1.3 }: { width: number; height?: number }) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 10 10">
-      <Path d="M5 0 10 5 5 10 0 5Z" fill={color} />
+    <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <Defs>
+        <LinearGradient id="gr" x1="0%" y1="0%" x2="100%" y2="0%">
+          <Stop offset="0%" stopColor={G.green} />
+          <Stop offset="60%" stopColor={G.goldDeep} />
+          <Stop offset="100%" stopColor={G.gold} />
+        </LinearGradient>
+      </Defs>
+      <Rect x={0} y={0} width={width} height={height} fill="url(#gr)" />
     </Svg>
   )
 }
 
-// ─── Running head and footer ───────────────────────────────────────────────────
+// ─── Running head and foot ─────────────────────────────────────────────────────
 
 const chrome = StyleSheet.create({
   head: {
-    position: 'absolute', top: 0, left: 0, right: 0,
-    height: PAGE.headHeight,
-    paddingHorizontal: PAGE.gutter,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderBottomWidth: 0.6, borderBottomColor: C.mistLine,
-    backgroundColor: G.page,
+    position: 'absolute', top: 32, left: PAGE.gutter, right: PAGE.gutter,
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
   },
-  headLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headOrg: { fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: C.green, letterSpacing: 1.4 },
-  headPart: { fontSize: 6.5, color: C.ink35, letterSpacing: 1.1, textTransform: 'uppercase' },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  org: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: G.green, letterSpacing: 0.85 },
+  tagline: { fontSize: 5.4, color: G.goldInk, letterSpacing: 1.5, marginTop: 3.5 },
+  right: { alignItems: 'flex-end', maxWidth: 210 },
+  eyebrow: { fontSize: 5.4, color: G.goldInk, letterSpacing: 1.6 },
+  where: { fontSize: 7.4, fontFamily: 'Helvetica-Bold', color: G.green, letterSpacing: 0.7, marginTop: 3.5, textAlign: 'right' },
+  rule: { position: 'absolute', top: 68, left: PAGE.gutter },
 
   foot: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    height: PAGE.footHeight,
-    paddingHorizontal: PAGE.gutter, paddingTop: 10,
-    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    borderTopWidth: 0.6, borderTopColor: C.mistLine,
-    backgroundColor: G.page,
+    position: 'absolute', bottom: 30, left: PAGE.gutter, right: PAGE.gutter,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderTopWidth: 0.6, borderTopColor: G.line, paddingTop: 9,
   },
-  footText: { fontSize: 6, color: C.ink35, letterSpacing: 0.6 },
-  footNum: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: C.green, letterSpacing: 0.6 },
+  footL: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.green, letterSpacing: 1.1 },
+  footC: { fontSize: 5.5, color: G.ink35, letterSpacing: 1.1 },
+  footR: { fontSize: 6.4, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 1 },
 })
 
-export function RunningHead({ part }: { part: string }) {
+export function RunningHead({ where }: { where: string }) {
   return (
-    <View style={chrome.head} fixed>
-      <View style={chrome.headLeft}>
-        <XmmMark size={13} />
-        <Text style={chrome.headOrg}>XKIMM XA MALI FOUNDATION</Text>
+    <>
+      <View style={chrome.head} fixed>
+        <View style={chrome.brand}>
+          <XmmMark size={23} />
+          <View>
+            <Text style={chrome.org}>XKIMM XA MALI FOUNDATION</Text>
+            <Text style={chrome.tagline}>CONTRIBUTING  ·  GROWING  ·  SECURING</Text>
+          </View>
+        </View>
+        <View style={chrome.right}>
+          <Text style={chrome.eyebrow}>FOUNDER GUIDE</Text>
+          <Text style={chrome.where}>{where.toUpperCase()}</Text>
+        </View>
       </View>
-      <Text style={chrome.headPart}>{part}</Text>
-    </View>
+      <View style={chrome.rule} fixed>
+        <GradientRule width={PAGE.width - PAGE.gutter * 2} />
+      </View>
+    </>
   )
 }
 
-export function RunningFoot({ edition }: { edition: string }) {
+export function RunningFoot({ page, total }: { page: number; total: number }) {
   return (
     <View style={chrome.foot} fixed>
-      <Text style={chrome.footText}>THE FOUNDER GUIDE</Text>
-      <Text
-        style={chrome.footNum}
-        render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-      />
-      <Text style={chrome.footText}>{edition.toUpperCase()}</Text>
+      <Text style={chrome.footL}>XKIMM XA MALI FOUNDATION</Text>
+      <Text style={chrome.footC}>PRIVATE &amp; CONFIDENTIAL  ·  FOUNDER GUIDE</Text>
+      <Text style={chrome.footR}>{String(page).padStart(2, '0')} / {total}</Text>
     </View>
   )
 }
 
-// ─── Typography ────────────────────────────────────────────────────────────────
+/** The oversized page number set into the corner, behind the heading. */
+export function GhostNumeral({ n }: { n: number }) {
+  return (
+    <Text style={{
+      position: 'absolute', top: 74, right: PAGE.gutter - 6,
+      fontSize: 74, fontFamily: 'Times-Bold', color: G.ghost, letterSpacing: -1.5,
+    }}>
+      {String(n).padStart(2, '0')}
+    </Text>
+  )
+}
 
-const t = StyleSheet.create({
-  lede: { fontSize: 10.5, color: C.ink, lineHeight: 1.55, marginBottom: 10, fontFamily: 'Times-Roman' },
-  p: { fontSize: 9.2, color: C.ink70, lineHeight: 1.62, marginBottom: 8 },
-  h3wrap: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginBottom: 6 },
-  h3: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.green, letterSpacing: 1.3, textTransform: 'uppercase' },
-  strongInline: { fontFamily: 'Helvetica-Bold', color: C.ink },
+/** The green marker bleeding off the outer edge, level with the heading. */
+export function EdgeTab() {
+  return <View style={{ position: 'absolute', top: 128, right: 0, width: 7, height: 92, backgroundColor: G.greenMid }} fixed />
+}
+
+// ─── Display type ──────────────────────────────────────────────────────────────
+
+const type = StyleSheet.create({
+  kicker: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 9 },
+  kickerText: { fontSize: 6.6, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 2 },
+
+  h1: { fontSize: 23, fontFamily: 'Times-Bold', color: G.green, lineHeight: 1.2 },
+  h1Gold: { fontFamily: 'Times-BoldItalic', color: G.gold },
+  headRule: { height: 2, width: 62, backgroundColor: G.gold, marginTop: 11, marginBottom: 14 },
+
+  h2: { fontSize: 12.5, fontFamily: 'Times-Bold', color: G.green, marginTop: 3, marginBottom: 8 },
+
+  lede: { fontSize: 9.8, color: G.ink, lineHeight: 1.6, marginBottom: 11 },
+  p: { fontSize: 8.7, color: G.ink70, lineHeight: 1.62, marginBottom: 8 },
+  strong: { fontFamily: 'Helvetica-Bold', color: G.ink },
 })
 
-export function P({ children, style }: { children: React.ReactNode; style?: Style }) {
-  return <Text style={style ? [t.p, style] : t.p}>{children}</Text>
-}
-
-export function Lede({ children }: { children: React.ReactNode }) {
-  return <Text style={t.lede}>{children}</Text>
-}
-
-/** Bold run inside a paragraph. */
-export function B({ children }: { children: React.ReactNode }) {
-  return <Text style={t.strongInline}>{children}</Text>
-}
-
-export function H3({ children }: { children: React.ReactNode }) {
+export function Kicker({ children }: { children: React.ReactNode }) {
   return (
-    <View style={t.h3wrap} minPresenceAhead={40}>
-      <Lozenge />
-      <Text style={t.h3}>{children}</Text>
+    <View style={type.kicker}>
+      <Diamond size={6} />
+      <Text style={type.kickerText}>{children}</Text>
     </View>
   )
 }
 
-// ─── Blocks ────────────────────────────────────────────────────────────────────
+/**
+ * The display voice: a green roman phrase running into a gold italic one, as
+ * one line of type rather than two stacked headings.
+ */
+export function Heading({ plain, italic }: { plain: string; italic?: string }) {
+  return (
+    <>
+      <Text style={type.h1}>
+        {plain}
+        {italic ? <Text style={type.h1Gold}> {italic}</Text> : null}
+      </Text>
+      <View style={type.headRule} />
+    </>
+  )
+}
 
-const b = StyleSheet.create({
-  // A rule the Foundation is bound by. Green bar, because it is not advice.
-  rule: {
-    flexDirection: 'row', backgroundColor: G.ruleBg, borderRadius: 4,
-    marginTop: 4, marginBottom: 10, overflow: 'hidden',
+export const H2 = ({ children }: { children: React.ReactNode }) => <Text style={type.h2}>{children}</Text>
+export const Lede = ({ children }: { children: React.ReactNode }) => <Text style={type.lede}>{children}</Text>
+export const P = ({ children }: { children: React.ReactNode }) => <Text style={type.p}>{children}</Text>
+export const B = ({ children }: { children: React.ReactNode }) => <Text style={type.strong}>{children}</Text>
+
+// ─── Panels and boxes ──────────────────────────────────────────────────────────
+
+const box = StyleSheet.create({
+  hero: { borderRadius: 5, overflow: 'hidden', marginBottom: 13, backgroundColor: '#0E3625' },
+  heroTop: { height: 2.5, backgroundColor: G.gold },
+  heroInner: { paddingHorizontal: 20, paddingVertical: 17, flexDirection: 'row', gap: 15, alignItems: 'flex-start' },
+  heroMedal: {
+    width: 42, height: 42, borderRadius: 21, borderWidth: 1.4, borderColor: G.gold,
+    alignItems: 'center', justifyContent: 'center',
   },
-  ruleBar: { width: 3, backgroundColor: C.greenMid },
-  ruleBody: { flex: 1, paddingHorizontal: 12, paddingVertical: 10 },
-  ruleLabel: { fontSize: 6.2, fontFamily: 'Helvetica-Bold', color: C.greenMid, letterSpacing: 1.6, marginBottom: 4 },
-  ruleText: { fontSize: 9, color: C.green, lineHeight: 1.55, fontFamily: 'Helvetica-Bold' },
+  heroTitle: { fontSize: 13.5, fontFamily: 'Times-Bold', color: G.goldLight, marginBottom: 6 },
+  heroText: { fontSize: 8.3, color: '#CFE0D7', lineHeight: 1.62 },
+  heroStrong: { fontFamily: 'Helvetica-Bold', color: '#FFFFFF' },
 
-  // Context, not obligation.
-  note: {
-    flexDirection: 'row', backgroundColor: C.skySoft, borderRadius: 4,
-    marginTop: 4, marginBottom: 10, overflow: 'hidden',
-  },
-  noteBar: { width: 3, backgroundColor: C.sky },
-  warn: {
-    flexDirection: 'row', backgroundColor: C.amberSoft, borderRadius: 4,
-    marginTop: 4, marginBottom: 10, overflow: 'hidden',
-  },
-  warnBar: { width: 3, backgroundColor: C.amber },
-  softBody: { flex: 1, paddingHorizontal: 12, paddingVertical: 9 },
-  softLabel: { fontSize: 6.2, fontFamily: 'Helvetica-Bold', letterSpacing: 1.6, marginBottom: 4 },
-  softText: { fontSize: 8.7, lineHeight: 1.55 },
-
-  bullets: { marginBottom: 8, marginTop: 2 },
-  bulletRow: { flexDirection: 'row', marginBottom: 5, paddingRight: 6 },
-  bulletMark: { width: 12, paddingTop: 3.2, alignItems: 'flex-start' },
-  bulletText: { flex: 1, fontSize: 9.2, color: C.ink70, lineHeight: 1.55 },
-
-  steps: { marginTop: 4, marginBottom: 10 },
-  stepRow: { flexDirection: 'row', marginBottom: 9 },
-  stepDisc: {
-    width: 16, height: 16, borderRadius: 8, backgroundColor: C.green,
-    alignItems: 'center', justifyContent: 'center', marginRight: 10,
-  },
-  stepNum: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: C.paper },
-  stepBody: { flex: 1, paddingTop: 1 },
-  stepTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: C.ink, marginBottom: 2.5 },
-  stepText: { fontSize: 8.7, color: C.ink70, lineHeight: 1.5 },
-  stepRail: {
-    position: 'absolute', left: 7.5, top: 16, bottom: 0, width: 0.8,
-    backgroundColor: C.mistLine,
-  },
-
-  facts: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 12 },
-  fact: {
-    flex: 1, backgroundColor: C.paper, borderWidth: 0.6, borderColor: C.mistLine,
-    borderRadius: 4, paddingHorizontal: 10, paddingVertical: 10,
-  },
-  factValue: { fontSize: 15, fontFamily: 'Times-Bold', color: C.green, marginBottom: 3 },
-  factLabel: { fontSize: 6.2, color: C.ink50, letterSpacing: 0.9, textTransform: 'uppercase', lineHeight: 1.35 },
-
-  table: { borderWidth: 0.6, borderColor: C.mistLine, borderRadius: 4, marginTop: 4, marginBottom: 12, overflow: 'hidden' },
-  tHead: { flexDirection: 'row', backgroundColor: C.green, paddingVertical: 6, paddingHorizontal: 10 },
-  tHeadCell: { fontSize: 6.4, fontFamily: 'Helvetica-Bold', color: C.paper, letterSpacing: 1.2, textTransform: 'uppercase' },
-  tRow: { flexDirection: 'row', paddingVertical: 7, paddingHorizontal: 10, borderTopWidth: 0.6, borderTopColor: C.lineSoft },
-  tRowAlt: { backgroundColor: C.mist },
-  tTerm: { fontSize: 8.4, fontFamily: 'Helvetica-Bold', color: C.ink },
-  tDef: { fontSize: 8.4, color: C.ink70, lineHeight: 1.5 },
-
-  quote: {
-    backgroundColor: G.quoteBg, borderLeftWidth: 2, borderLeftColor: C.gold,
-    paddingHorizontal: 14, paddingVertical: 12, marginTop: 6, marginBottom: 12, borderRadius: 3,
-  },
-  quoteText: { fontSize: 10.5, fontFamily: 'Times-Italic', color: C.green, lineHeight: 1.5 },
-  quoteAttr: { fontSize: 6.5, color: C.gold, letterSpacing: 1.3, marginTop: 7, textTransform: 'uppercase', fontFamily: 'Helvetica-Bold' },
-
-  compare: { flexDirection: 'row', gap: 8, marginTop: 4, marginBottom: 12 },
-  compareCol: { flex: 1, borderRadius: 4, padding: 11, borderWidth: 0.6 },
-  compareHead: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 7 },
-  compareTitle: { fontSize: 7, fontFamily: 'Helvetica-Bold', letterSpacing: 1.1, textTransform: 'uppercase' },
-  compareItem: { fontSize: 8.3, lineHeight: 1.5, marginBottom: 4 },
+  advice: { borderRadius: 4, borderLeftWidth: 3, paddingHorizontal: 14, paddingVertical: 11, marginBottom: 11 },
+  adviceHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
+  adviceLabel: { fontSize: 6.3, fontFamily: 'Helvetica-Bold', letterSpacing: 1.7 },
+  adviceText: { fontSize: 8.3, lineHeight: 1.6 },
 })
 
-export function Rule({ label = 'THE RULE', children }: { label?: string; children: React.ReactNode }) {
+/** Emphasis inside a dark panel, where the body colour is already light. */
+export const HB = ({ children }: { children: React.ReactNode }) => <Text style={box.heroStrong}>{children}</Text>
+
+/**
+ * The dark panel the first edition reserves for the statements a member must
+ * not skim — that no money is ever held inside the platform, and that
+ * contributions cannot be taken back out. Used sparingly for that reason.
+ */
+export function HeroPanel({
+  title, children, glyph, centred = false,
+}: { title: string; children: React.ReactNode; glyph?: string; centred?: boolean }) {
   return (
-    <View style={b.rule} wrap={false}>
-      <View style={b.ruleBar} />
-      <View style={b.ruleBody}>
-        <Text style={b.ruleLabel}>{label}</Text>
-        <Text style={b.ruleText}>{children}</Text>
-      </View>
+    <View style={box.hero} wrap={false}>
+      <View style={box.heroTop} />
+      {centred ? (
+        <View style={{ paddingHorizontal: 26, paddingVertical: 18, alignItems: 'center' }}>
+          {glyph && <View style={{ marginBottom: 9 }}><Glyph name={glyph} size={20} color={G.gold} /></View>}
+          <Text style={[box.heroTitle, { textAlign: 'center', fontSize: 14.5 }]}>{title}</Text>
+          <Text style={[box.heroText, { textAlign: 'center' }]}>{children}</Text>
+        </View>
+      ) : (
+        <View style={box.heroInner}>
+          {glyph && <View style={box.heroMedal}><Glyph name={glyph} size={18} color={G.gold} /></View>}
+          <View style={{ flex: 1 }}>
+            <Text style={box.heroTitle}>{title}</Text>
+            <Text style={box.heroText}>{children}</Text>
+          </View>
+        </View>
+      )}
     </View>
   )
 }
 
-export function Note({ label = 'WORTH KNOWING', children }: { label?: string; children: React.ReactNode }) {
+type AdviceTone = 'gold' | 'green' | 'rose'
+const TONE: Record<AdviceTone, { bg: string; line: string; ink: string; label: string }> = {
+  gold:  { bg: G.goldPale,  line: G.goldLine, ink: '#6E5514', label: G.goldInk },
+  green: { bg: G.greenPale, line: G.greenMid, ink: '#245243', label: '#1E5C48' },
+  rose:  { bg: G.rosePale,  line: G.rose,     ink: '#84300B', label: G.roseInk },
+}
+
+export function Advice({
+  tone = 'gold', label, children,
+}: { tone?: AdviceTone; label: string; children: React.ReactNode }) {
+  const t = TONE[tone]
+  const Icon = tone === 'green' ? Tick : tone === 'rose' ? Hand : Warning
   return (
-    <View style={b.note} wrap={false}>
-      <View style={b.noteBar} />
-      <View style={b.softBody}>
-        <Text style={[b.softLabel, { color: C.sky }]}>{label}</Text>
-        <Text style={[b.softText, { color: C.ink70 }]}>{children}</Text>
+    <View style={[box.advice, { backgroundColor: t.bg, borderLeftColor: t.line }]} wrap={false}>
+      <View style={box.adviceHead}>
+        <Icon size={9} color={t.label} />
+        <Text style={[box.adviceLabel, { color: t.label }]}>{label.toUpperCase()}</Text>
       </View>
+      <Text style={[box.adviceText, { color: t.ink }]}>{children}</Text>
     </View>
   )
 }
 
-export function Warn({ label = 'TAKE CARE', children }: { label?: string; children: React.ReactNode }) {
-  return (
-    <View style={b.warn} wrap={false}>
-      <View style={b.warnBar} />
-      <View style={b.softBody}>
-        <Text style={[b.softLabel, { color: C.amber }]}>{label}</Text>
-        <Text style={[b.softText, { color: '#7C4A0B' }]}>{children}</Text>
-      </View>
-    </View>
-  )
-}
+// ─── Stat tiles ────────────────────────────────────────────────────────────────
 
-export function Bullets({ items }: { items: React.ReactNode[] }) {
+const tile = StyleSheet.create({
+  row: { flexDirection: 'row', borderWidth: 0.7, borderColor: G.line, borderRadius: 4, marginBottom: 13, overflow: 'hidden', backgroundColor: G.paper },
+  cell: { flex: 1, alignItems: 'center', paddingVertical: 13, paddingHorizontal: 5, borderLeftWidth: 0.7, borderLeftColor: G.line },
+  value: { fontSize: 20, fontFamily: 'Times-Bold', color: G.green },
+  prefix: { fontSize: 11.5, fontFamily: 'Times-Bold', color: G.gold },
+  label: { fontSize: 5.7, color: G.ink50, letterSpacing: 1.15, marginTop: 5, textAlign: 'center' },
+})
+
+export function Stats({ items }: { items: { value: string; prefix?: string; label: string }[] }) {
   return (
-    <View style={b.bullets}>
-      {items.map((item, i) => (
-        <View key={i} style={b.bulletRow}>
-          <View style={b.bulletMark}><Lozenge size={4} /></View>
-          <Text style={b.bulletText}>{item}</Text>
+    <View style={tile.row} wrap={false}>
+      {items.map((s, i) => (
+        <View key={i} style={[tile.cell, i === 0 ? { borderLeftWidth: 0 } : {}]}>
+          <Text style={tile.value}>
+            {s.prefix ? <Text style={tile.prefix}>{s.prefix}</Text> : null}{s.value}
+          </Text>
+          <Text style={tile.label}>{s.label.toUpperCase()}</Text>
         </View>
       ))}
     </View>
   )
 }
 
-export function Steps({ items }: { items: { title: string; text: React.ReactNode }[] }) {
+// ─── Icon list ─────────────────────────────────────────────────────────────────
+
+const il = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 11, marginBottom: 10 },
+  chip: {
+    width: 22, height: 22, borderRadius: 4, borderWidth: 0.8, borderColor: G.line,
+    backgroundColor: G.paper, alignItems: 'center', justifyContent: 'center',
+  },
+  title: { fontSize: 8.9, fontFamily: 'Helvetica-Bold', color: G.ink, marginBottom: 3 },
+  text: { fontSize: 8.2, color: G.ink70, lineHeight: 1.55 },
+})
+
+export function IconList({ items }: { items: { glyph: string; title: string; text: React.ReactNode }[] }) {
   return (
-    <View style={b.steps}>
-      {items.map((item, i) => (
-        <View key={i} style={b.stepRow} wrap={false}>
-          {/* The rail joins one step to the next, so the sequence reads as one
-              movement rather than four unrelated boxes. Not drawn after the
-              last, which would trail into nothing. */}
-          {i < items.length - 1 && <View style={b.stepRail} />}
-          <View style={b.stepDisc}><Text style={b.stepNum}>{i + 1}</Text></View>
-          <View style={b.stepBody}>
-            <Text style={b.stepTitle}>{item.title}</Text>
-            <Text style={b.stepText}>{item.text}</Text>
+    <View>
+      {items.map((it, i) => (
+        <View key={i} style={il.row} wrap={false}>
+          <View style={il.chip}><Glyph name={it.glyph} size={12} color={G.greenMid} /></View>
+          <View style={{ flex: 1 }}>
+            <Text style={il.title}>{it.title}</Text>
+            <Text style={il.text}>{it.text}</Text>
           </View>
         </View>
       ))}
@@ -319,248 +481,345 @@ export function Steps({ items }: { items: { title: string; text: React.ReactNode
   )
 }
 
-export function Facts({ items }: { items: { value: string; label: string }[] }) {
+// ─── The journey rail ──────────────────────────────────────────────────────────
+
+const rail = StyleSheet.create({
+  frame: { borderWidth: 0.7, borderColor: G.line, borderRadius: 5, backgroundColor: G.paper, paddingHorizontal: 14, paddingVertical: 16, marginBottom: 12 },
+  track: { flexDirection: 'row', position: 'relative' },
+  line: { position: 'absolute', top: 17, left: 48, right: 48, height: 1, backgroundColor: G.goldLine },
+  stop: { flex: 1, alignItems: 'center' },
+  disc: {
+    width: 34, height: 34, borderRadius: 17, backgroundColor: G.green,
+    borderWidth: 1.6, borderColor: G.gold, alignItems: 'center', justifyContent: 'center',
+  },
+  n: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 1, marginTop: 8 },
+  t: { fontSize: 8.1, fontFamily: 'Helvetica-Bold', color: G.ink, textAlign: 'center', marginTop: 4 },
+  d: { fontSize: 6.9, color: G.ink50, textAlign: 'center', lineHeight: 1.45, marginTop: 3, paddingHorizontal: 4 },
+})
+
+export function JourneyRail({ stops }: { stops: { glyph: string; title: string; text: string }[] }) {
   return (
-    <View style={b.facts} wrap={false}>
-      {items.map((f, i) => (
-        <View key={i} style={b.fact}>
-          <Text style={b.factValue}>{f.value}</Text>
-          <Text style={b.factLabel}>{f.label}</Text>
+    <View style={rail.frame} wrap={false}>
+      <View style={rail.track}>
+        <View style={rail.line} />
+        {stops.map((s, i) => (
+          <View key={i} style={rail.stop}>
+            <View style={rail.disc}><Glyph name={s.glyph} size={15} color={G.gold} /></View>
+            <Text style={rail.n}>{String(i + 1).padStart(2, '0')}</Text>
+            <Text style={rail.t}>{s.title}</Text>
+            <Text style={rail.d}>{s.text}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  )
+}
+
+// ─── Tables ────────────────────────────────────────────────────────────────────
+
+const tb = StyleSheet.create({
+  frame: { borderWidth: 0.7, borderColor: G.line, borderRadius: 4, overflow: 'hidden', marginBottom: 12, backgroundColor: G.paper },
+  head: { flexDirection: 'row', backgroundColor: G.green, paddingVertical: 7, paddingHorizontal: 12 },
+  headCell: { fontSize: 5.8, fontFamily: 'Helvetica-Bold', color: G.paper, letterSpacing: 1.4 },
+  row: { flexDirection: 'row', paddingVertical: 7.5, paddingHorizontal: 12, borderTopWidth: 0.6, borderTopColor: G.lineSoft },
+  alt: { backgroundColor: G.altRow },
+  cell: { fontSize: 8, color: G.ink70, lineHeight: 1.5 },
+  first: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: G.ink, lineHeight: 1.5 },
+})
+
+export function Table({
+  head, rows, widths,
+}: { head: string[]; rows: React.ReactNode[][]; widths: number[] }) {
+  return (
+    <View style={tb.frame}>
+      <View style={tb.head} wrap={false}>
+        {head.map((h, i) => (
+          <Text key={i} style={[tb.headCell, { width: `${widths[i]! * 100}%` }]}>{h.toUpperCase()}</Text>
+        ))}
+      </View>
+      {rows.map((r, i) => (
+        <View key={i} style={[tb.row, i % 2 === 1 ? tb.alt : {}]} wrap={false}>
+          {r.map((c, j) => (
+            <Text key={j} style={[j === 0 ? tb.first : tb.cell, { width: `${widths[j]! * 100}%`, paddingRight: 9 }]}>
+              {c}
+            </Text>
+          ))}
         </View>
       ))}
     </View>
   )
 }
 
-export function Defs({
-  head, rows, termWidth = 0.32,
-}: {
-  head: [string, string]
-  rows: [string, string][]
-  termWidth?: number
-}) {
+// ─── Two columns: what is so, and what is not ──────────────────────────────────
+
+const cmp = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  col: { flex: 1, borderWidth: 0.7, borderRadius: 4, paddingHorizontal: 13, paddingVertical: 12 },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  title: { fontSize: 6.3, fontFamily: 'Helvetica-Bold', letterSpacing: 1.4 },
+  item: { fontSize: 7.7, lineHeight: 1.5, marginBottom: 5 },
+})
+
+export function Compare({
+  yes, no,
+}: { yes: { title: string; items: string[] }; no: { title: string; items: string[] } }) {
   return (
-    <View style={b.table}>
-      <View style={b.tHead} wrap={false}>
-        <Text style={[b.tHeadCell, { width: `${termWidth * 100}%` }]}>{head[0]}</Text>
-        <Text style={[b.tHeadCell, { flex: 1 }]}>{head[1]}</Text>
+    <View style={cmp.row} wrap={false}>
+      <View style={[cmp.col, { backgroundColor: G.paper, borderColor: G.greenLine }]}>
+        <View style={cmp.head}><Tick size={9} /><Text style={[cmp.title, { color: '#1E5C48' }]}>{yes.title.toUpperCase()}</Text></View>
+        {yes.items.map((s, i) => <Text key={i} style={[cmp.item, { color: G.ink70 }]}>{s}</Text>)}
       </View>
-      {rows.map(([term, def], i) => (
-        <View key={i} style={[b.tRow, i % 2 === 1 ? b.tRowAlt : {}]} wrap={false}>
-          <Text style={[b.tTerm, { width: `${termWidth * 100}%`, paddingRight: 8 }]}>{term}</Text>
-          <Text style={[b.tDef, { flex: 1 }]}>{def}</Text>
-        </View>
-      ))}
+      <View style={[cmp.col, { backgroundColor: G.rosePale, borderColor: G.roseLine }]}>
+        <View style={cmp.head}><Ban size={9} /><Text style={[cmp.title, { color: G.roseInk }]}>{no.title.toUpperCase()}</Text></View>
+        {no.items.map((s, i) => <Text key={i} style={[cmp.item, { color: '#84300B' }]}>{s}</Text>)}
+      </View>
     </View>
   )
 }
+
+// ─── Pull quote and rules ──────────────────────────────────────────────────────
+
+const pq = StyleSheet.create({
+  wrap: { borderLeftWidth: 2.5, borderLeftColor: G.gold, paddingLeft: 14, paddingVertical: 3, marginTop: 3, marginBottom: 12 },
+  text: { fontSize: 10.2, fontFamily: 'Times-Italic', color: G.green, lineHeight: 1.52 },
+  attr: { fontSize: 5.9, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.6, marginTop: 7 },
+})
 
 export function Quote({ children, attr }: { children: React.ReactNode; attr?: string }) {
   return (
-    <View style={b.quote} wrap={false}>
-      <Text style={b.quoteText}>{children}</Text>
-      {attr && <Text style={b.quoteAttr}>{attr}</Text>}
+    <View style={pq.wrap} wrap={false}>
+      <Text style={pq.text}>{children}</Text>
+      {attr && <Text style={pq.attr}>{attr.toUpperCase()}</Text>}
     </View>
   )
 }
 
-/** Two columns: what is so, and what is not. */
-export function Compare({
-  yes, no,
-}: {
-  yes: { title: string; items: string[] }
-  no: { title: string; items: string[] }
-}) {
+/** A gold diamond between two rules, closing a page of prose. */
+export function DiamondRule() {
   return (
-    <View style={b.compare} wrap={false}>
-      <View style={[b.compareCol, { backgroundColor: C.okSoft, borderColor: '#C9E4DA' }]}>
-        <View style={b.compareHead}>
-          <Tick size={9} />
-          <Text style={[b.compareTitle, { color: C.ok }]}>{yes.title}</Text>
-        </View>
-        {yes.items.map((s, i) => (
-          <Text key={i} style={[b.compareItem, { color: '#1E5C48' }]}>{s}</Text>
-        ))}
-      </View>
-      <View style={[b.compareCol, { backgroundColor: C.redSoft, borderColor: '#F0D2C2' }]}>
-        <View style={b.compareHead}>
-          <Cross size={9} />
-          <Text style={[b.compareTitle, { color: C.red }]}>{no.title}</Text>
-        </View>
-        {no.items.map((s, i) => (
-          <Text key={i} style={[b.compareItem, { color: '#8A3009' }]}>{s}</Text>
-        ))}
-      </View>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 16, justifyContent: 'center' }}>
+      <View style={{ height: 0.7, width: 118, backgroundColor: G.line }} />
+      <Diamond size={7} />
+      <View style={{ height: 0.7, width: 118, backgroundColor: G.line }} />
     </View>
   )
 }
 
-// ─── Section heading ───────────────────────────────────────────────────────────
+// ─── The founders ──────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  wrap: { marginBottom: 26 },
-  head: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 9 },
-  numCol: { width: 34, paddingTop: 1 },
-  num: { fontSize: 20, fontFamily: 'Times-Bold', color: C.mistLine },
-  titleCol: { flex: 1, paddingTop: 4 },
-  title: { fontSize: 14, fontFamily: 'Times-Bold', color: C.green, marginBottom: 5, lineHeight: 1.2 },
-  hair: { height: 1.6, width: 26, backgroundColor: C.gold },
+const fc = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  card: { flex: 1, borderWidth: 0.7, borderColor: G.line, borderRadius: 5, overflow: 'hidden', backgroundColor: G.paper },
+  // The portraits are finished cards: the role and the name are part of the
+  // artwork. `contain` because cropping to fill would cut the name band off,
+  // and nothing is captioned again underneath.
+  // `contain`, never `cover`. The portraits are finished cards whose gold name
+  // band sits at the foot; cropping to fill a frame either cuts the band off or,
+  // anchored to the bottom, cuts their faces off instead. A fixed height with
+  // `contain` keeps every card whole and keeps the four the same size.
+  photo: { width: '100%', height: 196, objectFit: 'contain' },
+  photoFrame: { backgroundColor: '#0C0C0C' },
+  body: { paddingHorizontal: 11, paddingVertical: 9, borderTopWidth: 0.7, borderTopColor: G.lineSoft },
+  role: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  roleText: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.2 },
+  bio: { fontSize: 7.3, color: G.ink70, lineHeight: 1.5 },
+
+  strip: { flexDirection: 'row', gap: 9 },
+  stripCard: { flex: 1, height: 152, borderWidth: 0.8, borderColor: 'rgba(212,175,55,0.4)', borderRadius: 3, overflow: 'hidden' },
+  stripPhoto: { width: '100%', height: '100%', objectFit: 'cover', objectPositionY: '100%' },
 })
 
-export function Section({
-  num, title, children, breakBefore = false,
-}: {
-  num: number
-  title: string
-  children: React.ReactNode
-  breakBefore?: boolean
-}) {
+export function FounderGrid({
+  founders,
+}: { founders: { photo: Portrait; glyph: string; role: string; bio: string }[] }) {
+  // Laid out as explicit rows of two rather than one wrapping row. With
+  // `flexWrap` the renderer produced the first row and silently dropped the
+  // second — two of the four founders simply were not on the page, and nothing
+  // reported it.
+  const rows: typeof founders[] = []
+  for (let i = 0; i < founders.length; i += 2) rows.push(founders.slice(i, i + 2))
+
   return (
-    <View style={s.wrap} break={breakBefore}>
-      {/* Keeps a heading from stranding itself at the foot of a page with its
-          first paragraph overleaf. */}
-      <View style={s.head} minPresenceAhead={46}>
-        <View style={s.numCol}>
-          <Text style={s.num}>{String(num).padStart(2, '0')}</Text>
+    <View>
+      {rows.map((row, r) => (
+        <View key={r} style={fc.row}>
+          {row.map((f, i) => (
+            <View key={i} style={fc.card} wrap={false}>
+              {/* The portrait already carries the role and the name in a gold
+                  band at its foot, so neither is repeated underneath it. */}
+              <View style={fc.photoFrame}><Image src={f.photo} style={fc.photo} /></View>
+              <View style={fc.body}>
+                <View style={fc.role}>
+                  <Glyph name={f.glyph} size={9} color={G.goldInk} />
+                  <Text style={fc.roleText}>{f.role.toUpperCase()}</Text>
+                </View>
+                <Text style={fc.bio}>{f.bio}</Text>
+              </View>
+            </View>
+          ))}
         </View>
-        <View style={s.titleCol}>
-          <Text style={s.title}>{title}</Text>
-          <View style={s.hair} />
-        </View>
-      </View>
-      {children}
+      ))}
     </View>
   )
 }
 
-// ─── Cover and part dividers ───────────────────────────────────────────────────
+/** The four of them across the foot of the cover. */
+export function FounderStrip({ photos }: { photos: Portrait[] }) {
+  return (
+    <View style={fc.strip}>
+      {photos.map((p, i) => (
+        <View key={i} style={fc.stripCard}><Image src={p} style={fc.stripPhoto} /></View>
+      ))}
+    </View>
+  )
+}
 
-const cov = StyleSheet.create({
-  // flex:1 is load-bearing, not cosmetic. The gold frame below is positioned
-  // against all four edges, and without a height to resolve `bottom` against
-  // the layout produces Infinity and the renderer refuses the document.
-  page: { backgroundColor: G.night, position: 'relative', flex: 1, height: '100%' },
-  frame: {
-    position: 'absolute', top: 26, left: 26, right: 26, bottom: 26,
-    borderWidth: 0.8, borderColor: 'rgba(212,175,55,0.28)', borderRadius: 3,
+// ─── Cover ─────────────────────────────────────────────────────────────────────
+
+const cv = StyleSheet.create({
+  page: { flex: 1, height: '100%', position: 'relative' },
+  inner: { flex: 1, paddingHorizontal: 52, paddingTop: 44, paddingBottom: 38 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  conf: { alignItems: 'flex-end' },
+  confA: { fontSize: 6.3, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 2 },
+  confB: { fontSize: 5.5, color: G.greenSoft, letterSpacing: 1.6, marginTop: 4 },
+
+  eyebrow: { fontSize: 6.6, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 3, marginBottom: 13 },
+  title: { fontSize: 42, fontFamily: 'Times-Bold', color: '#FFFFFF', lineHeight: 1.1 },
+  titleGold: { fontFamily: 'Times-BoldItalic', color: G.gold },
+  rule: { height: 1.6, width: 128, backgroundColor: G.gold, marginTop: 19, marginBottom: 17 },
+  blurb: { fontSize: 8.5, color: '#C6D9CF', lineHeight: 1.78, maxWidth: 392 },
+
+  scripture: {
+    borderWidth: 0.8, borderColor: 'rgba(212,175,55,0.45)', borderRadius: 3,
+    paddingHorizontal: 16, paddingVertical: 13, marginTop: 21, maxWidth: 404,
   },
-  inner: { flex: 1, paddingHorizontal: 62, paddingTop: 44, paddingBottom: 46 },
-  // Two spacers rather than a top padding. The title block then sits on the
-  // optical centre at any page size, instead of leaving a hand's width of
-  // nothing between the subtitle and the plinth.
-  spacerTop: { flex: 0.85 },
-  markRow: { alignItems: 'center', marginBottom: 30 },
-  eyebrow: {
-    fontSize: 7, color: C.gold, letterSpacing: 3.4, textAlign: 'center',
-    fontFamily: 'Helvetica-Bold', marginBottom: 20,
-  },
-  org: {
-    fontSize: 25, fontFamily: 'Times-Bold', color: C.paper, textAlign: 'center',
-    letterSpacing: 1.6, lineHeight: 1.25,
-  },
-  goldRule: { height: 1.4, backgroundColor: C.gold, width: 62, alignSelf: 'center', marginVertical: 22 },
-  title: {
-    fontSize: 40, fontFamily: 'Times-Bold', color: C.gold, textAlign: 'center',
-    letterSpacing: 1.2, lineHeight: 1.12,
-  },
-  sub: {
-    fontSize: 9.5, color: C.greenSoft, textAlign: 'center', marginTop: 18,
-    lineHeight: 1.7, letterSpacing: 0.3, paddingHorizontal: 18,
-  },
-  spacer: { flex: 1 },
+  scriptureText: { fontSize: 9.4, fontFamily: 'Times-Italic', color: '#FFFFFF' },
+  scriptureRef: { fontSize: 5.9, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 1.8, marginTop: 7 },
+
   plinth: {
-    borderTopWidth: 0.8, borderTopColor: 'rgba(212,175,55,0.3)', paddingTop: 14,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    borderTopWidth: 0.7, borderTopColor: 'rgba(212,175,55,0.35)', paddingTop: 13,
+    flexDirection: 'row', justifyContent: 'space-between', marginTop: 19,
   },
-  plinthLabel: { fontSize: 6, color: C.greenSoft, letterSpacing: 1.6, marginBottom: 4 },
-  plinthValue: { fontSize: 8, color: C.paper, fontFamily: 'Helvetica-Bold', letterSpacing: 0.6 },
-  confidential: {
-    fontSize: 6.2, color: 'rgba(212,175,55,0.75)', letterSpacing: 1.8, textAlign: 'center',
-    marginTop: 18,
-  },
+  pLabel: { fontSize: 5.5, color: G.greenSoft, letterSpacing: 1.6, marginBottom: 5 },
+  pValue: { fontSize: 9, fontFamily: 'Times-Bold', color: '#FFFFFF', letterSpacing: 0.4 },
 })
 
 export function Cover({
-  edition, issued, holder,
+  version, released, nextReview, blurb, photos,
 }: {
-  edition: string
-  issued: string
-  holder: string
+  version: string
+  released: string
+  nextReview: string
+  blurb: string
+  photos: Portrait[]
 }) {
   return (
-    <View style={cov.page}>
-      <View style={cov.frame} />
-      <View style={cov.inner}>
-        <View style={cov.spacerTop} />
-        <View style={cov.markRow}><XmmMark size={88} /></View>
-        <Text style={cov.eyebrow}>ESTABLISHED BY FOUR  ·  HELD BY FIFTY</Text>
-        <Text style={cov.org}>XKIMM XA MALI{'\n'}FOUNDATION</Text>
-        <View style={cov.goldRule} />
-        <Text style={cov.title}>The Founder{'\n'}Guide</Text>
-        <Text style={cov.sub}>
-          Everything the Foundation asks of you, everything it owes you,{'\n'}
-          and exactly how the money moves between the two.
-        </Text>
-        <View style={cov.spacer} />
-        <View style={cov.plinth}>
-          <View>
-            <Text style={cov.plinthLabel}>EDITION</Text>
-            <Text style={cov.plinthValue}>{edition.toUpperCase()}</Text>
-          </View>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={cov.plinthLabel}>ISSUED</Text>
-            <Text style={cov.plinthValue}>{issued.toUpperCase()}</Text>
-          </View>
-          <View style={{ alignItems: 'flex-end' }}>
-            <Text style={cov.plinthLabel}>PREPARED FOR</Text>
-            <Text style={cov.plinthValue}>{holder.toUpperCase()}</Text>
+    <View style={cv.page}>
+      <NightGround />
+      <Guilloche />
+      <View style={cv.inner}>
+        <View style={cv.topRow}>
+          <XmmMark size={60} />
+          <View style={cv.conf}>
+            <Text style={cv.confA}>PRIVATE &amp; CONFIDENTIAL</Text>
+            <Text style={cv.confB}>FOUNDING MEMBERS ONLY</Text>
           </View>
         </View>
-        <Text style={cov.confidential}>CONFIDENTIAL  ·  FOR MEMBERS OF THE CIRCLE</Text>
+
+        <View style={{ marginTop: 62 }}>
+          <Text style={cv.eyebrow}>XKIMM XA MALI FOUNDATION</Text>
+          <Text style={cv.title}>The Founder{'\n'}<Text style={cv.titleGold}>Guide</Text></Text>
+          <View style={cv.rule} />
+          <Text style={cv.blurb}>{blurb}</Text>
+
+          <View style={cv.scripture}>
+            <Text style={cv.scriptureText}>“It is more blessed to give than to receive.”</Text>
+            <Text style={cv.scriptureRef}>ACTS 20:35</Text>
+          </View>
+        </View>
+
+        <View style={{ flex: 1 }} />
+        <FounderStrip photos={photos} />
+
+        <View style={cv.plinth}>
+          <View>
+            <Text style={cv.pLabel}>VERSION</Text>
+            <Text style={cv.pValue}>{version}</Text>
+          </View>
+          <View>
+            <Text style={cv.pLabel}>RELEASED</Text>
+            <Text style={cv.pValue}>{released}</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={cv.pLabel}>NEXT REVIEW</Text>
+            <Text style={cv.pValue}>{nextReview}</Text>
+          </View>
+        </View>
       </View>
     </View>
   )
 }
 
-const div = StyleSheet.create({
-  page: { backgroundColor: G.night, flex: 1, paddingHorizontal: 62, paddingTop: 190, position: 'relative' },
-  roman: { fontSize: 8, color: C.gold, letterSpacing: 4, fontFamily: 'Helvetica-Bold', marginBottom: 16 },
-  // Set behind and to the right rather than above. Stacked, its serif ran into
-  // the title's first letter — 'I' against 'The Foundation' read as damage.
-  numeral: {
-    position: 'absolute', right: 44, top: 96,
-    fontSize: 232, fontFamily: 'Times-Bold', color: 'rgba(212,175,55,0.13)', lineHeight: 1,
+// ─── Part divider ──────────────────────────────────────────────────────────────
+
+const dv = StyleSheet.create({
+  page: { flex: 1, height: '100%', position: 'relative' },
+  inner: { flex: 1, paddingHorizontal: 62, paddingTop: 92 },
+  numeral: { fontSize: 92, fontFamily: 'Times-Bold', color: 'rgba(255,255,255,0.10)', lineHeight: 1 },
+  kicker: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 20, marginBottom: 11 },
+  kickerText: { fontSize: 6.8, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 2.4 },
+  title: { fontSize: 30, fontFamily: 'Times-Bold', color: '#FFFFFF', lineHeight: 1.18 },
+  titleGold: { fontFamily: 'Times-BoldItalic', color: G.gold },
+  rule: { height: 1.6, width: 94, backgroundColor: G.gold, marginTop: 17, marginBottom: 19 },
+  conviction: { fontSize: 10.8, fontFamily: 'Times-Italic', color: '#D8E6DF', lineHeight: 1.62, maxWidth: 396 },
+  convictionGold: { fontFamily: 'Times-BoldItalic', color: G.goldLight },
+  label: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.greenSoft, letterSpacing: 2, marginTop: 15 },
+  foot: {
+    position: 'absolute', left: 62, right: 62, bottom: 50,
+    borderTopWidth: 0.7, borderTopColor: 'rgba(212,175,55,0.3)', paddingTop: 12,
+    flexDirection: 'row', flexWrap: 'wrap', gap: 15,
   },
-  title: { fontSize: 31, fontFamily: 'Times-Bold', color: C.paper, marginBottom: 16, letterSpacing: 0.8 },
-  rule: { height: 1.4, width: 48, backgroundColor: C.gold, marginBottom: 18 },
-  lede: { fontSize: 10, color: C.greenSoft, lineHeight: 1.7, maxWidth: 330 },
-  toc: { marginTop: 38, borderTopWidth: 0.6, borderTopColor: 'rgba(255,255,255,0.12)', paddingTop: 14 },
-  tocRow: { flexDirection: 'row', marginBottom: 7, alignItems: 'baseline' },
-  tocNum: { fontSize: 7.5, color: C.gold, fontFamily: 'Helvetica-Bold', width: 22, letterSpacing: 0.6 },
-  tocTitle: { fontSize: 9, color: 'rgba(255,255,255,0.72)' },
+  footItem: { flexDirection: 'row', alignItems: 'baseline', gap: 5 },
+  footN: { fontSize: 6.3, fontFamily: 'Helvetica-Bold', color: G.gold, letterSpacing: 0.8 },
+  footT: { fontSize: 7.5, color: 'rgba(255,255,255,0.72)' },
 })
 
 export function PartDivider({
-  roman, numeral, title, lede, sections,
+  numeral, roman, plain, italic, conviction, convictionTail, label, sections,
 }: {
-  roman: string
   numeral: string
-  title: string
-  lede: string
+  roman: string
+  plain: string
+  italic: string
+  conviction: string
+  convictionTail?: string
+  label: string
   sections: { num: number; title: string }[]
 }) {
   return (
-    <View style={div.page}>
-      <Text style={div.roman}>PART {roman.toUpperCase()}</Text>
-      <Text style={div.numeral}>{numeral}</Text>
-      <Text style={div.title}>{title}</Text>
-      <View style={div.rule} />
-      <Text style={div.lede}>{lede}</Text>
-      <View style={div.toc}>
-        {sections.map((sec) => (
-          <View key={sec.num} style={div.tocRow}>
-            <Text style={div.tocNum}>{String(sec.num).padStart(2, '0')}</Text>
-            <Text style={div.tocTitle}>{sec.title}</Text>
+    <View style={dv.page}>
+      <NightGround />
+      <Guilloche cx={-70} cy={660} rings={22} gap={30} opacity={0.4} />
+      <View style={dv.inner}>
+        <Text style={dv.numeral}>{numeral}</Text>
+        <View style={dv.kicker}>
+          <Diamond size={7} />
+          <Text style={dv.kickerText}>PART {roman.toUpperCase()}</Text>
+        </View>
+        <Text style={dv.title}>{plain}{'\n'}<Text style={dv.titleGold}>{italic}</Text></Text>
+        <View style={dv.rule} />
+        <Text style={dv.conviction}>
+          {conviction}
+          {convictionTail ? <Text style={dv.convictionGold}>{convictionTail}</Text> : null}
+        </Text>
+        <Text style={dv.label}>{label.toUpperCase()}</Text>
+      </View>
+      <View style={dv.foot}>
+        {sections.map((s) => (
+          <View key={s.num} style={dv.footItem}>
+            <Text style={dv.footN}>{String(s.num).padStart(2, '0')}</Text>
+            <Text style={dv.footT}>{s.title}</Text>
           </View>
         ))}
       </View>
@@ -570,93 +829,74 @@ export function PartDivider({
 
 // ─── Contents ──────────────────────────────────────────────────────────────────
 
-const toc = StyleSheet.create({
-  wrap: { paddingHorizontal: PAGE.gutter, paddingTop: 62 },
-  kicker: { fontSize: 7, color: C.gold, letterSpacing: 3, fontFamily: 'Helvetica-Bold', marginBottom: 10 },
-  title: { fontSize: 26, fontFamily: 'Times-Bold', color: C.green, marginBottom: 6 },
-  rule: { height: 1.4, width: 44, backgroundColor: C.gold, marginBottom: 22 },
-  partRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16, marginBottom: 8 },
-  partRoman: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: C.gold, letterSpacing: 1.6 },
-  partTitle: { fontSize: 10, fontFamily: 'Times-Bold', color: C.green, letterSpacing: 0.4 },
-  partLine: { flex: 1, height: 0.6, backgroundColor: C.mistLine },
-  row: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 5.5, paddingLeft: 4 },
-  num: { fontSize: 7.5, color: C.ink35, fontFamily: 'Helvetica-Bold', width: 20 },
-  name: { fontSize: 9, color: C.ink70 },
-  leader: { flex: 1, borderBottomWidth: 0.6, borderBottomColor: C.mistLine, borderBottomStyle: 'dotted', marginHorizontal: 5, marginBottom: 2.5 },
-  hint: { fontSize: 7.5, color: C.ink35, fontFamily: 'Helvetica-Bold' },
+const tc = StyleSheet.create({
+  part: { flexDirection: 'row', alignItems: 'baseline', marginTop: 14, marginBottom: 7 },
+  partRoman: { fontSize: 6.1, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.6 },
+  partLine: { flex: 1, height: 0.6, backgroundColor: G.line, marginHorizontal: 10 },
+  partName: { fontSize: 9, fontFamily: 'Times-Bold', color: G.green },
+  row: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 4.6 },
+  num: { fontSize: 6.7, fontFamily: 'Helvetica-Bold', color: G.gold, width: 19, letterSpacing: 0.6 },
+  name: { fontSize: 8.3, color: G.ink70 },
+  leader: { flex: 1, borderBottomWidth: 0.6, borderBottomColor: G.line, borderBottomStyle: 'dotted', marginHorizontal: 6, marginBottom: 2.3 },
+  page: { fontSize: 6.9, fontFamily: 'Helvetica-Bold', color: G.ink50, letterSpacing: 0.6 },
 })
 
 export function Contents({
-  parts, appendices,
+  parts,
 }: {
-  parts: { roman: string; title: string; sections: { num: number; title: string }[] }[]
-  /** Listed too. A contents page that omits two pages of the document is wrong. */
-  appendices: { letter: string; title: string }[]
+  parts: { roman: string; title: string; sections: { num: number; title: string; page: number }[] }[]
 }) {
   return (
-    <View style={toc.wrap}>
-      <Text style={toc.kicker}>WHAT IS IN HERE</Text>
-      <Text style={toc.title}>Contents</Text>
-      <View style={toc.rule} />
+    <View>
       {parts.map((part) => (
         <View key={part.roman} wrap={false}>
-          <View style={toc.partRow}>
-            <Text style={toc.partRoman}>PART {part.roman.toUpperCase()}</Text>
-            <Text style={toc.partTitle}>{part.title}</Text>
-            <View style={toc.partLine} />
+          <View style={tc.part}>
+            <Text style={tc.partRoman}>PART {part.roman.toUpperCase()}</Text>
+            <View style={tc.partLine} />
+            <Text style={tc.partName}>{part.title}</Text>
           </View>
-          {part.sections.map((sec) => (
-            <View key={sec.num} style={toc.row}>
-              <Text style={toc.num}>{String(sec.num).padStart(2, '0')}</Text>
-              <Text style={toc.name}>{sec.title}</Text>
-              <View style={toc.leader} />
+          {part.sections.map((s) => (
+            <View key={s.num} style={tc.row}>
+              <Text style={tc.num}>{String(s.num).padStart(2, '0')}</Text>
+              <Text style={tc.name}>{s.title}</Text>
+              <View style={tc.leader} />
+              <Text style={tc.page}>{String(s.page).padStart(2, '0')}</Text>
             </View>
           ))}
         </View>
       ))}
-
-      <View wrap={false}>
-        <View style={toc.partRow}>
-          <Text style={toc.partRoman}>AT THE BACK</Text>
-          <Text style={toc.partTitle}>Appendices</Text>
-          <View style={toc.partLine} />
-        </View>
-        {appendices.map((a) => (
-          <View key={a.letter} style={toc.row}>
-            <Text style={toc.num}>{a.letter}</Text>
-            <Text style={toc.name}>{a.title}</Text>
-            <View style={toc.leader} />
-          </View>
-        ))}
-      </View>
     </View>
   )
 }
 
-// ─── Small decorative pieces ───────────────────────────────────────────────────
+// ─── Signature block ───────────────────────────────────────────────────────────
 
-const misc = StyleSheet.create({
-  seal: { alignItems: 'center', marginTop: 20 },
-  sealRing: { alignItems: 'center', justifyContent: 'center' },
+const sg = StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 13, marginTop: 4 },
+  card: {
+    width: '47.6%', borderWidth: 0.7, borderColor: G.line, borderRadius: 4,
+    backgroundColor: G.paper, paddingHorizontal: 14, paddingVertical: 13,
+  },
+  name: { fontSize: 10, fontFamily: 'Times-Bold', color: G.green },
+  role: { fontSize: 5.7, fontFamily: 'Helvetica-Bold', color: G.goldInk, letterSpacing: 1.3, marginTop: 3 },
+  line: { borderBottomWidth: 0.8, borderBottomColor: G.ink35, marginTop: 28 },
+  cap: { fontSize: 5.5, color: G.ink35, letterSpacing: 1.2, marginTop: 5 },
+  dateLine: { borderBottomWidth: 0.8, borderBottomColor: G.ink35, marginTop: 18, width: '60%' },
 })
 
-/** A gold ring around the mark, for the closing page. */
-export function Seal({ size = 96 }: { size?: number }) {
+export function SignatureGrid({ people }: { people: { name: string; role: string }[] }) {
   return (
-    <View style={misc.seal}>
-      <View style={misc.sealRing}>
-        <Svg width={size} height={size} viewBox="0 0 100 100" style={{ position: 'absolute' }}>
-          <Circle cx="50" cy="50" r="48" fill="none" stroke={C.gold} strokeWidth={0.8} strokeOpacity={0.5} />
-          <Circle cx="50" cy="50" r="43" fill="none" stroke={C.gold} strokeWidth={0.4} strokeOpacity={0.3} />
-          <Rect x="49.6" y="0" width="0.8" height="6" fill={C.gold} fillOpacity={0.5} />
-          <Rect x="49.6" y="94" width="0.8" height="6" fill={C.gold} fillOpacity={0.5} />
-          <Rect x="0" y="49.6" width="6" height="0.8" fill={C.gold} fillOpacity={0.5} />
-          <Rect x="94" y="49.6" width="6" height="0.8" fill={C.gold} fillOpacity={0.5} />
-        </Svg>
-        <View style={{ paddingVertical: (size - size * 0.58) / 2 }}>
-          <XmmMark size={size * 0.58} />
+    <View style={sg.grid}>
+      {people.map((p, i) => (
+        <View key={i} style={sg.card} wrap={false}>
+          <Text style={sg.name}>{p.name}</Text>
+          <Text style={sg.role}>{p.role.toUpperCase()}</Text>
+          <View style={sg.line} />
+          <Text style={sg.cap}>SIGNATURE</Text>
+          <View style={sg.dateLine} />
+          <Text style={sg.cap}>DATE</Text>
         </View>
-      </View>
+      ))}
     </View>
   )
 }
