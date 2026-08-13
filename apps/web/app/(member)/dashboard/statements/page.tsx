@@ -5,6 +5,8 @@ import { getSession } from '@/lib/session'
 import { formatZAR } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
 import { getStatementPeriods } from '@/services/contribution.service'
+import { isFounder } from '@/services/distinction.service'
+import { FounderGuideCard } from '@/components/FounderGuideCard'
 
 export const metadata: Metadata = { title: 'Statements' }
 
@@ -55,7 +57,11 @@ export default async function StatementsPage() {
   const userId = session.user.id
   const roles  = (session.user.roles as string[] | undefined) ?? []
 
-  const contributions = await getStatementPeriods(userId, userId, roles)
+  // Two independent reads, so a slow one does not hold the other up.
+  const [contributions, founder] = await Promise.all([
+    getStatementPeriods(userId, userId, roles),
+    isFounder(userId),
+  ])
 
   const byYear = (contributions as ContribRow[]).reduce<Record<number, ContribRow[]>>((acc, c) => {
     ;(acc[c.periodYear] ??= []).push(c)
@@ -77,6 +83,14 @@ export default async function StatementsPage() {
           <p className="text-sm text-xxm-gray-500 mt-1">Download premium PDF statements for any contribution period</p>
         </div>
       </Reveal>
+
+      {/* The one document that is not a statement. Shown to founders only —
+          the route checks the badge again, so this is presentation, not a gate. */}
+      {founder && (
+        <Reveal variant="up" delay={60}>
+          <FounderGuideCard />
+        </Reveal>
+      )}
 
       <Reveal variant="up" delay={100}>
       {contributions.length === 0 ? (
