@@ -82,3 +82,20 @@ export const goalProposalRatelimit    = makeRatelimit('xxm:ratelimit:goal-propos
 export const adminInviteRatelimit     = makeRatelimit('xxm:ratelimit:admin-invite',    Ratelimit.slidingWindow(20, '1 h'))
 export const adminBroadcastRatelimit  = makeRatelimit('xxm:ratelimit:admin-broadcast', Ratelimit.slidingWindow(5,  '1 h'))
 export const adminBulkRatelimit       = makeRatelimit('xxm:ratelimit:admin-bulk',      Ratelimit.slidingWindow(3,  '1 h'))
+
+/**
+ * Posting to the community board.
+ *
+ * The Founder Guide tells four co-founders that a member may "post on the
+ * community board, up to ten times a day". Nothing enforced it — the route
+ * used the general 60-a-minute API limit, so the promise in a signed document
+ * was simply not true.
+ *
+ * A day rather than a minute is the point. The general limit stops a script;
+ * this stops one member filling the board, which is what the sentence was
+ * about. Both apply: whichever runs out first refuses.
+ */
+export const communityPostRatelimit = makeRatelimit(
+  'xxm:ratelimit:community-post',
+  Ratelimit.slidingWindow(10, '1 d'),
+)
