@@ -44,6 +44,8 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['listTransactionsForContributions', (r) => services.listTransactionsForContributions(r, ['c1'])],
   ['generateContributions',    (r) => services.generateContributions('a1', r, 1, 2026)],
   ['previewGeneration',        (r) => services.previewGeneration(r, 1, 2026)],
+  ['waiveContribution',        (r) => services.waiveContribution('a1', r, 'c1', 'A perfectly good reason')],
+  ['recordPayment',            (r) => services.recordPayment('a1', r, 'c1', 40, 'Cash at the meeting')],
   ['getBroadcastAudience',     (r) => services.getBroadcastAudience(r)],
   ['correctMemberIdNumber',    (r) => services.correctMemberIdNumber('a1', r, 'm1', '9001015800088', 'Captured wrong at registration')],
   ['listAllGoals',             (r) => services.listAllGoals(r)],
