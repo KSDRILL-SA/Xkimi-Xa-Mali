@@ -35,6 +35,7 @@ vi.mock('@xxm/observability', () => ({
 
 import {
   WATCHED_JOBS,
+  COMPLIANCE_JOBS,
   computeOverdue,
   recordJobHeartbeat,
   readHeartbeats,
@@ -69,6 +70,20 @@ function memoisingStep() {
 /** Every watched job beating just now, so a test can make exactly one of them stale. */
 function allHealthy(): HeartbeatReading[] {
   return WATCHED_JOBS.map((job) => ({ jobId: job.jobId, lastRunAt: NOW.toISOString() }))
+}
+
+/**
+ * The compliance jobs, beating.
+ *
+ * The checker reads two registries: the money jobs in `WATCHED_JOBS` and the
+ * statutory ones in `COMPLIANCE_JOBS`. The `findMany` mock ignores its `where`
+ * and returns whatever a test stubbed, so a fixture listing only watched jobs
+ * leaves every compliance job looking as though it had never run — and the test
+ * then sees a second, unrelated alert it never asked for. Appending these keeps
+ * a test about the debit run about the debit run.
+ */
+function complianceBeating() {
+  return COMPLIANCE_JOBS.map((job) => ({ jobId: job.jobId, lastRunAt: NOW }))
 }
 
 function minutesAgo(minutes: number): string {
@@ -138,12 +153,13 @@ describe('deciding that a job has stopped', () => {
 
 describe('what the alert says', () => {
   it('raises a critical alert naming the job and what is being lost', async () => {
-    mocks.findMany.mockResolvedValue(
-      WATCHED_JOBS.filter((j) => j.jobId !== 'debit-run').map((j) => ({
+    mocks.findMany.mockResolvedValue([
+      ...WATCHED_JOBS.filter((j) => j.jobId !== 'debit-run').map((j) => ({
         jobId: j.jobId,
         lastRunAt: NOW,
       })),
-    )
+      ...complianceBeating(),
+    ])
 
     const result = await executeJobHeartbeatCheck(step, NOW)
 
@@ -188,9 +204,10 @@ describe('what the alert says', () => {
   })
 
   it('says nothing at all when every job is beating', async () => {
-    mocks.findMany.mockResolvedValue(
-      WATCHED_JOBS.map((j) => ({ jobId: j.jobId, lastRunAt: NOW })),
-    )
+    mocks.findMany.mockResolvedValue([
+      ...WATCHED_JOBS.map((j) => ({ jobId: j.jobId, lastRunAt: NOW })),
+      ...complianceBeating(),
+    ])
 
     const result = await executeJobHeartbeatCheck(step, NOW)
 
@@ -203,12 +220,13 @@ describe('what the alert says', () => {
 
 describe('not saying it 96 times a day', () => {
   const silentDebitRun = () =>
-    mocks.findMany.mockResolvedValue(
-      WATCHED_JOBS.filter((j) => j.jobId !== 'debit-run').map((j) => ({
+    mocks.findMany.mockResolvedValue([
+      ...WATCHED_JOBS.filter((j) => j.jobId !== 'debit-run').map((j) => ({
         jobId: j.jobId,
         lastRunAt: NOW,
       })),
-    )
+      ...complianceBeating(),
+    ])
 
   it('stays quiet when the same set was reported inside the window', async () => {
     silentDebitRun()
@@ -225,11 +243,12 @@ describe('not saying it 96 times a day', () => {
     // most: reconciliation has been quiet for hours, that was reported, and now
     // the debit run has stopped too. Waiting out the window to mention it is
     // not a throttle, it is a missed alert.
-    mocks.findMany.mockResolvedValue(
-      WATCHED_JOBS.filter((j) => j.jobId !== 'debit-run' && j.jobId !== 'ledger-reconciliation').map(
+    mocks.findMany.mockResolvedValue([
+      ...WATCHED_JOBS.filter((j) => j.jobId !== 'debit-run' && j.jobId !== 'ledger-reconciliation').map(
         (j) => ({ jobId: j.jobId, lastRunAt: NOW }),
       ),
-    )
+      ...complianceBeating(),
+    ])
     mocks.auditFindMany.mockResolvedValue([{ payload: { jobs: ['ledger-reconciliation'] } }])
 
     const result = await executeJobHeartbeatCheck(step, NOW)
@@ -239,11 +258,12 @@ describe('not saying it 96 times a day', () => {
   })
 
   it('compares the set regardless of the order it was written in', async () => {
-    mocks.findMany.mockResolvedValue(
-      WATCHED_JOBS.filter((j) => j.jobId !== 'debit-run' && j.jobId !== 'notification-flush').map(
+    mocks.findMany.mockResolvedValue([
+      ...WATCHED_JOBS.filter((j) => j.jobId !== 'debit-run' && j.jobId !== 'notification-flush').map(
         (j) => ({ jobId: j.jobId, lastRunAt: NOW }),
       ),
-    )
+      ...complianceBeating(),
+    ])
     mocks.auditFindMany.mockResolvedValue([
       { payload: { jobs: ['notification-flush', 'debit-run'] } },
     ])
@@ -297,7 +317,9 @@ describe('the check as an Inngest run', () => {
     // than accumulating into a captured variable, so it would survive
     // memoisation in either position. The ledger-reconciliation defect was an
     // increment inside a step body, which is a different shape from this one.
-    mocks.findMany.mockResolvedValue([])
+    // Compliance jobs beating, so this stays a test about one alert and
+    // re-entry rather than about the second registry.
+    mocks.findMany.mockResolvedValue(complianceBeating())
     const memo = memoisingStep()
 
     const first = await executeJobHeartbeatCheck(memo, NOW)
@@ -311,10 +333,63 @@ describe('the check as an Inngest run', () => {
     expect(mocks.upsert).toHaveBeenCalledOnce()
   })
 
-  it('records its own heartbeat after reading, never before', async () => {
+  it('reports a silent compliance job separately, and never as critical', async () => {
+    // The gap this closes: the retention survey runs twelve times a year and is
+    // the only thing enforcing POPIA s14. It could have stopped and nothing
+    // would have said so for up to a year.
+    //
+    // Reported apart from the money jobs on purpose. `critical` also sends an
+    // SMS, which this system reserves for money not moving, and a compliance
+    // item arriving under `SCHEDULED_JOB_SILENT` would put the wrong first move
+    // in front of whoever reads it.
     mocks.findMany.mockResolvedValue(
       WATCHED_JOBS.map((j) => ({ jobId: j.jobId, lastRunAt: NOW })),
     )
+
+    const result = await executeJobHeartbeatCheck(step, NOW)
+
+    expect(result).toMatchObject({ overdue: 0, alerted: false, complianceAlerted: true })
+    expect(result.complianceJobs).toEqual(COMPLIANCE_JOBS.map((j) => j.jobId))
+
+    const alert = mocks.raiseAlert.mock.calls[0][0]
+    expect(alert).toMatchObject({ code: 'COMPLIANCE_JOB_SILENT', severity: 'warning' })
+    expect(alert.code).not.toBe('SCHEDULED_JOB_SILENT')
+    expect(alert.body).toContain('POPIA')
+  })
+
+  it('throttles compliance alerts on their own action, not the money one', async () => {
+    // Sharing a throttle would let a silent debit run suppress the retention
+    // survey's alert, and the reverse.
+    mocks.findMany.mockResolvedValue(
+      WATCHED_JOBS.map((j) => ({ jobId: j.jobId, lastRunAt: NOW })),
+    )
+
+    await executeJobHeartbeatCheck(step, NOW)
+
+    const actions = mocks.auditFindMany.mock.calls.map((c) => (c[0] as { action: string }).action)
+    expect(actions).toContain('COMPLIANCE_JOB_SILENT')
+    expect(actions).not.toContain('SCHEDULED_JOB_SILENT')
+  })
+
+  it('stays quiet when the same compliance jobs were already reported', async () => {
+    mocks.findMany.mockResolvedValue(
+      WATCHED_JOBS.map((j) => ({ jobId: j.jobId, lastRunAt: NOW })),
+    )
+    mocks.auditFindMany.mockResolvedValue([
+      { payload: { jobs: COMPLIANCE_JOBS.map((j) => j.jobId) } },
+    ])
+
+    const result = await executeJobHeartbeatCheck(step, NOW)
+
+    expect(result.complianceAlerted).toBe(false)
+    expect(mocks.raiseAlert).not.toHaveBeenCalled()
+  })
+
+  it('records its own heartbeat after reading, never before', async () => {
+    mocks.findMany.mockResolvedValue([
+      ...WATCHED_JOBS.map((j) => ({ jobId: j.jobId, lastRunAt: NOW })),
+      ...complianceBeating(),
+    ])
     const memo = memoisingStep()
 
     await executeJobHeartbeatCheck(memo, NOW)

@@ -108,6 +108,55 @@ export const WATCHED_JOBS: readonly WatchedJob[] = [
   },
 ] as const
 
+/**
+ * Jobs whose silence costs a statutory obligation rather than money.
+ *
+ * Kept apart from `WATCHED_JOBS` on purpose. That list's value is that every
+ * entry is worth an SMS at 03:00, and widening its rule to admit compliance work
+ * would dilute the one list somebody is guaranteed to act on. These are reported
+ * by the same checker at `warning` instead: they reach an inbox and an email,
+ * and they do not wake anyone.
+ *
+ * The gap this closes: the retention survey runs **twelve times a year** and is
+ * the only mechanism enforcing POPIA section 14. If it silently stopped, nothing
+ * anywhere would say so, and the first evidence would be a regulator asking to
+ * see the retention reports for a year in which none were produced. The deadline
+ * check has the same shape — it is the only thing counting the thirty days.
+ *
+ * The windows are generous because these are the sizes the jobs actually are. A
+ * monthly job is not late at thirty-one days; it is late when it has clearly
+ * missed a turn.
+ */
+export const COMPLIANCE_JOBS: readonly WatchedJob[] = [
+  {
+    jobId: 'retention-survey',
+    label: 'The monthly retention survey',
+    // Runs on the 1st. Forty days is one full month plus room for a late run,
+    // so this fires only once a month has genuinely been skipped.
+    maxSilenceMinutes: 40 * 24 * 60,
+    consequence:
+      'Nothing is checking what personal information is past its retention period (POPIA s14).',
+  },
+  {
+    jobId: 'backup-watch',
+    label: 'The off-platform backup watch',
+    // Runs daily. Watched here for the same reason it exists: it is the only
+    // thing that notices a backup which has stopped being scheduled, so its own
+    // silence restores exactly the blind spot it was added to remove.
+    maxSilenceMinutes: 50 * 60,
+    consequence: 'Nothing is checking that the off-platform backup is still running.',
+  },
+  {
+    jobId: 'dsr-deadline-check',
+    label: 'The data request deadline check',
+    // Runs Mondays. Ten days allows one missed week before this is more than a
+    // blip, while still catching it well inside a thirty-day statutory period.
+    maxSilenceMinutes: 10 * 24 * 60,
+    consequence:
+      'Nothing is counting the 30 days POPIA allows for answering a data request.',
+  },
+] as const
+
 /** A watched job and how long it has been quiet. `lastRunAt` null means never. */
 export interface OverdueJob {
   jobId: string
@@ -152,16 +201,23 @@ export async function recordJobHeartbeat(jobId: string, now: Date = new Date()):
   }
 }
 
-/** Read every watched job's last beat. Dates are serialised for step memoisation. */
-export async function readHeartbeats(): Promise<HeartbeatReading[]> {
+/**
+ * Read every watched job's last beat. Dates are serialised for step memoisation.
+ *
+ * The registry is a parameter so the compliance list can be read the same way,
+ * and defaults to `WATCHED_JOBS` so every existing caller means what it did.
+ */
+export async function readHeartbeats(
+  registry: readonly WatchedJob[] = WATCHED_JOBS,
+): Promise<HeartbeatReading[]> {
   const rows = await db.jobHeartbeat.findMany({
-    where: { jobId: { in: WATCHED_JOBS.map((job) => job.jobId) } },
+    where: { jobId: { in: registry.map((job) => job.jobId) } },
     select: { jobId: true, lastRunAt: true },
   })
 
   const byId = new Map(rows.map((row) => [row.jobId, row.lastRunAt]))
 
-  return WATCHED_JOBS.map((job) => ({
+  return registry.map((job) => ({
     jobId: job.jobId,
     lastRunAt: byId.get(job.jobId)?.toISOString() ?? null,
   }))
@@ -183,10 +239,11 @@ export async function readHeartbeats(): Promise<HeartbeatReading[]> {
 export function computeOverdue(
   readings: readonly HeartbeatReading[],
   now: Date = new Date(),
+  registry: readonly WatchedJob[] = WATCHED_JOBS,
 ): OverdueJob[] {
   const overdue: OverdueJob[] = []
 
-  for (const job of WATCHED_JOBS) {
+  for (const job of registry) {
     const reading = readings.find((r) => r.jobId === job.jobId)
     const lastRunAt = reading?.lastRunAt ?? null
 

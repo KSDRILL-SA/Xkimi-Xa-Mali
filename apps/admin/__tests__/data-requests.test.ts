@@ -20,6 +20,7 @@ vi.mock('@/lib/db', () => ({
 }))
 
 import {
+  listDataRequests,
   logDataRequest,
   startDataRequest,
   closeDataRequest,
@@ -222,6 +223,110 @@ describe('starting a request', () => {
   })
 })
 
+/**
+ * The list was the only function here with no tests, and the only one with a
+ * bug: two filters that each constrained `status` were merged with object
+ * spread, so whichever came second silently won.
+ */
+describe('listing requests', () => {
+  beforeEach(() => {
+    dsr.findMany.mockResolvedValue([])
+    dsr.count.mockResolvedValue(0)
+  })
+
+  /** The `where` the rows themselves were fetched with. */
+  function listWhere() {
+    return firstArg(dsr.findMany, 'findMany') as unknown as { where: Record<string, unknown> }
+  }
+
+  it('asks for everything when nothing is filtered', async () => {
+    await listDataRequests(ADMIN)
+    expect(listWhere().where).toEqual({})
+  })
+
+  it('filters by status alone', async () => {
+    await listDataRequests(ADMIN, { status: 'COMPLETED' })
+    expect(listWhere().where).toEqual({ AND: [{ status: 'COMPLETED' }] })
+  })
+
+  it('filters to open requests past their due date', async () => {
+    await listDataRequests(ADMIN, { overdueOnly: true })
+    const and = listWhere().where.AND as Array<Record<string, unknown>>
+
+    expect(and).toHaveLength(1)
+    expect(and[0]?.status).toEqual({ in: ['RECEIVED', 'IN_PROGRESS'] })
+    expect(and[0]?.dueAt).toHaveProperty('lt')
+  })
+
+  it('keeps both filters when both are given', async () => {
+    // The regression. Spreading these into one object let the overdue clause
+    // overwrite the chosen status, so asking for "completed and overdue"
+    // returned the OPEN overdue ones under a heading that said Completed —
+    // wrong rows, presented as the right ones.
+    await listDataRequests(ADMIN, { status: 'COMPLETED', overdueOnly: true })
+    const and = listWhere().where.AND as Array<Record<string, unknown>>
+
+    expect(and).toHaveLength(2)
+    expect(and[0]).toEqual({ status: 'COMPLETED' })
+    expect(and[1]?.status).toEqual({ in: ['RECEIVED', 'IN_PROGRESS'] })
+
+    // The chosen status must still be somewhere in the query. Before the fix
+    // this assertion was the one that failed: it had been replaced outright.
+    expect(JSON.stringify(and)).toContain('"COMPLETED"')
+  })
+
+  it('puts the closest deadline first, not the newest request', async () => {
+    await listDataRequests(ADMIN)
+    expect(firstArg(dsr.findMany, 'findMany')).toMatchObject({ orderBy: [{ dueAt: 'asc' }] })
+  })
+
+  it('pages from one, not from zero', async () => {
+    await listDataRequests(ADMIN, { page: 3, limit: 10 })
+    expect(firstArg(dsr.findMany, 'findMany')).toMatchObject({ skip: 20, take: 10 })
+  })
+
+  it('defaults to the first page', async () => {
+    await listDataRequests(ADMIN)
+    expect(firstArg(dsr.findMany, 'findMany')).toMatchObject({ skip: 0, take: 25 })
+  })
+
+  it('counts open and overdue across everything, not just the page', async () => {
+    // The header reads "N open · M past 30 days". If those counts obeyed the
+    // filter, filtering to COMPLETED would report zero open requests and the
+    // banner would say the Foundation had nothing outstanding.
+    dsr.count
+      .mockResolvedValueOnce(4)  // total, filtered
+      .mockResolvedValueOnce(9)  // open, unfiltered
+      .mockResolvedValueOnce(2)  // overdue, unfiltered
+
+    const result = await listDataRequests(ADMIN, { status: 'COMPLETED' })
+
+    expect(result).toMatchObject({ total: 4, openCount: 9, overdueCount: 2 })
+
+    const openWhere = dsr.count.mock.calls[1]?.[0] as { where: Record<string, unknown> }
+    expect(openWhere.where).toEqual({ status: { in: ['RECEIVED', 'IN_PROGRESS'] } })
+  })
+
+  it('returns the page it was asked for alongside the rows', async () => {
+    dsr.findMany.mockResolvedValue([{ id: 'dsr-1' }])
+    const result = await listDataRequests(ADMIN, { page: 2, limit: 5 })
+    expect(result).toMatchObject({ page: 2, limit: 5, rows: [{ id: 'dsr-1' }] })
+  })
+
+  it('names the requester and the handler, and nothing more of either', async () => {
+    await listDataRequests(ADMIN)
+    const include = firstArg(dsr.findMany, 'findMany') as unknown as {
+      include: { subject: { select: object }; handledBy: { select: object } }
+    }
+    expect(include.include.subject.select).toEqual({
+      id: true, firstName: true, lastName: true, email: true,
+    })
+    expect(include.include.handledBy.select).toEqual({
+      id: true, firstName: true, lastName: true,
+    })
+  })
+})
+
 describe('authorisation', () => {
   it('refuses a caller without the admin role', async () => {
     await expect(
@@ -231,5 +336,10 @@ describe('authorisation', () => {
     ).rejects.toThrow()
 
     expect(dsr.create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to list for a caller without the admin role', async () => {
+    await expect(listDataRequests([])).rejects.toThrow()
+    expect(dsr.findMany).not.toHaveBeenCalled()
   })
 })

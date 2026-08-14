@@ -75,14 +75,14 @@ Not external, but blocking production. Tracked in `registrations.md` clause 11.
 
 | # | Item | Severity |
 |---|---|---|
-| 1 | ~~Documented backup and restore procedure~~ | ✅ [`../backup-and-restore.md`](../backup-and-restore.md) |
-| 2 | ~~Retention enforcement~~ | ✅ Monthly survey, report-only |
-| 3 | ~~Data-subject-request log~~ | ✅ Admin console → Data Requests |
+| 1 | ~~Documented backup and restore procedure~~ | ✅ [`../backup-and-restore.md`](../backup-and-restore.md); a daily watcher in the app now catches a backup that has stopped being *scheduled* — needs a read-only token, §3b-ii |
+| 2 | ~~Retention enforcement~~ | ✅ Monthly survey, report-only; the survey itself is now watched, so its silence is not silent |
+| 3 | ~~Data-subject-request log~~ | ✅ Admin console → Data Requests; members submit at `/privacy/request`, deadlines watched weekly |
 | 4 | ~~PAIA manual published~~ | ✅ `/paia`, linked in the footer |
 | 5 | **Execute the restore drill** — the procedure has never been run | **High — should block go-live** |
 | 6 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
 
-On item 2: a backup procedure that has never been executed is a document, not a
+On item 5: a backup procedure that has never been executed is a document, not a
 capability. The drill is short — restore staging into a fresh database and run the
 eight checks — and it is the difference between believing the records are
 recoverable and knowing it.

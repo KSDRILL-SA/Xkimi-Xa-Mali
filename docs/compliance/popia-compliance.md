@@ -180,7 +180,7 @@ them.
 
 **CLOSED — implementation.** A monthly **retention survey** now runs on the 1st
 of each month (`apps/web/inngest/functions/retention-survey.ts`) and reports what
-is past its period as an `info` alert. It **deletes nothing**, deliberately: the
+is past its period as a `warning` alert. It **deletes nothing**, deliberately: the
 periods above are still proposals, and an automatic deleter whose periods are
 wrong destroys members' financial records irreversibly. Deletion can be added
 once the periods are settled and a few months of reports have been read and
@@ -203,18 +203,72 @@ A member (or an invited person who never joined) may:
 
 ### Procedure
 
-1. A request is made to the Information Officer at `[EMAIL]`.
-2. The Information Officer verifies the requester's identity.
-3. The request is logged, with the date received.
+1. A request is made through the **data request form at `/privacy/request`**, or
+   to the Information Officer at `[EMAIL]`.
+2. The request is recorded, with the date received. A request made through the
+   form records itself, at the moment it is submitted.
+3. The Information Officer verifies the requester's identity **before disclosing
+   or deleting anything**. Identity is deliberately not checked at intake — see
+   below.
 4. A response is given **within 30 days**. Where an extension is needed, the
    requester is told before the 30 days expire.
-5. Where a request is refused, reasons are given, together with the requester's
-   right to complain to the Regulator.
+5. Where a request is refused, in whole or in part, reasons are given, together
+   with the requester's right to complain to the Regulator.
 
 **CLOSED.** Requests are logged in the admin console at **Data Requests**, which
 records the requester, what was asked, when it arrived, the 30-day due date, who
 handled it and what was done. Open requests are shown with a countdown and
 overdue ones are flagged.
+
+**Why the form does not verify identity.** Recording that somebody asked is not
+the same act as answering them. Putting an identity check in front of the form
+would place a barrier in front of a statutory right and would give the Foundation
+a reason not to record awkward requests. So anyone may submit, verification
+happens before anything is disclosed or deleted, and what was verified is
+recorded in the outcome. A fraudulent request that is recorded and then refused
+is a compliant outcome; a genuine request that was never recorded is not.
+
+**The clock starts without anyone remembering.** Before the form existed, the
+thirty days began when an administrator transcribed a support email — so a
+request nobody transcribed had no clock at all, which is the exact failure this
+log was built to end. Requests submitted through the form write their own row and
+their own due date. A request that genuinely arrives by email is still logged by
+hand, and backdated to when it was sent rather than when it was noticed.
+
+**The deadline comes and finds a person.** A weekly job
+(`apps/web/inngest/functions/dsr-deadline-check.ts`) alerts on any open request
+within nine days of its deadline, and raises a `critical` alert for any already
+past it. Before this, `dueAt` was visible only to someone who opened the Data
+Requests page — a screen looked at by people already thinking about data
+requests, which is not the moment the reminder is needed.
+
+### Answering a deletion request
+
+Deletion requests are the ones where the honest answer is usually *partly no*,
+and section 23 entitles the requester to be told exactly what is held and why it
+is kept. **What we hold** in the admin console (on any open deletion request from
+an identified member) produces that inventory: every category of information held
+about the person, whether it may be deleted now, and the basis for keeping the
+rest, written to be given to the requester as it stands.
+
+Where a category has no remaining basis, it can be deleted from the same screen.
+That deletion touches **only** the categories the inventory has cleared — never a
+financial record, a mandate, or an audit entry — runs in one transaction, and is
+recorded in the audit log against the request that prompted it, alongside what
+was kept and why.
+
+This does not contradict the retention survey's refusal to delete (§6). That
+survey runs unattended against provisional periods, where a wrong period destroys
+records irreversibly and at scale. This runs when a named person has exercised a
+statutory right and an administrator has verified who they are. A person
+exercising that right is the one trigger that ought to cause deletion; a cron at
+05:00 is not.
+
+**Still done by hand:** erasing a member's identity outright once the identity
+period has run. Anonymising the user row would detach every financial record from
+the person it belongs to while those records must still be attributable, so a
+member who is genuinely past every period is a whole-account removal — a separate
+decision, deliberately not buried inside a request handler.
 
 Two properties worth noting for an inspection: the log records **whether each
 answer fell inside the statutory period** at the moment of closing, rather than
@@ -303,3 +357,38 @@ Note on item 4: the retention survey (item 5) runs against *provisional* periods
 It reports rather than deletes precisely because item 4 is still open, so the two
 are safe to leave in this state — but the survey's counts should not be acted on
 until the accountant has confirmed the periods.
+
+The same caveat applies to the erasure inventory in §7. Every date it shows is
+computed from the provisional periods above, and it says so on the screen. What
+it deletes is limited to sign-in records and message-delivery records past their
+period — neither of which is a financial record, and neither of which item 4 is
+likely to change materially. Settling item 4 is still what turns the rest of that
+inventory from a defensible position into a settled one.
+
+### Watching the jobs that enforce all of this
+
+Both of these were open questions and both are now closed.
+
+**A compliance job that stops running says so.** The retention survey runs twelve
+times a year and is the only mechanism enforcing section 14; the deadline check
+is the only thing counting the thirty days. Either could have stopped and nothing
+anywhere would have said so — for up to a year, in the survey's case.
+
+They are watched by `COMPLIANCE_JOBS` in `apps/web/lib/job-heartbeat.ts`, kept
+deliberately **separate** from `WATCHED_JOBS`. That list's admission rule is that
+silence costs money, and its value is that everything on it is worth an SMS at
+03:00; widening it to admit compliance work would dilute the one list somebody is
+guaranteed to act on. The compliance registry is reported by the same checker
+under its own code, `COMPLIANCE_JOB_SILENT`, at `warning` — an inbox and an
+email, no SMS — and throttled on its own action so a silent debit run cannot
+suppress it.
+
+**A backup that stops being scheduled says so.** The backup workflow alerts when
+a run fails and cannot alert when no run happens, because the alert is a job in
+the same workflow. GitHub disables scheduled workflows after roughly 60 days of
+repository inactivity, so a finished, stable system is precisely the case where
+backups stop silently. `apps/web/inngest/functions/backup-watch.ts` now asks
+GitHub daily when `backup.yml` last succeeded, from inside the app, which keeps
+running whatever GitHub does. It needs a read-only token — see
+`docs/backup-and-restore.md` §3b-ii — and without one it reports that it *cannot
+see*, which is deliberately neither silence nor a false all-clear.

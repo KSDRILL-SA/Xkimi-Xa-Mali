@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { ManualContributionSchema, type ManualContributionInput } from '@/lib/validation/contribution'
@@ -107,7 +107,7 @@ export default function ContributePage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<ManualContributionInput>({
@@ -123,10 +123,16 @@ export default function ContributePage() {
   })
 
   const selectedGoal = goals.find((g) => g.id === selectedGoalId) ?? null
-  const goalAmount = goalForm.watch('amount')
 
-  const selectedMonth = watch('periodMonth')
-  const selectedYear = watch('periodYear')
+  // `useWatch` rather than `watch`: the React Compiler cannot memoize the
+  // function `useForm` returns and skips compiling the whole component when it
+  // sees one, which quietly cost this page — the busiest in the app — its
+  // compilation. Note that `periodMonth` and `periodYear` have no default, so
+  // both read `undefined` on the first render; that this is true of `watch` too
+  // is pinned by `__tests__/form-watch-equivalence.test.tsx`.
+  const goalAmount = useWatch({ control: goalForm.control, name: 'amount' })
+  const selectedMonth = useWatch({ control, name: 'periodMonth' })
+  const selectedYear = useWatch({ control, name: 'periodYear' })
   const selectedPeriod = openPeriods.find(
     (p) => p.periodMonth === Number(selectedMonth) && p.periodYear === Number(selectedYear),
   )
@@ -496,7 +502,8 @@ export default function ContributePage() {
                 <div className="p-5">
                   {serverError && <Alert variant="error" className="mb-4">{serverError}</Alert>}
 
-                  <form onSubmit={goalForm.handleSubmit(onGoalSubmit)} className="space-y-5" noValidate>
+                  {/* Called on submit, not during render — see the note in GoalPayModal. */}
+                  <form onSubmit={(e) => { void goalForm.handleSubmit(onGoalSubmit)(e) }} className="space-y-5" noValidate>
                     <div>
                       <Label htmlFor="goal" required>Goal</Label>
                       <Select
@@ -639,12 +646,13 @@ export default function ContributePage() {
               </div>
               <div className="p-5">
                 {serverError && <Alert variant="error" className="mb-4">{serverError}</Alert>}
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+                {/* Called on submit, not during render — see the note in GoalPayModal. */}
+                <form onSubmit={(e) => { void handleSubmit(onSubmit)(e) }} className="space-y-5" noValidate>
                   <div>
                     <Label htmlFor="period" required>Period</Label>
                     <Select
                       id="period"
-                      value={`${watch('periodYear')}-${watch('periodMonth')}`}
+                      value={`${selectedYear}-${selectedMonth}`}
                       onChange={(e) => {
                         const [y, m] = e.target.value.split('-').map(Number)
                         if (y === undefined || m === undefined) return

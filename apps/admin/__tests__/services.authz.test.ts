@@ -79,6 +79,8 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['logDataRequest',           (r) => services.logDataRequest(r, 'a1', { requesterName: 'A', requesterEmail: 'a@b.co', kind: 'ACCESS', detail: 'x' })],
   ['startDataRequest',         (r) => services.startDataRequest(r, 'a1', 'd1')],
   ['closeDataRequest',         (r) => services.closeDataRequest(r, 'a1', 'd1', { status: 'COMPLETED', outcome: 'x' })],
+  ['assessErasure',            (r) => services.assessErasure(r, 'u1')],
+  ['eraseErasableData',        (r) => services.eraseErasableData(r, 'a1', { subjectId: 'u1', requestId: 'd1' })],
 ]
 
 beforeEach(() => vi.clearAllMocks())

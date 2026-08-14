@@ -41,10 +41,15 @@ export async function listDataRequests(adminRoles: string[], params: DsrListPara
   assertAdmin(adminRoles)
   const { status, overdueOnly, page = 1, limit = 25 } = params
 
-  const where: Prisma.DataSubjectRequestWhereInput = {
-    ...(status ? { status } : {}),
-    ...(overdueOnly ? { status: { in: OPEN }, dueAt: { lt: new Date() } } : {}),
-  }
+  // AND, not two spreads. Both filters constrain `status`, so spreading them
+  // into one object let the overdue filter silently overwrite the chosen status
+  // — asking for "completed and overdue" returned the *open* overdue ones under
+  // a heading that said Completed. Combining them can legitimately match
+  // nothing, and an empty table is the honest answer when it does.
+  const clauses: Prisma.DataSubjectRequestWhereInput[] = []
+  if (status) clauses.push({ status })
+  if (overdueOnly) clauses.push({ status: { in: OPEN }, dueAt: { lt: new Date() } })
+  const where: Prisma.DataSubjectRequestWhereInput = clauses.length ? { AND: clauses } : {}
 
   const [rows, total, openCount, overdueCount] = await Promise.all([
     db.dataSubjectRequest.findMany({

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ModalPortal } from '@/components/ui/ModalPortal'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -70,7 +70,7 @@ function GoalPayModalContent({ goalId, goalTitle, remaining, onClose }: Props) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<GoalPaymentInput>({
@@ -78,7 +78,11 @@ function GoalPayModalContent({ goalId, goalTitle, remaining, onClose }: Props) {
     defaultValues: { amount: Math.max(MIN_GOAL_PAYMENT, Math.min(Math.round(remaining) || 100, 500)) },
   })
 
-  const amount = watch('amount')
+  // `useWatch` rather than `watch`: the React Compiler cannot memoize the
+  // function `useForm` returns and skips compiling the whole component when it
+  // sees one. Equivalence on the first render — the only place the two differ —
+  // is pinned by `__tests__/form-watch-equivalence.test.tsx`.
+  const amount = useWatch({ control, name: 'amount' })
 
   async function onSubmit(data: GoalPaymentInput) {
     setServerError('')
@@ -171,7 +175,15 @@ function GoalPayModalContent({ goalId, goalTitle, remaining, onClose }: Props) {
             straight into this goal and counts toward your badges.
           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          {/* `handleSubmit(onSubmit)` is called when the form is submitted, not
+              while rendering. React Hook Form's `handleSubmit` reads the field
+              refs, and calling it during render is "Cannot access refs during
+              render" to the React Compiler — an error, not a warning. Hoisting
+              it to a variable does not help; the call is still made at render.
+              Deferring it to the event is what actually lets this component be
+              compiled, and it is the same handler React would have invoked with
+              the same event either way. */}
+          <form onSubmit={(e) => { void handleSubmit(onSubmit)(e) }} className="space-y-4" noValidate>
             <div>
               <Label htmlFor="goal-amount" required>Amount (ZAR)</Label>
               <Input
