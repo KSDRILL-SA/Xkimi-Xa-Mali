@@ -75,6 +75,10 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['getSignatureHistory',      (r) => services.getSignatureHistory('a1', r)],
   ['createSignature',          (r) => services.createSignature('a1', r, Buffer.from('x'), 'K M')],
   ['updateSignature',          (r) => services.updateSignature('a1', r, Buffer.from('x'), 'K M')],
+  ['listDataRequests',         (r) => services.listDataRequests(r)],
+  ['logDataRequest',           (r) => services.logDataRequest(r, 'a1', { requesterName: 'A', requesterEmail: 'a@b.co', kind: 'ACCESS', detail: 'x' })],
+  ['startDataRequest',         (r) => services.startDataRequest(r, 'a1', 'd1')],
+  ['closeDataRequest',         (r) => services.closeDataRequest(r, 'a1', 'd1', { status: 'COMPLETED', outcome: 'x' })],
 ]
 
 beforeEach(() => vi.clearAllMocks())

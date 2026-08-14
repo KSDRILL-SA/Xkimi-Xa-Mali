@@ -76,10 +76,11 @@ Not external, but blocking production. Tracked in `registrations.md` clause 11.
 | # | Item | Severity |
 |---|---|---|
 | 1 | ~~Documented backup and restore procedure~~ | ✅ [`../backup-and-restore.md`](../backup-and-restore.md) |
-| 2 | **Execute the restore drill** — the procedure has never been run | **High — should block go-live** |
-| 3 | Retention enforcement job (report-only first) | Medium |
-| 4 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
-| 5 | Data-subject-request log | Low |
+| 2 | ~~Retention enforcement~~ | ✅ Monthly survey, report-only |
+| 3 | ~~Data-subject-request log~~ | ✅ Admin console → Data Requests |
+| 4 | ~~PAIA manual published~~ | ✅ `/paia`, linked in the footer |
+| 5 | **Execute the restore drill** — the procedure has never been run | **High — should block go-live** |
+| 6 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
 
 On item 2: a backup procedure that has never been executed is a document, not a
 capability. The drill is short — restore staging into a fresh database and run the

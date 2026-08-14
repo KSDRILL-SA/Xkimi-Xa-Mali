@@ -187,11 +187,12 @@ yours.
 |---|---|---|
 | 1 | ~~Documented backup and restore procedure~~ | ✅ `../backup-and-restore.md` |
 | 2 | ~~Written breach response runbook (POPIA s22)~~ | ✅ `breach-response.md` |
-| 3 | ~~Cross-border transfer disclosure in the privacy notice~~ | ✅ Live on the privacy page |
-| 4 | **Execute the restore drill** | **High — should block go-live** |
-| 5 | Retention enforcement job (report-only first) | Medium |
-| 6 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
-| 7 | Data-subject-request log | Low — a spreadsheet suffices |
+| 3 | ~~Cross-border transfer disclosure~~ | ✅ Live on the privacy page |
+| 4 | ~~Retention enforcement job (report-only)~~ | ✅ Monthly survey |
+| 5 | ~~Data-subject-request log~~ | ✅ Admin console → Data Requests |
+| 6 | ~~Publish the PAIA manual~~ | ✅ `/paia`, linked in the footer |
+| 7 | **Execute the restore drill** | **High — should block go-live** |
+| 8 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
 
 ---
 
@@ -207,7 +208,7 @@ yours.
 | 6 | SARS position settled | ☐ Not started | 1 |
 | 7 | Netcash onboarding | ☐ Not started | 5 |
 | 8 | Information Officer registered | ☐ Not started | 1 |
-| 9 | PAIA manual published | ☐ Drafted, not published | 1, 8 |
+| 9 | PAIA manual published | ☑ Live at `/paia` — fill in the details once item 1 and 8 land | 1, 8 |
 | 10 | Attorney engaged | ☐ Not started | — |
 | 11 | Accountant engaged | ☐ Not started | — |
 | 12 | Backup & restore documented | ☑ Done | — |
