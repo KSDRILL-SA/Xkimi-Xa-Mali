@@ -6,7 +6,7 @@ import { ArrowLeft, MessageCircle, Mail, HelpCircle, Users, FileText, Shield } f
 import { env } from '@/lib/env'
 
 export const metadata: Metadata = {
-  title: 'Support — Xkimm Xa Mali Foundation',
+  title: 'Support',
   description: 'Get help with the Xkimm Xa Mali Foundation platform.',
 }
 

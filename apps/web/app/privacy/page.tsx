@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — Xkimm Xa Mali Foundation',
+  title: 'Privacy Policy',
   description: 'How Xkimm Xa Mali Foundation collects, uses, and protects your personal information.',
 }
 
