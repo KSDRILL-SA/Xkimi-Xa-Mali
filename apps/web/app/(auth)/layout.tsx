@@ -42,30 +42,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
       {/* Content */}
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-12">
-        {/* Brand mark */}
-        <Link
-          href="/"
-          className="mb-8 flex flex-col items-center gap-3 group outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-2xl p-2 -m-2 animate-fade-in-down"
-          aria-label="Xkimm Xa Mali Foundation home"
-        >
-          <div className="group-hover:scale-105 transition-transform duration-slow ease-bounce">
-            <XmmLogo size={64} />
-          </div>
-          <span className="font-display text-white font-extrabold text-2xl tracking-wide drop-shadow-sm">
-            Xkimm Xa Mali Foundation
-          </span>
-          <span className="text-white/50 text-xs italic tracking-wide">
-            &ldquo;Blessed is the hand that giveth.&rdquo;
-          </span>
-        </Link>
-
-        {/* Card */}
-        <div className="relative w-full max-w-md animate-scale-in">
-          <div className="absolute -top-px left-6 right-6 h-px bg-gold-shimmer opacity-70" aria-hidden />
-          <div className="bg-white rounded-2xl shadow-glass ring-1 ring-black/5 p-8">
-            {children}
-          </div>
-        </div>
+        {/* Each page brings its own card.
+            This used to be one narrow white box wrapped around every auth page,
+            which meant sign in — the front door, and the page most people see
+            most often — could never be anything other than the same shape as
+            the password-reset form. */}
+        {children}
 
         <div className="mt-6 flex items-center gap-4 text-white/35 text-xs animate-fade-in delay-300">
           <span>&copy; {new Date().getFullYear()} Xkimm Xa Mali Foundation</span>

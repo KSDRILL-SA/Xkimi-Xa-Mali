@@ -7,6 +7,7 @@ import { isAppError } from '@/lib/errors'
 import { InviteRegisterForm } from '@/components/auth/InviteRegisterForm'
 import { InviteErrorView } from '@/components/auth/InviteErrorView'
 import { AuthHeading } from '@/components/auth/AuthHeading'
+import { AuthCard } from '@/components/auth/AuthCard'
 
 export const metadata: Metadata = { title: 'Join the Foundation' }
 
@@ -46,17 +47,17 @@ export default async function InvitePage({
 
   if (errorCode || !invite) {
     return (
-      <>
+      <AuthCard>
         <AuthHeading title="Invite link" subtitle="Join Xkimm Xa Mali Foundation" centered />
         <InviteErrorView code={errorCode ?? 'SYS_500'} />
-      </>
+      </AuthCard>
     )
   }
 
   return (
-    <>
+    <AuthCard>
       <AuthHeading title="Create your account" subtitle="Complete your registration to join Xkimm Xa Mali Foundation" />
       <InviteRegisterForm invite={invite} inviteCode={token} />
-    </>
+    </AuthCard>
   )
 }

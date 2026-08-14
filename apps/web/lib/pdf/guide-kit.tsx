@@ -233,7 +233,14 @@ const chrome = StyleSheet.create({
   footR: { fontSize: 6.4, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 1 },
 })
 
-export function RunningHead({ where }: { where: string }) {
+/**
+ * `doc` names the document, not the page. It defaults to the guide because that
+ * is what this kit was built for — and it is a prop because the Leadership
+ * Handbook shares every other piece of the design and is emphatically not the
+ * Founder Guide. A handbook whose every page says "FOUNDER GUIDE" is a handbook
+ * somebody will file in the wrong place.
+ */
+export function RunningHead({ where, doc = 'FOUNDER GUIDE' }: { where: string; doc?: string }) {
   return (
     <>
       <View style={chrome.head} fixed>
@@ -245,7 +252,7 @@ export function RunningHead({ where }: { where: string }) {
           </View>
         </View>
         <View style={chrome.right}>
-          <Text style={chrome.eyebrow}>FOUNDER GUIDE</Text>
+          <Text style={chrome.eyebrow}>{doc}</Text>
           <Text style={chrome.where}>{where.toUpperCase()}</Text>
         </View>
       </View>
@@ -266,11 +273,11 @@ export function RunningHead({ where }: { where: string }) {
  * footer is true whatever the layout does; `assertPagination` is what keeps the
  * layout honest as well.
  */
-export function RunningFoot() {
+export function RunningFoot({ doc = 'FOUNDER GUIDE' }: { doc?: string } = {}) {
   return (
     <View style={chrome.foot} fixed>
       <Text style={chrome.footL}>XKIMM XA MALI FOUNDATION</Text>
-      <Text style={chrome.footC}>PRIVATE &amp; CONFIDENTIAL  ·  FOUNDER GUIDE</Text>
+      <Text style={chrome.footC}>PRIVATE &amp; CONFIDENTIAL  ·  {doc}</Text>
       <Text
         style={chrome.footR}
         render={({ pageNumber, totalPages }) => `${String(pageNumber).padStart(2, '0')} / ${totalPages}`}
