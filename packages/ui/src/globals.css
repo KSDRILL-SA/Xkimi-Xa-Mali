@@ -41,7 +41,10 @@ html {
 .scrollbar-none::-webkit-scrollbar { display: none; }
 
 /* ── Page entry animation ─────────────────────────────────────────────────── */
-.page-enter { animation: fade-in-up 0.35s ease-out both; }
+/* `backwards`, not `both`: see the note on xxmAnimations. `both` would
+ * leave translateY(0) on the page wrapper for good, making it a stacking
+ * context and the containing block for every fixed overlay inside it. */
+.page-enter { animation: fade-in-up 0.35s ease-out backwards; }
 
 @keyframes fade-in-up {
   from { opacity: 0; transform: translateY(10px); }
@@ -164,7 +167,7 @@ html {
 .nav-fade-right { right: 0; background: linear-gradient(to left, #fff 30%, transparent); }
 
 /* ── Toast animations ─────────────────────────────────────────────────────── */
-.toast-enter { animation: slide-in-right 0.35s ease-out both; }
+.toast-enter { animation: slide-in-right 0.35s ease-out backwards; }
 .toast-exit  { animation: fade-out 0.25s ease-in both; }
 
 @keyframes slide-in-right {
@@ -271,6 +274,33 @@ html {
               transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .reveal.revealed { opacity: 1; transform: translateY(0); }
+
+/* ── Why the transform is removed once the animation is over ──────────────────
+ *
+ * A non-`none` transform does two things beyond moving the element: it creates
+ * a stacking context, and it becomes the containing block for any
+ * `position: fixed` descendant. Both persist for as long as the transform does.
+ *
+ * `Reveal` wraps nearly every section of both apps, and the finished state used
+ * to keep `translateY(0)` — a transform that moves nothing and changes
+ * everything. Each revealed section became a box its own children could not
+ * paint out of: a dropdown inside one section could never rise above the
+ * section below it, whatever z-index it asked for, and a `fixed` overlay
+ * anchored itself to the card instead of the viewport. Menus disappeared behind
+ * the next card, and panels were clipped by content that had no business
+ * covering them.
+ *
+ * So the finished state is `transform: none`. It cannot simply be written into
+ * `.revealed`, because a transition to `none` does not animate — the element
+ * would jump. `Reveal` adds this class after the transition ends instead, which
+ * keeps the animation and leaves nothing behind once it is done.
+ *
+ * Written as compound selectors rather than `!important`: `.reveal.revealed`
+ * is two classes, so one class alone would lose. */
+.reveal.reveal-done,
+.reveal-left.reveal-done,
+.reveal-right.reveal-done,
+.reveal-scale.reveal-done { transform: none; }
 
 .reveal-left {
   opacity: 0;

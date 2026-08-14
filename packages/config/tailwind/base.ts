@@ -61,19 +61,43 @@ export const xxmBackgroundImage = {
   'green-radial': 'radial-gradient(ellipse at center, #2C5F47 0%, #1B4332 50%, #052E16 100%)',
 } satisfies Record<string, string>
 
+/**
+ * ── Why the one-shot animations end `backwards` and not `both` ───────────────
+ *
+ * `both` keeps the final keyframe applied for as long as the element lives. For
+ * anything whose last frame sets a transform — every fade, slide and scale
+ * below — that means a transform that moves nothing and never goes away.
+ *
+ * A non-`none` transform creates a stacking context and becomes the containing
+ * block for `position: fixed` descendants. `animate-fade-in-up` sits on the
+ * admin shell's `<main>`, so the whole page content was one trapped layer: a
+ * dropdown could not paint above a neighbouring section at any z-index, and a
+ * `fixed inset-0` overlay covered the padded, max-width `<main>` rather than the
+ * viewport. Menus and panels disappeared behind whatever sat next to them the
+ * moment they opened.
+ *
+ * `backwards` keeps the *first* keyframe before the animation starts — which is
+ * what stops the flash these were added for — and then hands the element back
+ * to its own styles when the animation ends. The resting appearance is
+ * identical, because the last keyframe of each is the element's natural state:
+ * `translateY(0)`, `translateX(0)`, `scale(1)`, `opacity: 1`.
+ *
+ * The infinite animations below keep running by definition and are left alone;
+ * they are decorative and sit on elements nothing needs to escape from.
+ */
 export const xxmAnimations = {
   animation: {
     'fade-in':        'fade-in 0.3s ease-out both',
-    'fade-in-up':     'fade-in-up 0.4s ease-out both',
-    'fade-in-down':   'fade-in-down 0.4s ease-out both',
-    'slide-in-right': 'slide-in-right 0.35s ease-out both',
-    'slide-left':     'slide-left 0.5s ease-out both',
-    'slide-right':    'slide-right 0.5s ease-out both',
+    'fade-in-up':     'fade-in-up 0.4s ease-out backwards',
+    'fade-in-down':   'fade-in-down 0.4s ease-out backwards',
+    'slide-in-right': 'slide-in-right 0.35s ease-out backwards',
+    'slide-left':     'slide-left 0.5s ease-out backwards',
+    'slide-right':    'slide-right 0.5s ease-out backwards',
     'shimmer':        'shimmer 1.6s infinite',
     'pulse-gold':     'pulse-gold 2s ease-in-out infinite',
     'pulse-ring':     'pulse-ring 2.5s ease-in-out infinite',
-    'scale-in':       'scale-in 0.2s ease-out both',
-    'count-up':       'fade-in-up 0.6s cubic-bezier(0.16,1,0.3,1) both',
+    'scale-in':       'scale-in 0.2s ease-out backwards',
+    'count-up':       'fade-in-up 0.6s cubic-bezier(0.16,1,0.3,1) backwards',
     'float':          'float 6s ease-in-out infinite',
     'float-delayed':  'float 6s ease-in-out 2s infinite',
     'gold-glow':      'gold-glow 3s ease-in-out infinite',
@@ -81,8 +105,8 @@ export const xxmAnimations = {
     'rotate-slow':    'rotate-slow 20s linear infinite',
     'scroll-bounce':  'scroll-bounce 2s ease-in-out infinite',
     'draw-line':      'draw-line 1.2s ease-out forwards',
-    'nav-reveal':     'nav-reveal 0.5s ease-out both',
-    'word-reveal':    'word-reveal 0.8s ease-out both',
+    'nav-reveal':     'nav-reveal 0.5s ease-out backwards',
+    'word-reveal':    'word-reveal 0.8s ease-out backwards',
     'orb-drift-1':    'orb-drift-1 18s ease-in-out infinite',
     'orb-drift-2':    'orb-drift-2 22s ease-in-out infinite',
     'orb-drift-3':    'orb-drift-3 14s ease-in-out infinite',
