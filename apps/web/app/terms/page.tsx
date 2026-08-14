@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 
 export const metadata: Metadata = {
-  title: 'Terms of Use — Xkimm Xa Mali Foundation',
+  title: 'Terms of Use',
   description: 'Terms and conditions governing your use of the Xkimm Xa Mali Foundation platform.',
 }
 
