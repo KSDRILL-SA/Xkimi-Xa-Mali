@@ -212,7 +212,10 @@ export async function getNudgeOutcomes(
         ON c."userId" = n."userId"
        AND c."periodMonth" = ${month} AND c."periodYear" = ${year}
       WHERE t.slug IN ('debit-morning-warning', 'debit-morning-warning-urgent')
-        AND date_trunc('month', n."createdAt") = make_date(${year}, ${month}, 1)
+        -- The casts are load-bearing. Prisma binds these as int8, and there is
+        -- no make_date(bigint, bigint, integer) — Postgres refuses the whole
+        -- query with 42883, which took the entire Reports page down with it.
+        AND date_trunc('month', n."createdAt") = make_date(${year}::int, ${month}::int, 1)
     `,
   ])
 
