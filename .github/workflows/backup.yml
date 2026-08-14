@@ -69,7 +69,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq age curl ca-certificates gnupg
           # Neon tracks recent major versions; the runner's default client can be
-          # older, and pg_dump refuses to dump a server newer than itself.
+          # older, and pg_dump refuses to dump a server newer than itself. The
+          # reverse is supported — a newer pg_dump reads an older server fine —
+          # so take pgdg's current client rather than pinning a major that Neon
+          # will eventually move past, which would fail the backup on the night
+          # they upgrade rather than on a night anyone is watching.
           sudo install -d /usr/share/postgresql-common/pgdg
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
             | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
@@ -77,7 +81,7 @@ jobs:
             https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client-17
+          sudo apt-get install -y -qq postgresql-client
           pg_dump --version
 
       - name: Dump
@@ -107,8 +111,15 @@ jobs:
               exit 1
             }
           ls -l "xxm-${STAMP}.dump"
+          # pg_dump can also warn and still exit 0. Those warnings are the early
+          # sign of a dump that is complete in the shell's eyes and wrong in
+          # ours, so surface them instead of leaving them in a file nobody reads.
+          if [ -s dump.err ]; then
+            echo "::warning::pg_dump wrote to stderr despite succeeding:"
+            sed -E 's#postgres(ql)?://[^ ]*#postgres://REDACTED#g' dump.err
+          fi
 
-      - name: Refuse to keep an implausibly small dump
+      - name: Refuse to keep a dump that is small or unreadable
         run: |
           set -euo pipefail
           SIZE=$(stat -c%s "xxm-${STAMP}.dump")
@@ -120,6 +131,39 @@ jobs:
             echo "::error::Dump is only ${SIZE} bytes. Treating as a failed backup."
             exit 1
           fi
+          # Size proves the file is not empty. It does not prove the archive can
+          # be read back, and a corrupt header on a large file passes the check
+          # above while being just as unrestorable as an empty one. pg_restore
+          # --list parses the custom-format header and the entire table of
+          # contents locally, with no server involved, so a truncated or damaged
+          # archive fails HERE — on a night when the database still exists —
+          # rather than during the one restore we will ever badly need.
+          if ! pg_restore --list "xxm-${STAMP}.dump" > toc.txt 2> toc.err; then
+            echo "::error::Dump is not a readable pg_restore archive."
+            sed -E 's#postgres(ql)?://[^ ]*#postgres://REDACTED#g' toc.err
+            exit 1
+          fi
+          # A readable archive of nothing is still a failed backup: this catches
+          # a dump that connected, found no tables, and exited pleased.
+          TABLES=$(grep -c ' TABLE DATA ' toc.txt || true)
+          echo "Archive lists ${TABLES} table-data entries."
+          if [ "$TABLES" -lt 1 ]; then
+            echo "::error::Archive contains no table data. Treating as a failed backup."
+            exit 1
+          fi
+          # --list stops after the table of contents, so it proves the archive
+          # opens, not that the rows are there — a file truncated or damaged in
+          # the data blocks lists perfectly. Converting the whole archive to SQL
+          # and discarding it forces every block to be read and decompressed,
+          # which is the only check short of an actual restore that touches all
+          # the bytes we are about to keep. No server is contacted; --file makes
+          # this a local conversion.
+          if ! pg_restore --file=/dev/null "xxm-${STAMP}.dump" 2> full.err; then
+            echo "::error::Archive header is intact but its contents do not read back."
+            sed -E 's#postgres(ql)?://[^ ]*#postgres://REDACTED#g' full.err
+            exit 1
+          fi
+          echo "Archive reads back in full."
 
       - name: Encrypt to the offline public key
         env:
@@ -128,8 +172,12 @@ jobs:
           set -euo pipefail
           age --encrypt --recipient "$AGE_PUBLIC_KEY" \
               --output "xxm-${STAMP}.dump.age" "xxm-${STAMP}.dump"
-          # Remove the plaintext before anything else can touch it.
-          shred -u "xxm-${STAMP}.dump" 2>/dev/null || rm -f "xxm-${STAMP}.dump"
+          # Remove the plaintext before anything else can touch it. dump.err goes
+          # with it: pg_dump's own error text can quote the connection string,
+          # which is the one secret this job holds.
+          SCRATCH="xxm-${STAMP}.dump dump.err toc.txt toc.err full.err"
+          # shellcheck disable=SC2086
+          shred -u $SCRATCH 2>/dev/null || rm -f $SCRATCH
           ls -l "xxm-${STAMP}.dump.age"
 
       - name: Retain
@@ -144,6 +192,11 @@ jobs:
           if-no-files-found: error
 
       - name: Summary
+        env:
+          # Through the environment, not `${{ }}` inside the script: an expression
+          # expanded into shell source is executed as shell source, and this
+          # value is set in repository settings rather than in this file.
+          AGE_PUBLIC_KEY: ${{ vars.BACKUP_AGE_PUBLIC_KEY }}
         run: |
           {
             echo "### Backup complete"
@@ -152,7 +205,7 @@ jobs:
             echo "|---|---|"
             echo "| Taken | \`${STAMP}\` |"
             echo "| Artifact | \`xxm-backup-${STAMP}\` |"
-            echo "| Encrypted to | \`${{ vars.BACKUP_AGE_PUBLIC_KEY }}\` |"
+            echo "| Encrypted to | \`${AGE_PUBLIC_KEY}\` |"
             echo "| Retention here | 90 days |"
             echo ""
             echo "Restoring needs the **private key**, held offline by two office"
@@ -176,8 +229,8 @@ jobs:
             echo "Check the \`dump\` job. Common causes:"
             echo "- \`PRODUCTION_DIRECT_DATABASE_URL\` rotated or expired"
             echo "- \`BACKUP_AGE_PUBLIC_KEY\` variable removed"
-            echo "- Neon unreachable, or the server's major version moved ahead"
-            echo "  of \`postgresql-client-17\` in this workflow"
+            echo "- Neon unreachable, or the pgdg client failed to install"
+            echo "- The dump came back unreadable or implausibly small"
             echo ""
             echo "Do not ignore this. See \`docs/backup-and-restore.md\`."
           } >> "$GITHUB_STEP_SUMMARY"

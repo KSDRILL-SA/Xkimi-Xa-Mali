@@ -15,6 +15,7 @@ import {
   UserPlus,
   BarChart3,
   ShieldCheck,
+  ShieldQuestion,
   Settings,
 } from 'lucide-react'
 
@@ -29,6 +30,9 @@ const adminNav: NavItem[] = [
   { href: '/invitations',   label: 'Invitations',  icon: UserPlus },
   { href: '/reports',       label: 'Reports',      icon: BarChart3 },
   { href: '/audit',         label: 'Audit',        icon: ShieldCheck },
+  // POPIA gives a member thirty days to be answered. Reachable from every page,
+  // because a log nobody opens counts the days just as badly as no log at all.
+  { href: '/data-requests', label: 'Data Requests',icon: ShieldQuestion },
   { href: '/settings',      label: 'Settings',     icon: Settings },
 ]
 
