@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { XmmLogo } from '@/components/ui/XmmLogo'
 
 export const metadata: Metadata = { title: 'Auth' }
 

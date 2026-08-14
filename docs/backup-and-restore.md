@@ -144,6 +144,38 @@ Then:
 | 5. Run the workflow by hand once and confirm it succeeds | Actions → Backup → Run workflow |
 | 6. Do a restore drill (§8) | — |
 
+### 3b-ii. The dead-man's switch — one time, and it matters
+
+The workflow alerts loudly when a backup run **fails**. It cannot alert when a
+run never happens, because the alert is a job inside the same workflow: nothing
+scheduled means nothing runs, which means nothing speaks.
+
+That is not a theoretical hole. **GitHub disables scheduled workflows after
+roughly 60 days without repository activity.** The moment this system is finished
+enough to stop being committed to every week is the moment its backups quietly
+stop — and the last thing anyone heard was a success.
+
+So the check lives in the app instead, which keeps its own schedule whatever
+GitHub does to its. `apps/web/inngest/functions/backup-watch.ts` runs daily at
+08:00 SAST and asks GitHub one question: when did `backup.yml` last complete
+successfully? Older than 50 hours, or never, and it raises a **critical** alert.
+
+| Step | Where |
+|---|---|
+| 1. Create a **fine-grained personal access token**, scoped to this repository only, with **Actions: read-only** and nothing else | GitHub → Settings → Developer settings → Personal access tokens |
+| 2. Set `BACKUP_WATCH_TOKEN` to that token | The app's environment (Vercel → Settings → Environment Variables) |
+| 3. Set `BACKUP_REPO` to `owner/repo` | Same place |
+
+Both are **optional**. Without them the watcher does not fail the boot and does
+not go quiet either — it reports `BACKUP_WATCH_BLIND` at `warning`, worded so it
+cannot be mistaken for "the backup has stopped". That distinction is deliberate:
+not being able to see the backup and the backup having stopped need different
+first moves, and only one of them is urgent tonight.
+
+The token is read-only and cannot reach the backup contents, which are encrypted
+to a key GitHub does not hold. It confirms that a run happened — never that the
+dump inside it is good. Only the restore drill (§8) can tell you that.
+
 ### 3c. The third copy — monthly, manual
 
 GitHub keeps artifacts for 90 days. Accounting retention runs to years.

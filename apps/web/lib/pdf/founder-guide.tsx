@@ -3,7 +3,7 @@ import { Document, Page, View, Text, StyleSheet, renderToBuffer } from '@react-p
 import {
   MAX_MEMBERS, FOUNDER_COUNT, MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR,
   DEFAULT_INVITE_AMOUNT, MIN_GOAL_PAYMENT, MAX_GOAL_PAYMENT,
-  PASSWORD_MIN_LENGTH, MAX_TRANSACTION_RETRY,
+  PASSWORD_MIN_LENGTH,
 } from '@xxm/utils'
 import { NETCASH_FEE_BUFFER } from '@/lib/group-account'
 import { registerGuideFonts, loadPortraits, type Portrait } from './guide-assets'

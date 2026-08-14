@@ -18,6 +18,12 @@ export type DsrRow = {
   open: boolean
   handledBy: string | null
   outcome: string | null
+  /**
+   * Set only for an open DELETION request that is linked to a known member.
+   * Without a member there is nothing to inventory, and on a closed request
+   * there is nothing left to decide.
+   */
+  erasureHref: string | null
 }
 
 type DsrAction = (formData: FormData) => Promise<void>
@@ -79,10 +85,13 @@ function Countdown({ dueAtIso, open }: { dueAtIso: string; open: boolean }) {
 
 export function RequestsTable({
   rows,
+  filtered = false,
   startAction,
   closeAction,
 }: {
   rows: DsrRow[]
+  /** Whether a filter is narrowing the list, so "nothing here" can say which it means. */
+  filtered?: boolean
   startAction: DsrAction
   closeAction: DsrAction
 }) {
@@ -92,9 +101,18 @@ export function RequestsTable({
         <div className="w-14 h-14 rounded-2xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
           <ShieldQuestion size={24} className="text-xxm-green-300" aria-hidden />
         </div>
-        <p className="text-xxm-gray-600 font-medium">No requests logged</p>
+        {/* An empty table under a filter means "none match", not "none exist",
+            and the two need different words. Combining a status with "overdue
+            only" can legitimately match nothing — a completed request is not
+            also awaiting an answer — and reading "No requests logged" there
+            would suggest the log had emptied itself. */}
+        <p className="text-xxm-gray-600 font-medium">
+          {filtered ? 'No requests match this filter' : 'No requests logged'}
+        </p>
         <p className="text-xxm-gray-400 text-sm mt-1">
-          Log one when a member asks to see, correct, or delete their information.
+          {filtered
+            ? 'Clear the filter to see every request.'
+            : 'Log one when a member asks to see, correct, or delete their information.'}
         </p>
       </div>
     )
@@ -142,6 +160,19 @@ export function RequestsTable({
             </div>
 
             <div className="space-y-2">
+              {r.erasureHref && (
+                // Before answering a deletion request, see what is actually
+                // held. Almost none of it is lawfully erasable, and the reasons
+                // are what the requester is owed.
+                <a
+                  href={r.erasureHref}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-xxm-gold/40 text-xxm-gold-dark text-xs font-semibold hover:bg-xxm-gold/5 transition-colors"
+                >
+                  <ShieldQuestion size={12} aria-hidden />
+                  What we hold
+                </a>
+              )}
+
               {r.status === 'Received' && (
                 <form action={startAction}>
                   <input type="hidden" name="id" value={r.id} />

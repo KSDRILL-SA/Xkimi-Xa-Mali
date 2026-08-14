@@ -15,7 +15,7 @@ import {
   type AccountType as GatewayAccountType,
 } from '@/integrations/payment'
 import type { CreateMandateInput, UpdateMandateInput, DelayMandateInput } from '@/lib/validation/mandate'
-import type { MandateStatus, AccountType, Prisma } from '@prisma/client'
+import type { AccountType, Prisma } from '@prisma/client'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import { logger } from '@xxm/observability'
 import { mandateRepo } from '@/repositories/mandate.repository'

@@ -210,6 +210,15 @@ async function handleRequest(
     pathname === '/' ||
     pathname === '/about' ||
     pathname === '/privacy' ||
+    // PAIA section 51 requires the manual to be *available on the website* — to
+    // anyone, member or not. Behind a login it is not published, whatever the
+    // compliance register says, and the one person most likely to want it is a
+    // former member who can no longer sign in.
+    pathname === '/paia' ||
+    // Exercising a POPIA right cannot require an account. A person who was
+    // invited and never joined, or who has already left, has the strongest claim
+    // to deletion and no way to authenticate.
+    pathname === '/privacy/request' ||
     pathname === '/terms' ||
     pathname === '/support' ||
     pathname === '/login' ||
@@ -228,7 +237,10 @@ async function handleRequest(
     // Reachable without a session by necessity: the people who need it are the
     // ones who cannot sign in.
     pathname === '/api/v1/auth/resend-verification' ||
-    pathname === '/api/v1/auth/invitations/validate'
+    pathname === '/api/v1/auth/invitations/validate' ||
+    // The endpoint behind the data request form, public for the same reason the
+    // form is. Rate-limited to three an hour per address in the route itself.
+    pathname === '/api/v1/data-requests'
 
   if (isPublicPage || isPublicApi) {
     // Someone already signed in has no business on the sign-in pages — unless

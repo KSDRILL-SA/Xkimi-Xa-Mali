@@ -182,8 +182,27 @@ export default function PaiaPage() {
                 <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-xxm-gold/15 mb-4">
                   <MessageCircle size={20} className="text-xxm-gold" aria-hidden />
                 </div>
+                {/* Two doors, because these are two different Acts. Asking for
+                    your own personal information is a POPIA request: no
+                    prescribed form, no fee, and it should be recorded the moment
+                    it is made. Asking for any other record is a PAIA request,
+                    which needs the Regulator's form and goes to the Information
+                    Officer. Sending the first kind down the second path is how a
+                    member ends up filling in a statutory form to see their own
+                    contribution history. */}
                 <p className="text-white text-sm leading-relaxed max-w-sm mx-auto">
-                  To make a request, or to reach the Information Officer, use the{' '}
+                  Asking for <strong className="font-semibold">your own</strong> personal
+                  information? Use the{' '}
+                  <Link
+                    href="/privacy/request"
+                    className="text-xxm-gold underline hover:text-xxm-gold-light font-semibold"
+                  >
+                    data request form
+                  </Link>
+                  {' '}— no form or fee is prescribed for that, and it is answered within 30 days.
+                </p>
+                <p className="text-white/75 text-sm leading-relaxed max-w-sm mx-auto mt-3">
+                  For any other record, or to reach the Information Officer, use the{' '}
                   <Link
                     href="/support"
                     className="text-xxm-gold underline hover:text-xxm-gold-light font-semibold"

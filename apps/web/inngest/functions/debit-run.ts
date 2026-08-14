@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client'
-import type { TransactionStatus } from '@prisma/client'
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
 import { todaySAST } from '@/lib/date'
