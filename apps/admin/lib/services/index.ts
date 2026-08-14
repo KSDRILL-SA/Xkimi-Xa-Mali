@@ -21,3 +21,14 @@ export * from './audit'
 export * from './invitations'
 export * from './reports'
 export * from './signatures'
+// Only the guarded entry points. `dueDateFor` and `DSR_RESPONSE_DAYS` are the
+// module's own plumbing — the same reason assertAdmin and writeAuditLog are not
+// re-exported above. `dueDateFor` in particular takes a Date rather than roles,
+// and putting it on this surface would ask the authz guard to cover a pure
+// function that has nothing to guard.
+export {
+  listDataRequests,
+  logDataRequest,
+  startDataRequest,
+  closeDataRequest,
+} from './data-requests'

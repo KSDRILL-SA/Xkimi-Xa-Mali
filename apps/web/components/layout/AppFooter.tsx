@@ -1,12 +1,16 @@
 import type { Route } from 'next'
 import Link from 'next/link'
-import { Shield, FileText, HelpCircle, Info, MessageCircle } from 'lucide-react'
+import { Shield, FileText, HelpCircle, Info, MessageCircle, BookOpen } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { env } from '@/lib/env'
 
+// PAIA requires the section 51 manual to be *available* on the website, which
+// means reachable — a page with no route to it is not published, whatever URL it
+// happens to answer on. The footer is the only element on every page.
 const legal = [
   { icon: Info,       label: 'About',          href: '/about' },
   { icon: Shield,     label: 'Privacy Policy', href: '/privacy' },
+  { icon: BookOpen,   label: 'PAIA Manual',    href: '/paia' },
   { icon: FileText,   label: 'Terms of Use',   href: '/terms' },
   { icon: HelpCircle, label: 'Support',        href: '/support' },
 ]

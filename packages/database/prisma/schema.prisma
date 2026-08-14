@@ -193,6 +193,8 @@ model User {
   passwordResetTokens    PasswordResetToken[]
   emailVerifTokens       EmailVerificationToken[]
   invitesSent            Invitation[]             @relation("InvitesSent")
+  dsrSubjectOf           DataSubjectRequest[]     @relation("DsrSubject")
+  dsrHandled             DataSubjectRequest[]     @relation("DsrHandler")
   inviteAccepted         Invitation?              @relation("InviteAccepted")
   approvedMandates       PaymentMandate[]         @relation("MandateApprover")
   revokedInvitations     Invitation[]             @relation("InviteRevoker")
@@ -1061,4 +1063,68 @@ model AdminSignatureHistory {
 
   @@index([adminId, replacedAt])
   @@map("admin_signature_history")
+}
+
+// ─── POPIA data subject requests ──────────────────────────────────────────────
+
+enum DsrKind {
+  ACCESS
+  CORRECTION
+  DELETION
+  OBJECTION
+  CONSENT_WITHDRAWAL
+}
+
+enum DsrStatus {
+  RECEIVED
+  IN_PROGRESS
+  COMPLETED
+  REFUSED
+}
+
+/// A request made under POPIA to see, correct, or delete personal information.
+///
+/// The Act gives a data subject these rights and gives the responsible party
+/// thirty days to answer. The obligation the Foundation was failing was not the
+/// answering — it was that nothing recorded a request had been *made*, so the
+/// thirty days ran against nobody and there was no way to show the Regulator a
+/// history of having complied.
+///
+/// A requester need not be a member. Someone who was invited and never joined
+/// still has personal information here (their encrypted ID number sits on the
+/// invitation), and the strongest claim of anyone to have it deleted. Hence
+/// `requesterEmail` rather than a required relation to `User`.
+model DataSubjectRequest {
+  id             String    @id @default(cuid())
+  requesterName  String
+  requesterEmail String
+  /// Set where the requester is a known member. Null for an invitee or a
+  /// former member whose account has been erased — deliberately SetNull rather
+  /// than Cascade, because deleting the member must not delete the evidence
+  /// that they asked to be deleted.
+  subjectId      String?
+  kind           DsrKind
+  status         DsrStatus @default(RECEIVED)
+  /// What was asked for, in the requester's own terms.
+  detail         String
+  receivedAt     DateTime  @default(now())
+  /// receivedAt + 30 days. Stored rather than computed so that a change to the
+  /// statutory period never silently moves the deadline on requests already
+  /// answered under the old one.
+  dueAt          DateTime
+  completedAt    DateTime?
+  /// What was done, or why it was refused. Refusing without recorded reasons is
+  /// itself a contravention.
+  outcome        String?
+  handledById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  subject   User? @relation("DsrSubject", fields: [subjectId], references: [id], onDelete: SetNull)
+  handledBy User? @relation("DsrHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([status, dueAt])
+  @@index([subjectId])
+  @@index([receivedAt])
+  @@map("data_subject_requests")
 }

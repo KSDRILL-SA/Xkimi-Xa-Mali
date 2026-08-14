@@ -178,12 +178,14 @@ settled policy. They must be confirmed by the owner, ideally on the advice of th
 Foundation's accountant, since the accounting retention obligations drive most of
 them.
 
-**GAP — implementation.** The system records `deletedAt` and `resignedAt` but
-there is **no automated retention enforcement job**. Retention is currently a
-policy without a mechanism. Options, in increasing order of effort: a documented
-manual annual review; a scheduled job that reports what is due for deletion; a
-scheduled job that deletes. Recommend the middle option first — a job that
-*reports* — because an automatic deleter that is wrong is worse than none.
+**CLOSED — implementation.** A monthly **retention survey** now runs on the 1st
+of each month (`apps/web/inngest/functions/retention-survey.ts`) and reports what
+is past its period as an `info` alert. It **deletes nothing**, deliberately: the
+periods above are still proposals, and an automatic deleter whose periods are
+wrong destroys members' financial records irreversibly. Deletion can be added
+once the periods are settled and a few months of reports have been read and
+agreed. The audit log is excluded from the survey — the constitution forbids its
+deletion and it is retained permanently by design.
 
 ---
 
@@ -209,10 +211,17 @@ A member (or an invited person who never joined) may:
 5. Where a request is refused, reasons are given, together with the requester's
    right to complain to the Regulator.
 
-**GAP.** There is no dedicated data-subject-request inbox or log. For a
-fifty-member closed collective this is proportionate to handle manually, but the
-log must exist — a spreadsheet is sufficient, and the absence of one is the thing
-that fails an inspection.
+**CLOSED.** Requests are logged in the admin console at **Data Requests**, which
+records the requester, what was asked, when it arrived, the 30-day due date, who
+handled it and what was done. Open requests are shown with a countdown and
+overdue ones are flagged.
+
+Two properties worth noting for an inspection: the log records **whether each
+answer fell inside the statutory period** at the moment of closing, rather than
+leaving it to be recomputed later; and a request cannot be closed — answered or
+refused — without recording the outcome, because refusing without recorded
+reasons is itself a contravention. Every action writes to the same append-only
+audit log as every other administrative act, which a spreadsheet cannot offer.
 
 ---
 
@@ -277,14 +286,20 @@ is a specific, fixable omission.
 
 | # | Gap | Severity | Owner |
 |---|---|---|---|
-| 1 | Information Officer not registered with the Regulator | **High** — statutory | Owner |
-| 2 | Cross-border transfer not disclosed in the privacy notice | **High** | Fixable in code |
-| 3 | Operator contracts / DPAs not confirmed | Medium | Owner |
-| 4 | Retention periods not decided | Medium | Owner + accountant |
-| 5 | No retention enforcement mechanism | Medium | Engineering |
-| 6 | No data-subject-request log | Low | Owner — a spreadsheet suffices |
-| 7 | No written breach response runbook | Medium | Joint |
-| 8 | No PAIA manual published | **High** — statutory | See `paia-manual.md` ✅ drafted |
+| 1 | Information Officer not registered with the Regulator | **High** — statutory | **Owner — outstanding** |
+| 2 | ~~Cross-border transfer not disclosed~~ | — | ✅ Live on the privacy page |
+| 3 | Operator contracts / DPAs not confirmed | Medium | **Owner — outstanding** |
+| 4 | Retention periods not decided | Medium | **Owner + accountant — outstanding** |
+| 5 | ~~No retention enforcement mechanism~~ | — | ✅ Monthly survey, report-only |
+| 6 | ~~No data-subject-request log~~ | — | ✅ Admin console → Data Requests |
+| 7 | ~~No written breach response runbook~~ | — | ✅ `breach-response.md` |
+| 8 | ~~No PAIA manual published~~ | — | ✅ Published at `/paia`, linked in the footer |
 
-Items 2 and 8 can be closed immediately. Item 8 is drafted; item 2 is a change to
-the privacy page and is recommended next.
+**Five of eight are closed.** The three that remain are all owner actions — a
+registration, a set of contracts, and a decision — and none can be closed from
+the codebase. They are tracked in `registrations.md`.
+
+Note on item 4: the retention survey (item 5) runs against *provisional* periods.
+It reports rather than deletes precisely because item 4 is still open, so the two
+are safe to leave in this state — but the survey's counts should not be acted on
+until the accountant has confirmed the periods.
