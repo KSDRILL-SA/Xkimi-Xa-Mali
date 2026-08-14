@@ -57,7 +57,7 @@ const sections = [
   {
     icon: Scale,
     title: 'Your Rights (POPIA)',
-    body: `In accordance with the Protection of Personal Information Act (POPIA), you have the right to access the personal information we hold about you, request correction of inaccurate information, and request deletion of your data subject to our legal retention obligations. You may also object to processing, and withdraw consent where processing is based on it. To exercise any of these rights, contact the Information Officer via the Support page. We will respond within 30 days. If you are not satisfied with our response, you have the right to complain to the Information Regulator of South Africa.`,
+    body: `In accordance with the Protection of Personal Information Act (POPIA), you have the right to access the personal information we hold about you, request correction of inaccurate information, and request deletion of your data subject to our legal retention obligations. You may also object to processing, and withdraw consent where processing is based on it. To exercise any of these rights, use the data request form — your request is recorded the moment you submit it and we will respond within 30 days. You do not need an account to use it. If you are not satisfied with our response, you have the right to complain to the Information Regulator of South Africa.`,
   },
   {
     // POPIA makes the head of a private body the Information Officer by
@@ -65,7 +65,7 @@ const sections = [
     // be deliberate — a right nobody can find the address for is not a right.
     icon: UserCheck,
     title: 'Information Officer',
-    body: `The Foundation has appointed an Information Officer who is responsible for ensuring our compliance with POPIA and for handling requests about your personal information. You can reach the Information Officer through the Support page. Requests relating to access, correction, deletion, or a complaint about how your information has been handled should be directed there rather than to an individual administrator, so that they are properly recorded and answered within the time the Act requires.`,
+    body: `The Foundation has appointed an Information Officer who is responsible for ensuring our compliance with POPIA and for handling requests about your personal information. Requests relating to access, correction, or deletion should go through the data request form, and a complaint about how your information has been handled can be sent through the Support page. Either route reaches the Information Officer rather than an individual administrator, so that requests are properly recorded and answered within the time the Act requires.`,
   },
   {
     icon: Cookie,
@@ -146,6 +146,31 @@ export default function PrivacyPage() {
                 </a>
               ))}
             </nav>
+
+            {/* The rights above are only real if there is a door. Put it above
+                the sections rather than in the footer CTA: someone who came here
+                to be deleted should not have to read the policy to find it. */}
+            <Link
+              href="/privacy/request"
+              className="group flex items-center gap-4 mb-8 p-5 rounded-2xl bg-white border border-xxm-gold/30 shadow-xxm-sm hover:border-xxm-gold hover:shadow-xxm transition-all"
+            >
+              <span className="inline-flex w-11 h-11 rounded-xl bg-xxm-gold/10 items-center justify-center shrink-0">
+                <UserCheck size={20} className="text-xxm-gold-dark" aria-hidden />
+              </span>
+              <span className="flex-1">
+                <span className="block font-bold text-xxm-green-900 text-sm">
+                  See, correct, or delete your information
+                </span>
+                <span className="block text-xs text-xxm-gray-500 mt-0.5">
+                  Make a POPIA data request — recorded immediately, answered within 30 days. No account needed.
+                </span>
+              </span>
+              <ArrowLeft
+                size={18}
+                className="text-xxm-gold-dark rotate-180 shrink-0 group-hover:translate-x-0.5 transition-transform"
+                aria-hidden
+              />
+            </Link>
 
             {/* Sections */}
             <div className="space-y-5">

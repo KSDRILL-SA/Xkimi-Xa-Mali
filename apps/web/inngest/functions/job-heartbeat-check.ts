@@ -5,6 +5,7 @@ import { raiseOperationalAlert } from '@/services/alert.service'
 import { alertOnFailure } from '@/inngest/on-failure'
 import {
   WATCHED_JOBS,
+  COMPLIANCE_JOBS,
   readHeartbeats,
   computeOverdue,
   recordJobHeartbeat,
@@ -41,6 +42,23 @@ const SILENT_ALERT_ACTION = 'SCHEDULED_JOB_SILENT'
  */
 const ALERT_QUIET_HOURS = 6
 
+/**
+ * The same mechanism for the compliance jobs, under its own action and its own
+ * window.
+ *
+ * A separate code because the first move differs: a silent money job means
+ * members are not being collected tonight, while a silent retention survey means
+ * a statutory duty has quietly stopped being performed. Reading both under
+ * `SCHEDULED_JOB_SILENT` would put a compliance item in front of somebody
+ * looking for a payment failure.
+ *
+ * A day rather than six hours because the jobs themselves are weekly and
+ * monthly. Repeating a monthly job's absence every six hours for four weeks is
+ * how a channel gets muted.
+ */
+const COMPLIANCE_ALERT_ACTION = 'COMPLIANCE_JOB_SILENT'
+const COMPLIANCE_QUIET_HOURS = 24
+
 export type HeartbeatStepRunner = {
   run<T>(id: string, fn: () => Promise<T> | T): Promise<T>
 }
@@ -63,11 +81,15 @@ export type HeartbeatStepRunner = {
  * unconfigured, so every read returns null and a Redis throttle fails *open*.
  * Here it would fail open on an alert that repeats every fifteen minutes.
  */
-async function shouldStayQuiet(overdue: readonly OverdueJob[]): Promise<boolean> {
-  const since = new Date(Date.now() - ALERT_QUIET_HOURS * 60 * 60 * 1000)
+async function shouldStayQuiet(
+  overdue: readonly OverdueJob[],
+  action: string = SILENT_ALERT_ACTION,
+  quietHours: number = ALERT_QUIET_HOURS,
+): Promise<boolean> {
+  const since = new Date(Date.now() - quietHours * 60 * 60 * 1000)
 
   const recent = await auditRepo.findMany(
-    { action: SILENT_ALERT_ACTION, createdAt: { gte: since } },
+    { action, createdAt: { gte: since } },
     { take: 1, orderBy: { createdAt: 'desc' } },
   )
 
@@ -151,6 +173,65 @@ export async function executeJobHeartbeatCheck(
     })
   }
 
+  // The compliance registry, checked the same way and reported separately.
+  //
+  // These jobs enforce statutory duties rather than move money, so they are kept
+  // out of WATCHED_JOBS — whose whole value is that everything on it is worth an
+  // SMS — and reported at `warning`, which reaches an inbox and an email without
+  // waking anyone. Before this, the retention survey could have stopped running
+  // and nothing anywhere would have said so for up to a year.
+  const complianceReadings = await step.run('read-compliance-heartbeats', () =>
+    readHeartbeats(COMPLIANCE_JOBS),
+  )
+  const complianceOverdue = computeOverdue(complianceReadings, now, COMPLIANCE_JOBS)
+
+  let complianceAlerted = false
+
+  if (complianceOverdue.length > 0) {
+    complianceAlerted = await step.run('alert-silent-compliance-jobs', async () => {
+      if (await shouldStayQuiet(complianceOverdue, COMPLIANCE_ALERT_ACTION, COMPLIANCE_QUIET_HOURS)) {
+        return false
+      }
+
+      const plural = complianceOverdue.length === 1 ? '' : 's'
+      const lines = complianceOverdue.map(
+        (job) => `${job.label} ${describeSilence(job)}. ${job.consequence}`,
+      )
+
+      await raiseOperationalAlert({
+        code: COMPLIANCE_ALERT_ACTION,
+        // Never critical. Nothing here costs money tonight, and `critical` also
+        // sends an SMS — reserved, by this service's own rule, for money.
+        severity: 'warning',
+        title:
+          complianceOverdue.length === 1 && complianceOverdue[0]
+            ? `Compliance job not running: ${complianceOverdue[0].label}`
+            : `${complianceOverdue.length} compliance job${plural} have stopped running`,
+        body: [
+          `${complianceOverdue.length} compliance job${plural} ${complianceOverdue.length === 1 ? 'has' : 'have'} not run within the time ${complianceOverdue.length === 1 ? 'it is' : 'they are'} expected to.`,
+          '',
+          ...lines,
+          '',
+          'Nothing failed — these were never invoked, so there is no failed run to',
+          'find. Check that the Inngest app is synced and the functions enabled.',
+          'See docs/compliance/popia-compliance.md.',
+        ].join('\n'),
+        entityId: now.toISOString().slice(0, 10),
+        payload: {
+          jobs: complianceOverdue.map((job) => job.jobId),
+          detail: complianceOverdue.map((job) => ({
+            jobId: job.jobId,
+            lastRunAt: job.lastRunAt,
+            silentMinutes: job.silentMinutes,
+            maxSilenceMinutes: job.maxSilenceMinutes,
+          })),
+        },
+      })
+
+      return true
+    })
+  }
+
   // Last, so the beat means this check reached the end — and after the read
   // above, so it is never clearing its own staleness before measuring it.
   await step.run('heartbeat', () => recordJobHeartbeat('job-heartbeat-check', now))
@@ -160,6 +241,10 @@ export async function executeJobHeartbeatCheck(
     overdue: overdue.length,
     jobs: overdue.map((job) => job.jobId),
     alerted,
+    complianceWatched: COMPLIANCE_JOBS.length,
+    complianceOverdue: complianceOverdue.length,
+    complianceJobs: complianceOverdue.map((job) => job.jobId),
+    complianceAlerted,
   }
 
   logger.info('Job heartbeat check completed', summary)

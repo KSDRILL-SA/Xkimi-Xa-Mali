@@ -467,7 +467,6 @@ function StatementDocument({ data }: { data: StatementData }) {
               <Text style={s.signLabel}>Authorised By</Text>
               {signature ? (
                 <>
-                  {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image, not an HTML img */}
                   <Image src={signature.imageDataUri} style={s.signImage} />
                   <View style={s.signRule} />
                   <Text style={s.signName}>{signature.displayName}</Text>

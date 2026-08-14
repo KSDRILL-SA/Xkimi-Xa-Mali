@@ -210,6 +210,19 @@ export const env = createEnv({
     // boot rather than silently selecting the wrong branch.
     ENABLE_MANUAL_PAYMENTS: booleanFlag(true),
     ENABLE_GOAL_LOCKING: booleanFlag(true),
+    // Watching the off-platform backup from outside GitHub.
+    //
+    // The backup workflow alerts when a run fails. It cannot alert when no run
+    // happens at all, and GitHub disables scheduled workflows after roughly 60
+    // days without repository activity — so a stable, finished app is exactly
+    // the case where backups stop silently. The check therefore has to live
+    // somewhere that keeps running regardless of GitHub, which is this app.
+    //
+    // Optional everywhere, including production: without a token the check
+    // reports that it cannot see, rather than failing the boot. A repository
+    // read-only fine-grained token is enough — see docs/backup-and-restore.md.
+    BACKUP_REPO: z.string().regex(/^[^/\s]+\/[^/\s]+$/, 'expected "owner/repo"').optional(),
+    BACKUP_WATCH_TOKEN: z.string().optional(),
     // Sentry (build-time source-map upload; optional in dev)
     SENTRY_ORG: z.string().optional(),
     SENTRY_PROJECT: z.string().optional(),
@@ -276,6 +289,8 @@ export const env = createEnv({
     SUPPORT_EMAIL: process.env.SUPPORT_EMAIL,
     ENABLE_MANUAL_PAYMENTS: process.env.ENABLE_MANUAL_PAYMENTS,
     ENABLE_GOAL_LOCKING: process.env.ENABLE_GOAL_LOCKING,
+    BACKUP_REPO: process.env.BACKUP_REPO,
+    BACKUP_WATCH_TOKEN: process.env.BACKUP_WATCH_TOKEN,
     SENTRY_ORG: process.env.SENTRY_ORG,
     SENTRY_PROJECT: process.env.SENTRY_PROJECT,
     SENTRY_DSN: process.env.SENTRY_DSN,

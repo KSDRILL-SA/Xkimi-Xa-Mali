@@ -99,3 +99,19 @@ export const communityPostRatelimit = makeRatelimit(
   'xxm:ratelimit:community-post',
   Ratelimit.slidingWindow(10, '1 d'),
 )
+
+/**
+ * POPIA data subject requests, submitted from the public privacy page.
+ *
+ * Deliberately loose for a public unauthenticated form — three an hour, not
+ * three a day. The failure this endpoint must never have is a person exercising
+ * a statutory right and being turned away by our throttle: someone who is angry
+ * enough to demand deletion is exactly the person who will submit twice, correct
+ * a typo in their email, and submit again. Duplicates cost an administrator a
+ * minute each; a refused request costs the Foundation a complaint to the
+ * Regulator that it cannot answer.
+ */
+export const dataRequestRatelimit = makeRatelimit(
+  'xxm:ratelimit:data-request',
+  Ratelimit.slidingWindow(3, '1 h'),
+)

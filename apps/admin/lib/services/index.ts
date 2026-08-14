@@ -32,3 +32,8 @@ export {
   startDataRequest,
   closeDataRequest,
 } from './data-requests'
+
+// Same rule: only the guarded entry points. The retention constants and the
+// date helpers stay inside the module.
+export { assessErasure, eraseErasableData } from './erasure'
+export type { ErasureAssessment, ErasureCategory, Disposition } from './erasure'

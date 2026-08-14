@@ -20,6 +20,8 @@ import {
   badgeGraceCheck,
   financialAnomalyWatch,
   retentionSurvey,
+  dsrDeadlineCheck,
+  backupWatch,
   monthlyStatementNotice,
   jobHeartbeatCheck,
 } from '@/inngest'
@@ -46,6 +48,8 @@ export const { GET, POST, PUT } = serve({
     badgeGraceCheck,
     financialAnomalyWatch,
     retentionSurvey,
+    dsrDeadlineCheck,
+    backupWatch,
     monthlyStatementNotice,
     // A function that exists but is not in this array is registered nowhere and
     // runs never — the exact failure this one was added to detect. The list is

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ModalPortal } from '@/components/ui/ModalPortal'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import { ManualContributionSchema, type ManualContributionInput } from '@/lib/validation/contribution'
@@ -80,7 +80,7 @@ function PaymentModalContent({ contribution, mandateBankName, mandateAccountMask
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     getValues,
     formState: { errors, isSubmitting },
@@ -93,7 +93,9 @@ function PaymentModalContent({ contribution, mandateBankName, mandateAccountMask
     },
   })
 
-  const watchedAmount = watch('amount')
+  // `useWatch` rather than `watch` — see the note in GoalPayModal, and the
+  // first-render equivalence pinned by `__tests__/form-watch-equivalence.test.tsx`.
+  const watchedAmount = useWatch({ control, name: 'amount' })
 
   // One token per payment this modal is offering to make. The same intent
   // submitted twice — a double tap, a retried request — collapses onto the
@@ -248,7 +250,8 @@ function PaymentModalContent({ contribution, mandateBankName, mandateAccountMask
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          {/* Called on submit, not during render — see the note in GoalPayModal. */}
+          <form onSubmit={(e) => { void handleSubmit(onSubmit)(e) }} className="space-y-4" noValidate>
             <input type="hidden" {...register('periodMonth', { valueAsNumber: true })} />
             <input type="hidden" {...register('periodYear', { valueAsNumber: true })} />
 

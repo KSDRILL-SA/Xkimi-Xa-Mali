@@ -5,8 +5,12 @@ declare module 'next-auth' {
     user: {
       id: string
       roles: string[]
-    status?: string
       roleVersion: number
+      // Declared once. There was a second, optional `status?: string` above
+      // `roleVersion` — a stray line that made this a duplicate identifier
+      // (TS2300) with conflicting optionality (TS2687). It never surfaced
+      // because `skipLibCheck` exempts `.d.ts` files from checking, so the
+      // error sat in the type that decides what every `session.user` is.
       status: string
     } & DefaultSession['user']
   }

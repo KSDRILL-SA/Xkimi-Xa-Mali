@@ -99,6 +99,13 @@ export default async function DataRequestsPage({
       open,
       handledBy: r.handledBy ? `${r.handledBy.firstName} ${r.handledBy.lastName}` : null,
       outcome: r.outcome,
+      // A deletion request from someone we can identify is the only case where
+      // an inventory is possible. A request from an invitee who never joined has
+      // no member record to walk.
+      erasureHref:
+        open && r.kind === 'DELETION' && r.subjectId
+          ? `/data-requests/${r.id}/erasure`
+          : null,
     }
   })
 
@@ -200,7 +207,12 @@ export default async function DataRequestsPage({
       </Reveal>
 
       <Reveal variant="up" delay={200} className="space-y-4">
-        <RequestsTable rows={rows} startAction={startAction} closeAction={closeAction} />
+        <RequestsTable
+          rows={rows}
+          filtered={Boolean(status) || overdueOnly}
+          startAction={startAction}
+          closeAction={closeAction}
+        />
         <RouterPagination
           totalItems={total}
           itemsPerPage={20}
