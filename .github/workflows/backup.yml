@@ -1,0 +1,185 @@
+# Encrypted off-platform backup of the production database.
+#
+# Why this exists: Neon's point-in-time restore is a feature of one vendor's
+# account. It protects against our mistakes; it does not protect against losing
+# the account, a billing lapse, or a vendor incident. This workflow is the second
+# copy on a second platform, which is the part the 3-2-1 rule actually asks for.
+#
+# THE KEY DESIGN POINT — asymmetric encryption:
+#
+#   The dump is encrypted with a PUBLIC key that lives in this file in plain
+#   sight. The matching PRIVATE key is never given to GitHub, never a secret in
+#   this repository, and never in CI. It lives in the password managers of two
+#   office bearers.
+#
+#   So GitHub runs the backup and stores the backup, and GitHub cannot read the
+#   backup. If both this repository and the Neon account were fully compromised,
+#   the attacker gets ciphertext. Had we used a symmetric passphrase stored in
+#   GitHub Secrets, whoever holds the repository would hold both halves and the
+#   encryption would be decoration.
+#
+#   The cost of this design is real and must be understood: LOSE THE PRIVATE KEY
+#   AND EVERY BACKUP IS PERMANENTLY UNREADABLE. That is the trade, and it is the
+#   right one, but it means the private key needs the same care as the encryption
+#   key ring — see docs/backup-and-restore.md §2.
+
+name: Backup
+
+on:
+  schedule:
+    # 01:30 UTC daily — 03:30 SAST, after the day's collections have settled.
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Why this backup is being taken by hand'
+        required: false
+        default: 'manual'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  dump:
+    name: Dump, encrypt, retain
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to run without a destination key
+        env:
+          AGE_PUBLIC_KEY: ${{ vars.BACKUP_AGE_PUBLIC_KEY }}
+        run: |
+          if [ -z "$AGE_PUBLIC_KEY" ]; then
+            echo "::error::BACKUP_AGE_PUBLIC_KEY repository variable is not set."
+            echo "An unencrypted backup of members' ID numbers and bank details"
+            echo "must never be produced. Refusing to run. See docs/backup-and-restore.md."
+            exit 1
+          fi
+
+      - name: Install age and a matching Postgres client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age curl ca-certificates gnupg
+          # Neon tracks recent major versions; the runner's default client can be
+          # older, and pg_dump refuses to dump a server newer than itself.
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Dump
+        env:
+          # The UNPOOLED connection string. The pooled endpoint is not suitable
+          # for pg_dump — see docs/environment-setup-plan.md.
+          PGCONN: ${{ secrets.PRODUCTION_DIRECT_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$PGCONN" ]; then
+            echo "::error::PRODUCTION_DIRECT_DATABASE_URL secret is not set."
+            exit 1
+          fi
+          STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          # --no-owner so the dump restores into any role.
+          # Custom format so pg_restore can be selective on the way back.
+          # Output is never echoed; the connection string must not reach the log.
+          pg_dump "$PGCONN" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --file="xxm-${STAMP}.dump" 2> dump.err || {
+              echo "::error::pg_dump failed"
+              # Print stderr but scrub anything resembling a connection string.
+              sed -E 's#postgres(ql)?://[^ ]*#postgres://REDACTED#g' dump.err
+              exit 1
+            }
+          ls -l "xxm-${STAMP}.dump"
+
+      - name: Refuse to keep an implausibly small dump
+        run: |
+          set -euo pipefail
+          SIZE=$(stat -c%s "xxm-${STAMP}.dump")
+          echo "Dump size: ${SIZE} bytes"
+          # A successful dump of an empty or half-connected database is the
+          # failure mode that goes unnoticed for months. 50 KB is far below a
+          # real dump of this schema and far above an empty one.
+          if [ "$SIZE" -lt 51200 ]; then
+            echo "::error::Dump is only ${SIZE} bytes. Treating as a failed backup."
+            exit 1
+          fi
+
+      - name: Encrypt to the offline public key
+        env:
+          AGE_PUBLIC_KEY: ${{ vars.BACKUP_AGE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          age --encrypt --recipient "$AGE_PUBLIC_KEY" \
+              --output "xxm-${STAMP}.dump.age" "xxm-${STAMP}.dump"
+          # Remove the plaintext before anything else can touch it.
+          shred -u "xxm-${STAMP}.dump" 2>/dev/null || rm -f "xxm-${STAMP}.dump"
+          ls -l "xxm-${STAMP}.dump.age"
+
+      - name: Retain
+        uses: actions/upload-artifact@v4
+        with:
+          name: xxm-backup-${{ env.STAMP }}
+          path: xxm-*.dump.age
+          # GitHub's maximum. This is the rolling operational copy, NOT the
+          # archival record — a monthly copy must be downloaded and held
+          # offline. See docs/backup-and-restore.md §3.
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          {
+            echo "### Backup complete"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Taken | \`${STAMP}\` |"
+            echo "| Artifact | \`xxm-backup-${STAMP}\` |"
+            echo "| Encrypted to | \`${{ vars.BACKUP_AGE_PUBLIC_KEY }}\` |"
+            echo "| Retention here | 90 days |"
+            echo ""
+            echo "Restoring needs the **private key**, held offline by two office"
+            echo "bearers. GitHub cannot read this file."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # A backup that fails silently is worse than none, because it is believed.
+  alert:
+    name: Alert on failure
+    runs-on: ubuntu-latest
+    needs: dump
+    if: failure()
+    steps:
+      - name: Say so loudly
+        run: |
+          {
+            echo "### ⚠️ BACKUP FAILED"
+            echo ""
+            echo "The production database was **not** backed up on this run."
+            echo ""
+            echo "Check the \`dump\` job. Common causes:"
+            echo "- \`PRODUCTION_DIRECT_DATABASE_URL\` rotated or expired"
+            echo "- \`BACKUP_AGE_PUBLIC_KEY\` variable removed"
+            echo "- Neon unreachable, or the server's major version moved ahead"
+            echo "  of \`postgresql-client-17\` in this workflow"
+            echo ""
+            echo "Do not ignore this. See \`docs/backup-and-restore.md\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Production backup failed — see docs/backup-and-restore.md"
+          exit 1

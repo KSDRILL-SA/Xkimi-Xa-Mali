@@ -13,6 +13,8 @@ import {
   Cookie,
   RefreshCw,
   MessageCircle,
+  Globe,
+  UserCheck,
 } from 'lucide-react'
 
 export const metadata: Metadata = {
@@ -42,9 +44,28 @@ const sections = [
     body: `Member financial records, contribution histories, and audit logs are retained for a minimum of five years from the date of creation in accordance with applicable South African financial record-keeping requirements. Inactive member accounts are archived after 24 months of inactivity.`,
   },
   {
+    // POPIA s72 requires that a transfer of personal information outside South
+    // Africa be disclosed and consented to. Most of the services this platform
+    // depends on — email delivery, hosting, error reporting, rate limiting — run
+    // outside the country, so the disclosure belongs here and not in a footnote.
+    // Netcash is named separately because it is the one that receives an ID
+    // number and a bank account, and it is the one that stays in South Africa.
+    icon: Globe,
+    title: 'Where Your Information Is Processed',
+    body: `Your payment information is processed in South Africa by Netcash, our authorised payment processor. Some of the services that run this platform — website hosting, email delivery, error monitoring, and security rate-limiting — are operated by providers located outside South Africa, which means some of your personal information is transferred and stored abroad. We only use providers that are bound by data protection obligations comparable to those required by POPIA, and we transfer only what those services need to function. By registering, you consent to this transfer. If you would like to know exactly which providers hold which information, ask the Information Officer.`,
+  },
+  {
     icon: Scale,
     title: 'Your Rights (POPIA)',
-    body: `In accordance with the Protection of Personal Information Act (POPIA), you have the right to access the personal information we hold about you, request correction of inaccurate information, and request deletion of your data subject to our legal retention obligations. To exercise any of these rights, contact the platform administrator via the Support page.`,
+    body: `In accordance with the Protection of Personal Information Act (POPIA), you have the right to access the personal information we hold about you, request correction of inaccurate information, and request deletion of your data subject to our legal retention obligations. You may also object to processing, and withdraw consent where processing is based on it. To exercise any of these rights, contact the Information Officer via the Support page. We will respond within 30 days. If you are not satisfied with our response, you have the right to complain to the Information Regulator of South Africa.`,
+  },
+  {
+    // POPIA makes the head of a private body the Information Officer by
+    // operation of law. Naming a route to that person is the part that has to
+    // be deliberate — a right nobody can find the address for is not a right.
+    icon: UserCheck,
+    title: 'Information Officer',
+    body: `The Foundation has appointed an Information Officer who is responsible for ensuring our compliance with POPIA and for handling requests about your personal information. You can reach the Information Officer through the Support page. Requests relating to access, correction, deletion, or a complaint about how your information has been handled should be directed there rather than to an individual administrator, so that they are properly recorded and answered within the time the Act requires.`,
   },
   {
     icon: Cookie,
