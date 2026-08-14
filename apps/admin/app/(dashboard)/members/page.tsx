@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listMembers } from '@/lib/services'
 import { Reveal, RouterPagination } from '@xxm/ui'
+import { formatSAPhone } from '@xxm/utils'
 import { Search, Users, CheckCircle2, Clock, Ban, ArrowRight, Gem } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Members' }
@@ -187,7 +188,7 @@ export default async function MembersPage({
                   </div>
 
                   {/* Phone */}
-                  <span className="text-xs font-mono text-xxm-gray-600 hidden sm:block">{m.phone}</span>
+                  <span className="text-xs font-mono text-xxm-gray-600 hidden sm:block">{formatSAPhone(m.phone)}</span>
 
                   {/* Status */}
                   <div className="hidden md:flex justify-center">

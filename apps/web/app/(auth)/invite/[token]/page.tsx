@@ -8,7 +8,7 @@ import { InviteRegisterForm } from '@/components/auth/InviteRegisterForm'
 import { InviteErrorView } from '@/components/auth/InviteErrorView'
 import { AuthHeading } from '@/components/auth/AuthHeading'
 
-export const metadata: Metadata = { title: 'Join Xkimm Xa Mali Foundation' }
+export const metadata: Metadata = { title: 'Join the Foundation' }
 
 export default async function InvitePage({
   params,

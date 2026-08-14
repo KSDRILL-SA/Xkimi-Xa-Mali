@@ -4,7 +4,7 @@ import { AdminLoginForm } from '@/components/auth/AdminLoginForm'
 import { XmmLogo, Reveal } from '@xxm/ui'
 import { ShieldCheck, Lock, Users, BarChart3 } from 'lucide-react'
 
-export const metadata: Metadata = { title: 'Login — XXM Admin' }
+export const metadata: Metadata = { title: 'Login' }
 
 const features = [
   { icon: Users,    text: 'Manage all member accounts' },
