@@ -1,6 +1,9 @@
 'use client'
 
-import { createContext, useContext, useRef, useState, useEffect, useCallback, useId } from 'react'
+import {
+  createContext, useContext, useRef, useState, useEffect, useLayoutEffect, useCallback, useId,
+} from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@xxm/utils'
 import type { LucideIcon } from 'lucide-react'
 
@@ -10,7 +13,12 @@ interface DropdownCtx {
   close: () => void
   triggerId: string
   menuId: string
+  triggerRef: React.RefObject<HTMLButtonElement | null>
+  menuRef: React.RefObject<HTMLDivElement | null>
 }
+
+/** `useLayoutEffect` warns during SSR; the menu only ever measures in a browser. */
+const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 const Ctx = createContext<DropdownCtx | null>(null)
 
@@ -28,6 +36,8 @@ interface DropdownProps {
 export function Dropdown({ children, className }: DropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
   const uid = useId()
   const triggerId = `dd-trigger-${uid}`
   const menuId    = `dd-menu-${uid}`
@@ -38,7 +48,14 @@ export function Dropdown({ children, className }: DropdownProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
     const onClickOut = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) close()
+      const t = e.target as Node
+      // The menu is portalled to the body, so it is not inside `ref`. Without
+      // the second check a mousedown on a menu item counted as "outside",
+      // unmounted the menu, and the click that followed landed on nothing —
+      // every item silently did nothing.
+      if (ref.current?.contains(t)) return
+      if (menuRef.current?.contains(t)) return
+      close()
     }
     document.addEventListener('keydown', onKey)
     document.addEventListener('mousedown', onClickOut)
@@ -49,7 +66,7 @@ export function Dropdown({ children, className }: DropdownProps) {
   }, [close])
 
   return (
-    <Ctx.Provider value={{ open, toggle, close, triggerId, menuId }}>
+    <Ctx.Provider value={{ open, toggle, close, triggerId, menuId, triggerRef, menuRef }}>
       <div ref={ref} className={cn('relative inline-block', className)}>
         {children}
       </div>
@@ -58,9 +75,10 @@ export function Dropdown({ children, className }: DropdownProps) {
 }
 
 export function DropdownTrigger({ children, className }: { children: React.ReactNode; className?: string }) {
-  const { toggle, open, triggerId, menuId } = useDropdown()
+  const { toggle, open, triggerId, menuId, triggerRef } = useDropdown()
   return (
     <button
+      ref={triggerRef}
       type="button"
       id={triggerId}
       aria-haspopup="menu"
@@ -74,24 +92,85 @@ export function DropdownTrigger({ children, className }: { children: React.React
   )
 }
 
+/**
+ * The menu itself, rendered into the body rather than beside its trigger.
+ *
+ * Positioned absolutely inside the trigger's wrapper, it was clipped by any
+ * ancestor that scrolls or hides its overflow — the rounded frame on
+ * `DataTable`, the decorative clip on `StatCard`, the horizontal scroller on
+ * `ScrollNav`. A menu opened in the last row of a table was cut off at the
+ * table's edge, and no z-index helps: clipping is not a paint order.
+ *
+ * So it is portalled to the body and placed with `fixed` coordinates measured
+ * from the trigger. It keeps its right edge aligned with the trigger's, as the
+ * old `right-0` did, and flips above when there is not enough room below.
+ *
+ * The trade-off, stated: a fixed menu does not travel with a scrolling
+ * container, so it is repositioned on scroll and resize, and any scroll outside
+ * its own list closes it. That is the ordinary behaviour of a menu, and it is
+ * better than one that is invisible.
+ */
 export function DropdownContent({ children, className }: { children: React.ReactNode; className?: string }) {
-  const { open, menuId, triggerId } = useDropdown()
-  if (!open) return null
+  const { open, menuId, triggerId, triggerRef, menuRef } = useDropdown()
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const [mounted, setMounted] = useState(false)
 
-  return (
+  useEffect(() => setMounted(true), [])
+
+  const place = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const r = trigger.getBoundingClientRect()
+    const menuHeight = menuRef.current?.offsetHeight ?? 0
+    const below = window.innerHeight - r.bottom
+    // Flip up only when it genuinely does not fit below and there is more room
+    // above — otherwise a menu near the foot of a short page would jump upward
+    // for no gain.
+    const flip = menuHeight > 0 && below < menuHeight + 8 && r.top > below
+    setPos({
+      top: flip ? r.top - menuHeight - 4 : r.bottom + 4,
+      right: Math.max(8, window.innerWidth - r.right),
+    })
+  }, [triggerRef, menuRef])
+
+  useIsomorphicLayoutEffect(() => {
+    if (!open) { setPos(null); return }
+    place()
+  }, [open, place])
+
+  useEffect(() => {
+    if (!open) return
+    const onMove = () => place()
+    // `capture` so a scroll inside any ancestor is heard, not just the window.
+    window.addEventListener('scroll', onMove, true)
+    window.addEventListener('resize', onMove)
+    return () => {
+      window.removeEventListener('scroll', onMove, true)
+      window.removeEventListener('resize', onMove)
+    }
+  }, [open, place])
+
+  if (!open || !mounted) return null
+
+  return createPortal(
     <div
+      ref={menuRef}
       id={menuId}
       role="menu"
       aria-labelledby={triggerId}
+      style={{ position: 'fixed', top: pos?.top ?? -9999, right: pos?.right ?? 0 }}
       className={cn(
-        'absolute right-0 top-full mt-1 z-50',
-        'min-w-[180px] bg-white rounded-xl shadow-xxm border border-xxm-gray-100',
+        'z-50 min-w-[180px] bg-white rounded-xl shadow-xxm border border-xxm-gray-100',
         'py-1 animate-scale-in',
+        // Hidden until measured, so it cannot be seen at the wrong place for a
+        // frame before the first layout pass lands.
+        pos ? 'visible' : 'invisible',
         className,
       )}
     >
       {children}
-    </div>
+    </div>,
+    document.body,
   )
 }
 
