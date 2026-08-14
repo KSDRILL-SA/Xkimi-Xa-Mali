@@ -21,6 +21,17 @@ const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 const REDIS_CONFIGURED = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN)
 
+let warnedUnconfigured = false
+function warnUnconfiguredOnce(): void {
+  if (warnedUnconfigured) return
+  warnedUnconfigured = true
+  console.warn(
+    '[auth] no role-version cache configured — role and status changes will not ' +
+    'take effect until a session expires. Set UPSTASH_REDIS_REST_URL and ' +
+    'UPSTASH_REDIS_REST_TOKEN to enforce them immediately.',
+  )
+}
+
 function getRedisClient(): Redis | null {
   if (!REDIS_CONFIGURED) return null
   return getRedis()
@@ -64,6 +75,12 @@ function getRedis(): Redis {
  * admin who can reverse a transaction.
  */
 async function checkRoleVersion(userId: string, tokenVersion: number): Promise<RoleVersionVerdict> {
+  // No cache configured is not the same as a cache that did not answer. The
+  // first means this deployment does not operate the control at all; the
+  // second means it does and is having a bad minute. They had the same verdict,
+  // and admins were locked out of deployments that never had Redis.
+  if (!REDIS_CONFIGURED) return 'unconfigured'
+
   const redisClient = getRedisClient()
   if (!redisClient) return 'unverifiable'
 
@@ -271,6 +288,11 @@ async function handleRequest(
   const verdict = session.user?.id
     ? await checkRoleVersion(session.user.id, tokenVersion)
     : 'unverifiable'
+
+  // Said once per process, not once per request: a deployment running without a
+  // role-version cache should know that suspending an admin will not take
+  // effect until their token expires.
+  if (verdict === 'unconfigured') warnUnconfiguredOnce()
 
   const mustReauth = mustReauthenticate(verdict, isPrivileged)
 
