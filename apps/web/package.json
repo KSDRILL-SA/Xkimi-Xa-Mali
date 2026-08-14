@@ -12,7 +12,8 @@
     "test:watch": "vitest --config vitest.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "render:statement": "tsx --tsconfig scripts/tsconfig.json scripts/render-statement.ts",
-    "render:guide": "tsx --tsconfig scripts/tsconfig.json scripts/render-guide.ts"
+    "render:guide": "tsx --tsconfig scripts/tsconfig.json scripts/render-guide.ts",
+    "render:handbook": "tsx --tsconfig scripts/tsconfig.json scripts/render-handbook.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
