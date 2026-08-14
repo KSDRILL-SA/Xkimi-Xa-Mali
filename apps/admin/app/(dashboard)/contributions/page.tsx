@@ -2,10 +2,13 @@ import type { Metadata } from 'next'
 import { isPastPeriod } from '@xxm/utils/contribution-period'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { listAllContributions, generateContributions, listTransactionsForContributions, previewGeneration } from '@/lib/services'
+import {
+  listAllContributions, generateContributions, listTransactionsForContributions,
+  previewGeneration, waiveContribution, recordPayment,
+} from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
 import { Alert, Reveal, RouterPagination } from '@xxm/ui'
-import { Wallet, ChevronDown, Zap, Undo2 } from 'lucide-react'
+import { Wallet, ChevronDown, Zap, Undo2, HandCoins, CircleSlash } from 'lucide-react'
 import { requireAdmin } from '@/lib/admin-action'
 import { internalAdminPost } from '@/lib/api'
 import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
@@ -53,7 +56,7 @@ const TX_STATUS_BADGE: Record<string, string> = {
 export default async function ContributionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string; created?: string; skipped?: string; total?: string; reversed?: string; reverseError?: string }>
+  searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string; created?: string; skipped?: string; total?: string; reversed?: string; reverseError?: string; waived?: string; recorded?: string; amount?: string; period?: string; actionError?: string }>
 }) {
   const session = await auth()
   const roles   = (session?.user?.roles as string[] | undefined) ?? []
@@ -130,6 +133,56 @@ export default async function ContributionsPage({
     }
 
     redirect(back('&reversed=1'))
+  }
+
+  /**
+   * Release a member from a month, and record money that arrived another way.
+   *
+   * Both are stated in the Founder Guide as things leadership can do, and until
+   * now neither existed: `WAIVED` was a status every report could read and
+   * nothing could write, and a cash payment had nowhere to go. The services
+   * hold the rules; these two only carry the form across and put the refusal
+   * back in the URL, the way `reverse` above does.
+   */
+  async function waive(fd: FormData) {
+    'use server'
+    const { userId, roles: r } = await requireAdmin('contribution.waive')
+
+    const id     = String(fd.get('contributionId') ?? '')
+    const reason = String(fd.get('reason') ?? '')
+    const m = String(fd.get('month') ?? ''), y = String(fd.get('year') ?? '')
+    const pg = String(fd.get('page') ?? '1'), st = String(fd.get('status') ?? '')
+    const back = (extra: string) =>
+      `/contributions?month=${m}&year=${y}${st ? `&status=${st}` : ''}&page=${pg}${extra}`
+
+    try {
+      const res = await waiveContribution(userId, r, id, reason)
+      redirect(back(`&waived=1&period=${encodeURIComponent(res.period)}`))
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+      redirect(back(`&actionError=${encodeURIComponent(err instanceof Error ? err.message : 'That did not go through')}`))
+    }
+  }
+
+  async function record(fd: FormData) {
+    'use server'
+    const { userId, roles: r } = await requireAdmin('contribution.record-payment')
+
+    const id     = String(fd.get('contributionId') ?? '')
+    const amount = Number(fd.get('amount') ?? 0)
+    const ref    = String(fd.get('reference') ?? '')
+    const m = String(fd.get('month') ?? ''), y = String(fd.get('year') ?? '')
+    const pg = String(fd.get('page') ?? '1'), st = String(fd.get('status') ?? '')
+    const back = (extra: string) =>
+      `/contributions?month=${m}&year=${y}${st ? `&status=${st}` : ''}&page=${pg}${extra}`
+
+    try {
+      const res = await recordPayment(userId, r, id, amount, ref)
+      redirect(back(`&recorded=1&amount=${res.amount}&period=${encodeURIComponent(res.period)}`))
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+      redirect(back(`&actionError=${encodeURIComponent(err instanceof Error ? err.message : 'That did not go through')}`))
+    }
   }
 
   async function generate(fd: FormData) {
@@ -215,6 +268,26 @@ export default async function ContributionsPage({
       {reverseErr && (
         <Alert variant="error" title="The reversal did not go through">
           {reverseErr}
+        </Alert>
+      )}
+
+      {params.actionError && (
+        <Alert variant="error" title="That did not go through">
+          {params.actionError}
+        </Alert>
+      )}
+
+      {params.waived === '1' && (
+        <Alert variant="success" title="Month waived">
+          {params.period ?? 'That month'} has been released, and the member has been told why.
+          It shows on their statement as waived.
+        </Alert>
+      )}
+
+      {params.recorded === '1' && (
+        <Alert variant="success" title="Payment recorded">
+          R{Number(params.amount ?? 0).toFixed(2)} recorded against {params.period ?? 'that month'}.
+          The member has been told, and the payment is on their statement.
         </Alert>
       )}
 
@@ -318,8 +391,78 @@ export default async function ContributionsPage({
                   </div>
                 </summary>
 
-                {/* ── The payments behind this contribution ───────────── */}
+                {/* ── What leadership can still do about this month ───── */}
                 <div className="px-4 pb-4 pt-1 bg-xxm-gray-50/60 border-t border-xxm-gray-100">
+                  {c.status !== 'PAID' && c.status !== 'WAIVED' && (
+                    <div className="grid gap-2 sm:grid-cols-2 pt-3">
+                      {/* Money that arrived as cash or a transfer. The service
+                          refuses more than is outstanding, so the hint is the
+                          same number it checks against. */}
+                      <form action={record} className="bg-white rounded-2xl border border-xxm-gray-100 p-3 space-y-2">
+                        <input type="hidden" name="contributionId" value={c.id} />
+                        <input type="hidden" name="month" value={month} />
+                        <input type="hidden" name="year" value={year} />
+                        <input type="hidden" name="page" value={page} />
+                        <input type="hidden" name="status" value={status ?? ''} />
+                        <p className="flex items-center gap-1.5 text-[11px] font-bold text-xxm-gray-500 uppercase tracking-wide">
+                          <HandCoins size={12} aria-hidden /> Record a payment
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <input
+                            name="amount" type="number" step="0.01" min="0.01"
+                            max={Number(c.amountDue) - Number(c.amountPaid)}
+                            required
+                            placeholder={`Up to ${formatZAR(Number(c.amountDue) - Number(c.amountPaid))}`}
+                            aria-label={`Amount received from ${fullName}`}
+                            className="w-32 rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                          />
+                          <input
+                            name="reference" required minLength={3}
+                            placeholder="How it arrived"
+                            aria-label={`How the payment from ${fullName} arrived`}
+                            className="flex-1 min-w-[8rem] rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                          />
+                        </div>
+                        <ConfirmSubmitButton
+                          title="Record this payment?"
+                          message={`This adds money to ${fullName}'s ${MONTHS[c.periodMonth - 1]} ${c.periodYear} contribution and tells them it arrived. Only do this once the money is actually in the account.`}
+                          confirmLabel="Record it"
+                          className="px-3 py-1.5 rounded-lg bg-xxm-green text-white text-xs font-semibold hover:bg-xxm-canopy transition-colors"
+                        >
+                          Record payment
+                        </ConfirmSubmitButton>
+                      </form>
+
+                      {/* Releasing the month. Deliberately beside recording a
+                          payment: they are the two ways a month stops being
+                          owed, and an admin should see both at once. */}
+                      <form action={waive} className="bg-white rounded-2xl border border-xxm-gray-100 p-3 space-y-2">
+                        <input type="hidden" name="contributionId" value={c.id} />
+                        <input type="hidden" name="month" value={month} />
+                        <input type="hidden" name="year" value={year} />
+                        <input type="hidden" name="page" value={page} />
+                        <input type="hidden" name="status" value={status ?? ''} />
+                        <p className="flex items-center gap-1.5 text-[11px] font-bold text-xxm-gray-500 uppercase tracking-wide">
+                          <CircleSlash size={12} aria-hidden /> Waive this month
+                        </p>
+                        <input
+                          name="reason" required minLength={10}
+                          placeholder="Why this month is being released"
+                          aria-label={`Why ${fullName}'s month is being waived`}
+                          className="w-full rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                        />
+                        <ConfirmSubmitButton
+                          title="Waive this month?"
+                          message={`${fullName} will owe nothing for ${MONTHS[c.periodMonth - 1]} ${c.periodYear}. They are told the reason, it is recorded against your name, and it shows on their statement as waived.`}
+                          confirmLabel="Waive it"
+                          className="px-3 py-1.5 rounded-lg border border-xxm-gray-200 text-xxm-gray-700 text-xs font-semibold hover:bg-xxm-gray-50 transition-colors"
+                        >
+                          Waive month
+                        </ConfirmSubmitButton>
+                      </form>
+                    </div>
+                  )}
+
                   {rowTxs.length === 0 ? (
                     <p className="text-xs text-xxm-gray-400 py-2">No payments recorded against this contribution yet.</p>
                   ) : (
