@@ -215,20 +215,19 @@ yours.
 | 12 | Backup & restore documented | ☑ Done | — |
 | 13 | Development restore drill | ☑ Run 2026-08-15 — found 3 defects | — |
 | 14 | **Production restore drill + `age` round trip** | ☐ Not started | 15 |
-| 15 | **GitHub Actions: no run has ever started on this repo** | ☐ **BLOCKING** | — (owner, browser) |
+| 15 | **GitHub billing is locked — a payment authorization failed** | ☐ **BLOCKING** | — (owner + bank) |
 
-⚠️ **Item 15 first.** No Actions run on this repository has ever reached a job —
-1 900 examined, all `startup_failure`, back to at least 29 May. So the daily
-backup has never executed and CI has never checked a commit.
+⚠️ **Item 15 first, and it is a five-minute job.** GitHub has locked billing on
+the account because a stored card failed authorization. That lock blocks Actions
+on private repositories, so **the daily backup has never run** and **CI has never
+checked a commit** — 2 250 runs, none of which reached a job.
 
-**Billing was investigated and ruled out**: no Actions usage in June, July or
-August, zero billable time, free allowance intact. The workflow files are valid
-and registered, and other repositories on the same account run Actions fine — so
-it is specific to this repository and not visible over the API.
+**Nothing is owed.** Everything is on free plans at $0.00/month and metered usage
+is $0; it is a declined verification hold, not an unpaid bill.
 
-Open the repository's **Actions tab in a browser**, where a blocked repository
-carries a banner the API does not expose; then **Settings → Actions → General**;
-then **Account → Settings → Billing**. If all three look healthy this is one for
-**GitHub Support**. Until it is fixed, the pack's statements about a daily
-off-platform backup are aspirations and must not be shown to a bank as fact.
+**Fix:** github.com/settings/billing → *Update payment method*, and contact the
+bank about the declined authorization. Nothing in this repository needs changing.
+
+Until it clears, the pack's statements about a daily off-platform backup are
+aspirations and must not be shown to a bank as fact.
 See `../backup-and-restore.md` §0a.
