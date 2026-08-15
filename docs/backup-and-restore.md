@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | **BLOCKED — no Actions run has ever started, see §0a.** Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill still outstanding**; the `age` round trip is proved in CI (§8a) |
+| Status | **BLOCKED — account billing locked, see §0a.** Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill still outstanding**; the `age` round trip is proved in CI (§8a) |
 | Applies to | Production |
 | Companion to | `runbook.md`, `compliance/breach-response.md` |
 
@@ -16,70 +16,65 @@
 
 ---
 
-## ⚠️ 0a. No backup has ever run, and no Actions run has ever started
+## ⚠️ 0a. No backup has ever run — the account's billing is locked
 
-**Investigated 2026-08-15.** Not one GitHub Actions run on this repository has
-ever reached a job. **1 900 runs examined, going back to at least 29 May 2026 —
-every single one `startup_failure`**, created and then failed before a runner was
-allocated. `timing` reports `{"billable":{}}`; there are no logs, and
-`latest_check_runs_count` is 0.
+**Confirmed in the browser, 2026-08-15.** The repository's Actions tab carries a
+banner the REST API does not expose:
 
-### It is not billing — that was checked and ruled out
+> **GitHub Actions workflows can't be executed on this repository.**
+> Your account's billing is currently locked. Please update your payment
+> information.
 
-An earlier note in this file guessed at exhausted Actions minutes. **That guess
-was wrong**, and it is corrected here rather than quietly deleted:
+And the account billing page:
 
-| Checked | Result |
-|---|---|
-| Actions usage, June / July / August 2026 | **No usage items at all.** The free allowance is untouched |
-| Billable time on failing runs | Zero. No minutes have ever been consumed |
-| Account plan | Free — which includes 2 000 private-repo minutes a month |
+> **Your payment authorization has failed.** Please contact your bank to resolve
+> the issue.
 
-Minutes cannot be exhausted by runs that never start, and nothing else on the
-account has been consuming them.
+**Nothing is owed.** GitHub Free is $0.00/month, Copilot Free is $0.00/month,
+metered usage for the period is $0 and next payment due is blank. A stored card
+failed *authorization* — typically a small verification hold declined by the bank
+— and GitHub responds by locking billing across the account. On a **private**
+repository that lock blocks Actions outright.
 
-### It is not the workflow files
+### The fix
 
-GitHub has parsed and **registered all three** and lists them `active`; all three
-also parse locally. Actions are enabled on the repository, all actions are
-allowed, and default workflow permissions are normal. A manual
-`workflow_dispatch` fails at startup just as immediately as a push does.
+1. **github.com/settings/billing** → *Update payment method*, and/or contact the
+   bank about the declined authorization.
+2. Once the lock clears, workflows run again on the next trigger. Nothing in this
+   repository needs changing — the workflows have been valid and registered the
+   whole time.
+3. Then do the production drill in §8, which has been blocked behind this.
 
-A commit touching `ci.yml` on 26 July looked like a suspect until the timestamps
-were read: the failures begin eighteen hours **before** it, and its diff adds two
-environment variables.
+### Why the API investigation could not find it
 
-### It is not the whole account
+Worth writing down, because the reasoning failed in an instructive way.
 
-Other repositories owned by the same account **do** run Actions — a private one in
-April, a public one in May, both reaching jobs and failing there on their merits.
-So this is specific to **this repository**.
+The first guess was exhausted Actions minutes. Checking usage appeared to refute
+it: **no** Actions usage in June, July or August, zero billable time on every
+run, free allowance untouched. That was recorded as "it is not the billing".
 
-### What follows, and it is not small
+That conclusion was wrong, and the evidence for it was actually a **symptom of the
+real cause**. A billing lock prevents runs from starting, and runs that never
+start consume nothing — so zero usage is exactly what a lock produces. Zero usage
+ruled out *exhaustion*; it never ruled out *billing*, and the two were treated as
+the same thing.
 
-- **The daily backup has never executed. Not once.** There is no encrypted copy of
-  anything, anywhere. Every statement in the compliance pack about a daily
-  off-platform backup describes an intention until a run reaches a job.
+Every API surface reported health: Actions enabled, all actions allowed,
+workflows registered and `active`, permissions normal. The one place the truth
+was written is a banner rendered only in the web UI. **When every API says fine
+and nothing works, open the page in a browser** — earlier than feels necessary.
+
+### What it cost
+
+- **The daily backup has never executed.** Not once, in 2 250 runs. There is no
+  encrypted copy of anything.
 - **CI has never validated a single commit in this repository's history.** Every
-  gate ever reported on every pull request here was run on a developer's machine.
-  That is not nothing, but no branch has been checked by anything but its author.
-- The in-app backup watcher exists for exactly this silence and cannot help yet —
-  it needs a read-only token that is not set (§3b-ii).
+  gate ever reported on every pull request here was run on a developer machine.
+- The in-app backup watcher exists for this silence and needs a read-only token
+  that is not set (§3b-ii).
 
-### What a human has to do, because the API cannot see it
-
-1. Open the repository's **Actions tab** in a browser. A blocked repository
-   usually carries a banner there explaining why; none of it is exposed over the
-   API, which is why this investigation could rule things out but not finish.
-2. **Settings → Actions → General** on the repository.
-3. **Account → Settings → Billing**, for the spending limit, even though usage
-   says minutes are not the problem.
-4. If all three look healthy, this is **GitHub Support's** to answer. Nineteen
-   hundred runs failing before provisioning, with zero billable time and valid
-   registered workflows, is not a condition a repository can put itself into.
-
-Until a run reaches a job, the backup posture is **1-1-0** — one copy, one
-platform, nothing off-site — whatever the tables below say.
+Until the lock clears, the backup posture is **1-1-0** — one copy, one platform,
+nothing off-site — whatever the tables below say.
 
 ---
 
