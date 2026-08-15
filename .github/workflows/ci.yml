@@ -52,6 +52,23 @@ jobs:
       BLOB_READ_WRITE_TOKEN: test
       WHATSAPP_GROUP_LINK: https://chat.whatsapp.com/test
       NEXT_PUBLIC_WEB_URL: http://localhost:3000
+      # The website app requires these six at build time and fails the build
+      # without them. DEPLOY_ENV=ci does not exempt it the way it exempts the
+      # server-side checks above: `lib/env.ts` is reachable from the browser
+      # bundle, and Next inlines only NEXT_PUBLIC_* there — so DEPLOY_ENV and
+      # VERCEL_ENV both read as undefined and `isLiveDeployment()` falls through
+      # to NODE_ENV, which every production build sets. The guard therefore
+      # treats any build as live, which is the safe direction for it to be wrong
+      # in, and means CI has to supply real-shaped values like a deploy would.
+      #
+      # Placeholders, but well-formed ones: the guard only rejects empty values,
+      # and a malformed URL here would fail somewhere less obvious than this.
+      NEXT_PUBLIC_SITE_URL: http://localhost:3001
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_ADMIN_URL: http://localhost:3002
+      NEXT_PUBLIC_WHATSAPP_GROUP_LINK: https://chat.whatsapp.com/test
+      NEXT_PUBLIC_ADMIN_WHATSAPP_NUMBER: '27000000000'
+      NEXT_PUBLIC_SUPPORT_EMAIL: support@example.invalid
 
     steps:
       - name: Checkout
