@@ -16,39 +16,70 @@
 
 ---
 
-## ⚠️ 0a. No backup has ever run
+## ⚠️ 0a. No backup has ever run, and no Actions run has ever started
 
-**Verified 2026-08-15.** Every GitHub Actions run on this repository for at least
-the last forty runs has ended in `startup_failure` — created, then failed before
-a single job was provisioned. `gh api .../actions/runs/<id>` reports
-`path: BuildFailed` with an empty job list.
+**Investigated 2026-08-15.** Not one GitHub Actions run on this repository has
+ever reached a job. **1 900 runs examined, going back to at least 29 May 2026 —
+every single one `startup_failure`**, created and then failed before a runner was
+allocated. `timing` reports `{"billable":{}}`; there are no logs, and
+`latest_check_runs_count` is 0.
 
-This is **not** a fault in the workflow files. GitHub has parsed and registered
-all three (`CI`, `Backup`, `Backup Self-Test`) and lists them as `active`;
-Actions are enabled on the repository and all actions are allowed. The failure is
-at the point of provisioning a runner.
+### It is not billing — that was checked and ruled out
 
-For a **private** repository the usual cause is exhausted included Actions
-minutes, no payment method, or a spending limit of zero. The billing API endpoint
-has moved and cannot be read from here, so this needs a human to open
-**GitHub → Settings → Billing** and look.
+An earlier note in this file guessed at exhausted Actions minutes. **That guess
+was wrong**, and it is corrected here rather than quietly deleted:
 
-**What follows from it, and it is not small:**
+| Checked | Result |
+|---|---|
+| Actions usage, June / July / August 2026 | **No usage items at all.** The free allowance is untouched |
+| Billable time on failing runs | Zero. No minutes have ever been consumed |
+| Account plan | Free — which includes 2 000 private-repo minutes a month |
 
-- **The daily backup in §3a has never executed.** Not once. There is no encrypted
-  copy of anything, and every statement in the compliance pack about a daily
-  off-platform backup describes an intention rather than a fact until this is
-  fixed.
-- **CI has never validated any commit.** Every gate reported on every pull
-  request in this repository was run on a developer machine. That is not nothing,
-  but it is not CI, and no branch has ever been checked by anything other than
-  the person who wrote it.
-- The in-app backup watcher added for exactly this class of problem is the right
-  instinct and cannot help yet: it needs a read-only token that is not set (§3b-ii).
+Minutes cannot be exhausted by runs that never start, and nothing else on the
+account has been consuming them.
 
-**Do this before relying on any of it.** Until a run reaches a job, the backup
-strategy is 1-1-0 again — one copy, one platform, nothing off-site — whatever the
-tables below say.
+### It is not the workflow files
+
+GitHub has parsed and **registered all three** and lists them `active`; all three
+also parse locally. Actions are enabled on the repository, all actions are
+allowed, and default workflow permissions are normal. A manual
+`workflow_dispatch` fails at startup just as immediately as a push does.
+
+A commit touching `ci.yml` on 26 July looked like a suspect until the timestamps
+were read: the failures begin eighteen hours **before** it, and its diff adds two
+environment variables.
+
+### It is not the whole account
+
+Other repositories owned by the same account **do** run Actions — a private one in
+April, a public one in May, both reaching jobs and failing there on their merits.
+So this is specific to **this repository**.
+
+### What follows, and it is not small
+
+- **The daily backup has never executed. Not once.** There is no encrypted copy of
+  anything, anywhere. Every statement in the compliance pack about a daily
+  off-platform backup describes an intention until a run reaches a job.
+- **CI has never validated a single commit in this repository's history.** Every
+  gate ever reported on every pull request here was run on a developer's machine.
+  That is not nothing, but no branch has been checked by anything but its author.
+- The in-app backup watcher exists for exactly this silence and cannot help yet —
+  it needs a read-only token that is not set (§3b-ii).
+
+### What a human has to do, because the API cannot see it
+
+1. Open the repository's **Actions tab** in a browser. A blocked repository
+   usually carries a banner there explaining why; none of it is exposed over the
+   API, which is why this investigation could rule things out but not finish.
+2. **Settings → Actions → General** on the repository.
+3. **Account → Settings → Billing**, for the spending limit, even though usage
+   says minutes are not the problem.
+4. If all three look healthy, this is **GitHub Support's** to answer. Nineteen
+   hundred runs failing before provisioning, with zero billable time and valid
+   registered workflows, is not a condition a repository can put itself into.
+
+Until a run reaches a job, the backup posture is **1-1-0** — one copy, one
+platform, nothing off-site — whatever the tables below say.
 
 ---
 
