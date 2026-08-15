@@ -34,6 +34,20 @@ export default defineConfig({
     // It is also faster on this suite — roughly 47s against 64s — because these
     // tests spend their time on cold module loads rather than on CPU, and forks
     // parallelise that better than threads do here.
+    //
+    // **Status as at 2026-08-15.** `gateway-selection` and `health.route` were
+    // still recorded as failing about one full run in six after this change, and
+    // that note is now doubtful. Twelve consecutive full runs of this suite
+    // passed with nothing else on the machine. The one failure seen recently
+    // happened while two Next dev servers were compiling alongside the tests,
+    // which points at contention against the 30s timeouts below rather than at
+    // state leaking between files — and forks with the default isolation give
+    // each file its own process, so the `process.env` leak this comment
+    // describes should not be reachable any more.
+    //
+    // Left as it is, because the reasoning above is sound on its own terms and
+    // nothing was reproduced to justify changing it. Recorded so the next person
+    // to see a red run measures before assuming this is the same old ghost.
     pool: 'forks',
     // Route suites dynamically import Next handlers, which pulls in the Prisma
     // client and the whole handler chain on first use. That cold load alone can
