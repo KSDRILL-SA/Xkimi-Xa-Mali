@@ -5,7 +5,7 @@ import { adminBroadcastRatelimit } from '@/lib/redis'
 import { broadcastNotification } from '@/services/admin.service'
 import type { BroadcastChannel, BroadcastFilter } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest } from '@/lib/internal-request'
+import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 const VALID_CHANNELS: BroadcastChannel[] = ['SMS', 'EMAIL', 'BOTH', 'IN_APP']
@@ -22,7 +22,29 @@ export const POST = withApiHandler(async (req: NextRequest) => {
     if (!roles.includes('ADMIN')) return apiError('SYS_003', 'Forbidden', 403)
   }
 
-  const adminId = isTrustedInternal ? (session?.user?.id ?? 'system') : session!.user.id
+  // On the internal path there is no session — the admin console calls this
+  // server to server, without cookies — so `session?.user?.id` is always
+  // undefined and the old fallback made `adminId` the literal string 'system'.
+  // That string was then written as `inbox_messages.createdById` and as the
+  // audit log's `userId`, both of which are foreign keys to `users.id`. No user
+  // has that id, so **every** broadcast sent from the console failed on a
+  // foreign key violation: the in-app one before anything was delivered, and
+  // SMS or email *after* the messages had gone out and been charged for, losing
+  // the audit record of a broadcast that had actually been sent.
+  //
+  // `resolveInternalAdmin` is what every other trusted route already uses. It
+  // reads the forwarded id and confirms it belongs to a live admin, so the
+  // broadcast is recorded against the person who sent it.
+  let adminId: string
+  if (isTrustedInternal) {
+    const forwarded = await resolveInternalAdmin(req)
+    if (!forwarded) {
+      return apiError('VAL_004', 'A trusted request must name a current admin', 400)
+    }
+    adminId = forwarded
+  } else {
+    adminId = session!.user.id
+  }
   const adminRoles = isTrustedInternal ? ['ADMIN'] : roles
 
   const { success } = await adminBroadcastRatelimit.limit(adminId)

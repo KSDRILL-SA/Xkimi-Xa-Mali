@@ -155,7 +155,7 @@ export async function submitDataRequest(
     await raiseOperationalAlert({
       code: 'DSR_RECEIVED',
       severity: 'warning',
-      title: `A ${kindLabel(request.kind)} request has been submitted`,
+      title: `${article(kindLabel(request.kind))} ${kindLabel(request.kind)} request has been submitted`,
       body: [
         `Someone has asked the Foundation to ${kindSentence(request.kind)}.`,
         '',
@@ -177,6 +177,17 @@ export async function submitDataRequest(
   }
 
   return request
+}
+
+/**
+ * "An access request", not "A access request".
+ *
+ * Two of the five kinds begin with a vowel. The alert read "A access request has
+ * been submitted" the first time it was raised for real — correct in every test,
+ * because no test asserted on the article.
+ */
+function article(word: string): 'A' | 'An' {
+  return /^[aeiou]/i.test(word) ? 'An' : 'A'
 }
 
 function kindLabel(kind: DsrKind): string {
