@@ -8,6 +8,45 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // fresh copy of the route.
 // ---------------------------------------------------------------------------
 
+/**
+ * `next/server` stubbed, and this is what stops the file timing out.
+ *
+ * `loadRoute` runs eleven times here, each one a `vi.resetModules()` followed by
+ * a fresh `import` of the route — so Next's server runtime was being re-resolved
+ * and re-evaluated eleven times. `@/lib/db` and `@/lib/redis` were already
+ * mocked, so Prisma was never the cost; this was.
+ *
+ * Standalone that is about 250ms a cycle and nobody notices. Under the full
+ * suite on a four-core machine it stretches far enough that eleven of them
+ * cross the 30s timeout, which is what this test was failing on — not a wrong
+ * answer, `Test timed out in 30000ms`.
+ *
+ * The stub is faithful to everything the route uses and everything the cases
+ * assert: the route calls only `NextResponse.json(body, { status })`, and the
+ * cases read only `res.status` and `await res.json()`. A plain `Response` does
+ * both natively, so nothing is being pretended here that a real one would do
+ * differently.
+ *
+ * `vi.mock` rather than the `vi.doMock` used for db and redis below: doMock
+ * registrations have to be re-applied after every `resetModules()`, which is why
+ * they live inside `loadRoute`. This one is constant across every case, so it is
+ * hoisted and registered once.
+ */
+vi.mock('next/server', () => ({
+  NextResponse: {
+    // `init.headers` is passed through rather than dropped: the route sets
+    // `Cache-Control: no-store` there, and "is never cached" asserts on it. A
+    // first version of this stub kept only the status and that case failed
+    // immediately — which is the stub being held to the real thing's contract,
+    // and the reason to keep the case.
+    json: (body: unknown, init?: { status?: number; headers?: HeadersInit }) =>
+      new Response(JSON.stringify(body), {
+        status: init?.status ?? 200,
+        headers: { 'content-type': 'application/json', ...Object.fromEntries(new Headers(init?.headers)) },
+      }),
+  },
+}))
+
 type RedisState = {
   configured: boolean
   pingRejects?: boolean

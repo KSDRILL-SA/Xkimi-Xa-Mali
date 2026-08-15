@@ -13,41 +13,35 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
-    // Each test file gets its own process, and this is a correctness setting
-    // rather than a performance one.
+    // Kept because it is measurably faster on this suite — roughly 47s against
+    // 64s — and for no other reason. Read on before treating it as a fix for
+    // anything.
     //
-    // The default `threads` pool runs files in worker threads that share a
-    // single `process.env`. Vitest's own module isolation does not extend to it
-    // — a worker is reused across files, so a file that stubs an environment
-    // variable and a file that reads one at import time are in the same room.
-    // The suites that have ever flaked here are exactly the suites that do both:
-    // `gateway-selection`, `env-netcash`, `health.route`, `whatsapp.preferences`
-    // and `netcash-soap`, all of which call `vi.resetModules()` and re-import a
-    // module whose behaviour is decided by the environment at load.
+    // This was originally added on the theory that the long-standing flake in
+    // `gateway-selection`, `env-netcash` and `health.route` was `process.env`
+    // leaking between files sharing a worker thread. **That theory was wrong.**
+    // The failures were finally captured on 2026-08-15 and every one of them
+    // reads `Test timed out in 30000ms` — not a wrong value, no value at all.
+    // Separate processes cannot fix a timeout, and this setting never did.
     //
-    // `gateway-selection` already carries a long comment about an earlier
-    // attempt at this, which moved the file from replacing `process.env` to
-    // `vi.stubEnv`. That removed one way for the leak to happen and left the
-    // shared object in place. Separate processes cannot share `process.env` at
-    // all, which closes the class rather than another instance of it.
+    // The real cause was cost. Those files call `vi.resetModules()` and
+    // re-import in a loop — nine times in `gateway-selection`, eleven in
+    // `health.route` — and what they re-imported was heavy: the netcash adapter
+    // pulls in `@/lib/netcash` and from there the SOAP client, the batch-file
+    // builder, the method table and the retry helper; the health route pulls in
+    // Next's server runtime. Nothing caches across a `resetModules()`. On four
+    // cores, with the rest of the suite competing for them, that is what crossed
+    // the 30s below.
     //
-    // It is also faster on this suite — roughly 47s against 64s — because these
-    // tests spend their time on cold module loads rather than on CPU, and forks
-    // parallelise that better than threads do here.
+    // Fixed where it belonged, in those three files, by stubbing the weight that
+    // was never under test — the adapters are only ever compared by identity,
+    // and the route only ever calls `NextResponse.json`. They now run in 1.5s,
+    // 1.4s and 2.7s, and the suite fell from 85s to about 35s.
     //
-    // **Status as at 2026-08-15.** `gateway-selection` and `health.route` were
-    // still recorded as failing about one full run in six after this change, and
-    // that note is now doubtful. Twelve consecutive full runs of this suite
-    // passed with nothing else on the machine. The one failure seen recently
-    // happened while two Next dev servers were compiling alongside the tests,
-    // which points at contention against the 30s timeouts below rather than at
-    // state leaking between files — and forks with the default isolation give
-    // each file its own process, so the `process.env` leak this comment
-    // describes should not be reachable any more.
-    //
-    // Left as it is, because the reasoning above is sound on its own terms and
-    // nothing was reproduced to justify changing it. Recorded so the next person
-    // to see a red run measures before assuming this is the same old ghost.
+    // So: if a red run appears here again, measure before reaching for module
+    // state. Twice that instinct produced a confident wrong answer, and both
+    // times the evidence for it — clean standalone runs, no minutes consumed —
+    // was a symptom of the real cause rather than a clue about it.
     pool: 'forks',
     // Route suites dynamically import Next handlers, which pulls in the Prisma
     // client and the whole handler chain on first use. That cold load alone can
