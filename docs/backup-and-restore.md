@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | Procedure documented; **not yet exercised** — see §7 |
+| Status | Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill and the `age` round trip still outstanding** |
 | Applies to | Production |
 | Companion to | `runbook.md`, `compliance/breach-response.md` |
 
@@ -37,7 +37,13 @@ retention obligations run to years. **Once a month, download that day's artifact
 and keep it offline** (§3c). Until someone does that, there is no copy that
 survives losing both vendor accounts.
 
-**What is still untested:** all of it. See §8.
+**What is now tested:** the dump, the archive's readability, and the restore, end
+to end on development — which found that the audit log was not append-only and
+that two of the verification checks were wrong. See §8.
+
+**What is still untested:** the `age` encrypt/decrypt round trip, and all of it
+against *production* data. Neither has been done, and until the production drill
+is run the recovery time is unknown.
 
 ---
 
@@ -279,7 +285,7 @@ Run every step. Steps 4 and 5 are the ones that actually matter.
 | 1 | Row counts plausible | Members, contributions, transactions, ledger entries |
 | 2 | Latest data present | Most recent `AuditLog` entry is close to the restore point |
 | 3 | Migrations current | `prisma migrate status` reports no pending |
-| 4 | **Ledger balances** | Debits equal credits. A restore that breaks the ledger is a corrupted restore |
+| 4 | **Ledger preserved** | Entry count and pool balance match the source. **Not** "debits equal credits" — see below |
 | 5 | **Encrypted columns decrypt** | Read one member's ID number and one bank account number **through the application**. If these fail, the key ring is wrong and the restore is worthless |
 | 6 | Login works | Sign in as a test member |
 | 7 | Mandates intact | One active mandate per member still holds; no duplicates |
@@ -288,14 +294,95 @@ Run every step. Steps 4 and 5 are the ones that actually matter.
 **Record the result and the date.** An unverified restore capability is an
 assumption.
 
+### The queries, and why check 4 was wrong
+
+Run these against the restored database and compare with the source.
+
+```sql
+-- 1. Row counts
+SELECT 'users', count(*) FROM users
+UNION ALL SELECT 'contributions',  count(*) FROM contributions
+UNION ALL SELECT 'transactions',   count(*) FROM transactions
+UNION ALL SELECT 'ledger_entries', count(*) FROM ledger_entries
+UNION ALL SELECT 'audit_logs',     count(*) FROM audit_logs;
+
+-- 2. Latest data present
+SELECT max("createdAt") FROM audit_logs;
+
+-- 4. Ledger preserved. Compare all three numbers with the source.
+SELECT count(*) AS entries,
+       coalesce(sum(amount) FILTER (WHERE direction = 'CREDIT'), 0) AS credits,
+       coalesce(sum(amount) FILTER (WHERE direction = 'DEBIT'),  0) AS debits
+FROM ledger_entries;
+
+-- 7. No member holds two active mandates
+SELECT coalesce(max(n), 0) FROM (
+  SELECT count(*) n FROM payment_mandates WHERE status = 'ACTIVE' GROUP BY "userId"
+) x;   -- must be 0 or 1
+
+-- 8. The append-only guarantee is present
+SELECT tgname FROM pg_trigger
+WHERE tgrelid = 'audit_logs'::regclass AND NOT tgisinternal;
+-- expect audit_logs_no_update and audit_logs_no_delete
+```
+
+**Check 4 used to read "debits equal credits", and that was wrong.** This ledger
+is not two-legged per entry. A `GOAL_PAYMENT` writes a **CREDIT** when money
+arrives and a **DEBIT** only if the bank later reverses it — see
+`apps/web/services/goal-payment.service.ts`. Debits equalling credits would
+therefore mean every payment ever made had been reversed, which is an empty
+fund, not a healthy one. The 2026-08-15 drill hit this immediately: a perfectly
+good database showed 4 230 in credits against 4 100 in debits and "failed" a
+check it could only ever have passed while broke.
+
+What matters on a restore is that the ledger came back **unchanged**, which is
+what the query above tests.
+
 ---
 
-## 8. Drill — outstanding
+## 8. Drill
 
-**This procedure has never been executed.** Until it has, the Foundation does not
-have a backup capability; it has a document about one.
+### Partially executed — 2026-08-15, against development
 
-### Before go-live
+A dump-and-restore drill was run end to end on the development database. It is
+**not** the go-live drill: it did not use production data, and the `age`
+encrypt/decrypt round trip was not exercised because `age` is not installed on
+the machine it ran from. Everything either side of that step was.
+
+| Step | Result |
+|---|---|
+| `pg_dump --format=custom` | 143 KB, 40 table-data entries |
+| `pg_restore --list` | Readable archive |
+| Full read-back (`pg_restore --file=...`) | 151 KB of SQL, no error |
+| `pg_restore --no-owner --clean --if-exists` | Exit 0, no errors |
+| Check 1 — row counts | **Identical**, source vs restored |
+| Check 2 — latest audit entry | Preserved to the second |
+| Check 3 — `prisma migrate status` | Up to date, 44 migrations |
+| Check 4 — ledger preserved | Passes, once the check itself was corrected — see §7 |
+| Check 7 — one active mandate per member | Passes |
+| Check 8 — audit log append-only | **Failed. There was no constraint at all** |
+
+**What the drill found, and what was done about it**
+
+1. **The audit log was not append-only.** An `UPDATE` and a `DELETE` against
+   `audit_logs` as the ordinary application role both succeeded — one row
+   rewritten, another removed. No trigger, no rule, no row-level security.
+   Migration `20260815090000_audit_log_append_only` now enforces it in the
+   database; both statements are refused and `INSERT` is untouched.
+2. **Check 4 could never pass on a healthy database.** Corrected in §7.
+3. **Check 8 had nothing to confirm.** It does now, and §7 gives the query.
+4. **`pg_restore --file=/dev/null` fails on Windows** — there is no `/dev/null`
+   for the Windows build, so the full read-back reports "could not open output
+   file". This is not a fault in `backup.yml`, which runs on `ubuntu-latest`
+   where the path is valid. Drilling from a Windows machine, write to a real
+   temporary file instead and delete it afterwards.
+5. **The application's database role cannot create a database.** `xxm` has
+   neither `CREATEDB` nor superuser, so "restore into a fresh database" cannot
+   be done with the app's own credentials. On Neon this is a console operation
+   (branch or new database); locally it needs the `postgres` role. Worth knowing
+   before the clock is running.
+
+### Still outstanding — the real drill, before go-live
 
 1. Take a dump of staging.
 2. Restore it into a fresh database.
