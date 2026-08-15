@@ -8,7 +8,7 @@ import { assessErasure, eraseErasableData, type Disposition } from '@/lib/servic
 import { requireAdmin } from '@/lib/admin-action'
 import { Breadcrumb, Reveal, PageHeader } from '@xxm/ui'
 import { formatDate } from '@xxm/utils'
-import { ShieldQuestion, Lock, Trash2, Archive, AlertTriangle } from 'lucide-react'
+import { ShieldQuestion, Lock, Trash2, Archive, AlertTriangle, Inbox } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'What We Hold' }
 
@@ -93,7 +93,15 @@ export default async function ErasurePage({ params }: { params: Promise<{ id: st
       <Reveal variant="up" delay={120}>
         <div className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm overflow-hidden divide-y divide-xxm-gray-100">
           {assessment.categories.map((c) => {
-            const d = DISPOSITION[c.disposition]
+            // A category holding nothing is not a category being retained. The
+            // first run of this screen reported "Must be kept · 0 records" for
+            // sign-in history, notifications and the invitation — and this text
+            // is written to be read back to the requester, who would be told the
+            // Foundation is holding records it does not have.
+            const empty = c.count === 0
+            const d = empty
+              ? { label: 'None held', className: 'text-xxm-gray-500 bg-xxm-gray-50 border-xxm-gray-200', icon: Inbox }
+              : DISPOSITION[c.disposition]
             const Icon = d.icon
             return (
               <div key={c.key} className="p-5 flex gap-4">
@@ -110,8 +118,10 @@ export default async function ErasurePage({ params }: { params: Promise<{ id: st
                       {c.count} record{c.count === 1 ? '' : 's'}
                     </span>
                   </div>
-                  <p className="text-xs text-xxm-gray-600 leading-relaxed mt-1.5">{c.basis}</p>
-                  {c.erasableFrom && c.disposition === 'RETAINED' && (
+                  <p className="text-xs text-xxm-gray-600 leading-relaxed mt-1.5">
+                    {empty ? 'The Foundation holds nothing in this category for this person.' : c.basis}
+                  </p>
+                  {!empty && c.erasableFrom && c.disposition === 'RETAINED' && (
                     <p className="text-[11px] text-xxm-gray-400 mt-1">
                       Erasable from {formatDate(c.erasableFrom)}
                     </p>

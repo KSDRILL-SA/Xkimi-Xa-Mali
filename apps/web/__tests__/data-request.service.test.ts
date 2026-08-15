@@ -120,6 +120,25 @@ describe('telling the administrators', () => {
     expect(JSON.stringify(alert)).not.toContain('9001015800086')
   })
 
+  it('gets the article right for every kind', async () => {
+    // "A access request has been submitted" is what actually went out the first
+    // time this ran for real. Every test passed, because none of them read the
+    // sentence.
+    const expected: Record<string, string> = {
+      ACCESS: 'An access request has been submitted',
+      OBJECTION: 'An objection request has been submitted',
+      CORRECTION: 'A correction request has been submitted',
+      DELETION: 'A deletion request has been submitted',
+      CONSENT_WITHDRAWAL: 'A consent withdrawal request has been submitted',
+    }
+
+    for (const [kind, title] of Object.entries(expected)) {
+      raiseAlert.mockClear()
+      await submitDataRequest({ ...VALID, kind: kind as typeof VALID.kind })
+      expect(raiseAlert.mock.calls[0][0].title).toBe(title)
+    }
+  })
+
   it('does not send an SMS, because there are thirty days', async () => {
     await submitDataRequest(VALID)
     expect(raiseAlert.mock.calls[0][0].severity).toBe('warning')

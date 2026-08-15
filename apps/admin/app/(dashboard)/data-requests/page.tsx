@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { listDataRequests, logDataRequest, startDataRequest, closeDataRequest } from '@/lib/services'
+import { listDataRequests, logDataRequest, startDataRequest, closeDataRequest, listMembers } from '@/lib/services'
 import { formatDate } from '@xxm/utils'
 import { Breadcrumb, Reveal, RouterPagination, PageHeader } from '@xxm/ui'
 import { ShieldQuestion } from 'lucide-react'
@@ -36,6 +36,9 @@ async function logAction(fd: FormData) {
     requesterEmail: String(fd.get('requesterEmail') ?? ''),
     kind:           String(fd.get('kind') ?? 'ACCESS') as DsrKind,
     detail:         String(fd.get('detail') ?? ''),
+    // Empty string means "not a member" — the select's own first option — and
+    // must reach the service as null rather than as an id that does not exist.
+    subjectId:      String(fd.get('subjectId') ?? '') || null,
   })
   revalidatePath('/data-requests')
 }
@@ -71,12 +74,24 @@ export default async function DataRequestsPage({
   const overdueOnly = params.overdue === '1'
   const page        = Math.max(1, parseInt(params.page ?? '1', 10))
 
-  const { rows: items, total, openCount, overdueCount } = await listDataRequests(roles, {
-    status: status as never,
-    overdueOnly,
-    page,
-    limit: 20,
-  })
+  const [{ rows: items, total, openCount, overdueCount }, memberPage] = await Promise.all([
+    listDataRequests(roles, {
+      status: status as never,
+      overdueOnly,
+      page,
+      limit: 20,
+    }),
+    // For the optional "who is this about" link on the log form. The membership
+    // is capped well below this, so one page is the whole circle.
+    listMembers(roles, { limit: 100 }),
+  ])
+
+  const members = memberPage.items.map((m) => ({
+    id: m.id,
+    firstName: m.firstName,
+    lastName: m.lastName,
+    email: m.email,
+  }))
 
   const rows: DsrRow[] = items.map((r) => {
     const sc   = STATUS_CONFIG[r.status] ?? { label: r.status, className: 'xxm-status-pending' }
@@ -160,6 +175,26 @@ export default async function DataRequestsPage({
               placeholder="What they asked for, in their words"
               className="rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
             />
+            {/* Optional, and chosen by a person rather than matched on the email
+                they typed. Without it a request logged here can never be linked
+                to a member — which is most of them, since the ordinary route is
+                that somebody emails the Information Officer — and "What we hold"
+                only exists for a request whose subject is known. Matching on
+                requesterEmail automatically was the alternative, and it would
+                have let anyone attach their request to another member's record
+                by typing their address. */}
+            <select
+              name="subjectId"
+              defaultValue=""
+              className="sm:col-span-2 rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+            >
+              <option value="">Not a member, or not yet identified</option>
+              {members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.firstName} {m.lastName} — {m.email}
+                </option>
+              ))}
+            </select>
             <button
               type="submit"
               className="sm:col-span-2 justify-self-start px-4 py-2 rounded-xl bg-xxm-green text-white text-sm font-medium hover:bg-xxm-canopy transition-colors"

@@ -28,7 +28,7 @@ export default async function NotificationsPage({
 
   async function broadcast(fd: FormData) {
     'use server'
-    await requireAdmin('notifications.broadcast', { bulk: true })
+    const { userId, ip } = await requireAdmin('notifications.broadcast', { bulk: true })
 
     const message = (fd.get('message') as string)?.trim()
     const channel = fd.get('channel') as Channel
@@ -36,7 +36,17 @@ export default async function NotificationsPage({
 
     if (!message || message.length < 5) redirect('/notifications?failed=1')
 
-    const result = await internalAdminPost('/api/v1/admin/notifications/broadcast', { message, channel, filter })
+    // The acting admin must travel with the request. Without these the web app
+    // has no session to read — this is a server-to-server call, so no cookies —
+    // and cannot record who sent the broadcast. Contributions and invitations
+    // already forward them; this one did not, which is why every broadcast
+    // failed. `adminIp` matters for the same reason: without it the audit trail
+    // records our own server as the origin rather than the admin who clicked.
+    const result = await internalAdminPost(
+      '/api/v1/admin/notifications/broadcast',
+      { message, channel, filter },
+      { adminUserId: userId, adminIp: ip },
+    )
     redirect(result.ok ? '/notifications?sent=1' : '/notifications?failed=1')
   }
 
