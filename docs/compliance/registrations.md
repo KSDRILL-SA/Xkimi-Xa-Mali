@@ -191,8 +191,9 @@ yours.
 | 4 | ~~Retention enforcement job (report-only)~~ | ✅ Monthly survey |
 | 5 | ~~Data-subject-request log~~ | ✅ Admin console → Data Requests |
 | 6 | ~~Publish the PAIA manual~~ | ✅ `/paia`, linked in the footer |
-| 7 | **Execute the restore drill** | **High — should block go-live** |
-| 8 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
+| 7 | ~~Audit log not actually append-only~~ | ✅ Database trigger; the first drill found the property was only a convention |
+| 8 | **The production restore drill** — development drilled 2026-08-15; production data and the `age` round trip not yet | **High — should block go-live** |
+| 9 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
 
 ---
 
@@ -212,4 +213,5 @@ yours.
 | 10 | Attorney engaged | ☐ Not started | — |
 | 11 | Accountant engaged | ☐ Not started | — |
 | 12 | Backup & restore documented | ☑ Done | — |
-| 13 | **Restore drill executed** | ☐ Not started | — (engineering) |
+| 13 | Development restore drill | ☑ Run 2026-08-15 — found 3 defects | — |
+| 14 | **Production restore drill + `age` round trip** | ☐ Not started | — (engineering) |

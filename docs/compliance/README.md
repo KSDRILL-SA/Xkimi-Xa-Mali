@@ -79,13 +79,17 @@ Not external, but blocking production. Tracked in `registrations.md` clause 11.
 | 2 | ~~Retention enforcement~~ | ✅ Monthly survey, report-only; the survey itself is now watched, so its silence is not silent |
 | 3 | ~~Data-subject-request log~~ | ✅ Admin console → Data Requests; members submit at `/privacy/request`, deadlines watched weekly |
 | 4 | ~~PAIA manual published~~ | ✅ `/paia`, linked in the footer |
-| 5 | **Execute the restore drill** — the procedure has never been run | **High — should block go-live** |
-| 6 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
+| 5 | ~~Audit log not actually append-only~~ | ✅ Enforced by a database trigger, found by the first drill |
+| 6 | **The production restore drill** — development was drilled 2026-08-15; production data and the `age` round trip were not | **High — should block go-live** |
+| 7 | Decide on `REQUIRE_PASSWORD_POLICY_RESET` | Medium |
 
-On item 5: a backup procedure that has never been executed is a document, not a
-capability. The drill is short — restore staging into a fresh database and run the
-eight checks — and it is the difference between believing the records are
-recoverable and knowing it.
+On item 6: the development drill was worth running on its own — it found that the
+audit log could be updated and deleted by the ordinary application role, and that
+two of the eight verification checks could never have passed. What it did **not**
+exercise is production data, or the `age` encrypt-and-decrypt round trip that
+every scheduled backup depends on. A backup that encrypts perfectly and cannot be
+decrypted is worse than none, because it is believed. See
+[`../backup-and-restore.md`](../backup-and-restore.md) §8.
 
 ---
 
