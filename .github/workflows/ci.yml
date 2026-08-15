@@ -36,6 +36,13 @@ jobs:
       DIRECT_DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
       AUTH_SECRET: test_secret_32_chars_minimum_here_x
       NEXTAUTH_SECRET: test_secret_32_chars_minimum_here
+      # The admin app's schema requires these three and the workflow never had
+      # them. Nothing noticed because no build had ever run here.
+      NEXTAUTH_URL: http://localhost:3002
+      # Admin calls the member app server to server; the value is never reached
+      # during a build, but the schema requires it to be present and well-formed.
+      WEB_INTERNAL_URL: http://localhost:3000
+      ADMIN_API_SECRET: test_admin_api_secret_32_chars_min
       # Throwaway CI-only key (32 bytes / 64 hex chars). Not a real secret.
       ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
       NETCASH_SERVICE_KEY: test
