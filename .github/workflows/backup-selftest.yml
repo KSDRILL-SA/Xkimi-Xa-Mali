@@ -1,0 +1,152 @@
+# Proof that a backup can be read back.
+#
+# `backup.yml` encrypts every production dump to an `age` public key whose
+# private half is deliberately kept out of GitHub. That is the right design, and
+# it has an uncomfortable consequence: **nothing in CI has ever decrypted
+# anything**. The scheduled job could have been producing unreadable files since
+# the day it was written and every run would have reported success, because
+# encrypting is the part it does and reading back is the part nobody does until
+# the day the database is gone.
+#
+# A backup that encrypts perfectly and cannot be decrypted is worse than no
+# backup, because it is believed.
+#
+# So this exercises the whole path — keygen, encrypt, decrypt, compare — on a
+# throwaway keypair and synthetic data. It needs no secrets, touches no real
+# database, and never sees a member's information. It is not a substitute for the
+# production drill in docs/backup-and-restore.md §8; it is the part of that drill
+# that can be automated, run on every change to how backups are made.
+
+name: Backup Self-Test
+
+on:
+  push:
+    paths:
+      - '.github/workflows/backup.yml'
+      - '.github/workflows/backup-selftest.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/backup.yml'
+      - '.github/workflows/backup-selftest.yml'
+  schedule:
+    # Monthly. The crypto does not change on its own, but the runner image does,
+    # and `age` disappearing from apt is exactly the kind of silent breakage this
+    # is here to catch.
+    - cron: '0 4 2 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  round-trip:
+    name: Encrypt, decrypt, compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install age
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age
+          age --version
+
+      - name: Generate a throwaway keypair
+        run: |
+          set -euo pipefail
+          # Never reused, never stored, gone when the runner is destroyed. The
+          # real private key is not here and must never be.
+          age-keygen -o throwaway.key 2>keygen.out
+          PUB=$(grep -oE 'age1[a-z0-9]+' keygen.out | head -1)
+          if [ -z "$PUB" ]; then
+            echo "::error::could not read a public key out of age-keygen"
+            cat keygen.out
+            exit 1
+          fi
+          echo "PUB=$PUB" >> "$GITHUB_ENV"
+          echo "Public key: $PUB"
+
+      - name: Build a dump-shaped file
+        run: |
+          set -euo pipefail
+          # Binary, and larger than the 50 KB floor backup.yml enforces, so this
+          # exercises the same size class as a real custom-format dump rather
+          # than a one-line text file that would round-trip trivially.
+          head -c 2097152 /dev/urandom > original.bin
+          sha256sum original.bin | tee original.sha256
+          ls -l original.bin
+
+      - name: Encrypt, exactly as backup.yml does
+        run: |
+          set -euo pipefail
+          age --encrypt --recipient "$PUB" --output encrypted.age original.bin
+          ls -l encrypted.age
+          # A ciphertext that is byte-identical to the plaintext would mean the
+          # encryption silently did nothing.
+          if cmp -s original.bin encrypted.age; then
+            echo "::error::ciphertext is identical to plaintext — nothing was encrypted"
+            exit 1
+          fi
+
+      - name: Confirm it is not readable without the key
+        run: |
+          set -euo pipefail
+          # The whole premise is that holding the file is not holding the data.
+          # If a decrypt with a *different* key ever succeeds, that premise is
+          # gone and every backup ever taken is readable by whoever has it.
+          age-keygen -o wrong.key 2>/dev/null
+          if age --decrypt --identity wrong.key --output /dev/null encrypted.age 2>/dev/null; then
+            echo "::error::decrypted with the wrong key — the backups are not private"
+            exit 1
+          fi
+          echo "Refused with the wrong key, as it must."
+
+      - name: Decrypt and compare
+        run: |
+          set -euo pipefail
+          age --decrypt --identity throwaway.key --output restored.bin encrypted.age
+          # The check that matters. Not "it ran" — byte-for-byte identical.
+          if ! cmp -s original.bin restored.bin; then
+            echo "::error::round trip did NOT return the original bytes"
+            sha256sum original.bin restored.bin
+            exit 1
+          fi
+          sha256sum -c original.sha256 < /dev/null || true
+          echo "Round trip returned the original bytes exactly."
+
+      - name: Confirm a truncated archive is detected
+        run: |
+          set -euo pipefail
+          # Half-written backups are a real failure mode — an interrupted upload,
+          # a full disk at the destination. age must refuse rather than hand back
+          # a partial file that looks like a restore.
+          head -c $(( $(stat -c%s encrypted.age) / 2 )) encrypted.age > truncated.age
+          if age --decrypt --identity throwaway.key --output /dev/null truncated.age 2>/dev/null; then
+            echo "::error::a truncated archive decrypted without complaint"
+            exit 1
+          fi
+          echo "Truncated archive refused, as it must."
+
+      - name: Destroy the throwaway keys
+        if: always()
+        run: shred -u throwaway.key wrong.key 2>/dev/null || rm -f throwaway.key wrong.key
+
+      - name: Summary
+        run: |
+          {
+            echo "### Backup crypto verified"
+            echo ""
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| Encrypts to an \`age\` recipient | ✅ |"
+            echo "| Ciphertext differs from plaintext | ✅ |"
+            echo "| Refuses the wrong key | ✅ |"
+            echo "| Round trip is byte-identical | ✅ |"
+            echo "| Refuses a truncated archive | ✅ |"
+            echo ""
+            echo "Throwaway keypair, synthetic data, no secrets, no member information."
+            echo "This does **not** replace the production drill — see \`docs/backup-and-restore.md\` §8."
+          } >> "$GITHUB_STEP_SUMMARY"

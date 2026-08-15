@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill and the `age` round trip still outstanding** |
+| Status | Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill still outstanding**; the `age` round trip is proved in CI (§8a) |
 | Applies to | Production |
 | Companion to | `runbook.md`, `compliance/breach-response.md` |
 
@@ -381,6 +381,27 @@ the machine it ran from. Everything either side of that step was.
    be done with the app's own credentials. On Neon this is a console operation
    (branch or new database); locally it needs the `postgres` role. Worth knowing
    before the clock is running.
+
+### 8a. The `age` round trip — proved in CI
+
+`.github/workflows/backup-selftest.yml` runs the whole crypto path on a
+throwaway keypair and synthetic data: keygen, encrypt, decrypt, compare
+byte-for-byte. It also asserts the two things that would quietly void every
+backup — that a *wrong* key is refused, and that a **truncated** archive is
+refused rather than restored as a partial file.
+
+It needs no secrets, touches no database, and never sees a member's information.
+It runs on every change to either backup workflow, and monthly, because the
+runner image changes even when the crypto does not.
+
+Why it exists: `backup.yml` encrypts to a public key whose private half is
+deliberately kept out of GitHub, which means **nothing in CI had ever decrypted
+anything**. The scheduled job could have been writing unreadable files since the
+day it was written and every run would have reported success. Encrypting is the
+part it does; reading back is the part nobody does until the database is gone.
+
+This is not the production drill. It proves the envelope can be opened, not that
+what is inside it is a restorable database — §8 still owes that.
 
 ### Still outstanding — the real drill, before go-live
 
