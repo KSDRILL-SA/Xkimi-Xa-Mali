@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill still outstanding**; the `age` round trip is proved in CI (§8a) |
+| Status | **BLOCKED — no Actions run has ever started, see §0a.** Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill still outstanding**; the `age` round trip is proved in CI (§8a) |
 | Applies to | Production |
 | Companion to | `runbook.md`, `compliance/breach-response.md` |
 
@@ -13,6 +13,42 @@
 > assumption about someone else's product that nobody here has tested. This
 > document exists so that the first time a restore is attempted is **not** the day
 > it is needed.
+
+---
+
+## ⚠️ 0a. No backup has ever run
+
+**Verified 2026-08-15.** Every GitHub Actions run on this repository for at least
+the last forty runs has ended in `startup_failure` — created, then failed before
+a single job was provisioned. `gh api .../actions/runs/<id>` reports
+`path: BuildFailed` with an empty job list.
+
+This is **not** a fault in the workflow files. GitHub has parsed and registered
+all three (`CI`, `Backup`, `Backup Self-Test`) and lists them as `active`;
+Actions are enabled on the repository and all actions are allowed. The failure is
+at the point of provisioning a runner.
+
+For a **private** repository the usual cause is exhausted included Actions
+minutes, no payment method, or a spending limit of zero. The billing API endpoint
+has moved and cannot be read from here, so this needs a human to open
+**GitHub → Settings → Billing** and look.
+
+**What follows from it, and it is not small:**
+
+- **The daily backup in §3a has never executed.** Not once. There is no encrypted
+  copy of anything, and every statement in the compliance pack about a daily
+  off-platform backup describes an intention rather than a fact until this is
+  fixed.
+- **CI has never validated any commit.** Every gate reported on every pull
+  request in this repository was run on a developer machine. That is not nothing,
+  but it is not CI, and no branch has ever been checked by anything other than
+  the person who wrote it.
+- The in-app backup watcher added for exactly this class of problem is the right
+  instinct and cannot help yet: it needs a read-only token that is not set (§3b-ii).
+
+**Do this before relying on any of it.** Until a run reaches a job, the backup
+strategy is 1-1-0 again — one copy, one platform, nothing off-site — whatever the
+tables below say.
 
 ---
 

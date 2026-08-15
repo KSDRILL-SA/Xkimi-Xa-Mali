@@ -214,4 +214,13 @@ yours.
 | 11 | Accountant engaged | ☐ Not started | — |
 | 12 | Backup & restore documented | ☑ Done | — |
 | 13 | Development restore drill | ☑ Run 2026-08-15 — found 3 defects | — |
-| 14 | **Production restore drill + `age` round trip** | ☐ Not started | — (engineering) |
+| 14 | **Production restore drill + `age` round trip** | ☐ Not started | 15 |
+| 15 | **GitHub Actions billing — no run has ever started** | ☐ **BLOCKING** | — (owner, 5 minutes) |
+
+⚠️ **Item 15 is the one to do first.** Every Actions run on this repository ends
+in `startup_failure` before a job is provisioned — so the daily backup has never
+executed, and CI has never checked a commit. The workflows are valid and
+registered; this is almost certainly billing on a private repository. Check
+**GitHub → Settings → Billing**. Until it is fixed, the compliance pack's
+statements about a daily off-platform backup are aspirations, and should not be
+shown to a bank as fact. See `../backup-and-restore.md` §0a.
