@@ -120,6 +120,22 @@ jobs:
         run: npm run test
 
       - name: Build
+        # Scoped to this step on purpose. The job-level values are whatever the
+        # UPSTASH_*_TEST secrets hold, and this repository has none — so they
+        # arrive empty, which the admin schema rejects as an invalid URL and an
+        # empty token when Next collects /api/export.
+        #
+        # Only the build validates them. The tests pass with the empty values and
+        # were verified that way, and several of them care whether Redis reads as
+        # configured, so overriding this at job level would change what the suite
+        # is actually exercising in order to fix a different step.
+        #
+        # Placeholders rather than real credentials: nothing here connects to
+        # Redis. The build only needs the schema to be satisfiable, and a build
+        # check that required live infrastructure would be a worse check.
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL_TEST || 'https://redis.example.invalid' }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN_TEST || 'ci-placeholder-token' }}
         run: npm run build
 
       - name: Validate Prisma schema
