@@ -1,6 +1,7 @@
 'use client'
 
 import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { FACTS } from '@/lib/facts'
 
 type StatsData = {
   members: number
@@ -34,47 +35,68 @@ function formatPooled(total: number): { value: string; unit: string } {
   return { value: `R${Math.floor(total / 1000)}k`, unit: '+' }
 }
 
-function buildStats(data: StatsData): Stat[] {
-  const pooled = formatPooled(data.totalPooled)
+/**
+ * What a measured tile shows when the figure could not be measured.
+ *
+ * An em dash, and a `sub` that says plainly why. The alternative — printing a
+ * plausible number — is the defect this component was built around twice
+ * already, and a visitor who sees "—" learns something true (the figure is not
+ * available right now) where a substituted "4" teaches them something false.
+ */
+const UNAVAILABLE = '—'
+
+function buildStats(data: StatsData | null): Stat[] {
+  const pooled = data ? formatPooled(data.totalPooled) : { value: UNAVAILABLE, unit: '' }
 
   return [
     {
-      // No `|| 4` here. A real zero is a fact about the Foundation, and the
-      // fallback for an unreachable API already lives in `lib/stats`; a second
-      // one here only turned a true zero into a number nobody could stand
-      // behind. The same applied to months active, which published "1" while
-      // the Foundation was still in its first month.
-      value: String(data.members),
+      // No `|| 4` here. A real zero is a fact about the Foundation; a fallback
+      // here only turned a true zero into a number nobody could stand behind.
+      // The same applied to months active, which published "1" while the
+      // Foundation was still in its first month.
+      value: data ? String(data.members) : UNAVAILABLE,
       unit:  '',
       label: 'Active Members',
-      sub:   'Private brotherhood',
+      sub:   data ? 'Private brotherhood' : 'Figure unavailable',
       delay: 'delay-100',
     },
     {
       value: pooled.value,
       unit:  pooled.unit,
       label: 'Total Pooled',
-      sub:   'Contributions to date',
+      sub:   data ? 'Contributions to date' : 'Figure unavailable',
       delay: 'delay-200',
     },
     {
-      value: String(data.monthsActive),
+      value: data ? String(data.monthsActive) : UNAVAILABLE,
       unit:  '',
       label: 'Months Active',
-      sub:   'Growing together',
+      sub:   data ? 'Growing together' : 'Figure unavailable',
       delay: 'delay-300',
     },
     {
-      value: '100',
-      unit:  '%',
-      label: 'Automated Collections',
-      sub:   'Via Netcash DebiCheck',
+      // Was "100% Automated Collections", and it was not true: the audit log
+      // records manual payments and Netcash has never run a live collection.
+      // Sitting in a grid beside three live figures, it read as measured.
+      //
+      // The cap is a real fact, enforced in `constants.ts` — the fiftieth seat
+      // is refused — and it says something the other three do not: this circle
+      // is closed on purpose.
+      //
+      // It is also the one tile that survives an outage with a number on it,
+      // and legitimately so: it is not measured, so there is nothing to fail to
+      // measure. It is the rule itself, read from the same constant the system
+      // enforces it with.
+      value: String(FACTS.memberCap),
+      unit:  '',
+      label: 'Member Cap',
+      sub:   'A closed circle, by design',
       delay: 'delay-400',
     },
   ]
 }
 
-export function StatsDisplay({ data }: { data: StatsData }) {
+export function StatsDisplay({ data }: { data: StatsData | null }) {
   const revealRef = useScrollReveal(0.15)
   const stats = buildStats(data)
 

@@ -1,4 +1,5 @@
 import { ImageResponse } from 'next/og'
+import { FACTS } from '@/lib/facts'
 
 /**
  * The card people see when the site is shared.
@@ -96,7 +97,7 @@ export default function OpengraphImage() {
             maxWidth: 860,
           }}
         >
-          A private savings collective, built by four brothers for the people closest to them.
+          {`A private savings collective, built by ${FACTS.founderWord} brothers for the people closest to them.`}
         </div>
       </div>
     ),
