@@ -1,67 +1,21 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'fs'
 import path from 'path'
-import {
-  FOUNDER_COUNT,
-  MAX_MEMBERS,
-  MIN_CONTRIBUTION_ZAR,
-  MAX_CONTRIBUTION_ZAR,
-} from '@xxm/utils'
-
-import { FACTS } from '@/lib/facts'
 
 /**
- * Every fact the public site states about the Foundation, checked against the
- * constant the system actually enforces.
+ * Nothing the public site says about the Foundation may be typed if it can be
+ * derived.
  *
- * The site used to type these: "R100+ / Month" in the hero, "four brothers" in
- * five pieces of copy, a member count of 4 in the stats fallback, and "100%
- * Automated Collections" in a grid of live figures. All but the last happened to
- * be correct, which is exactly the danger — the day somebody raises the minimum
- * contribution in `constants.ts`, the marketing site keeps quoting the old
- * figure to the public and nothing anywhere disagrees.
+ * That the derived values are *correct* is `packages/utils`' business and is
+ * tested there, beside the constants they come from. What this file guards is
+ * different and cannot be checked from there: that the next person to write a
+ * sentence on this site reaches for `FACTS` instead of typing "four brothers"
+ * again. A page can import the shared module and still hardcode the number two
+ * lines below it, and no assertion about `FACTS` would ever notice.
  *
- * The last one was not correct at all. It sat among measured numbers implying it
- * had been measured, while the audit log records manual payments and Netcash has
- * never run a live collection. It is now the member cap, which is a real fact
- * the system enforces by refusing the fiftieth seat.
- */
-
-describe('the facts match the rules the system enforces', () => {
-  it('states the founder count the constant fixes', () => {
-    expect(FACTS.founderCount).toBe(FOUNDER_COUNT)
-    expect(FACTS.founderWord).toBe('four')
-    expect(FACTS.founderWordCapitalised).toBe('Four')
-  })
-
-  it('states the member cap the constant fixes', () => {
-    expect(FACTS.memberCap).toBe(MAX_MEMBERS)
-  })
-
-  it('formats the contribution range in rand, South African style', () => {
-    // A space, not a comma: a comma reads as a decimal point to a South
-    // African, which on a page about money is not a small thing.
-    //
-    // The separator is a NON-BREAKING space, written here as an escape rather
-    // than typed. An earlier version of this case typed a plain space and
-    // failed with "expected 'R10 000' to be 'R10 000'" — two strings that are
-    // identical on screen and different in memory. Spelling it out is the only
-    // way this assertion stays readable.
-    expect(FACTS.minMonthly).toBe(`R${MIN_CONTRIBUTION_ZAR}`)
-    expect(FACTS.maxMonthly).toBe('R10\u00a0000')
-    expect(FACTS.maxMonthly).not.toContain(',')
-    expect(MAX_CONTRIBUTION_ZAR).toBe(10_000)
-  })
-
-  it('offers the hero its "+" form without inventing a ceiling', () => {
-    expect(FACTS.minMonthlyPlus).toBe(`R${MIN_CONTRIBUTION_ZAR}+`)
-  })
-})
-
-/**
- * A source scan, because the risk is not that these values are wrong today — it
- * is that the next person types one instead of importing it, and nothing
- * notices until the constant moves.
+ * It earns its keep. The `Netcash DebiCheck` rule found occurrences in
+ * `FeaturesSection` and `HowItWorksSection` that a careful manual sweep had
+ * already missed twice.
  */
 describe('no public source states a fact it could derive', () => {
   const ROOTS = ['app', 'components'].map((d) => path.resolve(__dirname, '..', d))

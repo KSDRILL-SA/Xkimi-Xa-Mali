@@ -24,7 +24,7 @@ import { Footer } from '@/components/Footer'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { APP_URL, SUPPORT_EMAIL, adminWhatsAppUrl } from '@/lib/utils'
 import { FOUNDERS } from '@/lib/founders'
-import { FACTS } from '@/lib/facts'
+import { FACTS } from '@xxm/utils'
 
 export const metadata: Metadata = {
   title: 'About',

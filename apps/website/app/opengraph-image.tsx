@@ -1,5 +1,5 @@
 import { ImageResponse } from 'next/og'
-import { FACTS } from '@/lib/facts'
+import { FACTS } from '@xxm/utils'
 
 /**
  * The card people see when the site is shared.
