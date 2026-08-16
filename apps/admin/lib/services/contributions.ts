@@ -76,6 +76,8 @@ export async function listTransactionsForContributions(
 export async function generateContributions(
   adminId: string, adminRoles: string[],
   month: number, year: number,
+  /** Caller IP, for the audit trail. See `requireAdmin`. */
+  ip?: string,
 ) {
   assertAdmin(adminRoles)
 
@@ -124,6 +126,7 @@ export async function generateContributions(
     entity: 'Contribution',
     entityId: `${year}-${month}`,
     payload: { month, year, created, skipped, total: mandates.length },
+    ipAddress: ip,
   })
 
   return { created, skipped, total: mandates.length }
@@ -189,6 +192,8 @@ export async function waiveContribution(
   adminId: string, adminRoles: string[], contributionId: string,
   /** Why. Told to the member, and kept in the audit trail. */
   reason?: string,
+  /** Caller IP, for the audit trail. See `requireAdmin`. */
+  ip?: string,
 ) {
   assertAdmin(adminRoles)
 
@@ -251,6 +256,7 @@ export async function waiveContribution(
       amountPaid: Number(c.amountPaid),
       reason: trimmed,
     },
+    ipAddress: ip,
   })
 
   return { id: c.id, status: 'WAIVED' as const, period }
@@ -275,6 +281,8 @@ export async function recordPayment(
   amount: number,
   /** How it arrived - a deposit reference, cash at the meeting, and so on. */
   reference?: string,
+  /** Caller IP, for the audit trail. See `requireAdmin`. */
+  ip?: string,
 ) {
   assertAdmin(adminRoles)
 
@@ -386,6 +394,7 @@ export async function recordPayment(
       outstandingBefore: outstanding,
       status: settled ? 'PAID' : 'PARTIAL',
     },
+    ipAddress: ip,
   })
 
   return { id: c.id, amount, settled, period }

@@ -22,16 +22,16 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 async function approveMandateAction(fd: FormData) {
   'use server'
   const mandateId = fd.get('mandateId') as string
-  const { userId, roles: sr } = await requireAdmin('mandate.approve')
-  await approveMandate(userId, sr, mandateId)
+  const { userId, roles: sr, ip } = await requireAdmin('mandate.approve')
+  await approveMandate(userId, sr, mandateId, ip)
   revalidatePath('/mandates')
 }
 
 async function rejectMandateAction(fd: FormData) {
   'use server'
   const mandateId = fd.get('mandateId') as string
-  const { userId, roles: sr } = await requireAdmin('mandate.reject')
-  await rejectMandate(userId, sr, mandateId, undefined, String(fd.get('reason') ?? ''))
+  const { userId, roles: sr, ip } = await requireAdmin('mandate.reject')
+  await rejectMandate(userId, sr, mandateId, ip, String(fd.get('reason') ?? ''))
   revalidatePath('/mandates')
 }
 

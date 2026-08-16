@@ -38,41 +38,42 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
   async function handleStatusChange(fd: FormData) {
     'use server'
-    const { userId, roles: r } = await requireAdmin('member.changeStatus')
-    await setMemberStatus(userId, r, id, String(fd.get('status') ?? ''), undefined, String(fd.get('reason') ?? ''))
+    const { userId, roles: r, ip } = await requireAdmin('member.changeStatus')
+    await setMemberStatus(userId, r, id, String(fd.get('status') ?? ''), ip, String(fd.get('reason') ?? ''))
     revalidatePath(`/members/${id}`)
     revalidatePath('/members')
   }
 
   async function handleCorrectId(fd: FormData) {
     'use server'
-    const { userId, roles: r } = await requireAdmin('member.correctIdNumber')
+    const { userId, roles: r, ip } = await requireAdmin('member.correctIdNumber')
     await correctMemberIdNumber(
       userId, r, id,
       String(fd.get('idNumber') ?? ''),
       String(fd.get('reason') ?? ''),
+      ip,
     )
     revalidatePath(`/members/${id}`)
   }
 
   async function handleUnlock() {
     'use server'
-    const { userId, roles: r } = await requireAdmin('member.unlock')
-    await unlockMember(userId, r, id)
+    const { userId, roles: r, ip } = await requireAdmin('member.unlock')
+    await unlockMember(userId, r, id, ip)
     revalidatePath(`/members/${id}`)
   }
 
   async function handlePromoteAdmin() {
     'use server'
-    const { userId, roles: r } = await requireAdmin('member.grantAdmin')
-    await setMemberRole(userId, r, id, 'ADMIN', true)
+    const { userId, roles: r, ip } = await requireAdmin('member.grantAdmin')
+    await setMemberRole(userId, r, id, 'ADMIN', true, ip)
     revalidatePath(`/members/${id}`)
   }
 
   async function handleRemoveAdmin() {
     'use server'
-    const { userId, roles: r } = await requireAdmin('member.removeAdmin')
-    await setMemberRole(userId, r, id, 'ADMIN', false)
+    const { userId, roles: r, ip } = await requireAdmin('member.removeAdmin')
+    await setMemberRole(userId, r, id, 'ADMIN', false, ip)
     revalidatePath(`/members/${id}`)
   }
 
