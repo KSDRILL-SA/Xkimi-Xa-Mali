@@ -2,6 +2,7 @@
 
 import { Quote } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
+import { FACTS } from '@/lib/facts'
 
 const pillars = [
   {
@@ -11,7 +12,7 @@ const pillars = [
   },
   {
     title: 'Growing',
-    body: 'Pooled contributions compound over time. What no individual can build alone, four brothers build together.',
+    body: `Pooled contributions compound over time. What no individual can build alone, ${FACTS.founderWord} brothers build together.`,
     num: '02',
   },
   {
@@ -62,7 +63,7 @@ export function MissionSection() {
 
             <div className="mt-8 space-y-5 text-white/60 text-[15px] leading-relaxed">
               <p>
-                Xkimm Xa Mali Foundation was born from a conversation between four men who shared a
+                Xkimm Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a
                 common frustration: despite earning consistently, individual financial progress
                 felt slow, scattered, and unaccountable.
               </p>
