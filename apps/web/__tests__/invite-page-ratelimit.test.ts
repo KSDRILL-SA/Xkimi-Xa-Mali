@@ -7,7 +7,7 @@ import { resolve } from 'node:path'
  *
  * `POST /api/v1/auth/invitations/validate` calls `validateInviteCode` behind
  * `authRatelimit`. `GET /invite/[token]` called it behind no limiter at all,
- * and `middleware.ts` waves `/invite/` through as a public page — so the route
+ * and `proxy.ts` waves `/invite/` through as a public page — so the route
  * was throttled and the page beside it was an open oracle for the identical
  * check.
  *

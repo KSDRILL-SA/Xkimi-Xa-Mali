@@ -189,7 +189,7 @@ describe('the endpoint tells a stranger nothing', () => {
   it('is reachable without a session, which is the whole point', async () => {
     const { readFileSync } = await import('node:fs')
     const { resolve } = await import('node:path')
-    const middleware = readFileSync(resolve(__dirname, '../middleware.ts'), 'utf8')
+    const middleware = readFileSync(resolve(__dirname, '../proxy.ts'), 'utf8')
 
     expect(middleware).toContain("pathname === '/api/v1/auth/resend-verification'")
   })

@@ -49,7 +49,7 @@ describe('the middleware actually applies it', () => {
   const source = async () => {
     const { readFileSync } = await import('node:fs')
     const { resolve } = await import('node:path')
-    return readFileSync(resolve(__dirname, '../middleware.ts'), 'utf8')
+    return readFileSync(resolve(__dirname, '../proxy.ts'), 'utf8')
   }
 
   it('checks every mutating request, not only /api/*', async () => {
