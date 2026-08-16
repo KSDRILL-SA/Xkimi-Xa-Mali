@@ -6,15 +6,26 @@ export { cn }
 export const SITE_URL        = siteEnv.SITE_URL
 export const APP_URL         = siteEnv.APP_URL
 export const ADMIN_URL       = siteEnv.ADMIN_URL
-export const WA_LINK         = siteEnv.WA_LINK
 export const ADMIN_WA_NUMBER = siteEnv.ADMIN_WA_NUMBER
 export const SUPPORT_EMAIL   = siteEnv.SUPPORT_EMAIL
 
+/**
+ * A message to an administrator asking to be let in.
+ *
+ * Deliberately **not** the group's join link. This is a private, invite-only
+ * collective: someone who finds this site should be able to ask, and an
+ * administrator decides. A join link on a public page lets anyone walk into the
+ * group where members discuss their money.
+ *
+ * The group link is reachable from `siteEnv.WA_LINK` and is deliberately not
+ * re-exported here. This function used to fall back to it when no admin number
+ * was configured — unreachable in practice, because `lib/env` always resolves
+ * that variable to a real value or a placeholder, but it was the join link
+ * sitting one config change away from a public page. It is also not a degraded
+ * version of asking an administrator; it is the opposite of it.
+ */
 export function adminWhatsAppUrl(message: string): string {
-  if (ADMIN_WA_NUMBER) {
-    return `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(message)}`
-  }
-  return WA_LINK
+  return `https://wa.me/${ADMIN_WA_NUMBER}?text=${encodeURIComponent(message)}`
 }
 
 export const NAV_LINKS = [

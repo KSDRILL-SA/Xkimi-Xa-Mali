@@ -19,6 +19,11 @@ const links = {
   Legal: [
     { label: 'About',         href: '/about' },
     { label: 'Privacy Policy', href: `${APP_URL}/privacy` },
+    // PAIA section 51 requires the manual to be available on the body's
+    // *website*, and this is the site the public actually reaches — the member
+    // app is where a member signs in. It was linked there and not here, which
+    // satisfied the letter of "published somewhere" and none of the intent.
+    { label: 'PAIA Manual',   href: `${APP_URL}/paia` },
     { label: 'Terms of Service', href: `${APP_URL}/terms` },
     { label: 'Support',       href: `${APP_URL}/support` },
   ],
