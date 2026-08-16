@@ -1,13 +1,30 @@
 # Session Handoff
 
-**Session closed:** 2026-08-09 (second sitting — the member-app pass)
+**Session closed:** 2026-08-16
 **Branch state at close:** `main` is the **only** branch. No open pull requests.
-**Health at close:** typecheck 0 · lint 0 errors (5 warnings, all pre-existing
-files) · test 0 — **1264 passing** (was 1039) · build 0 (3/3) · `npm audit` 0.
+**Health at close:** typecheck 3/3 · lint 0 errors · **test 9/9 packages, 1714
+passing** · build 3/3 · `npm audit` 0 · **CI green on `main`**.
 
-Everything below was verified locally. **CI is still not executing** — GitHub
-Actions minutes are exhausted on the free tier. Nothing automated is checking
-this repository.
+## What changed most since the last handoff
+
+**CI runs now.** The previous handoff said Actions minutes were exhausted. That
+was wrong twice over: the account's **billing was locked** because a stored card
+failed authorisation against an empty billing address, and nothing was owed —
+both subscriptions are free. Roughly **2 250 runs had ended in `startup_failure`
+since at least 29 May**, so no commit in this repository's history had ever been
+validated by anything but a developer's machine. Fixed 2026-08-15; the story and
+the reasoning failures are in `backup-and-restore.md` §0a.
+
+**The website app is in the test pipeline.** It had no `__tests__` directory and
+no `test` script, so `turbo run test` ran eight tasks and skipped it. Every suite
+total quoted before 2026-08-16 was two apps out of three.
+
+**What CI found once it could run** — five defects, none introduced by the work
+that ran them: a live high-severity `nanoid` advisory; a seed that could not run
+on Node 20 while `engines` claims `>=20`; a `turbo.json` declaring no `env`, so
+**every cached task ran with a filtered environment**; nine missing workflow
+variables; and a build that could not compile without reaching Google for a font
+(now self-hosted in `packages/ui/fonts`).
 
 > The previous handoff (2026-08-08) is preserved in git history at `f8ff61b`.
 
@@ -27,7 +44,10 @@ same tree**. Recorded as §4.11 in `ENGINEERING_WORKFLOW.md`.
 **3. `rm -rf apps/*/.next` after a branch switch too.** Next's generated
 `.next/types/validator.ts` still imports routes from the other branch.
 
-**4. The website build needs the network.** All three apps use
+**4. ~~The website build needs the network.~~** Fixed — Playfair Display is
+self-hosted at `packages/ui/fonts` and loaded through `next/font/local`. The old
+note below is kept because the reasoning still applies to any font added later.
+All three apps use
 `next/font/google`. A DNS blip fails the build with `next/font: error:` and
 nothing is wrong with the code — re-run.
 
@@ -791,7 +811,8 @@ whatever ran next in that worker.
 | **Inngest stops scheduling entirely** | Everyone, on the next debit day | Nothing inside this system says so. Only an external monitor on `/api/v1/health` catches it — **not configured** |
 | **Migrations not run before deploy** | Everyone | Prisma errors on any query touching the new tables |
 | **A key removed from `ENCRYPTION_PREVIOUS_KEYS` too early** | Every member with a bank account | `secrets:reencrypt` exits non-zero. **Do not proceed past that** |
-| **CI still not executing** | Everyone | Nothing automated is checking this repository |
+| ~~CI still not executing~~ | — | **Resolved 2026-08-15.** Green on `main`. Was a billing lock, not exhausted minutes |
+| **Netcash not yet applied for** | The first collection | Known and expected — the merchant application has not been submitted |
 
 ---
 
@@ -807,7 +828,9 @@ whatever ran next in that worker.
 | 6 | Click through the Founder badge and role flows once on a real deploy | 30 min | A deploy |
 | 7 | Create the `staging` branch and stand that environment up | Half a day | Owner |
 | 8 | Confirm the `RESIGNED` sign-in interpretation with the founders | Minutes | Founders |
-| 9 | Restore CI (H-3) | Half a day | Billing decision |
+| 9 | ~~Restore CI (H-3)~~ | — | **Done 2026-08-15.** Green on `main` |
+| 11 | Set `BACKUP_AGE_PUBLIC_KEY` + `PRODUCTION_DIRECT_DATABASE_URL`, then the first real backup runs | 15 min | Owner (keypair) + a production DB |
+| 12 | Production restore drill (`backup-and-restore.md` §8). Development was drilled 2026-08-15 | Half a day | Action 11 |
 | 10 | GitHub Support request to purge the Founder Guide PDF blob | 15 min | Owner only |
 
 ---
