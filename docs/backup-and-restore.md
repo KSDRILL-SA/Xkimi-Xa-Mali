@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Status | **BLOCKED — account billing locked, see §0a.** Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill still outstanding**; the `age` round trip is proved in CI (§8a) |
+| Status | Billing lock resolved 2026-08-15 (§0a); CI and the self-test now run. Procedure documented; dump/restore drilled 2026-08-15 on development (§8). **Production drill still outstanding**; the `age` round trip is proved in CI (§8a) |
 | Applies to | Production |
 | Companion to | `runbook.md`, `compliance/breach-response.md` |
 
@@ -16,65 +16,64 @@
 
 ---
 
-## ⚠️ 0a. No backup has ever run — the account's billing is locked
+## 0a. The billing lock — found, and resolved 2026-08-15
 
-**Confirmed in the browser, 2026-08-15.** The repository's Actions tab carries a
-banner the REST API does not expose:
+For most of this repository's life, **no GitHub Actions run ever reached a job**:
+2 254 runs, every one `startup_failure`, going back to at least 29 May. The
+cause was invisible to the REST API and written only in a banner in the web UI:
 
-> **GitHub Actions workflows can't be executed on this repository.**
-> Your account's billing is currently locked. Please update your payment
-> information.
+> GitHub Actions workflows can't be executed on this repository. Your account's
+> billing is currently locked. Please update your payment information.
 
-And the account billing page:
+Underneath it, on the billing page: *"Invalid payment method — authorization hold
+failed."* Nothing was owed — GitHub Free and Copilot Free are both $0.00/month
+and metered usage was $0. The billing address on file was **empty**, so the
+bank's address check declined the verification hold, and GitHub locked billing
+across the account. On a private repository that lock blocks Actions outright.
 
-> **Your payment authorization has failed.** Please contact your bank to resolve
-> the issue.
+**Resolved** by completing the billing address and re-running the authorisation.
 
-**Nothing is owed.** GitHub Free is $0.00/month, Copilot Free is $0.00/month,
-metered usage for the period is $0 and next payment due is blank. A stored card
-failed *authorization* — typically a small verification hold declined by the bank
-— and GitHub responds by locking billing across the account. On a **private**
-repository that lock blocks Actions outright.
+### Verified working, same day
 
-### The fix
+| | |
+|---|---|
+| **Backup Self-Test** | ✅ **Passed in 19s** — the first successful workflow run in this repository's history. Round trip byte-identical, wrong key refused, truncated archive refused |
+| **Backup** | ✅ Guard verified: refused at the first step because `BACKUP_AGE_PUBLIC_KEY` is unset, rather than producing an unencrypted dump. Correct behaviour, now demonstrated rather than assumed |
 
-1. **github.com/settings/billing** → *Update payment method*, and/or contact the
-   bank about the declined authorization.
-2. Once the lock clears, workflows run again on the next trigger. Nothing in this
-   repository needs changing — the workflows have been valid and registered the
-   whole time.
-3. Then do the production drill in §8, which has been blocked behind this.
+### What it cost while it lasted
 
-### Why the API investigation could not find it
+- **The daily backup never executed once.** There is still no encrypted copy of
+  anything — that waits on §3b below.
+- **CI never validated a single commit** in this repository's history. Every gate
+  ever reported on every pull request here was run on a developer machine.
 
-Worth writing down, because the reasoning failed in an instructive way.
+### The reasoning failure, kept on purpose
 
-The first guess was exhausted Actions minutes. Checking usage appeared to refute
-it: **no** Actions usage in June, July or August, zero billable time on every
-run, free allowance untouched. That was recorded as "it is not the billing".
+Two rounds of API investigation reached the wrong answer, and the second was
+published with more confidence than it had earned.
 
-That conclusion was wrong, and the evidence for it was actually a **symptom of the
-real cause**. A billing lock prevents runs from starting, and runs that never
-start consume nothing — so zero usage is exactly what a lock produces. Zero usage
-ruled out *exhaustion*; it never ruled out *billing*, and the two were treated as
-the same thing.
+The first guess was exhausted Actions minutes. Checking usage looked like a
+refutation — no Actions usage in June, July or August, zero billable time on
+every run, free allowance untouched — and that was written up as *"it is not the
+billing."*
+
+**That evidence was a symptom of the real cause.** A billing lock stops runs
+before they start, and runs that never start consume nothing, so zero usage is
+precisely what a lock produces. Zero usage ruled out *exhaustion*; it never ruled
+out *billing*. The two were treated as one thing.
 
 Every API surface reported health: Actions enabled, all actions allowed,
-workflows registered and `active`, permissions normal. The one place the truth
-was written is a banner rendered only in the web UI. **When every API says fine
-and nothing works, open the page in a browser** — earlier than feels necessary.
+workflows registered and `active`, permissions normal, a manual dispatch failing
+as fast as a push. **When every API says healthy and nothing works, open the page
+in a browser — earlier than it feels necessary.**
 
-### What it cost
+### Still to do
 
-- **The daily backup has never executed.** Not once, in 2 250 runs. There is no
-  encrypted copy of anything.
-- **CI has never validated a single commit in this repository's history.** Every
-  gate ever reported on every pull request here was run on a developer machine.
-- The in-app backup watcher exists for this silence and needs a read-only token
-  that is not set (§3b-ii).
-
-Until the lock clears, the backup posture is **1-1-0** — one copy, one platform,
-nothing off-site — whatever the tables below say.
+1. Set `BACKUP_AGE_PUBLIC_KEY` and `PRODUCTION_DIRECT_DATABASE_URL` (§3b), after
+   which the daily backup runs for real and the first encrypted copy exists.
+2. The production drill (§8).
+3. Minor: `actions/checkout@v4` targets Node 20, which is deprecated and now
+   forced onto Node 24. Move to `@v5` before it stops being forced.
 
 ---
 

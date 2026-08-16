@@ -6,6 +6,30 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
  * module registry with the environment already in place.
  */
 
+/**
+ * Both payment adapters stubbed, for the last case in this file only.
+ *
+ * Every other case here re-imports `@/lib/env`, which is cheap. "is not a way to
+ * deploy without them" re-imports `@/integrations/payment`, and the real
+ * `netcash.adapter` drags in `@/lib/netcash` and from there the SOAP client, the
+ * batch-file builder, the method table and the retry helper — after a
+ * `resetModules()`, so none of it is cached.
+ *
+ * That one cold load, on a four-core machine with the rest of the suite
+ * competing, is what timed this test out at 30s. It was never asserting the
+ * wrong value; it never got an answer at all.
+ *
+ * Safe to stub because the case asserts that the module *throws* while loading.
+ * That decision is made in `payment/index.ts` from the environment alone, and
+ * the adapters are only ever compared by identity, never called.
+ */
+vi.mock('@/integrations/payment/netcash.adapter', () => ({
+  netcashGateway: { __stub: 'netcash' },
+}))
+vi.mock('@/integrations/payment/mock.adapter', () => ({
+  mockGateway: { __stub: 'mock' },
+}))
+
 // Everything lib/env demands on a live deployment *apart from* the Netcash
 // credentials, so a failure in these tests is always about those and never about
 // missing scaffolding. Kept complete deliberately: if a new live-required

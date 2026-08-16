@@ -13,6 +13,33 @@ vi.mock('@/lib/env', () => ({
 }))
 
 /**
+ * Both adapters stubbed, and this is what stops the file timing out.
+ *
+ * `selectGateway` uses these two only as identities — it returns one of them and
+ * `IS_MOCK_GATEWAY` is a `===` against `mockGateway`. It never calls a method on
+ * either. But importing the real `netcash.adapter` drags in `@/lib/netcash` and
+ * from there the SOAP client, the batch-file builder, the method table and the
+ * retry helper.
+ *
+ * Every case below calls `loadGateway`, which does `vi.resetModules()` and then
+ * re-imports — so that whole chain was being re-resolved and re-evaluated nine
+ * times in this one file. On a four-core machine, with the rest of the suite
+ * competing for those cores, nine cold loads of it is what pushed this past the
+ * 30s timeout: the failures were never wrong answers, they were `Test timed out
+ * in 30000ms`.
+ *
+ * Stubbing the two adapters leaves `index.ts` — the module actually under test —
+ * as the only thing being re-evaluated, and the identity comparison still means
+ * exactly what it meant.
+ */
+vi.mock('@/integrations/payment/netcash.adapter', () => ({
+  netcashGateway: { __stub: 'netcash' },
+}))
+vi.mock('@/integrations/payment/mock.adapter', () => ({
+  mockGateway: { __stub: 'mock' },
+}))
+
+/**
  * Every variable that can change the outcome, cleared before each case is set
  * up. DEPLOY_ENV and VERCEL_ENV matter most: they outrank NODE_ENV when deciding
  * whether this is the live deployment, and both are set in environments these
