@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Refuse to run without a destination key
         env:
@@ -181,7 +181,7 @@ jobs:
           ls -l "xxm-${STAMP}.dump.age"
 
       - name: Retain
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: xxm-backup-${{ env.STAMP }}
           path: xxm-*.dump.age
