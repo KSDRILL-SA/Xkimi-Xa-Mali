@@ -22,7 +22,7 @@ import path from 'path'
  * on the commit that adds the page rather than on the complaint that follows.
  */
 
-const SOURCE = readFileSync(path.resolve(__dirname, '..', 'middleware.ts'), 'utf8')
+const SOURCE = readFileSync(path.resolve(__dirname, '..', 'proxy.ts'), 'utf8')
 
 /** Everything before `if (isPublicPage || isPublicApi)` — the two allowlists. */
 const ALLOWLIST = SOURCE.slice(0, SOURCE.indexOf('if (isPublicPage || isPublicApi)'))

@@ -15,8 +15,9 @@ export function Navbar() {
   const [menuOpen, setMenuOpen]       = useState(false)
   const [activeSection, setActive]    = useState<string>('hero')
   const [showLeftFade, setLeftFade]   = useState(false)
-  const [showRightFade, setRightFade] = useState(true)
+  const [showRightFade, setRightFade] = useState(false)
   const navScrollRef                  = useRef<HTMLDivElement>(null)
+  const menuButtonRef                 = useRef<HTMLButtonElement>(null)
 
   /* ── Scroll state — visible only when exactly at the top ────────── */
   useEffect(() => {
@@ -41,13 +42,57 @@ export function Navbar() {
     return () => observers.forEach((o) => o?.disconnect())
   }, [])
 
+  /* ── The overlay menu is a modal, so it behaves like one ─────────
+     Escape closes it, the page behind stops scrolling while it is open,
+     and focus returns to the button that opened it rather than being
+     dropped at the top of the document. */
+  useEffect(() => {
+    if (!menuOpen) return
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    // Captured now rather than read in cleanup: by the time cleanup runs the
+    // ref may point somewhere else, and focus would be handed to whatever
+    // happened to be there instead of the button the user actually pressed.
+    const toggle = menuButtonRef.current
+
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      // Restore what was there rather than clearing to '', which would
+      // undo a lock some other component is still relying on.
+      document.body.style.overflow = previousOverflow
+      toggle?.focus()
+    }
+  }, [menuOpen])
+
   /* ── Mobile nav scroll fades ────────────────────────────────────── */
+
   const onNavScroll = () => {
     const el = navScrollRef.current
     if (!el) return
     setLeftFade(el.scrollLeft > 12)
     setRightFade(el.scrollLeft < el.scrollWidth - el.clientWidth - 12)
   }
+
+  /* Measured on mount, not assumed. `showRightFade` used to default to true,
+     so on a screen wide enough to show every pill without scrolling, the fade
+     sat there permanently hinting at content that was not there. Declared
+     after `onNavScroll` deliberately — an effect that calls a `const` defined
+     below it reads as fine and is one refactor away from a runtime error. */
+  useEffect(() => {
+    onNavScroll()
+    const el = navScrollRef.current
+    if (!el) return
+    const ro = new ResizeObserver(onNavScroll)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const scrollToSection = (id: string | null) => {
     if (!id) return
@@ -120,10 +165,12 @@ export function Navbar() {
 
           {/* ── Mobile hamburger ──────────────────────────────────── */}
           <button
+            ref={menuButtonRef}
             onClick={() => setMenuOpen((v) => !v)}
             className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold"
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
           >
             {menuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -173,11 +220,25 @@ export function Navbar() {
       </header>
 
       {/* ── Mobile full-screen overlay menu ─────────────────────────── */}
+      {/* `inert` while closed, which is the whole point.
+
+          This was `opacity-0 pointer-events-none` with `aria-hidden`.
+          `pointer-events-none` stops a mouse and does nothing to the Tab key,
+          so every link in here stayed focusable while invisible — and
+          `aria-hidden` over focusable children is an ARIA violation for
+          exactly that reason: the screen reader stops announcing the menu
+          while focus still travels into it, and the user is left tabbing
+          through something that is not on screen.
+
+          `inert` removes the whole subtree from focus order and the
+          accessibility tree together, which is the one attribute that makes
+          those two agree. */}
       <div
+        id="mobile-menu"
         className={`fixed inset-0 z-40 lg:hidden transition-all duration-400 ${
           menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
-        aria-hidden={!menuOpen}
+        inert={!menuOpen}
       >
         {/* backdrop */}
         <div

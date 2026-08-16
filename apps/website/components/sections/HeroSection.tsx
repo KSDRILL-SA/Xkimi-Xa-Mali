@@ -128,7 +128,13 @@ export async function HeroSection() {
             {[
               { icon: Users,      label: `${members} Member${members === 1 ? '' : 's'}`, sub: 'Brotherhood' },
               { icon: TrendingUp, label: 'R100+ / Month',     sub: 'Per member' },
-              { icon: Shield,     label: 'DebiCheck Verified', sub: 'Netcash' },
+              // "DebiCheck Verified" claimed a credential the Foundation does
+              // not hold — the Netcash merchant application has not been
+              // submitted, so nothing has verified anything. The system is
+              // built for DebiCheck and submits authenticated mandates, which
+              // is what this now says. A financial credential is exactly the
+              // claim a prospective member or a bank would rely on.
+              { icon: Shield,     label: 'DebiCheck Mandates', sub: 'Bank-authenticated' },
             ].map(({ icon: Icon, label, sub }) => (
               <div
                 key={label}

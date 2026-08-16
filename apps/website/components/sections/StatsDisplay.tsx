@@ -16,28 +16,49 @@ type Stat = {
   delay: string
 }
 
+/**
+ * The pooled total, shortened without ever claiming more than there is.
+ *
+ * This used to be `(total / 1000).toFixed(0)` with a `+` always appended, which
+ * rounds up: R1 500 was published as "R2k+" and R9 900 as "R10k+". On a savings
+ * collective's public page that is not a formatting choice, it is a statement
+ * about other people's money that is larger than the money.
+ *
+ * Floored, so the figure shown is always one the Foundation genuinely holds, and
+ * the `+` appears only when something really was truncated — under a thousand
+ * the exact rand figure is shown with no `+` at all, because R480 is R480 and
+ * not "more than R480".
+ */
+function formatPooled(total: number): { value: string; unit: string } {
+  if (total < 1000) return { value: `R${Math.floor(total)}`, unit: '' }
+  return { value: `R${Math.floor(total / 1000)}k`, unit: '+' }
+}
+
 function buildStats(data: StatsData): Stat[] {
-  const pooled = data.totalPooled >= 1000
-    ? `R${(data.totalPooled / 1000).toFixed(0)}k`
-    : `R${data.totalPooled.toFixed(0)}`
+  const pooled = formatPooled(data.totalPooled)
 
   return [
     {
-      value: String(data.members || 4),
+      // No `|| 4` here. A real zero is a fact about the Foundation, and the
+      // fallback for an unreachable API already lives in `lib/stats`; a second
+      // one here only turned a true zero into a number nobody could stand
+      // behind. The same applied to months active, which published "1" while
+      // the Foundation was still in its first month.
+      value: String(data.members),
       unit:  '',
       label: 'Active Members',
       sub:   'Private brotherhood',
       delay: 'delay-100',
     },
     {
-      value: pooled,
-      unit:  '+',
+      value: pooled.value,
+      unit:  pooled.unit,
       label: 'Total Pooled',
       sub:   'Contributions to date',
       delay: 'delay-200',
     },
     {
-      value: String(data.monthsActive || 1),
+      value: String(data.monthsActive),
       unit:  '',
       label: 'Months Active',
       sub:   'Growing together',
