@@ -121,7 +121,7 @@ survives losing both vendor accounts.
 to end on development — which found that the audit log was not append-only and
 that two of the verification checks were wrong. See §8.
 
-**What is still untested:** the `age` encrypt/decrypt round trip, and all of it
+**Since updated — see §8b.** The `age` round trip has now been run against a real dump. What remains untested is all of it
 against *production* data. Neither has been done, and until the production drill
 is run the recovery time is unknown.
 
@@ -366,7 +366,7 @@ Run every step. Steps 4 and 5 are the ones that actually matter.
 | 2 | Latest data present | Most recent `AuditLog` entry is close to the restore point |
 | 3 | Migrations current | `prisma migrate status` reports no pending |
 | 4 | **Ledger preserved** | Entry count and pool balance match the source. **Not** "debits equal credits" — see below |
-| 5 | **Encrypted columns decrypt** | Read one member's ID number and one bank account number **through the application**. If these fail, the key ring is wrong and the restore is worthless |
+| 5 | **Encrypted columns decrypt** | `npm run secrets:reencrypt -w @xxm/database` — read-only without `--apply`. It walks every encrypted column and names the rows it cannot read. If any are named, the key ring is wrong and the restore is worthless |
 | 6 | Login works | Sign in as a test member |
 | 7 | Mandates intact | One active mandate per member still holds; no duplicates |
 | 8 | Audit log append-only | Confirm the constraint survived |
@@ -482,6 +482,47 @@ part it does; reading back is the part nobody does until the database is gone.
 
 This is not the production drill. It proves the envelope can be opened, not that
 what is inside it is a restorable database — §8 still owes that.
+
+### 8b. Development drill, 2026-08-16 — the full pipeline, end to end
+
+Run against the development database with `age` installed locally and a throwaway
+keypair. Every step of §6b exercised, and the restore done **inside a transaction
+that was rolled back**, so nothing was written.
+
+| Step | Result |
+|---|---|
+| `pg_dump --format=custom` | 144 KB, 40 table-data entries |
+| `pg_restore --list` | Opens cleanly |
+| Full archive read to SQL | 153 KB — every block decompressed |
+| `age` encrypt | 145 KB, ciphertext differs from plaintext |
+| Wrong key | **Refused** |
+| `age` decrypt → sha256 | **Byte-identical** to the original dump |
+| Restore into a live server | All 40 tables, inside `BEGIN … ROLLBACK` |
+| Row counts vs original | users 3/3, contributions 3/3, transactions 6/6, ledger 18/18, audit_logs 89/89, mandates 2/2, templates 43/43 — **all match** |
+| Append-only triggers | Both `audit_logs_no_delete` and `audit_logs_no_update` restored |
+| Dev database afterwards | Untouched — one schema, 40 tables, same row counts |
+
+**Method worth reusing.** The application role cannot `CREATE DATABASE`, which is
+what stopped the previous drill from restoring anywhere. It *can* create schemas,
+so the restore was done as `BEGIN; ALTER SCHEMA public RENAME TO drill_orig;
+CREATE SCHEMA public; \i dump.sql; …verify…; ROLLBACK;`. That exercises real DDL
+and real inserts against a real server, lets the restored tables be compared
+directly against the originals in the same transaction, and leaves nothing
+behind — including if it crashes, since Postgres rolls back an open transaction
+on disconnect.
+
+**What it found.** One bank account row written under a key no longer in the ring
+(`unversioned`, from 2026-06-11), unreadable and undetected until something asked
+for it. Development data, and harmless there — but the same condition in
+production is a member whose mandate cannot be submitted, discovered on debit
+night. It also exposed that `secrets:reencrypt` did not cover
+`Invitation.idNumber`, so a rotation would have reported a clean sweep while
+leaving every invitation pinned to the retired key. Both are covered now.
+
+**Windows note.** This `pg_dump`/`psql` build does not permute options after the
+connection string — `pg_dump "$URL" --format=custom` is silently rejected as
+"too many command-line arguments". Pass `-d "$URL"` last instead. GNU getopt
+permutes, so `backup.yml` on ubuntu-latest is unaffected.
 
 ### Still outstanding — the real drill, before go-live
 
