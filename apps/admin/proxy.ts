@@ -98,6 +98,13 @@ export default auth(async (req) => {
 
 export const config = {
   matcher: [
-    '/((?!login$|login/|forbidden$|forbidden/|_next/static|_next/image|favicon.ico|api/auth).*)',
+    // `icon.svg` sits beside `favicon.ico` for the same reason: Next serves the
+    // app icon from that path, and without the exclusion the proxy redirects the
+    // browser's favicon request to /login — so the one page where an
+    // unauthenticated person actually looks at this app is the one page with no
+    // icon. Listed explicitly rather than excluding every path with an
+    // extension, which is what the member app does; broadening an auth matcher
+    // is not a change to make in passing.
+    '/((?!login$|login/|forbidden$|forbidden/|_next/static|_next/image|favicon.ico|icon.svg|api/auth).*)',
   ],
 }
