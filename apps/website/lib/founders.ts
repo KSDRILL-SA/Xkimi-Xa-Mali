@@ -2,10 +2,18 @@
  * The four brothers who founded the collective — one source of truth, shared by
  * the About page and the hero backdrop so the two can never drift.
  *
- * `photo` points at a finished portrait card: the name and title are part of the
- * artwork, and the images differ in aspect ratio (3:4 and 1:1) and in background tone
- * (dark studio and light grey). Anything rendering these must show them WHOLE —
- * cropping to fill a landscape frame cuts the name band off the bottom.
+ * `photo` points at a finished portrait card: the gold rule, the role in gold
+ * caps and the name in white are printed INTO the artwork. Anything rendering
+ * these must show them WHOLE — cropping to fill a frame slices the name band off
+ * the foot — and must not print the name over them, which for a while the About
+ * page did, so every card carried its name twice with a near-opaque gradient
+ * dulling the printed one.
+ *
+ * All four are 3:4 (1086x1448) as at 2026-08-16. This note used to say they
+ * differed, 3:4 and 1:1; they were evened up at some point and nobody updated
+ * it. `object-contain` is still the right choice — it costs nothing while they
+ * match and is the difference between a letterbox and a decapitation if one
+ * ever does not.
  */
 import { FOUNDER_COUNT } from '@xxm/utils'
 
