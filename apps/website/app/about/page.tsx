@@ -303,47 +303,44 @@ export default async function AboutPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 lg:gap-10">
+            {/* Four across on a wide screen, so the brotherhood reads as a set
+                rather than as four separate billboards. At sm:grid-cols-2 each
+                card rendered around 660x880 on a desktop — one face filling half
+                the viewport, and four screens of scrolling to see the group. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-7">
               {founders.map(({ photo, name, title, bio, ring, accent }, idx) => (
                 <div
                   key={name}
                   className={`group relative rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 ring-2 ${ring} hover:ring-xxm-gold/50`}
                 >
-                  {/* Large portrait */}
-                  <div className="relative w-full aspect-[3/4] overflow-hidden bg-xxm-green-900">
+                  {/* The portrait, shown whole.
+
+                      These are finished cards, not raw photographs: the gold
+                      rule, "FOUNDER & CHAIRMAN" and the name are printed into
+                      the artwork, as `lib/founders.ts` warns. This page used to
+                      lay a near-opaque gradient over that band and then print
+                      the same name and title on top of it — every card carried
+                      its name twice, the second one dulling the first.
+
+                      So the overlay is gone and the artwork speaks for itself.
+                      `object-contain` rather than `cover` because the same file
+                      warns a portrait may not be 3:4; contain letterboxes onto
+                      the green, cover would slice the name band off the foot. */}
+                  <div className="relative w-full aspect-[3/4] overflow-hidden bg-xxm-green-950">
                     <Image
                       src={photo}
                       alt={`${name} — ${title}`}
                       fill
                       priority={idx < 2}
-                      sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 560px"
-                      className="object-cover object-top transition-transform duration-700 group-hover:scale-105"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 320px"
+                      className="object-contain object-center transition-transform duration-700 group-hover:scale-[1.03]"
                     />
-                    {/* Dark-to-transparent gradient so name is legible */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-xxm-green-950/95 via-xxm-green-950/40 to-transparent" />
-                    {/* Colour accent on hover */}
+                    {/* Colour accent on hover, kept faint so it warms the card
+                        without tinting a person's face. */}
                     <div
-                      className={`absolute inset-0 bg-gradient-to-br ${accent} to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none`}
+                      className={`absolute inset-0 bg-gradient-to-br ${accent} to-transparent opacity-0 group-hover:opacity-60 transition-opacity duration-500 pointer-events-none`}
                       aria-hidden
                     />
-                    {/* Name / title overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 px-7 py-7">
-                      <div className="flex items-end justify-between gap-4">
-                        <div>
-                          <p className="font-display font-black text-white text-xl sm:text-2xl leading-snug drop-shadow">
-                            {name}
-                          </p>
-                          <p className="text-xxm-gold text-xs font-bold uppercase tracking-widest mt-2">
-                            {title}
-                          </p>
-                        </div>
-                        <div className="w-11 h-11 rounded-full bg-xxm-gold/15 border border-xxm-gold/40 backdrop-blur-sm flex items-center justify-center shrink-0">
-                          <span className="text-xxm-gold text-xs font-black tabular-nums">
-                            {String(idx + 1).padStart(2, '0')}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
 
                   {/* Bio panel */}
