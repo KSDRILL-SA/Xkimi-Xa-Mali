@@ -62,6 +62,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-ZA" className={`${GeistSans.variable} ${GeistMono.variable} ${playfairDisplay.variable}`}>
       <body className="min-h-dvh bg-xxm-champagne antialiased selection:bg-xxm-gold/30 selection:text-xxm-green-900">
+        {/* First focusable element on the page. WCAG 2.4.1 (Bypass Blocks) is
+            a Level A requirement, and this site has a nav of seven items ahead
+            of its content — a keyboard or screen-reader visitor had to walk all
+            of them on every page. The member and admin apps get this from
+            `packages/ui`'s AppHeader; this app has its own Navbar and so had
+            the target (`#main-content`) with nothing pointing at it. */}
+        <a href="#main-content" className="skip-to-main">Skip to main content</a>
         {children}
         <script src="/nav-progress.js" defer />
       </body>
