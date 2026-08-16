@@ -1,7 +1,7 @@
 'use client'
 
 import { useScrollReveal } from '@/hooks/useScrollReveal'
-import { FACTS } from '@/lib/facts'
+import { FACTS } from '@xxm/utils'
 
 type StatsData = {
   members: number

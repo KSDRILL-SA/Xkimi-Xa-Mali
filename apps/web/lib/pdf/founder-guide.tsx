@@ -3,7 +3,7 @@ import { Document, Page, View, Text, StyleSheet, renderToBuffer } from '@react-p
 import {
   MAX_MEMBERS, FOUNDER_COUNT, MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR,
   DEFAULT_INVITE_AMOUNT, MIN_GOAL_PAYMENT, MAX_GOAL_PAYMENT,
-  PASSWORD_MIN_LENGTH,
+  PASSWORD_MIN_LENGTH, FACTS,
 } from '@xxm/utils'
 import { NETCASH_FEE_BUFFER } from '@/lib/group-account'
 import { registerGuideFonts, loadPortraits, type Portrait } from './guide-assets'
@@ -223,7 +223,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           version={VERSION}
           released={RELEASED}
           nextReview={NEXT_REVIEW}
-          blurb={`A private savings collective built by four brothers, for four brothers and the people closest to them. This guide explains what the Foundation is, exactly how money moves, what your account holds, and the one rule every member agrees to before joining.`}
+          blurb={`A private savings collective built by ${FACTS.founderWord} brothers, for ${FACTS.founderWord} brothers and the people closest to them. This guide explains what the Foundation is, exactly how money moves, what your account holds, and the one rule every member agrees to before joining.`}
           photos={portraits}
         />
       </Page>

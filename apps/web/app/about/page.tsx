@@ -16,6 +16,7 @@ import {
   Zap,
   MessageCircle,
 } from 'lucide-react'
+import { FACTS } from '@xxm/utils'
 
 export const metadata: Metadata = {
   title: 'About',
@@ -90,7 +91,7 @@ const values = [
   {
     icon: Users,
     title: 'Stronger Together',
-    body: "We operate on the age-old African wisdom of ubuntu — 'I am because we are.' What one person cannot achieve alone, four brothers can achieve together.",
+    body: `We operate on the age-old African wisdom of ubuntu — 'I am because we are.' What one person cannot achieve alone, ${FACTS.founderWord} brothers can achieve together.`,
   },
   {
     icon: Target,
@@ -100,7 +101,7 @@ const values = [
   {
     icon: Handshake,
     title: 'Trust Above All',
-    body: "Xkimm Xa Mali Foundation runs on trust. The technology enforces it, the governance backs it, but it begins with four men who chose to keep their word to each other.",
+    body: `Xkimm Xa Mali Foundation runs on trust. The technology enforces it, the governance backs it, but it begins with ${FACTS.founderWord} men who chose to keep their word to each other.`,
   },
 ]
 
@@ -178,7 +179,7 @@ export default function AboutPage() {
             </blockquote>
 
             <p className="text-white/60 text-sm max-w-md leading-relaxed">
-              A private, invite-only collective financial platform built by four brothers united
+              A private, invite-only collective financial platform built by {FACTS.founderWord} brothers united
               by discipline, brotherhood, and an unshakeable vision for shared wealth.
             </p>
           </div>
@@ -196,7 +197,7 @@ export default function AboutPage() {
 
             <div className="space-y-5 text-gray-600 text-[15px] leading-relaxed max-w-prose mx-auto">
               <p>
-                Xkimm Xa Mali Foundation was born from a conversation between four men who shared a common
+                Xkimm Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a common
                 frustration: despite earning consistently, individual financial progress felt slow,
                 scattered, and unaccountable. They recognised what generations of their people had
                 always known — that money moves faster and further when it moves together.
@@ -282,7 +283,7 @@ export default function AboutPage() {
               </span>
               <h2 className="text-2xl sm:text-3xl font-black text-xxm-green-900">Meet the founders</h2>
               <p className="text-gray-500 text-sm max-w-md leading-relaxed mt-1">
-                Four men. One pact. A platform built from scratch with nothing but discipline,
+                {FACTS.founderWordCapitalised} men. One pact. A platform built from scratch with nothing but discipline,
                 vision, and each other&rsquo;s word.
               </p>
             </div>
@@ -374,7 +375,7 @@ export default function AboutPage() {
                 },
                 {
                   heading: 'Automated debits',
-                  body: 'Monthly contributions are collected via Netcash DebiCheck — zero manual transfers.',
+                  body: 'Monthly contributions are collected by DebiCheck mandate — bank-authenticated, zero manual transfers.',
                 },
                 {
                   heading: 'Full audit trail',
