@@ -48,8 +48,8 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 async function revokeInvitationAction(fd: FormData) {
   'use server'
   const id = fd.get('id') as string
-  const { userId, roles: sr } = await requireAdmin('invitation.revoke')
-  await revokeInvitation(userId, sr, id)
+  const { userId, roles: sr, ip } = await requireAdmin('invitation.revoke')
+  await revokeInvitation(userId, sr, id, ip)
   revalidatePath('/invitations')
 }
 

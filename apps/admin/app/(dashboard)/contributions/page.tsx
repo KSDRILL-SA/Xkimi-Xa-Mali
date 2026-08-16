@@ -146,7 +146,7 @@ export default async function ContributionsPage({
    */
   async function waive(fd: FormData) {
     'use server'
-    const { userId, roles: r } = await requireAdmin('contribution.waive')
+    const { userId, roles: r, ip } = await requireAdmin('contribution.waive')
 
     const id     = String(fd.get('contributionId') ?? '')
     const reason = String(fd.get('reason') ?? '')
@@ -156,7 +156,7 @@ export default async function ContributionsPage({
       `/contributions?month=${m}&year=${y}${st ? `&status=${st}` : ''}&page=${pg}${extra}`
 
     try {
-      const res = await waiveContribution(userId, r, id, reason)
+      const res = await waiveContribution(userId, r, id, reason, ip)
       redirect(back(`&waived=1&period=${encodeURIComponent(res.period)}`))
     } catch (err) {
       if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
@@ -166,7 +166,7 @@ export default async function ContributionsPage({
 
   async function record(fd: FormData) {
     'use server'
-    const { userId, roles: r } = await requireAdmin('contribution.record-payment')
+    const { userId, roles: r, ip } = await requireAdmin('contribution.record-payment')
 
     const id     = String(fd.get('contributionId') ?? '')
     const amount = Number(fd.get('amount') ?? 0)
@@ -177,7 +177,7 @@ export default async function ContributionsPage({
       `/contributions?month=${m}&year=${y}${st ? `&status=${st}` : ''}&page=${pg}${extra}`
 
     try {
-      const res = await recordPayment(userId, r, id, amount, ref)
+      const res = await recordPayment(userId, r, id, amount, ref, ip)
       redirect(back(`&recorded=1&amount=${res.amount}&period=${encodeURIComponent(res.period)}`))
     } catch (err) {
       if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
@@ -187,11 +187,11 @@ export default async function ContributionsPage({
 
   async function generate(fd: FormData) {
     'use server'
-    const { userId, roles: r } = await requireAdmin('contributions.generate', { bulk: true })
+    const { userId, roles: r, ip } = await requireAdmin('contributions.generate', { bulk: true })
     const m = parseInt(fd.get('month') as string, 10)
     const y = parseInt(fd.get('year')  as string, 10)
 
-    const result = await generateContributions(userId, r, m, y)
+    const result = await generateContributions(userId, r, m, y, ip)
     redirect(`/contributions?month=${m}&year=${y}&generated=1&created=${result.created}&skipped=${result.skipped}&total=${result.total}`)
   }
 
