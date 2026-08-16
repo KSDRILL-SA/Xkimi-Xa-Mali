@@ -1,8 +1,8 @@
 import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
 import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
-import { FACTS } from '@/lib/facts'
 import { FoundersBackdrop } from './FoundersBackdrop'
+import { FACTS } from '@xxm/utils'
 
 export async function HeroSection() {
   const stats = await getPublicStats()

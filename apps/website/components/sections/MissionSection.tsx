@@ -2,7 +2,7 @@
 
 import { Quote } from 'lucide-react'
 import { useScrollReveal } from '@/hooks/useScrollReveal'
-import { FACTS } from '@/lib/facts'
+import { FACTS } from '@xxm/utils'
 
 const pillars = [
   {

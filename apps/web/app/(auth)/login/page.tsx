@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { Users, ShieldCheck, FileText } from 'lucide-react'
-import { MAX_MEMBERS } from '@xxm/utils'
+import { MAX_MEMBERS, FACTS } from '@xxm/utils'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { SkeletonForm } from '@/components/ui/Skeleton'
 import { XmmLogo } from '@/components/ui/XmmLogo'
@@ -84,7 +84,7 @@ export default function LoginPage() {
               <span className="block text-xxm-gold">Securing.</span>
             </h2>
             <p className="text-green-100/70 text-sm leading-relaxed mt-4 max-w-sm">
-              A private savings collective built by four brothers, for the people closest to them.
+              A private savings collective built by {FACTS.founderWord} brothers, for the people closest to them.
             </p>
           </div>
 
