@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
 
 // ---------------------------------------------------------------------------
 // The route reads `REDIS_CONFIGURED` and `redis` from '@/lib/redis' and runs
@@ -99,6 +99,30 @@ async function loadRoute(opts: {
   const { GET } = await import('@/app/api/v1/health/route')
   return { GET, ping }
 }
+
+/**
+ * One throwaway load, so no assertion pays the cold transform.
+ *
+ * The `next/server` stub below took this file from "times out" to "passes", but
+ * it did not make the first `loadRoute` cheap — it made the other ten cheap.
+ * Vite compiles the route and its whole import graph from TypeScript once per
+ * process and caches the result; `vi.resetModules()` clears evaluated module
+ * instances, not that compile cache. So call one carries transform + evaluate
+ * and calls two through eleven carry evaluate alone.
+ *
+ * That is why the case that failed under a nine-package `turbo run test` was
+ * always the first one in the file, and why it passed on its own and passed on
+ * a re-run — the second run found a warm cache. It was never a wrong answer,
+ * and the number it asserts has never been in doubt.
+ *
+ * Paying it here means the budget each test is held to measures the route, not
+ * the compiler. The hook gets its own generous timeout because the cost is
+ * genuinely unbounded: it scales with how much else the machine is compiling at
+ * that moment, and this suite runs alongside eight other packages.
+ */
+beforeAll(async () => {
+  await loadRoute({ redis: { configured: true } })
+}, 120_000)
 
 beforeEach(() => vi.clearAllMocks())
 
