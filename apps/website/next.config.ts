@@ -4,6 +4,12 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/config', 'geist'],
   images: {
     formats: ['image/avif', 'image/webp'],
+    // Next 16 requires every quality the app asks for to be declared, and warns
+    // on each render otherwise. `FoundersBackdrop` uses both: 40 for the blurred
+    // backdrop, where detail is thrown away anyway and the saving is real on a
+    // 1.6 MB portrait, and 85 for the portrait shown at full size. 75 is Next's
+    // default and is kept for anything that does not ask.
+    qualities: [40, 75, 85],
     // No remotePatterns: every image the site renders is now served from its own
     // /public. The hero was the last third-party fetch (a stock photo from
     // Unsplash) and it is now the founders' own portraits.
