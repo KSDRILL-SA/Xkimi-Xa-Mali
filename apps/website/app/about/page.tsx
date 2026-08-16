@@ -105,7 +105,7 @@ export default async function AboutPage() {
     <>
       <Navbar />
 
-      <main className="pt-[var(--nav-height)]">
+      <main id="main-content" className="pt-[var(--nav-height)]">
 
         {/* ── Hero ──────────────────────────────────────────────────── */}
         <section className="relative overflow-hidden bg-xxm-green pb-20 md:pb-28 pt-16 md:pt-24 px-4">

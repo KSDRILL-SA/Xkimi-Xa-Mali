@@ -343,3 +343,23 @@ body {
   box-shadow: 0 0 0 2px #D4AF37, 0 0 0 4px rgba(212,175,55,0.2);
 }
 .btn-base:active { transform: scale(0.97); }
+
+/* ── Skip to main ─────────────────────────────────────────────────────────── */
+/* Copied from packages/ui/src/globals.css rather than imported: this app does
+   not pull in that stylesheet, and duplicating fourteen lines is cheaper than
+   dragging the whole shared sheet in for one class. Keep them in step. */
+.skip-to-main {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  z-index: 9999;
+  background: #1b4332;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+.skip-to-main:focus { top: 1rem; }
