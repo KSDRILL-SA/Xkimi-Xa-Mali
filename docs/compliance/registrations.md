@@ -215,19 +215,16 @@ yours.
 | 12 | Backup & restore documented | ☑ Done | — |
 | 13 | Development restore drill | ☑ Run 2026-08-15 — found 3 defects | — |
 | 14 | **Production restore drill + `age` round trip** | ☐ Not started | 15 |
-| 15 | **GitHub billing is locked — a payment authorization failed** | ☐ **BLOCKING** | — (owner + bank) |
+| 15 | ~~GitHub billing locked — Actions could not run~~ | ☑ **Resolved 2026-08-15** | — |
 
-⚠️ **Item 15 first, and it is a five-minute job.** GitHub has locked billing on
-the account because a stored card failed authorization. That lock blocks Actions
-on private repositories, so **the daily backup has never run** and **CI has never
-checked a commit** — 2 250 runs, none of which reached a job.
+✅ The account's billing lock is cleared. A failed card authorisation — caused by
+an empty billing address, not by anything owed — had blocked Actions on this
+private repository for months, so **2 254 runs never reached a job**. The
+`Backup Self-Test` now passes in 19 seconds, and the `Backup` workflow correctly
+refuses to run while its key is unset.
 
-**Nothing is owed.** Everything is on free plans at $0.00/month and metered usage
-is $0; it is a declined verification hold, not an unpaid bill.
-
-**Fix:** github.com/settings/billing → *Update payment method*, and contact the
-bank about the declined authorization. Nothing in this repository needs changing.
-
-Until it clears, the pack's statements about a daily off-platform backup are
-aspirations and must not be shown to a bank as fact.
+**Next, and now unblocked:** set `BACKUP_AGE_PUBLIC_KEY` and
+`PRODUCTION_DIRECT_DATABASE_URL` (`../backup-and-restore.md` §3b), after which the
+daily backup runs for real and the Foundation has its first encrypted copy. Only
+then does the pack's statement about a daily off-platform backup become fact.
 See `../backup-and-restore.md` §0a.

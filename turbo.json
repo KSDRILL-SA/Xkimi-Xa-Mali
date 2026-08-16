@@ -1,30 +1,88 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NODE_ENV",
+    "DEPLOY_ENV",
+    "VERCEL_ENV",
+    "DATABASE_URL",
+    "DIRECT_DATABASE_URL",
+    "AUTH_SECRET",
+    "NEXTAUTH_SECRET",
+    "NEXTAUTH_URL",
+    "ENCRYPTION_KEY",
+    "ADMIN_API_SECRET",
+    "WEB_INTERNAL_URL",
+    "TRUSTED_PROXY",
+    "NETCASH_*",
+    "RESEND_*",
+    "UPSTASH_*",
+    "INNGEST_*",
+    "BULKSMS_*",
+    "SENTRY_*",
+    "BLOB_READ_WRITE_TOKEN",
+    "WHATSAPP_*",
+    "ADMIN_WHATSAPP_NUMBER",
+    "SUPPORT_EMAIL",
+    "ALERT_FALLBACK_EMAIL",
+    "PAYMENT_GATEWAY",
+    "MAX_LOGIN_ATTEMPTS",
+    "LOCKOUT_DURATION_MINUTES",
+    "REQUIRE_PASSWORD_POLICY_RESET",
+    "ENABLE_GOAL_LOCKING",
+    "ENABLE_MANUAL_PAYMENTS",
+    "NEXT_PUBLIC_*"
+  ],
   "ui": "tui",
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": [".next/**", "!.next/cache/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        ".env*"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": [
+        "^typecheck"
+      ]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$"],
-      "outputs": ["coverage/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
     },
-    "db:generate": { "cache": false },
-    "db:migrate":  { "cache": false },
-    "db:push":     { "cache": false },
-    "db:seed":     { "cache": false }
+    "db:generate": {
+      "cache": false
+    },
+    "db:migrate": {
+      "cache": false
+    },
+    "db:push": {
+      "cache": false
+    },
+    "db:seed": {
+      "cache": false
+    }
   }
 }

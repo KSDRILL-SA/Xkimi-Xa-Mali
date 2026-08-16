@@ -36,6 +36,13 @@ jobs:
       DIRECT_DATABASE_URL: postgresql://xxm:xxm_test@localhost:5432/xxm_test
       AUTH_SECRET: test_secret_32_chars_minimum_here_x
       NEXTAUTH_SECRET: test_secret_32_chars_minimum_here
+      # The admin app's schema requires these three and the workflow never had
+      # them. Nothing noticed because no build had ever run here.
+      NEXTAUTH_URL: http://localhost:3002
+      # Admin calls the member app server to server; the value is never reached
+      # during a build, but the schema requires it to be present and well-formed.
+      WEB_INTERNAL_URL: http://localhost:3000
+      ADMIN_API_SECRET: test_admin_api_secret_32_chars_min
       # Throwaway CI-only key (32 bytes / 64 hex chars). Not a real secret.
       ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
       NETCASH_SERVICE_KEY: test
@@ -52,6 +59,23 @@ jobs:
       BLOB_READ_WRITE_TOKEN: test
       WHATSAPP_GROUP_LINK: https://chat.whatsapp.com/test
       NEXT_PUBLIC_WEB_URL: http://localhost:3000
+      # The website app requires these six at build time and fails the build
+      # without them. DEPLOY_ENV=ci does not exempt it the way it exempts the
+      # server-side checks above: `lib/env.ts` is reachable from the browser
+      # bundle, and Next inlines only NEXT_PUBLIC_* there — so DEPLOY_ENV and
+      # VERCEL_ENV both read as undefined and `isLiveDeployment()` falls through
+      # to NODE_ENV, which every production build sets. The guard therefore
+      # treats any build as live, which is the safe direction for it to be wrong
+      # in, and means CI has to supply real-shaped values like a deploy would.
+      #
+      # Placeholders, but well-formed ones: the guard only rejects empty values,
+      # and a malformed URL here would fail somewhere less obvious than this.
+      NEXT_PUBLIC_SITE_URL: http://localhost:3001
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      NEXT_PUBLIC_ADMIN_URL: http://localhost:3002
+      NEXT_PUBLIC_WHATSAPP_GROUP_LINK: https://chat.whatsapp.com/test
+      NEXT_PUBLIC_ADMIN_WHATSAPP_NUMBER: '27000000000'
+      NEXT_PUBLIC_SUPPORT_EMAIL: support@example.invalid
 
     steps:
       - name: Checkout
@@ -96,6 +120,22 @@ jobs:
         run: npm run test
 
       - name: Build
+        # Scoped to this step on purpose. The job-level values are whatever the
+        # UPSTASH_*_TEST secrets hold, and this repository has none — so they
+        # arrive empty, which the admin schema rejects as an invalid URL and an
+        # empty token when Next collects /api/export.
+        #
+        # Only the build validates them. The tests pass with the empty values and
+        # were verified that way, and several of them care whether Redis reads as
+        # configured, so overriding this at job level would change what the suite
+        # is actually exercising in order to fix a different step.
+        #
+        # Placeholders rather than real credentials: nothing here connects to
+        # Redis. The build only needs the schema to be satisfiable, and a build
+        # check that required live infrastructure would be a worse check.
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL_TEST || 'https://redis.example.invalid' }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN_TEST || 'ci-placeholder-token' }}
         run: npm run build
 
       - name: Validate Prisma schema
