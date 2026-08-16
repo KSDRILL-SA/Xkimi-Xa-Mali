@@ -44,8 +44,27 @@ across the account. On a private repository that lock blocks Actions outright.
 
 - **The daily backup never executed once.** There is still no encrypted copy of
   anything — that waits on §3b below.
-- **CI never validated a single commit** in this repository's history. Every gate
-  ever reported on every pull request here was run on a developer machine.
+- **CI never validated a single commit** in this repository's history, up to this
+  point. Every gate ever reported on every pull request was run on a developer
+  machine.
+
+### What CI found once it could run
+
+CI went green on 2026-08-15 (PR #388). Getting there took five failures, and
+every one of them was a real defect that had been sitting undetected for as long
+as Actions had been blocked:
+
+| | |
+|---|---|
+| `nanoid <3.3.18` | A live high-severity advisory. The security-advisories step exists for exactly this and had never executed |
+| Seeding on Node 20 | `--import tsx/esm` throws `ERR_REQUIRE_CYCLE_MODULE`. Development runs Node 24; `engines` claims `>=20` |
+| Turborepo strict env | `turbo.json` declared nothing, so every **cached** task ran with a filtered environment. `cache: false` tasks got the full one, which is why seeding worked and hid it |
+| Nine missing variables | `NEXTAUTH_URL`, `WEB_INTERNAL_URL`, `ADMIN_API_SECRET` and the six `NEXT_PUBLIC_*` the website build requires |
+| `next/font/google` | Fetches at build time; the runners could not reach it, twice. The font is now self-hosted in `packages/ui/fonts` |
+
+The point worth keeping: none of these were introduced by the work that finally
+ran them. They were all already true, and the only thing standing between the
+repository and knowing about them was a declined card.
 
 ### The reasoning failure, kept on purpose
 
