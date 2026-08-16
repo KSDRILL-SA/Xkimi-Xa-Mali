@@ -43,8 +43,21 @@ const db = new PrismaClient()
  *
  * Adding a column to the schema means adding it here too — otherwise a
  * rotation reports success while leaving that column pinned to the old key.
- * The columns are `User.idNumber` and `BankAccount.accountNumber`; nothing else
- * is encrypted at rest.
+ * The columns are `User.idNumber`, `BankAccount.accountNumber` and
+ * `Invitation.idNumber`.
+ *
+ * That third one was missing until 2026-08-16, and its absence was the exact
+ * failure this script exists to prevent. `invite.service` stores the invitee's
+ * SA ID encrypted, so a rotation rewrote users and bank accounts, reported zero
+ * unreadable, and left every invitation pinned to the old key. The runbook then
+ * permits retiring a key once the report is clean — at which point those ID
+ * numbers become permanently unreadable, and the only sign is a registration
+ * that fails identity verification long afterwards.
+ *
+ * Found by a restore drill on 2026-08-15, which read every encrypted column back
+ * through the key ring and hit one invitation and one bank account it could not
+ * decrypt. If a column is encrypted anywhere in the codebase, it belongs in
+ * TARGETS below; the header comment claiming otherwise is how it was missed.
  */
 interface Target {
   /** Table name as a person would say it, for the report. */
@@ -84,6 +97,24 @@ const TARGETS: Target[] = [
     },
     async write(id, value) {
       await db.bankAccount.update({ where: { id }, data: { accountNumber: value } })
+    },
+  },
+  {
+    label: 'invitations.idNumber',
+    // Every invitation, not just PENDING ones. An expired or revoked invitation
+    // still holds a real person's ID number until retention removes it, and a
+    // value nobody can read is not a value nobody is responsible for.
+    async read(afterId) {
+      const rows = await db.invitation.findMany({
+        where: afterId ? { id: { gt: afterId } } : {},
+        select: { id: true, idNumber: true },
+        orderBy: { id: 'asc' },
+        take: BATCH_SIZE,
+      })
+      return rows.map((row) => ({ id: row.id, value: row.idNumber }))
+    },
+    async write(id, value) {
+      await db.invitation.update({ where: { id }, data: { idNumber: value } })
     },
   },
 ]
