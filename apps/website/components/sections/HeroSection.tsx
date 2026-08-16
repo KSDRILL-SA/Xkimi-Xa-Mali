@@ -1,10 +1,11 @@
 import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
 import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
+import { FACTS } from '@/lib/facts'
 import { FoundersBackdrop } from './FoundersBackdrop'
 
 export async function HeroSection() {
-  const { members } = await getPublicStats()
+  const stats = await getPublicStats()
 
   return (
     <section
@@ -126,8 +127,18 @@ export async function HeroSection() {
             style={{ animationDelay: '1s' }}
           >
             {[
-              { icon: Users,      label: `${members} Member${members === 1 ? '' : 's'}`, sub: 'Brotherhood' },
-              { icon: TrendingUp, label: 'R100+ / Month',     sub: 'Per member' },
+              // Omitted rather than guessed when the member app is unreachable.
+              // A pill reading "4 Members" beside two true statements is a
+              // claim about the size of the collective, and an outage is not a
+              // licence to make one; the row simply carries two pills instead.
+              ...(stats
+                ? [{
+                    icon: Users,
+                    label: `${stats.members} Member${stats.members === 1 ? '' : 's'}`,
+                    sub: 'Brotherhood',
+                  }]
+                : []),
+              { icon: TrendingUp, label: `${FACTS.minMonthlyPlus} / Month`, sub: 'Per member' },
               // "DebiCheck Verified" claimed a credential the Foundation does
               // not hold — the Netcash merchant application has not been
               // submitted, so nothing has verified anything. The system is

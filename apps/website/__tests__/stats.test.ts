@@ -3,16 +3,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 /**
  * The public site's only live data.
  *
- * `getPublicStats` reaches the member app for the member count, the pooled
- * total and how long the Foundation has been running, and falls back to static
- * values when it cannot. The fallback is the interesting part: this is a public
- * marketing page, so a silent wrong number is worse than a visible absence —
- * "R0 pooled" reads as a failed collective rather than as a failed fetch.
+ * `getPublicStats` reaches the member app for the member count, the pooled total
+ * and how long the Foundation has been running. All three are measured in the
+ * database; this module's whole job is to carry them to the page unchanged, or
+ * to admit it could not.
  *
- * These cases pin the behaviour that matters: the real numbers are used when
- * they arrive, the fallback is used rather than throwing when they do not, and
- * — the part that had no test and no logging — a failure is reported somewhere
- * a person will see it instead of being swallowed.
+ * It used to substitute a fallback instead — the founder count for `members`,
+ * zero for the rest. That is the behaviour these cases now forbid. The founder
+ * count and the active member count are different facts that are equal today
+ * only by coincidence, and the day they diverge, an outage would have the public
+ * page state the wrong size of the collective in the same typeface as two
+ * measured figures. Returning `null` forces each caller to decide what to show
+ * when there is nothing true to show, which is a question about honesty and does
+ * not belong hidden inside a default.
  */
 
 const fetchMock = vi.fn()
@@ -53,8 +56,8 @@ describe('the numbers the public sees', () => {
   })
 
   it('asks the member app, not itself', async () => {
-    // A site pointed at its own origin would 404 forever and quietly show the
-    // fallback, which is exactly the failure mode that looks like working.
+    // A site pointed at its own origin would 404 forever and quietly show no
+    // figures, which is exactly the failure mode that looks like working.
     fetchMock.mockResolvedValue(ok({ members: 1, totalPooled: 1, monthsActive: 1 }))
     const { getPublicStats } = await load()
     await getPublicStats()
@@ -75,25 +78,24 @@ describe('the numbers the public sees', () => {
 })
 
 describe('when the member app cannot be reached', () => {
-  it('falls back rather than throwing, so the page still renders', async () => {
+  it('reports nothing rather than throwing, so the page still renders', async () => {
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'))
-    const { getPublicStats, FALLBACK_STATS } = await load()
+    const { getPublicStats } = await load()
 
-    await expect(getPublicStats()).resolves.toEqual(FALLBACK_STATS)
+    await expect(getPublicStats()).resolves.toBeNull()
   })
 
-  it('falls back on a non-OK response too', async () => {
+  it('reports nothing on a non-OK response too', async () => {
     fetchMock.mockResolvedValue({ ok: false, json: async () => ({}) })
-    const { getPublicStats, FALLBACK_STATS } = await load()
+    const { getPublicStats } = await load()
 
-    await expect(getPublicStats()).resolves.toEqual(FALLBACK_STATS)
+    await expect(getPublicStats()).resolves.toBeNull()
   })
 
   it('says so, instead of failing silently', async () => {
-    // The whole point. The fallback publishes "R0 pooled" to the public, which
-    // is a claim about the Foundation rather than a missing value. If that is
-    // going to happen it must leave a trace, or a site showing zero for a month
-    // looks exactly like a site showing the truth.
+    // The whole point. An outage changes what every visitor sees, so it must
+    // leave a trace — otherwise a site showing no figures for a month looks
+    // exactly like a site nobody has looked at.
     fetchMock.mockRejectedValue(new Error('ECONNREFUSED'))
     const { getPublicStats } = await load()
     await getPublicStats()
@@ -101,23 +103,62 @@ describe('when the member app cannot be reached', () => {
     expect(warn).toHaveBeenCalled()
   })
 
-  it('falls back when the payload is missing the data envelope', async () => {
-    fetchMock.mockResolvedValue({ ok: true, json: async () => ({}) })
-    const { getPublicStats, FALLBACK_STATS } = await load()
+  it('never substitutes the founder count for the member count', async () => {
+    // The regression this module was rewritten to prevent. These are different
+    // facts, equal today by coincidence; asserted against the constant rather
+    // than the literal 4, because a test that hardcodes the number it checks
+    // cannot catch that number drifting.
+    const { getPublicStats } = await load()
+    const { FOUNDER_COUNT } = await import('@xxm/utils')
 
-    await expect(getPublicStats()).resolves.toEqual(FALLBACK_STATS)
+    fetchMock.mockRejectedValue(new Error('ECONNREFUSED'))
+    const result = await getPublicStats()
+
+    expect(result).toBeNull()
+    expect(result).not.toMatchObject({ members: FOUNDER_COUNT })
   })
 })
 
-describe('the fallback itself', () => {
-  it('never claims more than the Foundation can stand behind', async () => {
-    const { FALLBACK_STATS } = await load()
+describe('the envelope is checked, not assumed', () => {
+  // Each of these used to pass straight through `json.data as PublicStats`. A
+  // cast cannot fail, so every one of them reached the page: `undefined` in a
+  // stat tile, or `NaN` where a rand total belongs.
+  const bad: Array<[string, unknown]> = [
+    ['no data envelope', {}],
+    ['data is null', { data: null }],
+    ['a field is missing', { data: { members: 3, totalPooled: 100 } }],
+    ['a field is a string', { data: { members: '3', totalPooled: 100, monthsActive: 2 } }],
+    ['a field is null', { data: { members: null, totalPooled: 100, monthsActive: 2 } }],
+    ['a field is NaN', { data: { members: Number.NaN, totalPooled: 100, monthsActive: 2 } }],
+    ['a field is Infinity', { data: { members: 3, totalPooled: Infinity, monthsActive: 2 } }],
+    ['a field is negative', { data: { members: 3, totalPooled: -100, monthsActive: 2 } }],
+  ]
 
-    // Four founders is a fact that does not depend on a fetch. A pooled total
-    // is not, so it must not be invented — zero is honest here in a way that
-    // any other number would not be.
-    expect(FALLBACK_STATS.members).toBe(4)
-    expect(FALLBACK_STATS.totalPooled).toBe(0)
-    expect(FALLBACK_STATS.monthsActive).toBe(0)
+  for (const [name, payload] of bad) {
+    it(`reports nothing when ${name}`, async () => {
+      fetchMock.mockResolvedValue({ ok: true, json: async () => payload })
+      const { getPublicStats } = await load()
+
+      await expect(getPublicStats()).resolves.toBeNull()
+      expect(warn).toHaveBeenCalled()
+    })
+  }
+
+  it('accepts a legitimate all-zero reading', async () => {
+    // Zero members, zero pooled, zero months is what a brand new Foundation
+    // truly looks like. It must not be confused with a failure to measure.
+    fetchMock.mockResolvedValue(ok({ members: 0, totalPooled: 0, monthsActive: 0 }))
+    const { getPublicStats } = await load()
+
+    await expect(getPublicStats()).resolves.toEqual({ members: 0, totalPooled: 0, monthsActive: 0 })
+  })
+
+  it('ignores unexpected extra fields rather than passing them to the page', async () => {
+    fetchMock.mockResolvedValue(ok({ members: 3, totalPooled: 100, monthsActive: 2, email: 'x@y.z' }))
+    const { getPublicStats } = await load()
+
+    // Aggregates only. If the member app ever leaks a field, the site does not
+    // become the thing that publishes it.
+    await expect(getPublicStats()).resolves.toEqual({ members: 3, totalPooled: 100, monthsActive: 2 })
   })
 })

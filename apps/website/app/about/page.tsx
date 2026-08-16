@@ -23,8 +23,8 @@ import { Navbar } from '@/components/Navbar'
 import { Footer } from '@/components/Footer'
 import { XmmLogo } from '@/components/ui/XmmLogo'
 import { APP_URL, SUPPORT_EMAIL, adminWhatsAppUrl } from '@/lib/utils'
-import { getPublicStats } from '@/lib/stats'
 import { FOUNDERS } from '@/lib/founders'
+import { FACTS } from '@/lib/facts'
 
 export const metadata: Metadata = {
   title: 'About',
@@ -76,7 +76,7 @@ const values = [
   {
     icon: Users,
     title: 'Stronger Together',
-    body: "We operate on the age-old African wisdom of ubuntu — 'I am because we are.' What one person cannot achieve alone, four brothers can achieve together.",
+    body: `We operate on the age-old African wisdom of ubuntu — 'I am because we are.' What one person cannot achieve alone, ${FACTS.founderWord} brothers can achieve together.`,
   },
   {
     icon: Target,
@@ -86,13 +86,13 @@ const values = [
   {
     icon: Handshake,
     title: 'Trust Above All',
-    body: "Xkimm Xa Mali Foundation runs on trust. The technology enforces it. The governance backs it. But it all began with four men who chose to keep their word to each other.",
+    body: `Xkimm Xa Mali Foundation runs on trust. The technology enforces it. The governance backs it. But it all began with ${FACTS.founderWord} men who chose to keep their word to each other.`,
   },
 ]
 
 const platformFeatures = [
   { icon: Lock,         heading: 'Invite-only access',     body: 'Membership is by invitation only. Every member is personally verified before they join the collective.' },
-  { icon: CreditCard,   heading: 'Automated debits',       body: 'Monthly contributions are collected via Netcash DebiCheck — the same technology used by major banks. Zero manual transfers.' },
+  { icon: CreditCard,   heading: 'Automated debits',       body: 'Monthly contributions are collected by DebiCheck mandate — bank-authenticated, the same mechanism the major banks use. Zero manual transfers.' },
   { icon: Shield,       heading: 'Full audit trail',       body: 'Every action is logged. Every rand is traceable. Every admin decision is time-stamped and recorded for complete transparency.' },
   { icon: Target,       heading: 'Goal tracking',          body: 'Set collective financial goals, track progress in real time, and celebrate every milestone as a brotherhood.' },
   { icon: Bell,         heading: 'Instant notifications',  body: 'SMS, email, and push alerts keep every member informed of debits, overdue reminders, mandate status, and more.' },
@@ -100,7 +100,6 @@ const platformFeatures = [
 ]
 
 export default async function AboutPage() {
-  const { members } = await getPublicStats()
   return (
     <>
       <Navbar />
@@ -165,13 +164,36 @@ export default async function AboutPage() {
             </div>
 
             <p className="text-white/55 text-base max-w-md leading-relaxed mt-2">
-              A private, invite-only collective financial platform built by four brothers united
+              A private, invite-only collective financial platform built by {FACTS.founderWord} brothers united
               by discipline, brotherhood, and an unshakeable vision for shared wealth.
             </p>
 
             {/* Trust signals */}
             <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
-              {[`${members} Founding Member${members === 1 ? '' : 's'}`, 'Netcash DebiCheck', '100% Automated', 'Full Audit Trail'].map((label) => (
+              {[
+                // "Founding Members" fed by the ACTIVE MEMBER count, which is a
+                // different fact. With three active members and four founders
+                // this pill read "3 Founding Members" — understating the people
+                // who started the Foundation, and doing it on the page whose
+                // whole subject is who they are.
+                //
+                // Nothing here needs a fetch. The founder count is fixed in
+                // `constants.ts` and enforced there: a fifth founder cannot be
+                // created. So this pill no longer depends on the member app at
+                // all, and cannot go wrong when the member app does.
+                //
+                // The live member count is not missing from the site — it is on
+                // the home page, in the stats grid, correctly labelled "Active
+                // Members" and shown as unavailable when it cannot be measured.
+                `${FACTS.founderCount} Founding Members`,
+                // Was 'Netcash DebiCheck'. The Foundation has not submitted the
+                // Netcash merchant application, so naming the provider as a
+                // badge claims a relationship that does not exist yet. What is
+                // true is the mandate type the system is built to submit.
+                'DebiCheck Mandates',
+                `${FACTS.memberCap} Member Cap`,
+                'Append-Only Audit Trail',
+              ].map((label) => (
                 <span
                   key={label}
                   className="inline-flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-white/60 text-xs font-semibold"
@@ -202,7 +224,7 @@ export default async function AboutPage() {
 
             <div className="space-y-6 text-gray-600 text-base leading-loose max-w-prose mx-auto">
               <p className="text-lg text-gray-700 font-medium leading-relaxed">
-                Xkimm Xa Mali Foundation was born from a conversation between four men who shared a common
+                Xkimm Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a common
                 frustration: despite earning consistently, individual financial progress felt slow,
                 scattered, and unaccountable.
               </p>
@@ -298,7 +320,7 @@ export default async function AboutPage() {
                 Meet the founders
               </h2>
               <p className="text-gray-500 text-base max-w-lg leading-relaxed">
-                Four men. One pact. A platform built from scratch with nothing but discipline,
+                {FACTS.founderWordCapitalised} men. One pact. A platform built from scratch with nothing but discipline,
                 vision, and each other&rsquo;s word.
               </p>
             </div>

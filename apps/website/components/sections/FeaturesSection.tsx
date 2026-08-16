@@ -28,7 +28,10 @@ const features = [
     icon: Zap,
     title: 'Automated Debit Orders',
     description:
-      'Monthly contributions are collected via Netcash DebiCheck — the same technology banks use. Zero manual transfers, zero chasing.',
+      // Named Netcash. The merchant application has not been submitted, so the
+      // provider is not a fact yet; the mandate type the system is built to
+      // submit is. See `lib/facts` on why a claim is not a fact.
+      'Monthly contributions are collected by DebiCheck mandate — bank-authenticated, the same mechanism banks use. Zero manual transfers, zero chasing.',
     accent: 'from-xxm-gold/10 to-xxm-gold/5',
     iconBg: 'bg-xxm-gold text-xxm-green-950',
     delay: 'delay-200',

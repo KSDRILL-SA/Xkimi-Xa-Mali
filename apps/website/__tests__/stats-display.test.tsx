@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
+import { MAX_MEMBERS } from '@xxm/utils'
 
 /**
  * The only numbers about the Foundation's money that a stranger ever sees.
@@ -79,6 +80,35 @@ describe('a real zero is reported, not replaced', () => {
   })
 })
 
+describe('when the figures could not be measured', () => {
+  it('shows no number at all rather than a plausible one', () => {
+    render(<StatsDisplay data={null} />)
+
+    // Three measured tiles, three em dashes. The failure this replaced showed
+    // the founder count in the "Active Members" tile during an outage — a
+    // hardcoded 4 sitting beside two real figures, with nothing marking it as
+    // a guess. At thirty members that is a false statement about the size of
+    // the collective, published to the public.
+    expect(screen.getAllByText('—')).toHaveLength(3)
+    expect(screen.getAllByText('Figure unavailable')).toHaveLength(3)
+  })
+
+  it('still shows the member cap, because a rule is not a measurement', () => {
+    render(<StatsDisplay data={null} />)
+
+    // The cap comes from the constant the system enforces, not from a fetch.
+    // There is nothing to fail to measure, so it survives the outage honestly.
+    expect(screen.getByText('Member Cap')).toBeTruthy()
+    expect(screen.getByText(String(MAX_MEMBERS))).toBeTruthy()
+  })
+
+  it('never prints undefined or NaN', () => {
+    const { container } = render(<StatsDisplay data={null} />)
+
+    expect(container.textContent).not.toMatch(/undefined|NaN/)
+  })
+})
+
 describe('the section itself', () => {
   it('carries an accessible name, so it is findable as a landmark', () => {
     render(<StatsDisplay data={stats()} />)
@@ -89,7 +119,7 @@ describe('the section itself', () => {
   it('labels every figure it shows', () => {
     render(<StatsDisplay data={stats()} />)
 
-    for (const label of ['Active Members', 'Total Pooled', 'Months Active', 'Automated Collections']) {
+    for (const label of ['Active Members', 'Total Pooled', 'Months Active', 'Member Cap']) {
       expect(screen.getByText(label), `${label} is missing`).toBeTruthy()
     }
   })

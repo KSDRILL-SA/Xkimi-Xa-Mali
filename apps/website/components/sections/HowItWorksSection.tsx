@@ -30,7 +30,7 @@ const steps = [
     icon: CreditCard,
     title: 'Activate Your Debit Mandate',
     description:
-      'Authorise your monthly contribution via Netcash DebiCheck — bank-verified and compliant. Set it once, contribute automatically.',
+      'Authorise your monthly contribution with a DebiCheck mandate — bank-authenticated and compliant. Set it once, contribute automatically.',
     bg: 'bg-xxm-canopy/8 border-xxm-canopy/20',
     iconBg: 'bg-xxm-canopy text-white',
     delay: 'delay-300',
