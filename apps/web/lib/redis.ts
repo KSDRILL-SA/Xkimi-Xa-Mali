@@ -101,6 +101,32 @@ export const communityPostRatelimit = makeRatelimit(
 )
 
 /**
+ * The public statistics endpoint, per IP.
+ *
+ * The only unauthenticated endpoint in the system that reads the database on
+ * demand, and it had no limit of any kind. It is not wrapped in
+ * `withApiHandler` either, and that wrapper only throttles state-changing
+ * methods in any case — a deliberate choice for authenticated reads, which is
+ * exactly why an unauthenticated one needs saying explicitly rather than
+ * inheriting a default written for a different situation.
+ *
+ * A cache miss costs three queries: a member count, a sum over every successful
+ * inflow, and the oldest contribution row. The hour-long TTL makes that rare —
+ * until Redis is not configured, when `cache.get` returns null forever and
+ * every single request pays all three. That is the shape of the problem: the
+ * mitigation and the thing being mitigated fail together, so the endpoint is
+ * least protected in precisely the state where it most needs protecting.
+ *
+ * Thirty a minute is enormously generous for the one legitimate caller: the
+ * marketing site fetches this server-side with `revalidate: 3600`, so its real
+ * rate is once an hour per instance. The limit exists for everyone else.
+ */
+export const publicStatsRatelimit = makeRatelimit(
+  'xxm:ratelimit:public-stats',
+  Ratelimit.slidingWindow(30, '1 m'),
+)
+
+/**
  * POPIA data subject requests, submitted from the public privacy page.
  *
  * Deliberately loose for a public unauthenticated form — three an hour, not
