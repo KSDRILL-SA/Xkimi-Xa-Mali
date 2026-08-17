@@ -864,9 +864,26 @@ whatever ran next in that worker.
 
 ## 7. Recommended next actions, in order
 
+> **Read this before the table.** Action 1 used to say "apply to Netcash", as
+> though it were a thing that could be started. It is not. Netcash onboarding
+> requires **a bank account in the entity's name**; the bank requires the
+> **signed constitution** and a resolution naming signatories; the constitution
+> requires an **attorney's view on legal form** and the twelve open decisions
+> settled. That chain is serial, none of it has started, and no amount of
+> engineering shortens it — see `compliance/registrations.md` items 1 → 2 → 5 → 7.
+>
+> The single highest-leverage action available today is **engaging the
+> attorney**, and the first question to put to them is whether a *voluntary
+> association* suffices. If it does, entity registration disappears entirely and
+> the whole programme gets shorter and cheaper. The twelve constitution
+> decisions can be settled with the founders in parallel, needing nobody —
+> **clause 10.3 (exit entitlement on resignation) first**, because it is the one
+> that causes an argument if it is left until somebody needs it.
+
 | # | Action | Effort | Blocked on |
 |---|---|---|---|
-| 1 | Apply to Netcash; obtain account, service key and mandate template id | Days–weeks | External |
+| 0 | **Engage the attorney; settle the twelve constitution decisions** | 1–2 consultations | Nothing — start here |
+| 1 | Apply to Netcash; obtain account, service key and mandate template id | Days–weeks | Action 0 → constitution → bank account |
 | 2 | Set the live env vars (**including `ALERT_FALLBACK_EMAIL`**), run `migrate deploy`, call `checkServiceKey()` | 1 hour | Action 1 |
 | 3 | One member, one full debit cycle in test mode, end to end | Half a day | Action 2 |
 | 4 | Point the uptime monitor at `/api/v1/health` with a `"jobs":"ok"` body assertion | 15 min | A deploy |
@@ -891,17 +908,42 @@ whatever ran next in that worker.
 - **No external ping configured.** The heartbeat check cannot catch its own
   absence and only a monitor outside this system can.
 - **No component tests for the admin app** — it has no component test setup.
+  The website got one this session (`@testing-library/react` + `happy-dom`,
+  per-file `// @vitest-environment happy-dom`); the admin console did not, so
+  the Founder badge UI and the role controls are still tested only at the
+  service layer.
+- **The public-blob audit went only as far as the three known upload sites.**
+  All three now store privately (#404) and the adapter defaults to `'private'`,
+  so a *new* upload fails safe. Nothing swept for objects already written to a
+  production store under the old default — there is no production store yet, so
+  there is nothing to sweep, but that stops being true after the first deploy.
 - **No enforcement of `MEMBER` as a permission.** It is now refused as a
   revocable role rather than made meaningful. Making it meaningful would mean a
   check in every member-facing service, which is a larger change than the
   problem warranted.
 - **The member-app pass is 14 of 25 pages done.** See §2a for the scoreboard,
   the method, and the four recurring shapes. `invitations` is next.
-- **The flaky suite is not fixed.** It recurred after the `doUnmock` fix as a
-  different pair. §4.12 records the six mechanisms eliminated and the one
-  question left — and the fact that the assertion text was never captured on
-  either occurrence, which is what would decide it. Capture the whole log next
-  time before grepping it.
+- **~~The flaky suite is not fixed.~~ Mechanism found 2026-08-17 (#399, #403).**
+  It was never state leaking between files. Vite transforms a module graph from
+  TypeScript **once per process** and caches the result; `vi.resetModules()`
+  clears evaluated module instances and **not** that compile cache. So whichever
+  case is the first in its process to pull a large graph pays the whole
+  transform inside its own timeout, and a re-run finds a warm cache — which is
+  precisely why it always looked like noise and always passed on retry.
+
+  The advice in the old note was right and is what finally settled it: **capture
+  the whole log rather than grepping it.** The deciding evidence was two file
+  durations, 48.6s and 53.5s, against a 30-second per-test timeout. Nothing in
+  the assertion text would have shown that.
+
+  Fixed by warming the graph in `beforeAll` with its own generous timeout, in
+  `apps/web/__tests__/health.route.test.ts` and the two website files. **Three
+  consecutive full runs on a quiet machine are 9/9.**
+
+  The condition, and it matters more than the fix: **every flake this session
+  was found on a loaded machine and none reproduced on a quiet one.** Three
+  `next dev` servers had been running for a day and were distorting every
+  measurement. Do not trust a suite result taken next to them.
 - **The areas not yet audited:** mandates and the money path, contributions and
   goals, notifications, reporting, and the admin console's own surfaces beyond
   roles. Auth and roles were done in full this session; nothing else was.
