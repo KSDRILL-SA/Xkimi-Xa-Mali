@@ -34,11 +34,22 @@ graph pays for it inside its own budget. Warm it in `beforeAll` with its own
 timeout. CI runs on a quieter box and stayed green throughout, so CI was the
 *last* place this would have been noticed.
 
-> ⚠️ **Still open, and not yet diagnosed.** After #403, one full run in roughly
-> six still fails at **file-collection** level in `@xxm/web`
-> (`FAIL __tests__/x.test.ts [ __tests__/x.test.ts ]` — the file never loads),
-> on varying files. That is a different shape from the timeout above and has not
-> been chased. Do not assume #403 closed the class.
+> **One observation, probably confounded — recorded so it is not forgotten.**
+> After #403 a single full run failed at **file-collection** level in `@xxm/web`
+> (`FAIL __tests__/x.test.ts [ __tests__/x.test.ts ]` — the file never loads, a
+> different shape from the timeout above). It coincided exactly with three
+> `next dev` servers being killed mid-run, and **three consecutive full runs on
+> a quiet machine since have all been 9/9**. So the likeliest explanation is the
+> process kill, not a defect.
+>
+> Not written off, because one clean stretch does not disprove a one-in-six
+> event. If a bare `FAIL <file> [ <file> ]` with no assertion appears again,
+> this is the note to come back to — and the first thing to check is whether
+> anything else was competing for the machine.
+>
+> The wider lesson stands regardless: **do not run the suite next to three dev
+> servers and expect its result to mean anything.** Every flake this session was
+> found on a loaded machine and none reproduced on a quiet one.
 
 ## What changed most in the session before this one
 
