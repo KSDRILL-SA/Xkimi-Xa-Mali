@@ -16,6 +16,27 @@ type Props = {
  * Only rendered for an ACHIEVED goal. Offering it earlier would invite a
  * description of a purchase that has not happened.
  */
+
+/**
+ * Where to point the "view the proof" link.
+ *
+ * Proofs are stored privately now, so the stored value is a blob pathname
+ * rather than a URL a browser can follow — it goes through `/api/media`, which
+ * checks for an admin session and refuses any reference no row claims.
+ *
+ * Local development has no blob store and keeps the bytes in a `data:` URL,
+ * which the browser renders on its own. Those are used as-is: sending one
+ * through the route would be asking the server to fetch something the page is
+ * already holding.
+ *
+ * A legacy absolute URL is also passed straight through, so a proof recorded
+ * before this change still opens.
+ */
+function proofHref(ref: string): string {
+  if (ref.startsWith('data:') || /^https?:\/\//.test(ref)) return ref
+  return `/api/media?ref=${encodeURIComponent(ref)}`
+}
+
 export function GoalOutcomePanel({
   status, outcomeNote, outcomeProofUrl, outcomeRecordedAt, recordedBy, action,
 }: Props) {
@@ -43,7 +64,7 @@ export function GoalOutcomePanel({
 
         {outcomeProofUrl && (
           <a
-            href={outcomeProofUrl}
+            href={proofHref(outcomeProofUrl)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-sm font-semibold text-xxm-green hover:underline"

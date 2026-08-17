@@ -16,14 +16,15 @@ export class OutcomeProofError extends Error {
 }
 
 /**
- * Persist a Goal outcome's proof and return a URL that renders it.
+ * Persist a Goal outcome's proof and return a reference to it.
  *
  * Mirrors `signature-storage.ts`, deliberately: same adapter, same local
  * fallback, so there is one story about how this repository stores an uploaded
  * file rather than two that drift.
  *
- * - Configured (`BLOB_READ_WRITE_TOKEN`): uploads to Vercel Blob, returns the
- *   public URL.
+ * - Configured (`BLOB_READ_WRITE_TOKEN`): uploads privately and returns the
+ *   **pathname**. Serve it through `/api/media`, which requires an admin
+ *   session and refuses a reference no row claims.
  * - Local development: returns a self-contained base64 `data:` URL, so the
  *   feature works end to end without cloud storage.
  *
@@ -46,12 +47,17 @@ export async function storeGoalOutcomeProof(
 
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const blob = await put(`goal-outcomes/${goalId}.${ext}`, file.buffer, {
-      access: 'public',
+      // A proof is a receipt for money the collective spent — who was paid, for
+      // how much, sometimes a member's name on an invoice. `addRandomSuffix`
+      // made the path unguessable, which is not the same as private: the URL
+      // was still permanent and unauthenticated, so anywhere it was ever pasted
+      // it stayed readable by anyone, forever.
+      access: 'private',
       contentType: file.contentType,
       addRandomSuffix: true,
       allowOverwrite: false,
     })
-    return blob.url
+    return blob.pathname
   }
 
   return `data:${file.contentType};base64,${file.buffer.toString('base64')}`
