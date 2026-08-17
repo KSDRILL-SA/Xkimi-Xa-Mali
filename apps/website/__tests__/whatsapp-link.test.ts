@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'fs'
 import path from 'path'
 
@@ -38,6 +38,29 @@ vi.mock('@/lib/env', () => ({
     SUPPORT_EMAIL: 'support@example.invalid',
   },
 }))
+
+/**
+ * Warm the `@xxm/utils` barrel before anything is timed.
+ *
+ * This file failed roughly two runs in three under a nine-package
+ * `turbo run test`, passed on its own, and passed on a re-run — and the reported
+ * file duration was around 50 seconds against a 30-second per-test timeout. It
+ * was never a wrong answer.
+ *
+ * The barrel re-exports ten modules. Vite transforms that graph from TypeScript
+ * once per process and caches the result; `vi.resetModules()` clears evaluated
+ * module instances, not that compile cache. So whichever test is the first in
+ * the process to pull `@xxm/utils` pays the whole transform inside its own
+ * budget, and on a loaded machine that is what crosses the timeout. A re-run
+ * finds a warm cache, which is exactly why it reads as noise.
+ *
+ * Paying it here means each case is held to a budget that measures the code
+ * under test rather than the compiler. Same fix, same reasoning as
+ * `apps/web/__tests__/health.route.test.ts`.
+ */
+beforeAll(async () => {
+  await import('@xxm/utils')
+}, 120_000)
 
 beforeEach(() => vi.resetModules())
 
