@@ -1,11 +1,46 @@
 # Session Handoff
 
-**Session closed:** 2026-08-16
-**Branch state at close:** `main` is the **only** branch. No open pull requests.
-**Health at close:** typecheck 3/3 · lint 0 errors · **test 9/9 packages, 1714
-passing** · build 3/3 · `npm audit` 0 · **CI green on `main`**.
+**Session closed:** 2026-08-17
+**Branch state at close:** `main` is the only long-lived branch.
+**Health at close:** typecheck 3/3 · lint 0 errors · test 9/9 packages · build
+3/3 · CI green on `main`.
 
-## What changed most since the last handoff
+## 2026-08-17 — six PRs: what the public was told, and who could read what
+
+| PR | What was actually wrong |
+|---|---|
+| #399 | The health route suite failed on machine load, not behaviour. The first case paid the cold TypeScript transform of the whole route graph inside its own timeout |
+| #400 | The public site **substituted the founder count for the active member count** during an outage, printed in the same typeface as two measured figures. Different facts, equal today by coincidence. Also `json.data as PublicStats` — a cast that cannot fail, so a drifted payload rendered `undefined` to the public |
+| #401 | The member app hardcoded the same facts the site had just stopped hardcoding — including the founder guide's **own cover blurb**, in a document generated from the constants everywhere except there |
+| #402 | `/api/v1/stats/public`, the only endpoint a stranger can reach, had no rate limit, no error shape and no trace id. **The first fix did not work**: `makeRatelimit` returns a no-op without Redis, which is the same condition that disables the cache — so a per-instance memo is the floor underneath it |
+| #403 | The website suite failed **two runs in three** on the same two cases, at ~50s against a 30s timeout. `@xxm/utils` is a ten-module barrel; whichever case is first in its process to pull it pays the whole transform |
+| #404 | An admin's signature sat at a **permanent public URL derivable from their id**. Three upload sites, not the two §4.5a recorded |
+
+### The two worth remembering
+
+**A number nobody measured must not be rendered beside numbers that were.**
+`FACTS` (`packages/utils/src/facts.ts`) is now the only source for a *stated*
+fact — founder count, member cap, contribution range, all derived from
+`constants.ts`. It deliberately exposes **nothing measured**: member counts and
+pooled totals live in the database, and a test asserts they stay out, because if
+one were available as a constant somebody would use the constant. Unavailable
+measured figures render `—`, never a substitute.
+
+**A suite that reports differently under load is worse than a red one.** Two
+separate flakes this session had the same mechanism — Vite transforms a module
+graph once per process and caches it, and `vi.resetModules()` clears evaluated
+instances but *not* that compile cache. Whichever test is first to touch a big
+graph pays for it inside its own budget. Warm it in `beforeAll` with its own
+timeout. CI runs on a quieter box and stayed green throughout, so CI was the
+*last* place this would have been noticed.
+
+> ⚠️ **Still open, and not yet diagnosed.** After #403, one full run in roughly
+> six still fails at **file-collection** level in `@xxm/web`
+> (`FAIL __tests__/x.test.ts [ __tests__/x.test.ts ]` — the file never loads),
+> on varying files. That is a different shape from the timeout above and has not
+> been chased. Do not assume #403 closed the class.
+
+## What changed most in the session before this one
 
 **CI runs now.** The previous handoff said Actions minutes were exhausted. That
 was wrong twice over: the account's **billing was locked** because a stored card
