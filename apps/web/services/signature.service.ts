@@ -69,12 +69,31 @@ export async function verifySignatureExists(): Promise<AdminSignature> {
   return signature
 }
 
-/** Fetch a signature PNG from blob storage and return it as a base64 data URI for PDF embedding. */
-export async function embedSignatureInPdf(signatureUrl: string): Promise<string> {
-  const res = await fetch(signatureUrl)
-  if (!res.ok) throw new ExternalServiceError('Vercel Blob', `Failed to fetch signature (${res.status})`)
-  const buffer = Buffer.from(await res.arrayBuffer())
-  return `data:image/png;base64,${buffer.toString('base64')}`
+/**
+ * Read a signature PNG from storage and return it as a base64 data URI for
+ * embedding in a generated PDF.
+ *
+ * This was `fetch(signatureUrl)` against a public blob URL, which is the reason
+ * signatures had to be world-readable in the first place: the document
+ * generator was an anonymous HTTP client, so the only way it could see the
+ * image was for anybody to be able to. Going through the storage provider means
+ * it reads with the store's credentials instead, and the object can be private.
+ *
+ * The argument is a pathname now. A legacy row holding an absolute URL, or a
+ * local `data:` URL, still resolves — see the adapter — so an old signature
+ * keeps producing a statement rather than failing at the moment a member asks
+ * for one.
+ */
+export async function embedSignatureInPdf(signatureRef: string): Promise<string> {
+  try {
+    const { buffer } = await storageProvider.download(signatureRef)
+    return `data:image/png;base64,${buffer.toString('base64')}`
+  } catch (err) {
+    throw new ExternalServiceError(
+      'Vercel Blob',
+      `Failed to read signature (${err instanceof Error ? err.message : String(err)})`,
+    )
+  }
 }
 
 // ─── Signature management ───────────────────────────────────────────────────
@@ -93,15 +112,17 @@ export async function createSignature(
 
   const signatureHash = createHash('sha256').update(pngBuffer).digest('hex')
   const path = `signatures/${adminId}/${Date.now()}.png`
-  const { url } = await storageProvider.upload(path, pngBuffer, {
-    access: 'public',
+  const { pathname } = await storageProvider.upload(path, pngBuffer, {
+    // An admin's handwritten signature. Public storage put it at a URL derivable
+    // from the admin's id, permanently and without authentication.
+    access: 'private',
     contentType: 'image/png',
     addRandomSuffix: false,
   })
 
   const signature = await signatureRepo.create({
     adminId,
-    signatureUrl: url,
+    signatureUrl: pathname,
     signatureHash,
     displayName,
     isActive: true,
@@ -137,8 +158,10 @@ export async function updateSignature(
 
   const signatureHash = createHash('sha256').update(pngBuffer).digest('hex')
   const path = `signatures/${adminId}/${Date.now()}.png`
-  const { url } = await storageProvider.upload(path, pngBuffer, {
-    access: 'public',
+  const { pathname } = await storageProvider.upload(path, pngBuffer, {
+    // An admin's handwritten signature. Public storage put it at a URL derivable
+    // from the admin's id, permanently and without authentication.
+    access: 'private',
     contentType: 'image/png',
     addRandomSuffix: false,
   })
@@ -152,7 +175,7 @@ export async function updateSignature(
     }, tx)
 
     return signatureRepo.update(adminId, {
-      signatureUrl: url,
+      signatureUrl: pathname,
       signatureHash,
       displayName,
       nextChangeAllowedAt: new Date(Date.now() + LOCK_DURATION_MS),

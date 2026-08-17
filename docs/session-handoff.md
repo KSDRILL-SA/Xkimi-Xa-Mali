@@ -674,17 +674,39 @@ Member statements were uploaded to Vercel Blob with `access: 'public'` and
 was unauthenticated, permanent, and fully derivable from a member id. Fixed in
 #312 by streaming through the route and deleting the uploader.
 
-**The same pattern is still live in two other places**, deliberately left until
-the admin console is audited:
+**~~The same pattern is still live in two other places~~ — closed 2026-08-17.**
 
-- **Admin signatures** (`apps/admin/lib/signature-storage.ts`)
-- **Goal outcome media** (`apps/admin/lib/outcome-storage.ts`)
+Three upload sites, not the two recorded here. The third was
+`apps/web/services/signature.service.ts`, which passed `access: 'public'`
+explicitly at both its create and update paths and was not on this list.
 
-`access: 'public'` is the storage adapter's **default** (`options.access ?? 'public'`
-in `vercel-blob.adapter.ts`), so anything uploaded without an explicit choice is
-world-readable by URL. An admin's signature image at a guessable public URL is
-the same class of problem as the statement was, and is the one to look at first
-when that area comes up.
+- ~~**Admin signatures** (`apps/admin/lib/signature-storage.ts`)~~
+- ~~**Goal outcome media** (`apps/admin/lib/outcome-storage.ts`)~~
+- ~~**Member-app signatures** (`apps/web/services/signature.service.ts`) — missed by this note~~
+
+All three now store `access: 'private'` and persist the **pathname** rather than
+the URL. A stored URL is a standing decision that the object is reachable by
+anyone holding the string, and it survives every later attempt to make the object
+private; a pathname says where the bytes are and nothing about who may read them.
+
+**The adapter's default is now `'private'`** (`options.access ?? 'private'`), so
+forgetting to think about access produces the safe outcome rather than the
+exposed one.
+
+**Two things had to change to allow it**, and they are the interesting part:
+
+1. `embedSignatureInPdf` was `fetch(signatureUrl)`. That anonymous HTTP client
+   *was the reason* signatures had to be world-readable — the document generator
+   could only see the image if anybody could. It reads through the storage
+   provider with the store's credentials now.
+2. The admin console renders proofs in a browser, so `/api/media` serves them.
+   **The reference is checked against the database, not merely parsed** — it must
+   already be recorded on an `AdminSignature` or a `Goal` row. Without that check
+   the route would be "any admin session may read any object in the blob store",
+   which is a wider hole than the public URLs were. 16 cases cover it.
+
+Legacy absolute URLs and local `data:` URLs still resolve, so nothing recorded
+before this change breaks.
 
 ### 4.6 Staging has no branch
 
