@@ -123,6 +123,58 @@ describe('GET /api/v1/stats/public — reachable by anyone, so limited', () => {
   })
 })
 
+describe('the deployment with no Redis, where every protection fails at once', () => {
+  // The case the first version of this fix missed, and the reason the memo
+  // exists. With no Redis: `cache.get` returns null on every call AND
+  // `makeRatelimit` hands back a no-op limiter that always allows. So the rate
+  // limit — the thing added to protect this endpoint — is one of the things
+  // that disappears. It is easy to believe a limiter closes this. It does not.
+  const allowAlways = async () => ({ success: true })
+
+  it('reads the database once, not once per request', async () => {
+    const GET = await loadRoute()
+    limit.mockImplementation(allowAlways)
+    cacheGet.mockResolvedValue(null) // no Redis: always a miss
+
+    for (let i = 0; i < 25; i++) {
+      await GET(req(`198.51.100.${i}`), { params: Promise.resolve({}) })
+    }
+
+    // Twenty-five requests from twenty-five different IPs, so a per-IP limiter
+    // would not have helped even if one were running.
+    expect(getStats).toHaveBeenCalledTimes(1)
+  })
+
+  it('still answers correctly from the memo', async () => {
+    const GET = await loadRoute()
+    cacheGet.mockResolvedValue(null)
+
+    await GET(req(), { params: Promise.resolve({}) })
+    const res = await GET(req(), { params: Promise.resolve({}) })
+
+    expect(await res.json()).toEqual({ data: { members: 3, totalPooled: 480, monthsActive: 0 } })
+  })
+
+  it('goes back to the database once the memo has expired', async () => {
+    // A bound, not a freeze. The figures must still move.
+    vi.useFakeTimers()
+    try {
+      const GET = await loadRoute()
+      cacheGet.mockResolvedValue(null)
+
+      await GET(req(), { params: Promise.resolve({}) })
+      expect(getStats).toHaveBeenCalledTimes(1)
+
+      vi.advanceTimersByTime(3600 * 1000 + 1)
+      await GET(req(), { params: Promise.resolve({}) })
+
+      expect(getStats).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('what it must never return', () => {
   it('carries aggregates only — no field that could identify a member', async () => {
     const GET = await loadRoute()
