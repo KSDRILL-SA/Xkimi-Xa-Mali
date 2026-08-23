@@ -1,0 +1,45 @@
+name: Governance
+
+# Governova enforces the constitution on the code each pull request changes.
+#
+# `--changed` scans the diff against the pull request's base rather than the
+# whole tree, so this gate reports only what the pull request is responsible for.
+# Existing findings elsewhere in the repository do not block work that did not
+# touch them, and new code is held to the standard from today onward.
+#
+# The engine is installed from PyPI rather than used as the composite action that
+# ships beside it. The action lives in a private repository, and a private action
+# cannot be resolved from a repository under a different owner — the package is
+# public, so this form works everywhere and reads the same in all four
+# repositories governed this way.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  constitution:
+    name: Constitutional enforcement
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout, with the history the diff needs
+        uses: actions/checkout@v7
+        with:
+          # `--changed` diffs against the base commit, which a shallow clone does
+          # not contain. Governova's own history records a probe that returned
+          # `satisfied` on git history it could not see: a gate that is
+          # confidently wrong is worse than one that says it does not know.
+          fetch-depth: 0
+
+      - name: Install the engine
+        run: pip install --quiet "governova==0.2.3"
+
+      - name: Enforce the constitution on changed files
+        run: >
+          governova-enforce
+          --changed
+          --base "${{ github.event.pull_request.base.sha }}"
+          --mode block
+          --format github
