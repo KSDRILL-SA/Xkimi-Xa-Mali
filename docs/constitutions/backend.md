@@ -1,4 +1,4 @@
-# Backend Constitution — Xkimm Xa Mali Foundation
+# Backend Constitution — Xkimi Xa Mali Foundation
 
 ## Rules
 

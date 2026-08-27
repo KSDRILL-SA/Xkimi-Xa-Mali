@@ -31,7 +31,7 @@ describe('the character that keeps getting through', () => {
 
 describe('the GSM-7 alphabet', () => {
   it('accepts the letters, digits and punctuation a message is made of', () => {
-    expect(isGsm7("Xkimm Xa Mali Foundation: R110.00 is due on 25/08. Pay early! (ref #1) 50% @ 20:00")).toBe(true)
+    expect(isGsm7("Xkimi Xa Mali Foundation: R110.00 is due on 25/08. Pay early! (ref #1) 50% @ 20:00")).toBe(true)
   })
 
   it('accepts the accented characters the standard includes', () => {
@@ -89,8 +89,8 @@ describe('what this measured on the real templates', () => {
   it('reproduces the urgent warning going from three segments to two', () => {
     // The exact fix made in #238: an em dash became a hyphen, and the message
     // got LONGER while costing less.
-    const before = 'Xkimm Xa Mali Foundation: IMPORTANT — R110 will be deducted tonight at 20:00. A recent debit failed, so please make sure funds are available today to avoid another decline.'
-    const after  = "Xkimm Xa Mali Foundation: IMPORTANT - R110 will be deducted tonight at 20:00. A recent debit failed, so please make sure funds are available today to avoid another decline. Humesa Mali N'wa Mfenhe!"
+    const before = 'Xkimi Xa Mali Foundation: IMPORTANT — R110 will be deducted tonight at 20:00. A recent debit failed, so please make sure funds are available today to avoid another decline.'
+    const after  = "Xkimi Xa Mali Foundation: IMPORTANT - R110 will be deducted tonight at 20:00. A recent debit failed, so please make sure funds are available today to avoid another decline. Humesa Mali N'wa Mfenhe!"
 
     expect(smsCost(before)).toMatchObject({ encoding: 'UCS-2', segments: 3 })
     expect(smsCost(after)).toMatchObject({ encoding: 'GSM-7', segments: 2 })

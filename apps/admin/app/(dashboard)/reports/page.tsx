@@ -73,7 +73,7 @@ export default async function ReportsPage({
           </a>
           <a
             href={`/api/export?month=${month}&year=${year}`}
-            download={`xkimm-xa-mali-${month}-${year}.csv`}
+            download={`xkimi-xa-mali-${month}-${year}.csv`}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-xxm-green/20 text-xxm-green-900 text-sm font-semibold hover:bg-xxm-green-50 hover:-translate-y-0.5 transition-all duration-fast ease-smooth"
           >
             <Download size={14} aria-hidden />

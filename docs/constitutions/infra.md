@@ -1,4 +1,4 @@
-# Infrastructure Constitution — Xkimm Xa Mali Foundation
+# Infrastructure Constitution — Xkimi Xa Mali Foundation
 
 ## Rules
 

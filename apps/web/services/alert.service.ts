@@ -171,7 +171,7 @@ async function deliverToFallback(alert: OperationalAlert): Promise<boolean> {
         `<h2 style="margin:0 0 16px;">${escapeHtml(alert.title)}</h2>` +
         `<pre style="white-space:pre-wrap;font-family:inherit;margin:0 0 24px;">${escapeHtml(alert.body)}</pre>` +
         `<p style="color:#666;font-size:13px;margin:0;">Automated operational alert (${escapeHtml(alert.code)}) ` +
-        `from the Xkimm Xa Mali Foundation system.</p></div>`,
+        `from the Xkimi Xa Mali Foundation system.</p></div>`,
       // Not an idempotency key Resend can dedupe on across runs — the code and
       // the entity are what make two alerts the same alert.
       `alert:${alert.code}:${alert.entityId ?? ''}`,

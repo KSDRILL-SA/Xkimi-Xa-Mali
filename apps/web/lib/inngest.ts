@@ -27,7 +27,7 @@ type XXMEvents = {
 }
 
 export const inngest = new Inngest({
-  id: 'xkimm-xa-mali',
+  id: 'xkimi-xa-mali',
   eventKey: env.INNGEST_EVENT_KEY ?? 'local-dev-key',
   schemas: new EventSchemas().fromRecord<XXMEvents>(),
 })

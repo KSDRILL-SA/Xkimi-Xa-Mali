@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Responsible party | Xkimm Xa Mali Foundation |
+| Responsible party | Xkimi Xa Mali Foundation |
 | Registration number | `[REGISTRATION NUMBER]` |
 | Information Officer | `[NAME]` — **registration with the Information Regulator outstanding** |
 | Deputy Information Officer | `[NAME or "none appointed"]` |

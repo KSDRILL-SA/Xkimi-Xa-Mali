@@ -247,7 +247,7 @@ export function RunningHead({ where, doc = 'FOUNDER GUIDE' }: { where: string; d
         <View style={chrome.brand}>
           <XmmMark size={23} />
           <View>
-            <Text style={chrome.org}>XKIMM XA MALI FOUNDATION</Text>
+            <Text style={chrome.org}>XKIMI XA MALI FOUNDATION</Text>
             <Text style={chrome.tagline}>CONTRIBUTING  ·  GROWING  ·  SECURING</Text>
           </View>
         </View>
@@ -276,7 +276,7 @@ export function RunningHead({ where, doc = 'FOUNDER GUIDE' }: { where: string; d
 export function RunningFoot({ doc = 'FOUNDER GUIDE' }: { doc?: string } = {}) {
   return (
     <View style={chrome.foot} fixed>
-      <Text style={chrome.footL}>XKIMM XA MALI FOUNDATION</Text>
+      <Text style={chrome.footL}>XKIMI XA MALI FOUNDATION</Text>
       <Text style={chrome.footC}>PRIVATE &amp; CONFIDENTIAL  ·  {doc}</Text>
       <Text
         style={chrome.footR}
@@ -726,7 +726,7 @@ export function Cover({
         </View>
 
         <View style={{ marginTop: 62 }}>
-          <Text style={cv.eyebrow}>XKIMM XA MALI FOUNDATION</Text>
+          <Text style={cv.eyebrow}>XKIMI XA MALI FOUNDATION</Text>
           <Text style={cv.title}>The Founder{'\n'}<Text style={cv.titleGold}>Guide</Text></Text>
           <View style={cv.rule} />
           <Text style={cv.blurb}>{blurb}</Text>

@@ -73,3 +73,10 @@ CLAUDE.md
 
 # Locally rendered document previews. Artefacts of a design sitting.
 .render/
+
+# KSDRILL SA company registration and FICA documents (CIPC forms, tax number,
+# business account agreement/resolution). Real PII and financial documents,
+# never meant to enter version control. Currently also caught by the *.pdf
+# rule above, but that rule exists for an unrelated reason and could change —
+# this folder gets its own explicit, permanent rule.
+/ksdrill/

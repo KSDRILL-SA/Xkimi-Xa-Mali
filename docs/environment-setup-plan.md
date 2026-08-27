@@ -251,7 +251,7 @@ Already done (2026-07-26):
 Still outstanding:
 
 - **The domain, in three places.** The repo currently disagrees with itself —
-  `DEPLOYMENT.md` used `xkimmxamali.co.za`, the website app defaulted to
+  `DEPLOYMENT.md` used `xkimixamali.co.za`, the website app defaulted to
   `xkimimamali.co.za`, and the Resend from-address used a third spelling. The
   hardcoded values are gone and the docs now say `<your-domain>`, but once the
   real domain is registered it must be set in the environment variables of all

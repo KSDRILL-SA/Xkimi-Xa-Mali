@@ -117,10 +117,10 @@ describe('on a live deployment', () => {
   })
 
   it('builds when everything is supplied, and trims what it stores', async () => {
-    setEnv({ ...ALL_SET, DEPLOY_ENV: 'production', NEXT_PUBLIC_SITE_URL: '  https://xkimm.example  ' })
+    setEnv({ ...ALL_SET, DEPLOY_ENV: 'production', NEXT_PUBLIC_SITE_URL: '  https://xkimi.example  ' })
     const { siteEnv } = await import('@/lib/env')
 
-    expect(siteEnv.SITE_URL).toBe('https://xkimm.example')
+    expect(siteEnv.SITE_URL).toBe('https://xkimi.example')
   })
 })
 

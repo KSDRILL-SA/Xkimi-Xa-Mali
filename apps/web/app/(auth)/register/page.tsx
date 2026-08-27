@@ -9,7 +9,7 @@ export default function RegisterPage() {
   return (
     <AuthCard>
       <>
-        <AuthHeading title="Join Xkimm Xa Mali Foundation" subtitle="Create your member account" />
+        <AuthHeading title="Join Xkimi Xa Mali Foundation" subtitle="Create your member account" />
         <RegisterForm />
       </>
     </AuthCard>

@@ -23,7 +23,7 @@ async function main() {
 
   const dir = resolve(process.cwd(), '.render')
   mkdirSync(dir, { recursive: true })
-  const out = resolve(dir, 'Xkimm-Xa-Mali-Founder-Guide.pdf')
+  const out = resolve(dir, 'Xkimi-Xa-Mali-Founder-Guide.pdf')
   writeFileSync(out, pdf)
 
   // eslint-disable-next-line no-console -- a CLI script reporting where it wrote

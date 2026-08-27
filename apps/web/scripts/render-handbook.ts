@@ -15,7 +15,7 @@ async function main() {
   const pdf = await generateLeadershipHandbookPdf({ holder: process.argv[2] ?? 'The Leadership' })
   const dir = resolve(process.cwd(), '.render')
   mkdirSync(dir, { recursive: true })
-  const out = resolve(dir, 'Xkimm-Xa-Mali-Leadership-Handbook.pdf')
+  const out = resolve(dir, 'Xkimi-Xa-Mali-Leadership-Handbook.pdf')
   writeFileSync(out, pdf)
   // eslint-disable-next-line no-console -- a CLI script reporting where it wrote
   console.log(`${out}  (${pdf.byteLength} bytes)`)

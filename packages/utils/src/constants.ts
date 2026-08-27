@@ -1,4 +1,4 @@
-export const APP_NAME     = 'Xkimm Xa Mali Foundation'
+export const APP_NAME     = 'Xkimi Xa Mali Foundation'
 export const APP_ABBR    = 'XXM'
 export const MIN_CONTRIBUTION_ZAR  = 100
 export const MAX_CONTRIBUTION_ZAR  = 10_000

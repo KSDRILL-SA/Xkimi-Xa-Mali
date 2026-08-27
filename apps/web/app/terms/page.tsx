@@ -18,19 +18,19 @@ import {
 
 export const metadata: Metadata = {
   title: 'Terms of Use',
-  description: 'Terms and conditions governing your use of the Xkimm Xa Mali Foundation platform.',
+  description: 'Terms and conditions governing your use of the Xkimi Xa Mali Foundation platform.',
 }
 
 const sections = [
   {
     icon: Users,
     title: 'Membership & Access',
-    body: `Xkimm Xa Mali Foundation is a private, invite-only platform. Access is granted exclusively by an existing administrator via a unique invitation code. By accepting an invitation and completing registration, you agree to these terms in full. Membership may be revoked at any time for breach of these terms or the rules of the collective.`,
+    body: `Xkimi Xa Mali Foundation is a private, invite-only platform. Access is granted exclusively by an existing administrator via a unique invitation code. By accepting an invitation and completing registration, you agree to these terms in full. Membership may be revoked at any time for breach of these terms or the rules of the collective.`,
   },
   {
     icon: Wallet,
     title: 'Contribution Obligations',
-    body: `Each member agrees to pay the agreed monthly contribution amount on or before the due date each month. By registering a DebiCheck debit mandate, you authorise Xkimm Xa Mali Foundation's payment processor (Netcash) to collect the stipulated amount from your registered bank account. Repeated non-payment or failed debit attempts may result in suspension or removal from the platform.`,
+    body: `Each member agrees to pay the agreed monthly contribution amount on or before the due date each month. By registering a DebiCheck debit mandate, you authorise Xkimi Xa Mali Foundation's payment processor (Netcash) to collect the stipulated amount from your registered bank account. Repeated non-payment or failed debit attempts may result in suspension or removal from the platform.`,
   },
   {
     icon: CheckCircle2,
@@ -40,17 +40,17 @@ const sections = [
   {
     icon: Landmark,
     title: 'Financial Responsibility',
-    body: `Xkimm Xa Mali Foundation is not a registered bank, financial services provider, or investment scheme. The platform is a private member management tool. All funds collected remain the collective property of the contributing members and are governed by the internal rules of the collective, not by any external regulatory body. Members are collectively responsible for the governance and distribution of pooled funds.`,
+    body: `Xkimi Xa Mali Foundation is not a registered bank, financial services provider, or investment scheme. The platform is a private member management tool. All funds collected remain the collective property of the contributing members and are governed by the internal rules of the collective, not by any external regulatory body. Members are collectively responsible for the governance and distribution of pooled funds.`,
   },
   {
     icon: Lock,
     title: 'Account Security',
-    body: `You are responsible for maintaining the confidentiality of your login credentials. You agree to notify the administrator immediately if you suspect unauthorised access to your account. Xkimm Xa Mali Foundation will never ask for your password via email, SMS, or phone call. Actions taken under your account are deemed to be authorised by you unless you have reported a breach.`,
+    body: `You are responsible for maintaining the confidentiality of your login credentials. You agree to notify the administrator immediately if you suspect unauthorised access to your account. Xkimi Xa Mali Foundation will never ask for your password via email, SMS, or phone call. Actions taken under your account are deemed to be authorised by you unless you have reported a breach.`,
   },
   {
     icon: AlertTriangle,
     title: 'Limitation of Liability',
-    body: `KSDRILL-SA and the administrators of Xkimm Xa Mali Foundation shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. The platform is provided "as is" and we make no warranty that it will be error-free or uninterrupted. Our total liability for any claim is limited to the value of contributions processed in the three months preceding the claim.`,
+    body: `KSDRILL-SA and the administrators of Xkimi Xa Mali Foundation shall not be liable for any indirect, incidental, or consequential damages arising from your use of the platform. The platform is provided "as is" and we make no warranty that it will be error-free or uninterrupted. Our total liability for any claim is limited to the value of contributions processed in the three months preceding the claim.`,
   },
   {
     icon: Gavel,
@@ -78,9 +78,9 @@ export default function TermsPage() {
             <ArrowLeft size={16} aria-hidden />
             <span className="hidden sm:inline">Back</span>
           </Link>
-          <Link href="/" className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg" aria-label="Xkimm Xa Mali Foundation home">
+          <Link href="/" className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg" aria-label="Xkimi Xa Mali Foundation home">
             <XmmLogo size={32} />
-            <span className="font-bold text-white text-sm hidden sm:block">Xkimm Xa Mali Foundation</span>
+            <span className="font-bold text-white text-sm hidden sm:block">Xkimi Xa Mali Foundation</span>
           </Link>
         </div>
       </header>
@@ -110,7 +110,7 @@ export default function TermsPage() {
               Effective date: 1 January 2025 &nbsp;·&nbsp; Last updated: {new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long' })}
             </p>
             <p className="text-white/75 text-[15px] leading-relaxed mt-4 max-w-lg mx-auto">
-              By accessing or using the Xkimm Xa Mali Foundation platform operated by KSDRILL-SA, you agree to
+              By accessing or using the Xkimi Xa Mali Foundation platform operated by KSDRILL-SA, you agree to
               be bound by these Terms of Use. Please read them carefully before proceeding.
             </p>
           </div>

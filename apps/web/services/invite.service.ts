@@ -218,7 +218,7 @@ export async function generateInvite(
   smsProvider.send({
     to: normPhone,
     body: [
-      `Hi ${firstName}, you have been invited to join Xkimm Xa Mali Foundation.`,
+      `Hi ${firstName}, you have been invited to join Xkimi Xa Mali Foundation.`,
       `Your invite code: ${code}`,
       `Tap to register: ${registrationUrl}`,
       `IMPORTANT: Never share this code with anyone. It expires in 7 days.`,

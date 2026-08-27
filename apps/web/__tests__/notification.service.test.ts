@@ -74,7 +74,7 @@ const mockTemplate = {
   id: 'tpl-1',
   slug: 'debit-success',
   channel: 'SMS',
-  body: 'Xkimm Xa Mali Foundation: R{{amount}} received. Thanks, {{firstName}}!',
+  body: 'Xkimi Xa Mali Foundation: R{{amount}} received. Thanks, {{firstName}}!',
 }
 
 const mockUser = { email: 'test@example.com', phone: '0821234567' }
@@ -220,7 +220,7 @@ describe('flushQueuedNotifications', () => {
     expect(smsProvider.send).toHaveBeenCalledOnce()
     expect(smsProvider.send).toHaveBeenCalledWith(
       expect.objectContaining({
-        body: 'Xkimm Xa Mali Foundation: R500 received. Thanks, Kurhula!',
+        body: 'Xkimi Xa Mali Foundation: R500 received. Thanks, Kurhula!',
       }),
     )
     expect(result.processed).toBe(1)

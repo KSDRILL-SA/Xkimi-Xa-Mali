@@ -126,9 +126,9 @@ describe('an address Resend will never send from', () => {
   it('accepts an address on a domain we could verify', async () => {
     const mod = await loadEnv({
       NODE_ENV: 'production', DEPLOY_ENV: 'production', ...NETCASH_ENV,
-      RESEND_FROM_EMAIL: 'noreply@xkimmxamali.co.za',
+      RESEND_FROM_EMAIL: 'noreply@xkimixamali.co.za',
     })
-    expect(mod.env.RESEND_FROM_EMAIL).toBe('noreply@xkimmxamali.co.za')
+    expect(mod.env.RESEND_FROM_EMAIL).toBe('noreply@xkimixamali.co.za')
   })
 
   it('still rejects something that is not an address at all', async () => {

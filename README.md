@@ -1,4 +1,4 @@
-# Xkimm Xa Mali Foundation
+# Xkimi Xa Mali Foundation
 
 > *"It is more blessed to give than to receive."* — Acts 20:35
 
@@ -89,7 +89,7 @@ docs/         Architecture, flows, database, security, ADRs, constitutions
 ## Local setup
 
 ```bash
-git clone https://github.com/maluleke-ks/xkimi-xa-mali.git && cd xkimi-xa-mali
+git clone https://github.com/KSDRILL-SA/Xkimi-Xa-Mali.git && cd Xkimi-Xa-Mali
 npm install
 
 # one .env.local per app (see Environment reference below)

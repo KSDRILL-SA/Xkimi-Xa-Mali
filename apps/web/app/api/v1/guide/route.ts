@@ -49,7 +49,7 @@ export const GET = withApiHandler(async () => {
     status: 200,
     headers: {
       'Content-Type':        'application/pdf',
-      'Content-Disposition': 'attachment; filename="Xkimm-Xa-Mali-Founder-Guide.pdf"',
+      'Content-Disposition': 'attachment; filename="Xkimi-Xa-Mali-Founder-Guide.pdf"',
       'Content-Length':      String(buffer.byteLength),
       // Every copy is personalised with the holder's name, so it is never a
       // shared cache — and it is regenerated so it is never a stale one either.

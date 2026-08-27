@@ -49,7 +49,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {children}
 
         <div className="mt-6 flex items-center gap-4 text-white/35 text-xs animate-fade-in delay-300">
-          <span>&copy; {new Date().getFullYear()} Xkimm Xa Mali Foundation</span>
+          <span>&copy; {new Date().getFullYear()} Xkimi Xa Mali Foundation</span>
           <Link
             href="/about"
             className="gold-underline hover:text-white/60 transition-colors"

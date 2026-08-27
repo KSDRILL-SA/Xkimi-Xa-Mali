@@ -4,7 +4,7 @@
 
 | | |
 |---|---|
-| Private body | Xkimm Xa Mali Foundation |
+| Private body | Xkimi Xa Mali Foundation |
 | Registration number | `[REGISTRATION NUMBER]` |
 | Document status | **DRAFT — requires owner input and attorney review** |
 | Version | 1.0 |
@@ -25,7 +25,7 @@
 
 | | |
 |---|---|
-| Name of body | Xkimm Xa Mali Foundation |
+| Name of body | Xkimi Xa Mali Foundation |
 | Information Officer | `[NAME]` |
 | Postal address | `[POSTAL ADDRESS]` |
 | Physical address | `[PHYSICAL ADDRESS]` |

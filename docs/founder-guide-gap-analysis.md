@@ -1,6 +1,6 @@
 # Founder Guide — Gap Analysis & Implementation Plan
 
-**Source of truth:** `Xkimm-Xa-Mali-Foundation-Founder-Guide (1).pdf` (repository root, untracked).
+**Source of truth:** `Xkimi-Xa-Mali-Foundation-Founder-Guide (1).pdf` (repository root, untracked).
 **Analysed:** 2026-08-07, against `Dev` @ `671ddb5`.
 **Status of this document:** The Founder Guide is the specification. Where the
 system and the guide disagree, **the system is wrong and must be changed.** The
