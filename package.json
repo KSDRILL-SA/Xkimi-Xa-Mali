@@ -1,5 +1,5 @@
 {
-  "name": "xkimm-xa-mali",
+  "name": "xkimi-xa-mali",
   "private": true,
   "packageManager": "npm@10.9.7",
   "workspaces": [
@@ -20,7 +20,8 @@
     "db:push": "turbo run db:push",
     "db:seed": "turbo run db:seed",
     "db:studio": "cd packages/database && npx prisma studio",
-    "secrets:reencrypt": "npm run secrets:reencrypt -w @xxm/database --"
+    "secrets:reencrypt": "npm run secrets:reencrypt -w @xxm/database --",
+    "postinstall": "turbo run db:generate"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -33,7 +34,8 @@
     "undici": "^6.28.0",
     "brace-expansion": "^2.1.4",
     "js-yaml": "^4.3.1",
-    "nanoid": "^3.3.18"
+    "nanoid": "^3.3.18",
+    "deepmerge-ts": "^8.0.2"
   },
   "engines": {
     "node": ">=20.0.0",
