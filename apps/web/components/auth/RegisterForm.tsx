@@ -177,7 +177,9 @@ export function RegisterForm() {
     <div className="space-y-6">
       <Stepper steps={STEPS} currentStep={1} />
 
-      <form onSubmit={submit2(handleRegister)} className="space-y-4" noValidate>
+      {/* `method="post"` is a fallback only — see LoginForm.tsx for why a
+          password field needs one even though `onSubmit` always intercepts. */}
+      <form onSubmit={submit2(handleRegister)} method="post" className="space-y-4" noValidate>
         {error && <Alert variant="error">{error}</Alert>}
 
         <div className="rounded-xl bg-xxm-green/5 border border-xxm-green/20 px-4 py-3 text-sm text-xxm-green space-y-1">

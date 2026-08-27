@@ -39,8 +39,10 @@ export function ResetPasswordForm({ token }: Props) {
     }
   }
 
+  // `method="post"` is a fallback only — see LoginForm.tsx for why a
+  // password field needs one even though `onSubmit` always intercepts.
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} method="post" className="space-y-4" noValidate>
       {serverError && <Alert variant="error">{serverError}</Alert>}
       <FormGroup label="New password" htmlFor="password" required error={errors.password?.message} hint="At least 12 characters. A short phrase you will remember works well.">
         <Input id="password" type="password" autoComplete="new-password" placeholder="At least 12 characters" icon={Lock} {...register('password')} />
