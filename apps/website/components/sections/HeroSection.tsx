@@ -10,7 +10,7 @@ export async function HeroSection() {
   return (
     <section
       id="hero"
-      className="relative min-h-screen flex flex-col overflow-hidden"
+      className="relative min-h-screen flex flex-col overflow-hidden bg-xxm-green-950"
       aria-labelledby="hero-headline"
     >
       {/* ── Background: the four founders, rotating ───────────────── */}
@@ -40,7 +40,14 @@ export async function HeroSection() {
       </div>
 
       {/* ── Main content ──────────────────────────────────────────── */}
-      <div className="relative z-10 flex-1 flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pt-28 pb-12">
+      {/* The fixed header's own height grows with `env(safe-area-inset-top)`
+          on notch/Dynamic-Island phones. A flat `pt-28` (112px) is enough for
+          the header's base 72px, but not enough headroom once a ~59px notch
+          is added on top — the headline would sit partly under the bar. */}
+      <div
+        className="relative z-10 flex-1 flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-12"
+        style={{ paddingTop: 'calc(var(--nav-height) + env(safe-area-inset-top) + 2.5rem)' }}
+      >
         <div className="max-w-3xl">
 
           {/* badge */}
@@ -90,7 +97,7 @@ export async function HeroSection() {
             className="text-white/65 text-lg md:text-xl leading-relaxed max-w-xl mb-10 animate-fade-in-up"
             style={{ animationDelay: '0.65s' }}
           >
-            Xkimm Xa Mali Foundation is a private, invite-only collective financial platform built
+            Xkimi Xa Mali Foundation is a private, invite-only collective financial platform built
             on the African principle that{' '}
             <em className="text-xxm-gold/90 not-italic font-semibold">
               money moves faster and further when it moves together.
@@ -111,7 +118,7 @@ export async function HeroSection() {
             </a>
 
             <a
-              href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali Foundation group. Please add me.')}
+              href={adminWhatsAppUrl('Hi, I would like to join the Xkimi Xa Mali Foundation group. Please add me.')}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-secondary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl border border-white/20 text-white/80 font-semibold text-base hover:border-xxm-gold/40"

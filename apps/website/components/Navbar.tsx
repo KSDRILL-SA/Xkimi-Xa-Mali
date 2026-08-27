@@ -12,6 +12,7 @@ export function Navbar() {
   const router                         = useRouter()
   const isHome                         = pathname === '/'
   const [atTop, setAtTop]             = useState(true)
+  const [hidden, setHidden]           = useState(false)
   const [menuOpen, setMenuOpen]       = useState(false)
   const [activeSection, setActive]    = useState<string>('hero')
   const [showLeftFade, setLeftFade]   = useState(false)
@@ -25,6 +26,36 @@ export function Navbar() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  /* ── Hide on scroll down, reveal on scroll up ──────────────────────
+     Never hide near the top (nothing to reclaim yet, and it would flicker
+     in and out as `atTop`'s background toggles), and never hide while the
+     mobile menu is open — hiding the bar out from under an open menu would
+     strand the close button off-screen. A small threshold on the delta
+     stops the header twitching on sub-pixel/momentum scroll events. */
+  useEffect(() => {
+    let lastY = window.scrollY
+    const THRESHOLD = 8
+    const REVEAL_ZONE = 96 // px from top where the header always stays put
+
+    const onScroll = () => {
+      const y = window.scrollY
+      const delta = y - lastY
+
+      if (menuOpen || y < REVEAL_ZONE) {
+        setHidden(false)
+      } else if (delta > THRESHOLD) {
+        setHidden(true)
+      } else if (delta < -THRESHOLD) {
+        setHidden(false)
+      }
+
+      lastY = y
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [menuOpen])
 
   /* ── Active section tracking ────────────────────────────────────── */
   useEffect(() => {
@@ -110,11 +141,16 @@ export function Navbar() {
     <>
       <header
         className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+          hidden ? '-translate-y-full' : 'translate-y-0'
+        } ${
           atTop && isHome
             ? 'bg-transparent'
             : 'bg-xxm-green-950/95 backdrop-blur-md shadow-lg border-b border-white/10'
         }`}
-        style={{ height: 'var(--nav-height)' }}
+        style={{
+          height: 'calc(var(--nav-height) + env(safe-area-inset-top))',
+          paddingTop: 'env(safe-area-inset-top)',
+        }}
       >
         <div className="h-full max-w-screen-xl mx-auto px-4 md:px-8 flex items-center justify-between gap-6">
 
@@ -248,13 +284,19 @@ export function Navbar() {
 
         {/* panel */}
         <div
-          className={`absolute inset-x-0 top-0 bottom-0 flex flex-col p-8 pt-24 transition-transform duration-400 ${
+          className={`absolute inset-x-0 top-0 bottom-0 flex flex-col p-8 transition-transform duration-400 ${
             menuOpen ? 'translate-y-0' : '-translate-y-full'
           }`}
+          style={{ paddingTop: 'calc(var(--nav-height) + env(safe-area-inset-top) + 1.5rem)' }}
         >
           <nav className="flex flex-col gap-2" aria-label="Mobile navigation">
             {NAV_LINKS.map(({ label, href, sectionId }, i) => {
-              const itemClass = "text-left px-4 py-4 rounded-2xl text-xl font-bold text-white/80 hover:text-white hover:bg-white/8 transition-all duration-200 outline-none"
+              // `animate-fade-in-up` re-plays every time `menuOpen` flips true — a
+              // fresh `key` per open would work too, but this class already exists
+              // and reads correctly: the panel opens, then each item drops in.
+              const itemClass = menuOpen
+                ? "text-left px-4 py-4 rounded-2xl text-xl font-bold text-white/80 hover:text-white hover:bg-white/8 active:bg-white/12 transition-colors duration-200 outline-none animate-fade-in-up"
+                : "text-left px-4 py-4 rounded-2xl text-xl font-bold text-white/80 hover:text-white hover:bg-white/8 active:bg-white/12 transition-colors duration-200 outline-none opacity-0"
               return sectionId ? (
                 <button
                   key={label}
@@ -278,10 +320,13 @@ export function Navbar() {
             })}
           </nav>
 
-          <div className="mt-auto pt-8 border-t border-white/10 flex flex-col gap-3">
+          <div
+            className={`mt-auto pt-8 border-t border-white/10 flex flex-col gap-3 ${menuOpen ? 'animate-fade-in-up' : 'opacity-0'}`}
+            style={{ animationDelay: `${NAV_LINKS.length * 60}ms` }}
+          >
             <a
               href={`${APP_URL}/login`}
-              className="btn-primary flex items-center justify-center gap-2 py-4 rounded-2xl bg-xxm-gold text-xxm-green-950 text-base font-bold shadow-gold"
+              className="btn-primary flex items-center justify-center gap-2 py-4 rounded-2xl bg-xxm-gold text-xxm-green-950 text-base font-bold shadow-gold active:scale-[0.98] transition-transform"
               onClick={() => setMenuOpen(false)}
             >
               Sign In to Your Account
