@@ -107,8 +107,14 @@ export function LoginForm() {
     setResendState('sent')
   }
 
+  // `method="post"` is a fallback, not the real submit path — `onSubmit`
+  // always intercepts first. It matters for the one moment a real submit
+  // path isn't intercepted yet: a click that lands before React finishes
+  // hydrating. Without it, a bare <form> defaults to `method="get"`,
+  // which would put the password in the URL, browser history, and any
+  // server/proxy access log along the way.
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} method="post" className="space-y-4" noValidate>
       {verified && (
         <Alert variant="success">Email verified! You can now log in.</Alert>
       )}
