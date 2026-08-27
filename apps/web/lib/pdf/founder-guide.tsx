@@ -89,7 +89,7 @@ const RAW_PARTS: {
     label: 'The founding conviction',
     sections: [
       { num: 1, title: 'A Word From the Chairman' },
-      { num: 2, title: 'What Xkimm Xa Mali Is' },
+      { num: 2, title: 'What Xkimi Xa Mali Is' },
       { num: 3, title: 'Your Leadership' },
     ],
   },
@@ -212,8 +212,8 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
   const founders = FOUNDERS.map((f, i) => ({ ...f, photo: portraits[i]! }))
   return (
     <Document
-      title="Xkimm Xa Mali Foundation — The Founder Guide"
-      author="Xkimm Xa Mali Foundation"
+      title="Xkimi Xa Mali Foundation — The Founder Guide"
+      author="Xkimi Xa Mali Foundation"
       subject="What the Foundation is, how the money moves, and the one rule every member agrees to"
       keywords="stokvel, foundation, savings, members, goals"
     >
@@ -301,17 +301,17 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
             </Text>
           </View>
           <Text style={{ fontFamily: 'Geist', fontSize: 5.8, color: G.ink35, letterSpacing: 1.3, textAlign: 'right' }}>
-            XKIMM XA MALI FOUNDATION{'\n'}{RELEASED.toUpperCase()}
+            XKIMI XA MALI FOUNDATION{'\n'}{RELEASED.toUpperCase()}
           </Text>
         </View>
         <DiamondRule />
       </Section>
 
       {/* ── 02 ──────────────────────────────────────────────────────────────── */}
-      <Section num={2} title="What Xkimm Xa Mali Is" kicker="THE SHAPE OF THE THING"
+      <Section num={2} title="What Xkimi Xa Mali Is" kicker="THE SHAPE OF THE THING"
         plain="A Closed Circle," italic="Not a Product">
         <Lede>
-          Xkimm Xa Mali is a private savings collective. It is not open to the public, it is not
+          Xkimi Xa Mali is a private savings collective. It is not open to the public, it is not
           advertised, and nobody can sign up on their own. Membership begins with a personal
           invitation from one of us — and the circle is capped at {MAX_MEMBERS} people.
         </Lede>
@@ -982,7 +982,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
       <Section num={19} title="Important Notice" kicker="PLEASE READ BEFORE SIGNING"
         plain="Important" italic="Notice">
         <HeroPanel title="What this Foundation is not" glyph="shield">
-          Xkimm Xa Mali is <HB>not a bank, not an investment product and not a lender</HB>. It is
+          Xkimi Xa Mali is <HB>not a bank, not an investment product and not a lender</HB>. It is
           not registered as a financial services provider and does not give financial advice.
           Nobody here promises you a return, and no rand you contribute is guaranteed to come back
           to you multiplied. It is a private savings collective among people who know each other.
@@ -1018,7 +1018,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
       <Section num={20} title="Founder Declaration & Signature" kicker="WHAT WE AGREE, AND SIGN"
         plain="Declaration" italic="& Signature">
         <Lede>
-          We, the {FOUNDER_COUNT} founding members of Xkimm Xa Mali Foundation, declare the
+          We, the {FOUNDER_COUNT} founding members of Xkimi Xa Mali Foundation, declare the
           following to each other and to every member who follows us.
         </Lede>
 
@@ -1049,7 +1049,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 70 }}>
             <View style={{ marginBottom: 26 }}><Diamond size={9} /></View>
             <Text style={{ fontSize: 15, fontFamily: 'Times-Bold', color: '#FFFFFF', letterSpacing: 1.6, textAlign: 'center' }}>
-              XKIMM XA MALI FOUNDATION
+              XKIMI XA MALI FOUNDATION
             </Text>
             <Text style={{ fontSize: 6.2, fontFamily: 'Geist', fontWeight: 600, color: G.gold, letterSpacing: 2.4, marginTop: 9 }}>
               CONTRIBUTING  ·  GROWING  ·  SECURING

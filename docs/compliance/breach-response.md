@@ -169,7 +169,7 @@ collective this size, that is not optional in any sense that matters.
 > `[CONTACT]`. We will update you again by `[DATE]`.
 >
 > `[NAME]`
-> Information Officer, Xkimm Xa Mali Foundation
+> Information Officer, Xkimi Xa Mali Foundation
 
 ---
 

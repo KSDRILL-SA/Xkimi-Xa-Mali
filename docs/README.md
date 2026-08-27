@@ -1,6 +1,6 @@
 # Documentation Index
 
-**Xkimm Xa Mali Foundation (XXM)** — a real-money family savings platform. Next.js 15 · PostgreSQL · Vercel. Data classification: **financial + PII, highest sensitivity** (POPIA).
+**Xkimi Xa Mali Foundation (XXM)** — a real-money family savings platform. Next.js 15 · PostgreSQL · Vercel. Data classification: **financial + PII, highest sensitivity** (POPIA).
 
 ```mermaid
 flowchart TD

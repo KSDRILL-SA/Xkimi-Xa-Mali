@@ -44,7 +44,7 @@ import { PasswordSchema, PASSWORD_MIN_LENGTH, RegisterSchema } from '@xxm/utils/
 /** Email that can actually be delivered — the precondition for enforcing at all. */
 function withWorkingEmail() {
   envState.RESEND_API_KEY = 're_live_key'
-  envState.RESEND_FROM_EMAIL = 'noreply@xkimmxamali.co.za'
+  envState.RESEND_FROM_EMAIL = 'noreply@xkimixamali.co.za'
 }
 
 beforeEach(() => {
@@ -144,7 +144,7 @@ describe('refusing to lock everyone out of a door with no key', () => {
 
   it('does not enforce with no API key, however good the address looks', () => {
     envState.REQUIRE_PASSWORD_POLICY_RESET = true
-    envState.RESEND_FROM_EMAIL = 'noreply@xkimmxamali.co.za'
+    envState.RESEND_FROM_EMAIL = 'noreply@xkimixamali.co.za'
 
     expect(passwordPolicyResetRequired({ passwordChangedAt: null })).toBe(false)
   })

@@ -1,6 +1,6 @@
 # Engineering Operating Manual
 
-**Repository:** `Xkimi-Xa-Mali` (Xkimm Xa Mali Foundation)
+**Repository:** `Xkimi-Xa-Mali` (Xkimi Xa Mali Foundation)
 **Audience:** Every automated agent and engineering session that touches this repository.
 **Status of this document:** Authoritative. Read it before the first tool call of a session.
 

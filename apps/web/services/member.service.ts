@@ -160,7 +160,7 @@ async function warnPreviousNumber(previousPhone: string, userId: string): Promis
     await smsProvider.send({
       to: previousPhone,
       body:
-        'Xkimm Xa Mali Foundation: the mobile number on your account has been changed. ' +
+        'Xkimi Xa Mali Foundation: the mobile number on your account has been changed. ' +
         'Future alerts will go to the new number. If this was not you, contact the Foundation now.',
       userSuppliedId: `phone-change-${userId}-${Date.now()}`,
     })

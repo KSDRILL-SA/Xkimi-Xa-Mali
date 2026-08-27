@@ -63,7 +63,7 @@ export function MissionSection() {
 
             <div className="mt-8 space-y-5 text-white/60 text-[15px] leading-relaxed">
               <p>
-                Xkimm Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a
+                Xkimi Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a
                 common frustration: despite earning consistently, individual financial progress
                 felt slow, scattered, and unaccountable.
               </p>

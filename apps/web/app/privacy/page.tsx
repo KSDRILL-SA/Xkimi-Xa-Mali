@@ -19,7 +19,7 @@ import {
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'How Xkimm Xa Mali Foundation collects, uses, and protects your personal information.',
+  description: 'How Xkimi Xa Mali Foundation collects, uses, and protects your personal information.',
 }
 
 const sections = [
@@ -31,7 +31,7 @@ const sections = [
   {
     icon: Activity,
     title: 'How We Use Your Information',
-    body: `Your personal information is used exclusively to operate the Xkimm Xa Mali Foundation platform — specifically to process monthly contributions, send payment notifications, generate member statements, and maintain a complete financial audit trail. We do not sell, rent, or trade your personal information to any third party.`,
+    body: `Your personal information is used exclusively to operate the Xkimi Xa Mali Foundation platform — specifically to process monthly contributions, send payment notifications, generate member statements, and maintain a complete financial audit trail. We do not sell, rent, or trade your personal information to any third party.`,
   },
   {
     icon: ShieldCheck,
@@ -93,9 +93,9 @@ export default function PrivacyPage() {
             <ArrowLeft size={16} aria-hidden />
             <span className="hidden sm:inline">Back</span>
           </Link>
-          <Link href="/" className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg" aria-label="Xkimm Xa Mali Foundation home">
+          <Link href="/" className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg" aria-label="Xkimi Xa Mali Foundation home">
             <XmmLogo size={32} />
-            <span className="font-bold text-white text-sm hidden sm:block">Xkimm Xa Mali Foundation</span>
+            <span className="font-bold text-white text-sm hidden sm:block">Xkimi Xa Mali Foundation</span>
           </Link>
         </div>
       </header>
@@ -125,7 +125,7 @@ export default function PrivacyPage() {
               Effective date: 1 January 2025 &nbsp;·&nbsp; Last updated: {new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long' })}
             </p>
             <p className="text-white/75 text-[15px] leading-relaxed mt-4 max-w-lg mx-auto">
-              Xkimm Xa Mali Foundation is a private, invite-only collective savings platform operated by KSDRILL-SA.
+              Xkimi Xa Mali Foundation is a private, invite-only collective savings platform operated by KSDRILL-SA.
               This policy explains how we handle your personal information in accordance with the
               Protection of Personal Information Act (POPIA) and other applicable South African law.
             </p>

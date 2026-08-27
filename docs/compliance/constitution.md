@@ -1,23 +1,27 @@
-# Constitution of Xkimm Xa Mali Foundation
+# Constitution of Xkimi Xa Mali Foundation
 
 **A savings collective (stokvel) constituted under the laws of the Republic of South Africa.**
 
 | | |
 |---|---|
-| Document status | **DRAFT — requires attorney review before adoption** |
-| Version | 1.0 |
+| Document status | **DRAFT — ready for member review and signature.** Independent legal review is optional at this scale, not required to open an account or sign — see the note below. |
+| Version | 1.1 |
 | Adopted on | `[DATE OF ADOPTION]` |
-| Registered entity name | `[REGISTERED NAME]` |
-| Entity registration number | `[REGISTRATION NUMBER]` |
-| Self-regulatory body | `[NASASA MEMBERSHIP NUMBER]` |
+| Operated through | KSDRILL SA (Pty) Ltd, registration number 2026/614917/07 — see clause 1.4A |
+| Self-regulatory body | National Stokvel Association of South Africa (NASASA) — membership application in progress, number to follow |
 
-> **Read this first.** This is a drafted constitution, not legal advice, and it has
-> not been reviewed by a legal practitioner. It states what the system built for
-> this collective actually does, in the form a constitution takes — which is the
-> hard half, and the half a lawyer would otherwise bill you to extract from
-> interviews. Take it to a South African attorney with financial services
-> experience for review and adoption. Fields in `[BRACKETS]` need a human answer
-> before it can be signed.
+> **Read this first.** This document states what the system built for this
+> collective actually does, in the form a constitution takes. Independent legal
+> review by a South African attorney is genuinely optional at this scale — the
+> Foundation is a voluntary association operated through an already-registered
+> company, not itself seeking CIPC registration — but is still worth doing if the
+> circle grows, takes on outside contributors, or a founder wants to step back
+> safely. Fields still in `[BRACKETS]` are genuine member decisions — procedural
+> defaults are proposed inline where reasonable, marked **[DEFAULT]**, and can be
+> struck out and replaced before signing. **Clause 10.3 is not a default** — it
+> restates the Foundation's core rule, already agreed by every member through
+> the Founder Guide: contributions are never refunded to anyone personally, at
+> any time, for any reason. Money leaves the pool only through an agreed Goal.
 >
 > Every rule below marked *(enforced)* is enforced by the system in code, not by
 > anyone's memory. That is unusual for a stokvel constitution and it is worth
@@ -27,7 +31,7 @@
 
 ## 1. Name and status
 
-1.1 The collective is called **Xkimm Xa Mali Foundation** (in this document, "the
+1.1 The collective is called **Xkimi Xa Mali Foundation** (in this document, "the
 Foundation").
 
 1.2 The Foundation is a **stokvel**: a voluntary association of persons known to
@@ -38,10 +42,24 @@ public. Membership is by invitation only, is never advertised or offered
 publicly, and is limited to a closed circle of persons known to the existing
 members (see clause 3).
 
-1.4 The Foundation is a member of `[SELF-REGULATORY BODY]` and operates under the
-exemption from the Banks Act applicable to stokvels.
+1.4 The Foundation is a member of the National Stokvel Association of South Africa
+(NASASA) *(membership application in progress; number to be inserted once
+received)* and operates under the exemption from the Banks Act applicable to
+stokvels.
 
-1.5 The Foundation's registered address is `[ADDRESS]`.
+1.4A The Foundation does not itself hold CIPC registration. It is **operated
+through KSDRILL SA (Pty) Ltd** (registration number 2026/614917/07), which
+provides the software platform, is the contracting party with the Foundation's
+payment processor, and holds the Foundation's bank account as described in
+clause 6.1. KSDRILL SA (Pty) Ltd holds that account **in custody for the
+Foundation's members** — it is not KSDRILL SA's own income or asset, and is kept
+separate from any account KSDRILL SA uses for its own business. This is a
+custodial/administrative relationship, not an ownership one: the money in that
+account belongs to the Foundation's members, governed by this constitution.
+
+1.5 The Foundation's registered address, shared with KSDRILL SA (Pty) Ltd's
+registered office, is House No 223, Maphophe New Stands, Saselamani, Limpopo,
+0928.
 
 ---
 
@@ -179,9 +197,12 @@ evidenced, is described in `mandate-lifecycle.md`.
 
 ## 6. The pool and Goals
 
-6.1 All contributions are held in a bank account **in the name of the Foundation**
-at `[BANK]`, account `[ACCOUNT REFERENCE]`. They are not held in the personal
-account of any member or leader.
+6.1 All contributions are held in a dedicated bank account — Capitec Business,
+account holder KSDRILL SA (Pty) Ltd, account number 1055722831, branch code
+450105 — held **in custody for the Foundation's members** under clause 1.4A.
+This account is used **only** for the Foundation's funds: never for KSDRILL SA's
+own income or expenses, and never for any other system KSDRILL SA operates. They
+are not held in the personal account of any member or leader.
 
 6.2 Money leaves the pool **only** for a **Goal**.
 
@@ -207,10 +228,10 @@ name of the person who documented it. A failed Goal is not deleted.
 
 | Office | Holder |
 |---|---|
-| `[CHAIRPERSON]` | `[NAME]` |
-| `[TREASURER]` | `[NAME]` |
-| `[SECRETARY]` | `[NAME]` |
-| `[ADDITIONAL]` | `[NAME]` |
+| Chairman | Kurhula Maluleke |
+| Treasurer | Risima Maluleke |
+| Secretary | Ntwanano Maluleke |
+| Welfare Officer | Rito Nkuna |
 
 7.2 **Leadership is bound by every rule that binds a member.** There is no
 exemption from the minimum contribution, from collection, or from the record. A
@@ -236,7 +257,9 @@ leadership — can alter or delete** *(enforced)*.
 - (d) grant themselves an exemption from any obligation in this constitution.
 
 7.6 Office bearers are elected by a majority of members at a general meeting, and
-serve for `[TERM]`. `[ELECTION AND REMOVAL PROCEDURE TO BE CONFIRMED]`
+serve for **12 months, renewable** *[DEFAULT]*. An office bearer may be removed
+before the end of their term by the same majority required to elect them, at a
+general meeting called for that purpose *[DEFAULT]*.
 
 ---
 
@@ -254,12 +277,14 @@ engagement, or for conduct that damages the Foundation or its members.
 8.4 A suspended member retains their contribution history, their record, and their
 seat.
 
-8.5 A member may be **expelled** only by resolution of `[MAJORITY]` of members at a
-general meeting, and only after the member has been given notice and an
-opportunity to be heard.
+8.5 A member may be **expelled** only by resolution of **three-quarters (75%)** of
+members present at a general meeting *[DEFAULT]*, and only after the member has
+been given notice and an opportunity to be heard.
 
-8.6 A member who is expelled is entitled to `[EXIT ENTITLEMENT — TO BE CONFIRMED]`,
-calculated in accordance with clause 10.
+8.6 A member who is expelled is subject to the **same rule as a resigning
+member under clause 10.3** — no refund of contributions already made. This is
+not a penalty specific to expulsion; it is the same rule that applies to every
+member's exit, for the same reason.
 
 ---
 
@@ -274,8 +299,10 @@ recorded *(enforced)*.
 9.3 South African identity numbers and bank account numbers are **encrypted**
 wherever they are stored *(enforced)*.
 
-9.4 The Foundation's Information Officer is `[NAME]`, registered with the
-Information Regulator under `[REFERENCE]`.
+9.4 The Foundation's Information Officer is **Kurhula Success Maluleke** — under
+POPIA, the head of the body is the Information Officer by law. Registration with
+the Information Regulator is `[PENDING — free, online, see registrations.md item
+8]`.
 
 9.5 A member's rights of access, correction and deletion, and the procedure for
 exercising them, are set out in `popia-compliance.md`.
@@ -290,14 +317,22 @@ resignation is recorded *(enforced)*.
 10.2 On resignation, the member's mandate is cancelled and no further contributions
 are collected.
 
-10.3 A resigning member is entitled to `[EXIT ENTITLEMENT — TO BE CONFIRMED]`.
+10.3 **A resigning member is entitled to no refund of their contributions.**
+Money contributed to the pool is not personally withdrawable or refundable to
+any member, whether they resign after a month or after years of membership. It
+remains in the pool and continues to be applied only to Goals the circle has
+agreed, exactly as it would have been had the member stayed. Resignation ends
+future collection under clause 10.2; it does not create any claim to money
+already contributed.
 
-> **This clause must be settled before adoption.** It is the clause that causes
-> more disputes in stokvels than any other. The options are ordinarily: (a) return
-> of the member's own net contributions; (b) return of contributions less a share
-> of costs; or (c) a proportionate share of the pool. Each has different tax and
-> legal consequences. This is a decision for the members, taken on advice, and
-> written down **before** anyone needs it.
+> This is not a proposed default — it is the Foundation's actual operating
+> principle, already stated to every member at registration in the Founder
+> Guide as "the single most important sentence in this document," and already
+> agreed to by every member who signed it. The system enforces it: nothing in
+> the code pays a member out on resignation. An earlier draft of this clause
+> proposed a refund default, which was wrong — it would have contradicted a
+> promise members have already made to each other. This wording matches what
+> members actually agreed to.
 
 10.4 A member's record is retained after resignation for the period stated in
 `popia-compliance.md`, for the Foundation's legal and accounting obligations.
@@ -306,15 +341,16 @@ are collected.
 
 ## 11. Meetings
 
-11.1 A **general meeting** of members is held at least `[FREQUENCY]`.
+11.1 A **general meeting** of members is held at least **quarterly** *[DEFAULT]*.
 
-11.2 A quorum is `[QUORUM]` members.
+11.2 A quorum is **a majority (more than half) of active members** *[DEFAULT]*.
 
 11.3 Each member has **one vote**, regardless of their contribution amount and
 regardless of whether they are a founder.
 
-11.4 Notice of a general meeting shall be given at least `[NOTICE PERIOD]` in
-advance, through the Foundation's ordinary channels of communication with members.
+11.4 Notice of a general meeting shall be given at least **seven (7) days**
+*[DEFAULT]* in advance, through the Foundation's ordinary channels of
+communication with members.
 
 ---
 
@@ -332,23 +368,27 @@ advance, through the Foundation's ordinary channels of communication with member
 12.2 **Every member may inspect their own complete record at any time, and may
 download it** *(enforced)*.
 
-12.3 The financial year of the Foundation ends on `[FINANCIAL YEAR END]`.
+12.3 The financial year of the Foundation ends on **the last day of February**,
+matching KSDRILL SA (Pty) Ltd's own financial year end per its CIPC registration.
 
-12.4 The Foundation's financial statements shall be `[REVIEWED / AUDITED]` annually
-by `[ACCOUNTANT]` and presented to members at a general meeting.
+12.4 The Foundation's financial statements shall be **reviewed** *[DEFAULT — a
+full audit is ordinarily unnecessary and costly at this scale; revisit if the
+pool grows materially]* annually by `[ACCOUNTANT — to be engaged]` and presented
+to members at a general meeting.
 
 ---
 
 ## 13. Dispute resolution
 
 13.1 A member with a dispute shall first raise it with leadership, which shall
-respond within `[PERIOD]`.
+respond within **fourteen (14) days** *[DEFAULT]*.
 
 13.2 A dispute not resolved under 13.1 shall be referred to a general meeting of
 members.
 
 13.3 A dispute not resolved under 13.2 shall be referred to mediation, and failing
-mediation, to `[ARBITRATION / THE COURTS]`.
+mediation, to **arbitration** *[DEFAULT — faster, cheaper and private compared to
+the courts, which is usually the right fit for a closed circle of this size]*.
 
 13.4 No member shall approach a court before exhausting 13.1 and 13.2.
 
@@ -356,16 +396,17 @@ mediation, to `[ARBITRATION / THE COURTS]`.
 
 ## 14. Amendment
 
-14.1 This constitution may be amended only by resolution of `[MAJORITY]` of the
-members at a general meeting called with notice of the proposed amendment.
+14.1 This constitution may be amended only by resolution of **two-thirds (66%)**
+*[DEFAULT]* of the members at a general meeting called with notice of the
+proposed amendment.
 
 14.2 No amendment may:
 
 - (a) remove the requirement that every leadership action be recorded;
 - (b) permit money to leave the pool other than for an agreed Goal;
 - (c) grant leadership an exemption from an obligation binding on members; or
-- (d) raise the membership cap above fifty without a resolution of `[SPECIAL
-  MAJORITY]`.
+- (d) raise the membership cap above fifty without a resolution of
+  **three-quarters (75%)** *[DEFAULT]*.
 
 14.3 An amendment takes effect only once recorded in writing and signed by the
 office bearers.
@@ -374,50 +415,55 @@ office bearers.
 
 ## 15. Dissolution
 
-15.1 The Foundation may be dissolved by resolution of `[SPECIAL MAJORITY]` of
-members at a general meeting called for that purpose.
+15.1 The Foundation may be dissolved by resolution of **three-quarters (75%)**
+*[DEFAULT]* of members at a general meeting called for that purpose.
 
 15.2 On dissolution, the Foundation shall:
 
 - (a) settle all outstanding obligations;
 - (b) complete or abandon all active Goals, and account for each; and
-- (c) distribute the remaining pool among members in accordance with `[BASIS OF
-  DISTRIBUTION — TO BE CONFIRMED]`.
+- (c) apply the remaining pool to **one final Goal, agreed by the members at
+  the dissolution meeting** *[DEFAULT — consistent with clause 10.3 and clause
+  6.2: money has never personally belonged to any member and leaves the pool
+  only through a Goal, so dissolution should not become the one exception]*,
+  rather than distributed to members individually.
 
-15.3 The records of the Foundation shall be retained for `[PERIOD]` after
-dissolution.
+15.3 The records of the Foundation shall be retained for **five (5) years**
+*[DEFAULT — matches ordinary SA accounting-record retention practice; confirm
+with the accountant per registrations.md item 6]* after dissolution.
 
 ---
 
 ## Adoption
 
-We, the undersigned members of Xkimm Xa Mali Foundation, adopt this constitution.
+We, the undersigned members of Xkimi Xa Mali Foundation, adopt this constitution.
 
 | Name | Office | Signature | Date |
 |---|---|---|---|
-| `[NAME]` | `[OFFICE]` | | |
-| `[NAME]` | `[OFFICE]` | | |
-| `[NAME]` | `[OFFICE]` | | |
-| `[NAME]` | `[OFFICE]` | | |
+| Kurhula Maluleke | Chairman | | |
+| Risima Maluleke | Treasurer | | |
+| Ntwanano Maluleke | Secretary | | |
+| Rito Nkuna | Welfare Officer | | |
 
 ---
 
 ## Open decisions
 
-These must be answered by the members before adoption. They are gathered here so
-they can be worked through in one sitting rather than found one at a time.
+Most of what was open here now has a proposed **[DEFAULT]** filled in directly at
+the clause, so the document is signable as-is if the members are happy with
+sensible, standard choices for a small closed circle. Clause 10.3 (exit
+entitlement) is **not** a default — it states the Foundation's actual operating
+principle, already agreed by every member through the Founder Guide, so nothing
+further to decide there. What genuinely still needs a human answer:
 
 | # | Clause | Decision needed |
 |---|---|---|
-| 1 | 1.4 | Self-regulatory body membership (NASASA or other) — confirm and obtain number |
-| 2 | 6.1 | Bank and account details for the pool |
-| 3 | 7.1 | Office bearers, and their titles |
-| 4 | 7.6 | Term of office, election and removal procedure |
-| 5 | 8.5 | Majority required to expel |
-| 6 | **10.3** | **Exit entitlement on resignation — the single most important open item** |
-| 7 | 8.6 | Exit entitlement on expulsion (may differ from 10.3) |
-| 8 | 11.1–11.4 | Meeting frequency, quorum, notice period |
-| 9 | 12.3–12.4 | Financial year end; reviewed or audited; by whom |
-| 10 | 13.3 | Arbitration or the courts |
-| 11 | 14.1 | Majority required to amend |
-| 12 | 15.1–15.2 | Special majority to dissolve; basis of distribution |
+| 1 | 1.4 | NASASA membership number — inserted once the application (in progress) is approved |
+| 2 | 12.4 | Who reviews the financial statements — an accountant needs engaging |
+| 3 | Adoption table | Signatures and dates from all four founders |
+
+Everything else marked **[DEFAULT]** inline (expulsion majority, meeting cadence,
+quorum, notice periods, amendment majority, dissolution majority and
+distribution basis, records retention) is a reasonable standard choice for a
+closed circle of this size — struck out and replaced in the text itself if the
+members want something different, before signing.

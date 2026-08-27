@@ -26,7 +26,7 @@ const playfairDisplay = localFont({
 
 export const metadata: Metadata = {
   title: { template: '%s — XXM Admin', default: 'XXM Admin' },
-  description: 'Xkimm Xa Mali Foundation — Admin Portal',
+  description: 'Xkimi Xa Mali Foundation — Admin Portal',
   robots: { index: false, follow: false },
 }
 

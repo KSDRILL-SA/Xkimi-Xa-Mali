@@ -39,7 +39,7 @@ const sections = [
   {
     icon: Building2,
     title: 'About This Manual',
-    body: `This manual is published in terms of section 51 of the Promotion of Access to Information Act, 2 of 2000 ("PAIA"). It describes the records held by Xkimm Xa Mali Foundation and explains how a person may request access to them. The Foundation is a private, invite-only savings collective. Requests and enquiries under this manual should be directed to the Information Officer via the Support page.`,
+    body: `This manual is published in terms of section 51 of the Promotion of Access to Information Act, 2 of 2000 ("PAIA"). It describes the records held by Xkimi Xa Mali Foundation and explains how a person may request access to them. The Foundation is a private, invite-only savings collective. Requests and enquiries under this manual should be directed to the Information Officer via the Support page.`,
   },
   {
     icon: BookOpen,
@@ -90,10 +90,10 @@ export default function PaiaPage() {
           <Link
             href="/"
             className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg"
-            aria-label="Xkimm Xa Mali Foundation home"
+            aria-label="Xkimi Xa Mali Foundation home"
           >
             <XmmLogo size={32} />
-            <span className="font-bold text-white text-sm hidden sm:block">Xkimm Xa Mali Foundation</span>
+            <span className="font-bold text-white text-sm hidden sm:block">Xkimi Xa Mali Foundation</span>
           </Link>
         </div>
       </header>

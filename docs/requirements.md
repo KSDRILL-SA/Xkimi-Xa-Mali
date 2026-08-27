@@ -1,10 +1,10 @@
-# Xkimm Xa Mali Foundation — System Requirements
+# Xkimi Xa Mali Foundation — System Requirements
 
 > "Blessed is the hand that giveth." — Acts 20:35
 
 | | |
 |---|---|
-| **System** | Xkimm Xa Mali Foundation (XXM) |
+| **System** | Xkimi Xa Mali Foundation (XXM) |
 | **Version** | v1.0 |
 | **Classification** | Financial platform — highest data sensitivity |
 | **Scale** | 4–50 members, <1,000 req/day (v1) |

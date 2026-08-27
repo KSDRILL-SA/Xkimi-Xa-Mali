@@ -37,7 +37,7 @@ export const GET = withApiHandler(async () => {
     status: 200,
     headers: {
       'Content-Type':        'application/pdf',
-      'Content-Disposition': 'attachment; filename="Xkimm-Xa-Mali-Leadership-Handbook.pdf"',
+      'Content-Disposition': 'attachment; filename="Xkimi-Xa-Mali-Leadership-Handbook.pdf"',
       'Content-Length':      String(buffer.byteLength),
       'Cache-Control':       'private, no-store',
     },

@@ -1,4 +1,4 @@
-# Deployment & Launch Runbook — Xkimm Xa Mali Foundation
+# Deployment & Launch Runbook — Xkimi Xa Mali Foundation
 
 A practical go-live guide for the three apps. What's left is **config, infra, and
 external integrations** — work through this in order.

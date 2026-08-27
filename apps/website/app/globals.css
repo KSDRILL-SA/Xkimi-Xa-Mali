@@ -18,6 +18,12 @@
 html {
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
+  /* Matches the hero's own background. Without this, an overscroll bounce
+     (mobile Safari especially — `overscroll-behavior: none` on body doesn't
+     fully suppress it for the top-level document) or any gap before the hero's
+     async founder photos paint shows the browser's default white/gray through
+     the header, which sits `bg-transparent` while at the top of the page. */
+  background-color: #052E16;
 }
 
 body {
