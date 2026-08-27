@@ -21,7 +21,7 @@ import { FACTS } from '@xxm/utils'
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'Learn about Xkimm Xa Mali Foundation — a collective financial platform built on trust, brotherhood, and shared wealth.',
+    'Learn about Xkimi Xa Mali Foundation — a collective financial platform built on trust, brotherhood, and shared wealth.',
 }
 
 const founders = [
@@ -29,7 +29,7 @@ const founders = [
     photo: '/founders/maluleke-kurhula-success.png',
     name: 'Maluleke Kurhula Success',
     title: 'Founder & Chairman',
-    bio: 'The visionary behind Xkimm Xa Mali Foundation. Kurhula identified the need for a disciplined, technology-powered approach to communal savings and brought the collective to life.',
+    bio: 'The visionary behind Xkimi Xa Mali Foundation. Kurhula identified the need for a disciplined, technology-powered approach to communal savings and brought the collective to life.',
     ring: 'ring-xxm-green/20',
   },
   {
@@ -50,7 +50,7 @@ const founders = [
     photo: '/founders/nkuna-rito-blessing.png',
     name: 'Nkuna Rito Blessing',
     title: 'Co-Founder & Welfare Officer',
-    bio: 'The heart of the brotherhood. Rito champions member welfare, nurtures relationships within the collective, and ensures Xkimm Xa Mali Foundation remains rooted in trust.',
+    bio: 'The heart of the brotherhood. Rito champions member welfare, nurtures relationships within the collective, and ensures Xkimi Xa Mali Foundation remains rooted in trust.',
     ring: 'ring-xxm-green-900/20',
   },
 ]
@@ -86,7 +86,7 @@ const values = [
   {
     icon: Lock,
     title: 'Financial Discipline',
-    body: 'The culture of Xkimm Xa Mali Foundation is built on non-negotiable commitment. Deadlines are respected. Amounts are honoured. Discipline is the foundation.',
+    body: 'The culture of Xkimi Xa Mali Foundation is built on non-negotiable commitment. Deadlines are respected. Amounts are honoured. Discipline is the foundation.',
   },
   {
     icon: Users,
@@ -101,7 +101,7 @@ const values = [
   {
     icon: Handshake,
     title: 'Trust Above All',
-    body: `Xkimm Xa Mali Foundation runs on trust. The technology enforces it, the governance backs it, but it begins with ${FACTS.founderWord} men who chose to keep their word to each other.`,
+    body: `Xkimi Xa Mali Foundation runs on trust. The technology enforces it, the governance backs it, but it begins with ${FACTS.founderWord} men who chose to keep their word to each other.`,
   },
 ]
 
@@ -117,11 +117,11 @@ export default function AboutPage() {
           <Link
             href="/"
             className="flex items-center gap-2.5 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-lg"
-            aria-label="Xkimm Xa Mali Foundation home"
+            aria-label="Xkimi Xa Mali Foundation home"
           >
             <XmmLogo size={36} />
             <span className="hidden sm:flex flex-col leading-none">
-              <span className="font-bold text-white text-sm tracking-wide">Xkimm Xa Mali Foundation</span>
+              <span className="font-bold text-white text-sm tracking-wide">Xkimi Xa Mali Foundation</span>
               <span className="text-white/45 text-[10px] tracking-widest uppercase mt-0.5">
                 Contributing · Growing · Securing
               </span>
@@ -159,7 +159,7 @@ export default function AboutPage() {
 
             <div>
               <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-                Xkimm Xa Mali Foundation
+                Xkimi Xa Mali Foundation
               </h1>
               <p className="text-xxm-gold text-sm font-semibold tracking-widest uppercase mt-2">
                 Contributing · Growing · Securing
@@ -197,14 +197,14 @@ export default function AboutPage() {
 
             <div className="space-y-5 text-gray-600 text-[15px] leading-relaxed max-w-prose mx-auto">
               <p>
-                Xkimm Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a common
+                Xkimi Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a common
                 frustration: despite earning consistently, individual financial progress felt slow,
                 scattered, and unaccountable. They recognised what generations of their people had
                 always known — that money moves faster and further when it moves together.
               </p>
               <p>
                 Rooted in the age-old African wisdom that wealth moves faster and further when it
-                moves together, Xkimm Xa Mali Foundation was conceived as something more than ordinary group
+                moves together, Xkimi Xa Mali Foundation was conceived as something more than ordinary group
                 savings: a structured, transparent, technology-powered platform that takes the
                 principle of collective financial discipline and gives it the rigour, accountability,
                 and automation of a proper financial institution.
@@ -361,7 +361,7 @@ export default function AboutPage() {
             </h2>
 
             <p className="text-gray-500 text-[15px] leading-relaxed mb-10 max-w-prose mx-auto">
-              Xkimm Xa Mali Foundation is not a bank app, not a WhatsApp group, and not a spreadsheet. It is
+              Xkimi Xa Mali Foundation is not a bank app, not a WhatsApp group, and not a spreadsheet. It is
               purpose-built software that automates every aspect of running a financial collective —
               from invite-gated onboarding to bank-verified debit mandates, from real-time
               contribution tracking to goal-based savings milestones.
@@ -426,7 +426,7 @@ export default function AboutPage() {
             <a
               href={
                 env.ADMIN_WHATSAPP_NUMBER
-                  ? `https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I would like to join the Xkimm Xa Mali Foundation group. Please add me.')}`
+                  ? `https://wa.me/${env.ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi, I would like to join the Xkimi Xa Mali Foundation group. Please add me.')}`
                   : env.WHATSAPP_GROUP_LINK
               }
               target="_blank"

@@ -196,7 +196,7 @@ export const env = createEnv({
     // PDF statements and signature storage.
     BLOB_READ_WRITE_TOKEN: requiredWhenLive(z.string().min(1)),
     WHATSAPP_GROUP_LINK: z.string().url(),
-    WHATSAPP_GROUP_NAME: z.string().default('Xkimm Xa Mali Foundation'),
+    WHATSAPP_GROUP_NAME: z.string().default('Xkimi Xa Mali Foundation'),
     ADMIN_WHATSAPP_NUMBER: configuredWhenLive(z.string().min(1), '27000000000'),
     // Shown to members on the support page as a mailto: link.
     SUPPORT_EMAIL: configuredWhenLive(z.string().email(), 'support@example.invalid'),

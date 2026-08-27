@@ -278,11 +278,11 @@ function StatementDocument({ data }: { data: StatementData }) {
 
   return (
     <Document
-      title={`Xkimm Xa Mali Foundation — Statement — ${member.firstName} ${member.lastName} — ${period.label}`}
-      author="Xkimm Xa Mali Foundation"
+      title={`Xkimi Xa Mali Foundation — Statement — ${member.firstName} ${member.lastName} — ${period.label}`}
+      author="Xkimi Xa Mali Foundation"
       subject="Contribution Statement of Account"
-      creator="Xkimm Xa Mali Foundation Platform"
-      keywords="statement contribution savings xkimm"
+      creator="Xkimi Xa Mali Foundation Platform"
+      keywords="statement contribution savings xkimi"
     >
       <Page size="A4" style={s.page}>
 
@@ -478,7 +478,7 @@ function StatementDocument({ data }: { data: StatementData }) {
                       break — see the note on `sign` above. */}
                   <View style={{ height: 14 }} />
                   <View style={s.signRule} />
-                  <Text style={s.signName}>Xkimm Xa Mali Foundation Administration</Text>
+                  <Text style={s.signName}>Xkimi Xa Mali Foundation Administration</Text>
                 </>
               )}
               <Text style={s.signMeta}>Generated {generatedAt}</Text>

@@ -29,7 +29,7 @@ import { FACTS } from '@xxm/utils'
 export const metadata: Metadata = {
   title: 'About',
   description:
-    'Learn about Xkimm Xa Mali Foundation — a collective financial platform built on trust, brotherhood, and shared wealth.',
+    'Learn about Xkimi Xa Mali Foundation — a collective financial platform built on trust, brotherhood, and shared wealth.',
 }
 
 const founders = FOUNDERS
@@ -71,7 +71,7 @@ const values = [
   {
     icon: Lock,
     title: 'Financial Discipline',
-    body: 'The culture of Xkimm Xa Mali Foundation is built on non-negotiable commitment. Deadlines are respected. Amounts are honoured. Discipline is the foundation everything else rests on.',
+    body: 'The culture of Xkimi Xa Mali Foundation is built on non-negotiable commitment. Deadlines are respected. Amounts are honoured. Discipline is the foundation everything else rests on.',
   },
   {
     icon: Users,
@@ -86,7 +86,7 @@ const values = [
   {
     icon: Handshake,
     title: 'Trust Above All',
-    body: `Xkimm Xa Mali Foundation runs on trust. The technology enforces it. The governance backs it. But it all began with ${FACTS.founderWord} men who chose to keep their word to each other.`,
+    body: `Xkimi Xa Mali Foundation runs on trust. The technology enforces it. The governance backs it. But it all began with ${FACTS.founderWord} men who chose to keep their word to each other.`,
   },
 ]
 
@@ -144,7 +144,7 @@ export default async function AboutPage() {
                 <span className="text-xxm-gold text-xs font-bold tracking-widest uppercase">Private · Invite-Only · Brotherhood</span>
               </div>
               <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-[1.05]">
-                Xkimm Xa Mali Foundation
+                Xkimi Xa Mali Foundation
               </h1>
               <p className="text-xxm-gold text-sm font-bold tracking-widest uppercase mt-2">
                 Contributing · Growing · Securing
@@ -224,14 +224,14 @@ export default async function AboutPage() {
 
             <div className="space-y-6 text-gray-600 text-base leading-loose max-w-prose mx-auto">
               <p className="text-lg text-gray-700 font-medium leading-relaxed">
-                Xkimm Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a common
+                Xkimi Xa Mali Foundation was born from a conversation between {FACTS.founderWord} men who shared a common
                 frustration: despite earning consistently, individual financial progress felt slow,
                 scattered, and unaccountable.
               </p>
               <p>
                 They recognised what generations of their people had always known — that money moves
                 faster and further when it moves together. Rooted in the age-old African wisdom of
-                ubuntu, Xkimm Xa Mali Foundation was conceived as something more than ordinary group savings:
+                ubuntu, Xkimi Xa Mali Foundation was conceived as something more than ordinary group savings:
                 a structured, transparent, technology-powered platform that takes the principle of
                 collective financial discipline and gives it the rigour, accountability, and
                 automation of a proper financial institution.
@@ -281,7 +281,7 @@ export default async function AboutPage() {
                 Three pillars, one purpose
               </h2>
               <p className="text-gray-500 text-base max-w-sm leading-relaxed">
-                Every decision, feature, and rule inside Xkimm Xa Mali Foundation flows from these three principles.
+                Every decision, feature, and rule inside Xkimi Xa Mali Foundation flows from these three principles.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -438,7 +438,7 @@ export default async function AboutPage() {
                 Built for serious savers
               </h2>
               <p className="text-gray-500 text-base leading-relaxed max-w-xl mx-auto">
-                Xkimm Xa Mali Foundation is purpose-built software that automates every aspect of running a
+                Xkimi Xa Mali Foundation is purpose-built software that automates every aspect of running a
                 financial collective — from invite-gated onboarding to bank-verified debit mandates,
                 from real-time contribution tracking to goal-based savings milestones.
               </p>
@@ -510,7 +510,7 @@ export default async function AboutPage() {
                 <ArrowRight size={15} aria-hidden />
               </a>
               <a
-                href={adminWhatsAppUrl('Hi, I would like to join the Xkimm Xa Mali Foundation group. Please add me.')}
+                href={adminWhatsAppUrl('Hi, I would like to join the Xkimi Xa Mali Foundation group. Please add me.')}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl border border-white/15 text-white/70 font-semibold text-sm hover:text-white hover:border-white/30 transition-colors"

@@ -21,7 +21,7 @@ export function DataPrivacySection({ userId }: { userId: string }) {
       <div className="rounded-xl border border-gray-200 p-4">
         <h4 className="text-sm font-semibold text-xxm-green-900">Privacy</h4>
         <p className="text-xs text-xxm-gray-500 mt-1">
-          Your personal information is processed solely for managing your Xkimm Xa Mali Foundation
+          Your personal information is processed solely for managing your Xkimi Xa Mali Foundation
           contributions. Sensitive details such as your ID and bank account numbers are
           encrypted at rest and never shared beyond our payment processor.
         </p>

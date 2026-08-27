@@ -13,7 +13,7 @@ import {
 // environment schema to be drawn.
 function siteHost(): string {
   const raw = process.env.NEXT_PUBLIC_SITE_URL
-  if (!raw) return 'xkimmxamali.co.za'
+  if (!raw) return 'xkimixamali.co.za'
   try {
     return new URL(raw).host
   } catch {
@@ -24,7 +24,7 @@ function siteHost(): string {
   }
 }
 
-// ─── Shared design tokens for all Xkimm Xa Mali Foundation PDF documents ──────────────────
+// ─── Shared design tokens for all Xkimi Xa Mali Foundation PDF documents ──────────────────
 
 export const C = {
   ink:       '#0A1F17',
@@ -276,7 +276,7 @@ export function Masthead({ docType, period, docRef }: { docType: string; period:
         <View style={chrome.brandRow}>
           <XmmMark size={34} />
           <View>
-            <Text style={chrome.orgName}>XKIMM XA MALI FOUNDATION</Text>
+            <Text style={chrome.orgName}>XKIMI XA MALI FOUNDATION</Text>
             <Text style={chrome.orgTagline}>Contributing · Growing · Securing</Text>
           </View>
         </View>
@@ -295,7 +295,7 @@ export function Masthead({ docType, period, docRef }: { docType: string; period:
 export function PageFooter({ docRef }: { docRef: string }) {
   return (
     <View style={chrome.footer} fixed>
-      <Text style={chrome.fLeft}>XKIMM XA MALI FOUNDATION</Text>
+      <Text style={chrome.fLeft}>XKIMI XA MALI FOUNDATION</Text>
       <Text style={chrome.fCenter} render={({ pageNumber, totalPages }) => (
         `Confidential · ${docRef} · Page ${pageNumber} of ${totalPages}`
       )} />

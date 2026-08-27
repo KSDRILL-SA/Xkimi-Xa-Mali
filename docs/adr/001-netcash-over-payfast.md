@@ -10,7 +10,7 @@
 
 ## Context
 
-Xkimm Xa Mali Foundation is a South African family savings group where members contribute a fixed monthly amount via recurring debit orders. The payment processor must support:
+Xkimi Xa Mali Foundation is a South African family savings group where members contribute a fixed monthly amount via recurring debit orders. The payment processor must support:
 
 1. **Recurring debit orders** initiated by the group (not by the member clicking "pay")
 2. **SA banking rails** — DebiCheck and NAEDO

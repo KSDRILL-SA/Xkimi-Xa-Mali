@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   }
 
   const buffer = Buffer.from(await res.arrayBuffer())
-  const filename = `xkimm-xa-mali-report-${year}-${String(month).padStart(2, '0')}.pdf`
+  const filename = `xkimi-xa-mali-report-${year}-${String(month).padStart(2, '0')}.pdf`
 
   return new NextResponse(buffer, {
     status: 200,

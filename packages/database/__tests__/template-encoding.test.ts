@@ -23,8 +23,8 @@ const SAMPLE: Record<string, string> = {
   month: 'August',
   days: '3',
   code: 'ABC123XYZ',
-  url: 'https://xkimmxamali.co.za/invite/abcdefghijklmnop',
-  link: 'https://xkimmxamali.co.za/invite/abcdefghijklmnop',
+  url: 'https://xkimixamali.co.za/invite/abcdefghijklmnop',
+  link: 'https://xkimixamali.co.za/invite/abcdefghijklmnop',
   progress: '80',
   percentage: '85',
   budget: '2500.00',
@@ -112,15 +112,15 @@ describe('the operational alert SMS, measured against real headlines', () => {
 describe('template hygiene', () => {
   it('every template carries the platform name, so a member knows who is writing', () => {
     for (const t of SMS_TEMPLATES) {
-      expect(t.body, `${t.slug} does not name the sender`).toContain('Xkimm Xa Mali')
+      expect(t.body, `${t.slug} does not name the sender`).toContain('Xkimi Xa Mali')
     }
   })
 
   it('uses the full name everywhere, with no half-renamed leftovers', () => {
     for (const t of NOTIFICATION_TEMPLATES) {
       const text = `${t.subject ?? ''} ${t.body}`
-      if (text.includes('Xkimm Xa Mali')) {
-        expect(text, `${t.slug} still uses the short name`).toContain('Xkimm Xa Mali Foundation')
+      if (text.includes('Xkimi Xa Mali')) {
+        expect(text, `${t.slug} still uses the short name`).toContain('Xkimi Xa Mali Foundation')
       }
     }
   })

@@ -15,7 +15,7 @@ import { verifyCsrfOrigin } from '@xxm/utils/csrf-origin'
  * nothing keeping the two in step.
  */
 
-const ADMIN = 'https://admin.xkimmxamali.co.za'
+const ADMIN = 'https://admin.xkimixamali.co.za'
 
 function request(headers: Record<string, string>, url = `${ADMIN}/members/123`) {
   return { headers: new Headers(headers), nextUrl: new URL(url) }

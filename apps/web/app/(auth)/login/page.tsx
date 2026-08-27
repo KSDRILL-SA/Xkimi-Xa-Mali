@@ -66,11 +66,11 @@ export default function LoginPage() {
             <Link
               href="/"
               className="inline-flex items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-xl"
-              aria-label="Xkimm Xa Mali Foundation home"
+              aria-label="Xkimi Xa Mali Foundation home"
             >
               <XmmLogo size={44} />
               <span className="font-display text-white font-extrabold text-lg tracking-wide leading-tight">
-                Xkimm Xa Mali
+                Xkimi Xa Mali
                 <span className="block text-[10px] font-bold tracking-[0.2em] text-xxm-gold/90 mt-0.5">
                   FOUNDATION
                 </span>
@@ -113,11 +113,11 @@ export default function LoginPage() {
           <Link
             href="/"
             className="lg:hidden mb-7 inline-flex items-center gap-2.5 self-start outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-xl"
-            aria-label="Xkimm Xa Mali Foundation home"
+            aria-label="Xkimi Xa Mali Foundation home"
           >
             <XmmLogo size={34} />
             <span className="font-display font-extrabold text-xxm-green-900 tracking-wide">
-              Xkimm Xa Mali Foundation
+              Xkimi Xa Mali Foundation
             </span>
           </Link>
 

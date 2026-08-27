@@ -176,7 +176,7 @@ Progress against each: `registrations.md`.
 
 | | |
 |---|---|
-| Foundation | Xkimm Xa Mali Foundation |
+| Foundation | Xkimi Xa Mali Foundation |
 | Office bearer for this enquiry | `[NAME, OFFICE]` |
 | Email | `[EMAIL]` |
 | Telephone | `[TELEPHONE]` |

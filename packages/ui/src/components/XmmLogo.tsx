@@ -36,7 +36,7 @@ export function XmmLogo({
         viewBox="0 0 100 100"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        aria-label="Xkimm Xa Mali Foundation logo"
+        aria-label="Xkimi Xa Mali Foundation logo"
         role="img"
       >
         <defs>
@@ -154,7 +154,7 @@ export function XmmLogo({
 
       {wordmark && (
         <span className={cn('flex flex-col leading-none', textColor)}>
-          <span className="font-bold text-sm tracking-wide">Xkimm Xa Mali Foundation</span>
+          <span className="font-bold text-sm tracking-wide">Xkimi Xa Mali Foundation</span>
           <span className="text-[10px] opacity-50 tracking-widest uppercase mt-0.5">
             Contributing · Growing · Securing
           </span>

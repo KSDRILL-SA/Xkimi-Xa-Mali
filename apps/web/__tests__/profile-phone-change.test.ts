@@ -81,7 +81,7 @@ describe('warning the number that was replaced', () => {
     await updateMemberProfile('user-1', 'user-1', [], { phone: NEW_PHONE })
 
     const body = mocks.smsSend.mock.calls[0][0].body
-    expect(body).toContain('Xkimm Xa Mali Foundation')
+    expect(body).toContain('Xkimi Xa Mali Foundation')
     expect(body).toMatch(/if this was not you/i)
   })
 

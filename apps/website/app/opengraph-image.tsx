@@ -28,7 +28,7 @@ import { FACTS } from '@xxm/utils'
  */
 
 export const runtime = 'nodejs'
-export const alt = 'Xkimm Xa Mali Foundation — Contributing. Growing. Securing.'
+export const alt = 'Xkimi Xa Mali Foundation — Contributing. Growing. Securing.'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 

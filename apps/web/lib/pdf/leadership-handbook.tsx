@@ -172,8 +172,8 @@ const cov = StyleSheet.create({
 export function LeadershipHandbookDocument({ holder }: { holder: string }) {
   return (
     <Document
-      title="Xkimm Xa Mali Foundation — The Leadership Handbook"
-      author="Xkimm Xa Mali Foundation"
+      title="Xkimi Xa Mali Foundation — The Leadership Handbook"
+      author="Xkimi Xa Mali Foundation"
       subject="How leadership runs the Foundation, and what it owes the members"
     >
       {/* ═══ COVER ════════════════════════════════════════════════════════ */}
@@ -191,7 +191,7 @@ export function LeadershipHandbookDocument({ holder }: { holder: string }) {
             </View>
 
             <View style={{ marginTop: 66 }}>
-              <Text style={cov.eyebrow}>XKIMM XA MALI FOUNDATION</Text>
+              <Text style={cov.eyebrow}>XKIMI XA MALI FOUNDATION</Text>
               <Text style={cov.title}>The Leadership{'\n'}<Text style={cov.titleGold}>Handbook</Text></Text>
               <View style={cov.rule} />
               <Text style={cov.blurb}>
@@ -792,7 +792,7 @@ export function LeadershipHandbookDocument({ holder }: { holder: string }) {
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 70 }}>
             <View style={{ marginBottom: 26 }}><Diamond size={9} /></View>
             <Text style={{ fontSize: 15, fontFamily: 'Times-Bold', color: '#FFFFFF', letterSpacing: 1.6, textAlign: 'center' }}>
-              XKIMM XA MALI FOUNDATION
+              XKIMI XA MALI FOUNDATION
             </Text>
             <Text style={{ fontFamily: 'Geist', fontSize: 6.2, fontWeight: 600, color: G.gold, letterSpacing: 2.4, marginTop: 9 }}>
               THE LEADERSHIP HANDBOOK

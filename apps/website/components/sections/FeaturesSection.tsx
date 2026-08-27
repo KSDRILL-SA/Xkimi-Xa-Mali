@@ -118,7 +118,7 @@ export function FeaturesSection() {
             <span className="text-xxm-green">built in.</span>
           </h2>
           <p className="mt-5 text-gray-500 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            No spreadsheets. No WhatsApp reminders. No chasing payments. Xkimm Xa Mali Foundation automates
+            No spreadsheets. No WhatsApp reminders. No chasing payments. Xkimi Xa Mali Foundation automates
             the administration so the brotherhood can focus on growing.
           </p>
 

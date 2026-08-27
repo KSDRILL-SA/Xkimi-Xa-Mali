@@ -30,7 +30,7 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 
   const { month, year } = parsed.data
   const monthName = MONTHS?.[month - 1] ?? `Month-${month}`
-  const filename  = `xkimm-xa-mali-statement-${monthName.toLowerCase()}-${year}.pdf`
+  const filename  = `xkimi-xa-mali-statement-${monthName.toLowerCase()}-${year}.pdf`
 
   // Streamed through this route, always. Never redirected to blob storage.
   //

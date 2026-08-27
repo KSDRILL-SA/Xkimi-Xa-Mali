@@ -85,7 +85,7 @@ flowchart LR
         PA["*.vercel.app"] --- PDB["Neon PR branch"]
     end
     subgraph PR["Production — main"]
-        PRA["xkimmxamali.co.za"] --- PRDB["Neon prod — real data"]
+        PRA["xkimixamali.co.za"] --- PRDB["Neon prod — real data"]
         PRA --- PRNC["Netcash live — real debits"]
     end
     L -.->|no shared data or creds| P -.->|no shared data or creds| PR

@@ -48,7 +48,7 @@ export default async function InvitePage({
   if (errorCode || !invite) {
     return (
       <AuthCard>
-        <AuthHeading title="Invite link" subtitle="Join Xkimm Xa Mali Foundation" centered />
+        <AuthHeading title="Invite link" subtitle="Join Xkimi Xa Mali Foundation" centered />
         <InviteErrorView code={errorCode ?? 'SYS_500'} />
       </AuthCard>
     )
@@ -56,7 +56,7 @@ export default async function InvitePage({
 
   return (
     <AuthCard>
-      <AuthHeading title="Create your account" subtitle="Complete your registration to join Xkimm Xa Mali Foundation" />
+      <AuthHeading title="Create your account" subtitle="Complete your registration to join Xkimi Xa Mali Foundation" />
       <InviteRegisterForm invite={invite} inviteCode={token} />
     </AuthCard>
   )

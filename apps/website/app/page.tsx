@@ -10,7 +10,7 @@ import { CTASection } from '@/components/sections/CTASection'
 import { Footer } from '@/components/Footer'
 
 export const metadata: Metadata = {
-  title: 'Xkimm Xa Mali Foundation — Contributing. Growing. Securing.',
+  title: 'Xkimi Xa Mali Foundation — Contributing. Growing. Securing.',
 }
 
 function StatsFallback() {
