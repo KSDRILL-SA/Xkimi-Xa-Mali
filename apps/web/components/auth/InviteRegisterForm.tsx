@@ -62,8 +62,10 @@ export function InviteRegisterForm({ invite, inviteCode }: Props) {
     }
   }
 
+  // `method="post"` is a fallback only — see LoginForm.tsx for why a
+  // password field needs one even though `onSubmit` always intercepts.
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} method="post" className="space-y-4" noValidate>
       {error && <Alert variant="error">{error}</Alert>}
 
       <div className="rounded-xl bg-xxm-green/5 border border-xxm-green/20 px-4 py-3 text-sm text-xxm-green-900 space-y-0.5">

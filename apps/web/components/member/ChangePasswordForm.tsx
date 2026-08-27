@@ -33,8 +33,10 @@ export function ChangePasswordForm() {
     }
   }
 
+  // `method="post"` is a fallback only — see LoginForm.tsx for why a
+  // password field needs one even though `onSubmit` always intercepts.
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 max-w-md" noValidate>
+    <form onSubmit={handleSubmit(onSubmit)} method="post" className="space-y-4 max-w-md" noValidate>
       {status && <Alert variant={status.type}>{status.msg}</Alert>}
       <div>
         <Label htmlFor="currentPassword" required>Current password</Label>

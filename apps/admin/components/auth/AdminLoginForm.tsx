@@ -54,8 +54,10 @@ export function AdminLoginForm() {
     router.refresh()
   }
 
+  // `method="post"` is a fallback only — see apps/web's LoginForm.tsx for
+  // why a password field needs one even though `onSubmit` always intercepts.
   return (
-    <form onSubmit={handleSubmit} className="relative bg-white rounded-2xl shadow-xxm-lg ring-1 ring-black/5 p-6 space-y-4">
+    <form onSubmit={handleSubmit} method="post" className="relative bg-white rounded-2xl shadow-xxm-lg ring-1 ring-black/5 p-6 space-y-4">
       <div className="absolute -top-px left-6 right-6 h-px bg-gold-shimmer opacity-70" aria-hidden />
       {error && <Alert variant="error">{error}</Alert>}
 
