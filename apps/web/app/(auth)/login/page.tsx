@@ -1,11 +1,11 @@
 import type { Metadata } from 'next'
 import { Suspense } from 'react'
-import Link from 'next/link'
 import { Users, ShieldCheck, FileText } from 'lucide-react'
 import { MAX_MEMBERS, FACTS } from '@xxm/utils'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { SkeletonForm } from '@/components/ui/Skeleton'
 import { XmmLogo } from '@/components/ui/XmmLogo'
+import { env } from '@/lib/env'
 
 export const metadata: Metadata = { title: 'Sign in' }
 
@@ -63,8 +63,11 @@ export default function LoginPage() {
           />
 
           <div className="relative">
-            <Link
-              href="/"
+            {/* This app has no marketing homepage of its own — its `/` just
+                redirects unauthenticated visitors back to `/login`, the page
+                already showing — so "home" from here is the real public site. */}
+            <a
+              href={env.NEXT_PUBLIC_SITE_URL}
               className="inline-flex items-center gap-3 outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-xl"
               aria-label="Xkimi Xa Mali Foundation home"
             >
@@ -75,7 +78,7 @@ export default function LoginPage() {
                   FOUNDATION
                 </span>
               </span>
-            </Link>
+            </a>
 
             <h2 className="font-display text-white text-3xl xl:text-[2.1rem] font-extrabold leading-[1.15] mt-11">
               Contributing.
@@ -110,8 +113,8 @@ export default function LoginPage() {
         {/* ── Signing in ──────────────────────────────────────────────── */}
         <div className="bg-white p-8 sm:p-11 flex flex-col justify-center">
           {/* The mark, for the narrow layout where the panel beside it is gone. */}
-          <Link
-            href="/"
+          <a
+            href={env.NEXT_PUBLIC_SITE_URL}
             className="lg:hidden mb-7 inline-flex items-center gap-2.5 self-start outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold rounded-xl"
             aria-label="Xkimi Xa Mali Foundation home"
           >
@@ -119,7 +122,7 @@ export default function LoginPage() {
             <span className="font-display font-extrabold text-xxm-green-900 tracking-wide">
               Xkimi Xa Mali Foundation
             </span>
-          </Link>
+          </a>
 
           <div className="mb-7">
             <span className="inline-flex items-center gap-1.5 text-[10px] font-bold tracking-[0.18em] text-xxm-gold-dark">
