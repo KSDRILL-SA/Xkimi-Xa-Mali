@@ -67,7 +67,7 @@ export function FoundersBackdrop() {
               fill
               priority={i === 0}
               quality={85}
-              className="object-contain object-bottom md:object-right"
+              className="object-contain object-center md:object-right"
               sizes="(max-width: 768px) 100vw, 55vw"
             />
           </div>
