@@ -110,12 +110,12 @@ export default async function AboutPage() {
         <section className="relative overflow-hidden bg-xxm-green pb-20 md:pb-28 pt-16 md:pt-24 px-4">
           {/* Gold orb overlays */}
           <div
-            className="absolute -top-24 -right-24 w-[500px] h-[500px] rounded-full blur-3xl opacity-15 pointer-events-none"
+            className="absolute -top-24 -right-24 w-[500px] h-[500px] rounded-full opacity-15 pointer-events-none"
             style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 65%)' }}
             aria-hidden
           />
           <div
-            className="absolute bottom-0 -left-20 w-80 h-80 rounded-full blur-3xl opacity-10 pointer-events-none"
+            className="absolute bottom-0 -left-20 w-80 h-80 rounded-full opacity-10 pointer-events-none"
             style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
             aria-hidden
           />

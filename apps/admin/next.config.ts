@@ -43,8 +43,14 @@ const nextConfig: NextConfig = {
             "img-src 'self' data: blob:",
             "font-src 'self'",
             // Sentry ingestion, or reports are blocked by the policy that is
-            // meant to protect this app.
-            `connect-src 'self' ${WEB_URL} https://o*.ingest.sentry.io`,
+            // meant to protect this app. `data:` is not a network origin —
+            // it's what SignaturePadCard.tsx converts a drawn signature
+            // through (`fetch(canvas.toDataURL(...))` into a Blob before
+            // upload). Chrome enforces connect-src against `fetch()` calls to
+            // data: URIs same as any other origin, so without it here that
+            // fetch throws "Failed to fetch" before the signature ever
+            // reaches the server action — this is that bug's actual cause.
+            `connect-src 'self' data: ${WEB_URL} https://o*.ingest.sentry.io`,
             "frame-ancestors 'none'",
           ].join('; '),
         },

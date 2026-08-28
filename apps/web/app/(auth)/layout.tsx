@@ -10,9 +10,16 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="auth-bg fixed inset-0 -z-20" />
       <div className="noise-overlay -z-20" aria-hidden />
 
-      {/* Decorative drifting orbs */}
+      {/* Decorative drifting orbs.
+          No `blur-3xl` — the radial-gradient already fades to fully
+          transparent on its own, so an extra blur pass bought nothing.
+          What it did buy: on mid-range Android GPUs, a `fixed`, continuously
+          animated, heavily blurred layer is a well-known trigger for visible
+          tiling/seam artifacts, since the compositor has to re-rasterize the
+          blur every animation frame rather than once at paint time — and
+          this sits behind every login/register/reset page. */}
       <div
-        className="fixed -z-10 w-96 h-96 rounded-full blur-3xl opacity-20 animate-orb-drift-1"
+        className="fixed -z-10 w-96 h-96 rounded-full opacity-20 animate-orb-drift-1"
         style={{
           background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)',
           top: '-8rem',
@@ -21,7 +28,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         aria-hidden
       />
       <div
-        className="fixed -z-10 w-80 h-80 rounded-full blur-3xl opacity-15 animate-orb-drift-2"
+        className="fixed -z-10 w-80 h-80 rounded-full opacity-15 animate-orb-drift-2"
         style={{
           background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)',
           bottom: '-6rem',
@@ -30,7 +37,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         aria-hidden
       />
       <div
-        className="fixed -z-10 w-64 h-64 rounded-full blur-3xl opacity-10 animate-orb-drift-3"
+        className="fixed -z-10 w-64 h-64 rounded-full opacity-10 animate-orb-drift-3"
         style={{
           background: 'radial-gradient(circle, #ffffff 0%, transparent 70%)',
           top: '40%',

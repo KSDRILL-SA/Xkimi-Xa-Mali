@@ -120,6 +120,12 @@ export function RequestsTable({
 
   return (
     <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
+      {/* Two fixed columns (150px + 220px) left this squeezing three flexible
+          ones into whatever was left — on a phone, into almost nothing. Same
+          fix as every other table here: a real minimum width, scrolling
+          sideways rather than clipping the requester's own name. */}
+      <div className="overflow-x-auto">
+      <div className="min-w-[860px]">
       <div
         className={`${GRID} px-5 py-3 bg-xxm-green-50/60 border-b border-xxm-green/8 text-[11px] font-bold text-xxm-gray-500 uppercase tracking-wider`}
       >
@@ -221,6 +227,8 @@ export function RequestsTable({
             </div>
           </div>
         ))}
+      </div>
+      </div>
       </div>
     </div>
   )

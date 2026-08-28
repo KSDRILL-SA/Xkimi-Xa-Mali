@@ -62,12 +62,12 @@ export default function SupportPage() {
         {/* ── Hero ──────────────────────────────────────────────────── */}
         <section className="relative overflow-hidden bg-xxm-green py-14 md:py-20 px-4">
           <div
-            className="absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl opacity-20 pointer-events-none"
+            className="absolute -top-20 -right-20 w-72 h-72 rounded-full opacity-20 pointer-events-none"
             style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
             aria-hidden
           />
           <div
-            className="absolute -bottom-12 -left-12 w-56 h-56 rounded-full blur-3xl opacity-15 pointer-events-none"
+            className="absolute -bottom-12 -left-12 w-56 h-56 rounded-full opacity-15 pointer-events-none"
             style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
             aria-hidden
           />

@@ -350,6 +350,15 @@ export default async function ContributionsPage({
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
+          {/* The "Period" cell hides below sm, but the grid's own column
+              track for it does not — reserved space sat empty while the
+              other four columns kept shrinking to fit a phone screen. Same
+              fix as the other tables here: scroll sideways instead. This
+              also carries each row's expanded panel (payment history, waive
+              / record-payment forms) along at the same width, which is a
+              fair trade against clipping the numbers in the row itself. */}
+          <div className="overflow-x-auto">
+          <div className="min-w-[720px]">
           <div className="grid grid-cols-[2fr_1fr_1fr_1fr_90px] gap-3 px-4 py-3 bg-xxm-gray-50 border-b border-xxm-gray-100">
             <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest">Member</span>
             <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest hidden sm:block">Period</span>
@@ -543,6 +552,8 @@ export default async function ContributionsPage({
                 </details>
               )
             })}
+          </div>
+          </div>
           </div>
         </div>
       )}
