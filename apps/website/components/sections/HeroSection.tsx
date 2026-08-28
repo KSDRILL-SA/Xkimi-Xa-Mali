@@ -57,8 +57,7 @@ export async function HeroSection() {
           footprint predictable and clear of that zone; the bottom padding
           below is the deliberate gap that keeps it that way. */}
       <div
-        className="relative z-10 flex-1 flex flex-col justify-start md:justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-24 md:pb-12"
-        style={{ paddingTop: 'calc(var(--nav-height) + env(safe-area-inset-top) + 2.5rem)' }}
+        className="relative z-10 flex-1 flex flex-col justify-start md:justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-32 md:pb-12 pt-[calc(var(--nav-height)+env(safe-area-inset-top)+1.75rem)] md:pt-[calc(var(--nav-height)+env(safe-area-inset-top)+2.5rem)]"
       >
         <div className="max-w-3xl">
 
