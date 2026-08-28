@@ -25,6 +25,8 @@ async function createInvite(_prev: InviteState, fd: FormData): Promise<InviteSta
       lastName:      (fd.get('lastName')  as string | null)?.trim(),
       email:         (fd.get('email')     as string | null)?.trim().toLowerCase(),
       phone:          fd.get('phone'),
+      idNumber:      (fd.get('idNumber')   as string | null)?.trim(),
+      vouchedFor:    (fd.get('vouchedFor') as string | null)?.trim() || undefined,
       minimumAmount:  Number(fd.get('minimumAmount')),
     },
     { adminUserId: userId },
