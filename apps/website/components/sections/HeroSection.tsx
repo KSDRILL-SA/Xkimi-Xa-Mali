@@ -139,8 +139,15 @@ export async function HeroSection() {
           </div>
 
           {/* floating stat pills */}
+          {/* Three pills don't fit one row under 390px wide, and wrapping to a
+              second row is what pushed this block into the founder photo's
+              name band — the exact height that second row added varied with
+              which founder was showing, since the CTA-row fix above was tuned
+              against only one of them. Scrolling sideways on mobile instead
+              guarantees this block is always exactly one row tall, regardless
+              of the viewport or which of the four photos is up. */}
           <div
-            className="flex flex-wrap gap-3 animate-fade-in-up"
+            className="flex md:flex-wrap gap-3 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0 animate-fade-in-up"
             style={{ animationDelay: '1s' }}
           >
             {[
@@ -166,7 +173,7 @@ export async function HeroSection() {
             ].map(({ icon: Icon, label, sub }) => (
               <div
                 key={label}
-                className="glass flex items-center gap-3 px-4 py-3 rounded-2xl animate-float"
+                className="glass flex items-center gap-3 px-4 py-3 rounded-2xl shrink-0 animate-float"
               >
                 <div className="w-8 h-8 rounded-xl bg-xxm-gold/15 flex items-center justify-center shrink-0">
                   <Icon size={15} className="text-xxm-gold" aria-hidden />
