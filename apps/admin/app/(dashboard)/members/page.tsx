@@ -141,6 +141,14 @@ export default async function MembersPage({
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
+          {/* Hiding a cell's *content* below sm/md/lg doesn't touch the grid's
+              own column tracks — those four fixed-width columns (80+64+64+80
+              = 288px) stayed reserved even while empty, squeezing Member into
+              whatever was left. On a phone that was single digits of pixels:
+              the name rendered as one initial, overlapped by the View button.
+              Same fix as every other table here: scroll sideways instead. */}
+          <div className="overflow-x-auto">
+          <div className="min-w-[760px]">
           {/* Table header */}
           <div className="grid grid-cols-[2fr_1fr_80px_64px_64px_80px] gap-3 px-4 py-3 bg-xxm-gray-50 border-b border-xxm-gray-100">
             <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest">Member</span>
@@ -221,6 +229,8 @@ export default async function MembersPage({
                 </div>
               )
             })}
+          </div>
+          </div>
           </div>
         </div>
       )}

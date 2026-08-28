@@ -144,12 +144,12 @@ export default function AboutPage() {
         <section className="relative overflow-hidden bg-xxm-green py-20 md:py-32 px-4">
           {/* Background glow blobs */}
           <div
-            className="absolute -top-24 -right-24 w-80 h-80 rounded-full blur-3xl opacity-20 pointer-events-none"
+            className="absolute -top-24 -right-24 w-80 h-80 rounded-full opacity-20 pointer-events-none"
             style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
             aria-hidden
           />
           <div
-            className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full blur-3xl opacity-15 pointer-events-none"
+            className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full opacity-15 pointer-events-none"
             style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
             aria-hidden
           />

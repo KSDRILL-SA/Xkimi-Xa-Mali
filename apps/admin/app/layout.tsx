@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import localFont from 'next/font/local'
@@ -23,6 +23,19 @@ const playfairDisplay = localFont({
   variable: '--font-display',
   display: 'swap',
 })
+
+// Both member and marketing apps declare this explicitly; the admin app
+// never did. Next.js's own bare default (`width=device-width,
+// initial-scale=1`) is close, but without `viewportFit: 'cover'` the safe
+// area on a notch/Dynamic-Island phone is unaccounted for, and there's no
+// theme-color for the browser chrome.
+export const viewport: Viewport = {
+  themeColor: '#1B4332',
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+  viewportFit: 'cover',
+}
 
 export const metadata: Metadata = {
   title: { template: '%s — XXM Admin', default: 'XXM Admin' },
