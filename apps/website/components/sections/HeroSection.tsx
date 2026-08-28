@@ -40,10 +40,10 @@ export async function HeroSection() {
       </div>
 
       {/* ── Main content ──────────────────────────────────────────── */}
-      {/* The fixed header's own height grows with `env(safe-area-inset-top)`
-          on notch/Dynamic-Island phones. A flat `pt-28` (112px) is enough for
-          the header's base 72px, but not enough headroom once a ~59px notch
-          is added on top — the headline would sit partly under the bar. */}
+      {/* `--nav-height` is measured live off the header's real rendered box
+          (see Navbar.tsx's `useLayoutEffect`), so it already includes both
+          the top bar and, below `lg:`, the second row of section pills —
+          this padding only needs a small buffer past it, not a guessed one. */}
       {/* `justify-start` on mobile, not `justify-center`. On desktop the
           founder's portrait sits to the right (`object-right`) and this text
           block to the left — different halves of the screen, so vertical
@@ -54,10 +54,9 @@ export async function HeroSection() {
           risked the stat pills — the last thing in it — landing right on
           top of the photo's own caption depending on content length and
           screen height. Anchoring to the top instead keeps this block's
-          footprint predictable and clear of that zone; the bottom padding
-          below is the deliberate gap that keeps it that way. */}
+          footprint predictable and clear of that zone. */}
       <div
-        className="relative z-10 flex-1 flex flex-col justify-start md:justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-32 md:pb-12 pt-[calc(var(--nav-height)+env(safe-area-inset-top)+1.75rem)] md:pt-[calc(var(--nav-height)+env(safe-area-inset-top)+2.5rem)]"
+        className="relative z-10 flex-1 flex flex-col justify-start md:justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-16 md:pb-12 pt-[calc(var(--nav-height)+1rem)] md:pt-[calc(var(--nav-height)+2.5rem)]"
       >
         <div className="max-w-3xl">
 
@@ -116,8 +115,12 @@ export async function HeroSection() {
           </p>
 
           {/* CTA row */}
+          {/* Extra bottom margin on mobile only — a deliberate, separate lever
+              from the block's own top offset above, so the stat pills below
+              (the last thing before the founder photo's name band) get their
+              own clearance rather than the whole block sliding as one. */}
           <div
-            className="flex flex-wrap gap-4 mb-16 animate-fade-in-up"
+            className="flex flex-wrap gap-4 mb-20 md:mb-16 animate-fade-in-up"
             style={{ animationDelay: '0.8s' }}
           >
             <a
