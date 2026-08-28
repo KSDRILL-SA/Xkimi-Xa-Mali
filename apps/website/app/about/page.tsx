@@ -107,24 +107,7 @@ export default async function AboutPage() {
       <main id="main-content" className="pt-[var(--nav-height)]">
 
         {/* ── Hero ──────────────────────────────────────────────────── */}
-        <section className="relative overflow-hidden bg-xxm-green pb-20 md:pb-28 pt-16 md:pt-24 px-4">
-          {/* Gold orb overlays */}
-          <div
-            className="absolute -top-24 -right-24 w-[500px] h-[500px] rounded-full opacity-15 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 65%)' }}
-            aria-hidden
-          />
-          <div
-            className="absolute bottom-0 -left-20 w-80 h-80 rounded-full opacity-10 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
-            aria-hidden
-          />
-          <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-5 pointer-events-none"
-            style={{ background: 'radial-gradient(circle, #2C5F47 0%, transparent 60%)' }}
-            aria-hidden
-          />
-
+        <section className="relative bg-xxm-green pb-20 md:pb-28 pt-16 md:pt-24 px-4">
           <div className="relative max-w-screen-md mx-auto text-center flex flex-col items-center gap-6">
             <Link
               href="/"
