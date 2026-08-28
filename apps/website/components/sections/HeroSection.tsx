@@ -104,7 +104,7 @@ export async function HeroSection() {
 
           {/* subheadline */}
           <p
-            className="text-white/65 text-lg md:text-xl leading-relaxed max-w-xl mb-6 md:mb-10 animate-fade-in-up"
+            className="text-white/65 text-lg md:text-xl leading-relaxed max-w-xl mb-4 md:mb-10 animate-fade-in-up"
             style={{ animationDelay: '0.65s' }}
           >
             Xkimi Xa Mali Foundation is a private, invite-only collective financial platform built
@@ -116,7 +116,7 @@ export async function HeroSection() {
 
           {/* CTA row */}
           <div
-            className="flex flex-wrap gap-4 mb-12 md:mb-16 animate-fade-in-up"
+            className="flex flex-wrap gap-4 mb-24 md:mb-16 animate-fade-in-up"
             style={{ animationDelay: '0.8s' }}
           >
             <a
