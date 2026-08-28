@@ -131,7 +131,15 @@ export async function HeroSection() {
               href={adminWhatsAppUrl('Hi, I would like to join the Xkimi Xa Mali Foundation group. Please add me.')}
               target="_blank"
               rel="noopener noreferrer"
+              // `.btn-secondary` is transparent by design everywhere else it's
+              // used — here specifically, this button sits over the rotating
+              // founder photo's own name band, close enough on some founders
+              // that the caption showed straight through the glass. The
+              // inline background (site's own dark green, not a shared class)
+              // overrides it for this one instance without touching the
+              // shared style other pages rely on.
               className="btn-secondary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl border border-white/20 text-white/80 font-semibold text-base hover:border-xxm-gold/40"
+              style={{ background: 'rgba(5, 46, 22, 0.88)' }}
             >
               <MessageCircle size={16} aria-hidden />
               Join WhatsApp
