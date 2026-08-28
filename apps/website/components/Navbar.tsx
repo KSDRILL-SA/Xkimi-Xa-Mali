@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { ArrowRight, Menu, X } from 'lucide-react'
 import { XmmLogo } from '@/components/ui/XmmLogo'
@@ -19,6 +19,31 @@ export function Navbar() {
   const [showRightFade, setRightFade] = useState(false)
   const navScrollRef                  = useRef<HTMLDivElement>(null)
   const menuButtonRef                 = useRef<HTMLButtonElement>(null)
+  const headerRef                     = useRef<HTMLElement>(null)
+
+  /* ── Publish the header's REAL rendered height ─────────────────────
+     `--nav-height` used to be a hardcoded 72px — the top bar's height
+     alone. Below `lg:`, this header also renders a second row (the
+     horizontal-scroll section pills), which that constant never
+     accounted for: `-translate-y-full` only translates by the element's
+     *own* box height, so hiding the header on scroll left the second
+     row's overflow still visible, overlapping whatever content sat right
+     below it — and every page reserving top space via `--nav-height`
+     (this file's mobile menu, HeroSection, the About page) under-reserved
+     by the same amount. Measuring the actual box and writing it back
+     fixes both at once, and adapts automatically per breakpoint since the
+     second row simply isn't there above `lg:`. */
+  useLayoutEffect(() => {
+    const el = headerRef.current
+    if (!el) return
+    const publish = () => {
+      document.documentElement.style.setProperty('--nav-height', `${el.getBoundingClientRect().height}px`)
+    }
+    publish()
+    const ro = new ResizeObserver(publish)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   /* ── Scroll state — visible only when exactly at the top ────────── */
   useEffect(() => {
@@ -140,6 +165,7 @@ export function Navbar() {
   return (
     <>
       <header
+        ref={headerRef}
         className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
           hidden ? '-translate-y-full' : 'translate-y-0'
         } ${
@@ -147,12 +173,14 @@ export function Navbar() {
             ? 'bg-transparent'
             : 'bg-xxm-green-950/95 backdrop-blur-md shadow-lg border-b border-white/10'
         }`}
-        style={{
-          height: 'calc(var(--nav-height) + env(safe-area-inset-top))',
-          paddingTop: 'env(safe-area-inset-top)',
-        }}
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <div className="h-full max-w-screen-xl mx-auto px-4 md:px-8 flex items-center justify-between gap-6">
+        {/* Fixed to a real pixel height rather than the old `h-full` —
+            the header itself no longer declares one (see the
+            `useLayoutEffect` above): it now sizes to its actual content,
+            this bar plus the mobile pill row below it, so hiding the
+            header hides all of it, not just this bar's worth. */}
+        <div className="h-[72px] max-w-screen-xl mx-auto px-4 md:px-8 flex items-center justify-between gap-6">
 
           {/* ── Logo ──────────────────────────────────────────────── */}
           <button
@@ -287,7 +315,7 @@ export function Navbar() {
           className={`absolute inset-x-0 top-0 bottom-0 flex flex-col p-8 transition-transform duration-400 ${
             menuOpen ? 'translate-y-0' : '-translate-y-full'
           }`}
-          style={{ paddingTop: 'calc(var(--nav-height) + env(safe-area-inset-top) + 1.5rem)' }}
+          style={{ paddingTop: 'calc(var(--nav-height) + 1.5rem)' }}
         >
           <nav className="flex flex-col gap-2" aria-label="Mobile navigation">
             {NAV_LINKS.map(({ label, href, sectionId }, i) => {
