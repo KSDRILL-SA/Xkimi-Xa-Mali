@@ -48,7 +48,7 @@ export default async function DataRequestPage() {
       <main className="flex-1">
         <section className="relative overflow-hidden bg-xxm-green py-12 md:py-16 px-4">
           <div
-            className="absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl opacity-20 pointer-events-none"
+            className="absolute -top-20 -right-20 w-72 h-72 rounded-full opacity-20 pointer-events-none"
             style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
             aria-hidden
           />
