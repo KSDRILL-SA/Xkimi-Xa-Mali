@@ -44,8 +44,20 @@ export async function HeroSection() {
           on notch/Dynamic-Island phones. A flat `pt-28` (112px) is enough for
           the header's base 72px, but not enough headroom once a ~59px notch
           is added on top — the headline would sit partly under the bar. */}
+      {/* `justify-start` on mobile, not `justify-center`. On desktop the
+          founder's portrait sits to the right (`object-right`) and this text
+          block to the left — different halves of the screen, so vertical
+          centering never brings them near each other. On mobile there is no
+          side-by-side split: the portrait is the full-bleed background
+          *behind* this same text, name-and-title band baked into the
+          artwork's own foot. Centering a variable-height block over that
+          risked the stat pills — the last thing in it — landing right on
+          top of the photo's own caption depending on content length and
+          screen height. Anchoring to the top instead keeps this block's
+          footprint predictable and clear of that zone; the bottom padding
+          below is the deliberate gap that keeps it that way. */}
       <div
-        className="relative z-10 flex-1 flex flex-col justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-12"
+        className="relative z-10 flex-1 flex flex-col justify-start md:justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-24 md:pb-12"
         style={{ paddingTop: 'calc(var(--nav-height) + env(safe-area-inset-top) + 2.5rem)' }}
       >
         <div className="max-w-3xl">
