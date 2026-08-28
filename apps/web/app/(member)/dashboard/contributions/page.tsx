@@ -117,7 +117,12 @@ export default async function ContributionsPage({
       </Reveal>
 
       {/* Group collection account + Netcash fee transparency */}
-      <Reveal variant="up" delay={150}>
+      {/* Same delay as the summary cards above — staggering them let each
+          block finish its own translateY transition a beat apart, which on
+          a slower GPU can paint as a visible seam between the two right at
+          their shared edge while it settles. Revealing together removes the
+          gap between when each one repaints. */}
+      <Reveal variant="up" delay={100}>
         <GroupCollectionAccount />
       </Reveal>
 
