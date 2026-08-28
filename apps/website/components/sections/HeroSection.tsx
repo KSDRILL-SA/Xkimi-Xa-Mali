@@ -62,7 +62,7 @@ export async function HeroSection() {
 
           {/* badge */}
           <div
-            className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-2 mb-8 animate-fade-in-down"
+            className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-2 mb-6 md:mb-8 animate-fade-in-down"
             style={{ animationDelay: '0.1s' }}
           >
             <span className="w-2 h-2 rounded-full bg-xxm-gold animate-pulse-ring shrink-0" />
@@ -74,7 +74,7 @@ export async function HeroSection() {
           {/* headline — word by word staggered */}
           <h1
             id="hero-headline"
-            className="font-display text-5xl sm:text-6xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-6"
+            className="font-display text-5xl sm:text-6xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-4 md:mb-6"
           >
             <span className="block overflow-hidden">
               <span
@@ -104,7 +104,7 @@ export async function HeroSection() {
 
           {/* subheadline */}
           <p
-            className="text-white/65 text-lg md:text-xl leading-relaxed max-w-xl mb-10 animate-fade-in-up"
+            className="text-white/65 text-lg md:text-xl leading-relaxed max-w-xl mb-6 md:mb-10 animate-fade-in-up"
             style={{ animationDelay: '0.65s' }}
           >
             Xkimi Xa Mali Foundation is a private, invite-only collective financial platform built
@@ -115,12 +115,8 @@ export async function HeroSection() {
           </p>
 
           {/* CTA row */}
-          {/* Extra bottom margin on mobile only — a deliberate, separate lever
-              from the block's own top offset above, so the stat pills below
-              (the last thing before the founder photo's name band) get their
-              own clearance rather than the whole block sliding as one. */}
           <div
-            className="flex flex-wrap gap-4 mb-20 md:mb-16 animate-fade-in-up"
+            className="flex flex-wrap gap-4 mb-12 md:mb-16 animate-fade-in-up"
             style={{ animationDelay: '0.8s' }}
           >
             <a
