@@ -76,7 +76,10 @@ export async function reportAbandonedNotifications(step: FlushStepRunner): Promi
         '',
         `By channel: ${channels}`,
         abandoned.sampleError ? `Example error: ${abandoned.sampleError}` : '',
-        abandoned.latestAt ? `Most recent: ${abandoned.latestAt.toISOString()}` : '',
+        // `abandoned` crossed a `step.run` boundary above — Inngest persists
+        // step results as JSON, so `latestAt` comes back a string, not the
+        // `Date` the service returned. `new Date(...)` accepts either.
+        abandoned.latestAt ? `Most recent: ${new Date(abandoned.latestAt).toISOString()}` : '',
         '',
         'Common causes: RESEND_FROM_EMAIL on a domain Resend cannot verify, a revoked',
         'provider key, or a provider outage. Check the notifications table for the',
