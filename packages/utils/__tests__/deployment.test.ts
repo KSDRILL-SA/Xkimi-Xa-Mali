@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isLiveDeployment, isNonLiveDeployment } from '../src/deployment'
+import { isLiveDeployment, isNonLiveDeployment, deploymentEnvironmentName } from '../src/deployment'
 
 /**
  * The distinction this makes is the one NODE_ENV cannot: "is this an optimised
@@ -72,6 +72,29 @@ describe('off Vercel, NODE_ENV is the only signal', () => {
 
   it('is not live when nothing is set at all', () => {
     expect(isLiveDeployment(env({}))).toBe(false)
+  })
+})
+
+describe('deploymentEnvironmentName', () => {
+  // For tagging observability data, not for branching logic — a preview
+  // deploy's errors should say "preview" in Sentry, not merge into
+  // "production" the way a bare NODE_ENV tag would.
+  it('prefers DEPLOY_ENV, same order as isLiveDeployment', () => {
+    expect(
+      deploymentEnvironmentName(env({ DEPLOY_ENV: 'staging', VERCEL_ENV: 'production', NODE_ENV: 'production' })),
+    ).toBe('staging')
+  })
+
+  it('falls back to VERCEL_ENV when DEPLOY_ENV is unset', () => {
+    expect(deploymentEnvironmentName(env({ VERCEL_ENV: 'preview', NODE_ENV: 'production' }))).toBe('preview')
+  })
+
+  it('falls back to NODE_ENV when nothing Vercel-specific is set', () => {
+    expect(deploymentEnvironmentName(env({ NODE_ENV: 'development' }))).toBe('development')
+  })
+
+  it('returns "unknown" rather than undefined when nothing is set', () => {
+    expect(deploymentEnvironmentName(env({}))).toBe('unknown')
   })
 })
 
