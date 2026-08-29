@@ -6,7 +6,18 @@ order, what each one blocks, and which values must match each other.
 This is the **what and why, in what order**. [`DEPLOYMENT.md`](../DEPLOYMENT.md)
 is the **how**, once the accounts exist. Read this first.
 
-Written 2026-07-26. Nothing here has been done yet — every item is outstanding.
+Written 2026-07-26. **Superseded by events — this checklist is now
+substantially done, not outstanding.** All three apps are live on
+`xkimixamali.co.za` (member./admin./apex+www), the domain is registered and
+propagated, Neon/Redis/Inngest/Sentry/Resend/Vercel Blob are all connected,
+and the Netcash registration form itself is submitted (2026-08-29) with
+vetting now on Netcash's side — see `[[project-deployment-phase]]` and
+`[[project-netcash-critical-path]]` in memory for the real, current state.
+The sequencing and reasoning below is still accurate as a record of the
+plan that was followed; treat every checkbox as historical, not as a live
+task list — the production-readiness tracker
+(`docs/production-readiness/`) is where current open items actually live
+now.
 
 ---
 
