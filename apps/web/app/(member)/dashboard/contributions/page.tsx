@@ -111,18 +111,22 @@ export default async function ContributionsPage({
         )}
       </Reveal>
 
-      {/* Summary */}
-      <Reveal variant="up" delay={100}>
+      {/* Summary + group collection account, one Reveal for both. */}
+      {/* These used to be two separate <Reveal> wrappers, even with an
+          identical `delay`. Each Reveal owns its own IntersectionObserver, so
+          "identical delay" only means the two transforms are scheduled the
+          same distance behind whenever *that element itself* crosses the
+          viewport threshold — not the same distance behind each other. On a
+          short mobile viewport the summary cards and the account box cross
+          that threshold at different scroll positions a frame or more apart,
+          so their translateY transitions still ended up landing at slightly
+          different times. Two adjacent rounded-corner boxes animating
+          transform independently and settling a few ms apart is exactly what
+          reads as a torn/scratched seam where they meet. One Reveal around
+          both means one observer, one transform, one settle — there is no
+          seam left to open. */}
+      <Reveal variant="up" delay={100} className="space-y-6">
         <ContributionSummaryCards summary={summary} />
-      </Reveal>
-
-      {/* Group collection account + Netcash fee transparency */}
-      {/* Same delay as the summary cards above — staggering them let each
-          block finish its own translateY transition a beat apart, which on
-          a slower GPU can paint as a visible seam between the two right at
-          their shared edge while it settles. Revealing together removes the
-          gap between when each one repaints. */}
-      <Reveal variant="up" delay={100}>
         <GroupCollectionAccount />
       </Reveal>
 
