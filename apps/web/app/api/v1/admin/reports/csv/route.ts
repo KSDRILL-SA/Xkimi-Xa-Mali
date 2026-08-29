@@ -4,7 +4,8 @@ import { apiError } from '@/lib/api-response'
 import { AdminReportRequestSchema } from '@/lib/validation/report'
 import { exportAdminReportCSV } from '@/services/report.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest } from '@/lib/internal-request'
+import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { getClientIP } from '@/lib/request'
 
 export const GET = withApiHandler(async (req: NextRequest) => {
   const isTrusted = isValidInternalRequest(req)
@@ -13,6 +14,8 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 
   const roles = isTrusted ? ['ADMIN'] : (session?.user?.roles as string[] | undefined) ?? []
   if (!isTrusted && !roles.includes('ADMIN')) return apiError('SYS_003', 'Forbidden', 403)
+
+  const actorId = isTrusted ? (await resolveInternalAdmin(req)) ?? undefined : session!.user.id
 
   const { searchParams } = new URL(req.url)
 
@@ -23,7 +26,7 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 
   if (!parsed.success) return apiError('SYS_001', parsed.error.errors[0]?.message ?? 'Invalid request', 400)
 
-  const csv = await exportAdminReportCSV(parsed.data.month, parsed.data.year)
+  const csv = await exportAdminReportCSV(parsed.data.month, parsed.data.year, actorId, getClientIP(req) ?? undefined)
   const filename = `xxm-report-${parsed.data.year}-${String(parsed.data.month).padStart(2, '0')}.csv`
 
   return new NextResponse(csv, {
