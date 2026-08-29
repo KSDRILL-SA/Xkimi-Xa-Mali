@@ -41,6 +41,7 @@ vi.mock('@/lib/db', () => {
       findUnique: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       aggregate: vi.fn(),
     },
     paymentMandate: {
@@ -267,8 +268,8 @@ describe('processTransactionWebhook', () => {
       .mockResolvedValue(tx as never)
     ;(paymentGateway.mapTransactionStatus as MockedFunction<typeof paymentGateway.mapTransactionStatus>)
       .mockReturnValue('SUCCESS')
-    ;(db.transaction.update as MockedFunction<typeof db.transaction.update>)
-      .mockResolvedValue({} as never)
+    ;(db.transaction.updateMany as MockedFunction<typeof db.transaction.updateMany>)
+      .mockResolvedValue({ count: 1 } as never)
     ;(db.contribution.findUnique as MockedFunction<typeof db.contribution.findUnique>)
       .mockResolvedValue({ ...baseContribution, amountDue: 500, dueDate: new Date(Date.now() + 86400_000) } as never)
     ;(db.transaction.aggregate as MockedFunction<typeof db.transaction.aggregate>)
@@ -281,15 +282,42 @@ describe('processTransactionWebhook', () => {
       mandateId: 'mnd-1',
     })
 
-    expect(db.transaction.update).toHaveBeenCalledWith(
+    expect(db.transaction.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'tx-1' },
+        where: { id: 'tx-1', status: 'PENDING' },
         data: expect.objectContaining({ status: 'SUCCESS' }),
       }),
     )
     expect(db.contribution.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: 'PAID' }) }),
     )
+  })
+
+  it('loses the race safely when a concurrent delivery already updated the row', async () => {
+    // Same shape as the settlement test above, but the compare-and-swap
+    // reports zero rows matched — as it would if another delivery for the
+    // same transaction won first. Nothing downstream should run.
+    const tx = {
+      id: 'tx-race',
+      contributionId: 'ctr-1',
+      status: 'PENDING',
+      gatewayRef: 'ref-race',
+      processedAt: null,
+      contribution: { userId: 'user-1' },
+    }
+    ;(db.transaction.findFirst as MockedFunction<typeof db.transaction.findFirst>)
+      .mockResolvedValue(tx as never)
+    ;(paymentGateway.mapTransactionStatus as MockedFunction<typeof paymentGateway.mapTransactionStatus>)
+      .mockReturnValue('SUCCESS')
+    ;(db.transaction.updateMany as MockedFunction<typeof db.transaction.updateMany>)
+      .mockResolvedValue({ count: 0 } as never)
+
+    await processTransactionWebhook({ transactionRef: 'ref-race', status: 'SUCCESSFUL' })
+
+    expect(db.transaction.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'tx-race', status: 'PENDING' } }),
+    )
+    expect(db.contribution.updateMany).not.toHaveBeenCalled()
   })
 
   it('is idempotent — skips if incoming status equals current status', async () => {

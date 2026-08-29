@@ -555,8 +555,14 @@ export async function processTransactionWebhook(event: TransactionEvent) {
   }
 
   const settledChange = await runTransaction(async (tx) => {
-    await transactionRepo.update(
+    // Conditional on the status this function read a moment ago, not a blind
+    // overwrite — see updateIfStatus. A concurrent delivery that read the
+    // same pre-update status loses this compare-and-swap and does none of
+    // the downstream work below, instead of both proceeding to double-post
+    // the ledger credit.
+    const claimed = await transactionRepo.updateIfStatus(
       transaction.id,
+      transaction.status,
       {
         status: newStatus,
         processedAt: newStatus === 'SUCCESS' ? new Date() : null,
@@ -564,9 +570,24 @@ export async function processTransactionWebhook(event: TransactionEvent) {
       },
       tx,
     )
+    // undefined ("lost the race") is deliberately distinct from null, which
+    // recalculateContributionStatus already returns for its own legitimate
+    // reasons (e.g. nothing about the contribution's status actually
+    // changed) — collapsing the two would skip this function's own
+    // still-correct downstream ledger posting on every ordinary no-change
+    // webhook, not only on a genuine race loss.
+    if (claimed.count === 0) return undefined
 
     return recalculateContributionStatus(transaction.contributionId, tx)
   })
+
+  if (settledChange === undefined) {
+    logger.info('Transaction webhook lost the concurrent update race — a parallel delivery already applied it', {
+      transactionId: transaction.id,
+      transactionRef: event.transactionRef,
+    })
+    return
+  }
 
   // After the commit, never inside it. See recalculateContributionStatus.
   if (settledChange) await emitContributionStatusChange(settledChange)
