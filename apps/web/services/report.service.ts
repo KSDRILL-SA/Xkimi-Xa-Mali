@@ -7,6 +7,7 @@ import { MONTHS } from '@/lib/date'
 import { roundZAR, subtractZAR } from '@/lib/money'
 import { ReportNotFoundError } from '@/lib/errors'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
+import { writeAuditLog } from './audit.service'
 import { transactionRepo } from '@/repositories/transaction.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
@@ -446,8 +447,27 @@ function rands(n: number): string {
   return `R ${n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')}`
 }
 
-export async function exportAdminReportCSV(month: number, year: number): Promise<string> {
+export async function exportAdminReportCSV(
+  month: number,
+  year: number,
+  actorId?: string,
+  ipAddress?: string,
+): Promise<string> {
   const report = await getAdminReport(month, year)
+
+  // A bulk export of every member's name, email, phone, and financial standing
+  // in one file is exactly the kind of access a compromised admin account, or
+  // one used past its purpose, should leave a trace of — same reasoning as
+  // resolveInternalAdmin's own: an actor nobody recorded is not a history that
+  // can be retraced.
+  await writeAuditLog({
+    userId: actorId,
+    action: 'ADMIN_REPORT_EXPORTED_CSV',
+    entity: 'ContributionReport',
+    entityId: `${year}-${String(month).padStart(2, '0')}`,
+    payload: { memberCount: report.summary.memberCount },
+    ipAddress,
+  })
 
   const generatedAt = new Date().toLocaleString('en-ZA', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -502,10 +522,21 @@ export async function generateContributionReportPdf(
   roles: string[],
   month: number,
   year: number,
+  actorId?: string,
+  ipAddress?: string,
 ): Promise<Buffer> {
   assertAdmin(roles)
 
   const report = await getAdminReport(month, year)
+
+  await writeAuditLog({
+    userId: actorId,
+    action: 'ADMIN_REPORT_EXPORTED_PDF',
+    entity: 'ContributionReport',
+    entityId: `${year}-${String(month).padStart(2, '0')}`,
+    payload: { memberCount: report.summary.memberCount },
+    ipAddress,
+  })
 
   // Signature is embedded when configured; the report still generates otherwise.
   const signature = await verifySignatureExists().catch((): null => null)

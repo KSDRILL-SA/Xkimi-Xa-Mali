@@ -245,16 +245,16 @@ codebase before this was caught — `submitManualPayment` (#308) and
 
 | # | Audit event | Status | Evidence / Notes |
 |---|---|---|
-| a | Member creation | `NOT STARTED` | |
-| b | Member update | `NOT STARTED` | |
-| c | Mandate creation/change | `NOT STARTED` | |
-| d | Contribution creation | `NOT STARTED` | |
-| e | Transaction-status change | `NOT STARTED` | |
-| f | Administrative adjustment | `NOT STARTED` | |
+| a | Member creation | `PASSED` | This platform is invite-only — "member creation" is invitation acceptance. `invite.service.ts` writes `INVITE_ACCEPTED` inside the same DB transaction that creates the `User` row. |
+| b | Member update | `PASSED` | `member.service.ts` writes an audit entry on every mutating path (7 separate `writeAuditLog` call sites: profile update, status change, role change, bank account update/removal, id-number correction, unlock). |
+| c | Mandate creation/change | `PASSED` | `mandate.service.ts` — 6 call sites covering creation, update, cancel, approve, reject, delay. |
+| d | Contribution creation | `PASSED` | `contribution.service.ts` — 4 call sites, including the manual-payment and bulk-generation paths. |
+| e | Transaction-status change | `PASSED` | `mandate-status-sync.ts` and `transaction-retry-failed.ts` (both Inngest functions) write an audit entry when a transaction's status actually changes, not just on the happy path. |
+| f | Administrative adjustment | `PASSED` | = `TRANSACTION_REVERSED` in `contribution.service.ts` — this codebase has no separate "manual ledger adjustment" feature; `ledger.service.ts` only exposes reads and the automated reconciliation job. Reversal is the actual administrative-adjustment mechanism. |
 | g | Reversal | `PASSED` (mechanism) | = §3's "audit trail preserves original + correction" row. |
 | h | Permission/role change | `PASSED` | PR #306 unified the audit action name (`ADMIN_ROLE_REVOKED`) — previously the console wrote a *different* action name (`ADMIN_ROLE_REMOVED`) than the API, so any query filtered on one name silently missed the other's revocations. Now both write the same action. |
-| i | Statement generation | `NOT STARTED` | |
-| j | Important configuration changes | `NOT STARTED` | |
+| i | Statement generation | `PASSED` (found and fixed a real gap) | Found: `services/report.service.ts`'s two **admin bulk-export** functions (`exportAdminReportCSV`, `generateContributionReportPdf` — every member's name/email/phone/financial standing in one file) had **zero** audit trail, and `generateContributionReportPdf` didn't even resolve which admin was acting on the trusted-internal-console path (the exact gap `resolveInternalAdmin` exists to close elsewhere, just never applied here). Fixed: both now write `ADMIN_REPORT_EXPORTED_CSV`/`ADMIN_REPORT_EXPORTED_PDF` with the resolved actor id and client IP; both routes now call `resolveInternalAdmin` on the trusted path instead of leaving the actor unresolved. Proved with 4 new tests (actor recorded, still recorded with no actor, PDF path matches, forbidden before ever logging) — 17/17 passing. **Not covered by this fix, deliberately:** a member's own self-service statement view (`generateMemberStatementPdf`) — self-access to one's own data isn't the same exfiltration/insider-threat surface as an admin bulk export, so it was left out of scope rather than padding the fix. | 2026-08-29 |
+| j | Important configuration changes | `NOT STARTED` | No genuine runtime "configuration" surface found to audit — the app's tunables (`ENABLE_GOAL_LOCKING`, `REQUIRE_PASSWORD_POLICY_RESET`, etc.) are deploy-time env vars, not something an admin changes at runtime through the app. Leaving open rather than inventing a row to close; revisit if a real admin-configurable setting is added later. |
 
 **Structural guarantee (applies to all rows):** `audit_logs` is enforced
 **append-only at the database trigger level** — confirmed the hard way when
