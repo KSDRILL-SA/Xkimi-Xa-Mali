@@ -50,10 +50,17 @@ vi.mock('@/lib/pdf/statement', () => ({
   renderStatementPDF: vi.fn(),
 }))
 
+vi.mock('@/lib/pdf/contribution-report', () => ({
+  renderContributionReportPDF: vi.fn(),
+}))
+
 vi.mock('@/services/signature.service', () => ({
   verifySignatureExists: vi.fn(),
   embedSignatureInPdf: vi.fn(),
 }))
+
+const mocks = vi.hoisted(() => ({ writeAuditLog: vi.fn() }))
+vi.mock('@/services/audit.service', () => ({ writeAuditLog: mocks.writeAuditLog }))
 
 // ---------------------------------------------------------------------------
 // Imports after mocks
@@ -69,7 +76,9 @@ import {
   generateMemberStatementPdf,
   getAdminReport,
   exportAdminReportCSV,
+  generateContributionReportPdf,
 } from '@/services/report.service'
+import { renderContributionReportPDF } from '@/lib/pdf/contribution-report'
 
 const ReportForbiddenError = ForbiddenError
 
@@ -89,6 +98,7 @@ const mockRenderPDF      = renderStatementPDF as MockedFunction<typeof renderSta
 const mockDistinctionFindUnique = db.memberDistinction.findUnique as MockedFunction<typeof db.memberDistinction.findUnique>
 const mockVerifySignature = verifySignatureExists as MockedFunction<typeof verifySignatureExists>
 const mockEmbedSignature  = embedSignatureInPdf  as MockedFunction<typeof embedSignatureInPdf>
+const mockRenderContributionPDF = renderContributionReportPDF as MockedFunction<typeof renderContributionReportPDF>
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -390,5 +400,73 @@ describe('exportAdminReportCSV', () => {
     expect(lines[5]).toContain('500.00')
     expect(lines).toContain('Collection Rate,100%')
     expect(lines).toContain('Total Paid,R 500.00')
+  })
+
+  it('records who exported the report — a bulk export of every member\'s PII is not a silent action', async () => {
+    mockUserFindMany.mockResolvedValue([])
+    mockContribFindMany.mockResolvedValue([])
+    mockContribAggregate.mockResolvedValue({ _sum: { amountPaid: 0 } } as never)
+
+    await exportAdminReportCSV(5, 2025, 'admin-42', '10.0.0.1')
+
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'admin-42',
+        action: 'ADMIN_REPORT_EXPORTED_CSV',
+        entity: 'ContributionReport',
+        entityId: '2025-05',
+        ipAddress: '10.0.0.1',
+      }),
+    )
+  })
+
+  it('still records the export even when no actor id was resolved', async () => {
+    mockUserFindMany.mockResolvedValue([])
+    mockContribFindMany.mockResolvedValue([])
+    mockContribAggregate.mockResolvedValue({ _sum: { amountPaid: 0 } } as never)
+
+    await exportAdminReportCSV(5, 2025)
+
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: undefined, action: 'ADMIN_REPORT_EXPORTED_CSV' }),
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// generateContributionReportPdf
+// ---------------------------------------------------------------------------
+
+describe('generateContributionReportPdf', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockUserFindMany.mockReset()
+    mockContribFindMany.mockReset()
+    mockContribAggregate.mockReset()
+    mockVerifySignature.mockResolvedValue(null)
+    mockRenderContributionPDF.mockResolvedValue(Buffer.from('pdf'))
+  })
+
+  it('records who exported the report, same as the CSV path', async () => {
+    mockUserFindMany.mockResolvedValue([])
+    mockContribFindMany.mockResolvedValue([])
+    mockContribAggregate.mockResolvedValue({ _sum: { amountPaid: 0 } } as never)
+
+    await generateContributionReportPdf(['ADMIN'], 5, 2025, 'admin-42', '10.0.0.1')
+
+    expect(mocks.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'admin-42',
+        action: 'ADMIN_REPORT_EXPORTED_PDF',
+        entity: 'ContributionReport',
+        entityId: '2025-05',
+        ipAddress: '10.0.0.1',
+      }),
+    )
+  })
+
+  it('refuses a non-admin caller before ever touching the audit log', async () => {
+    await expect(generateContributionReportPdf(['MEMBER'], 5, 2025)).rejects.toThrow(ReportForbiddenError)
+    expect(mocks.writeAuditLog).not.toHaveBeenCalled()
   })
 })
