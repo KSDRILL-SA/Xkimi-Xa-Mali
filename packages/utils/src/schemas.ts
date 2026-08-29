@@ -130,7 +130,14 @@ export const DelayMandateSchema = z.object({
 // ── Contributions ─────────────────────────────────────────────────────────────
 
 export const ManualContributionSchema = z.object({
-  amount:      z.number().min(100, 'Minimum contribution is R100').max(10_000, 'Maximum contribution is R10,000'),
+  // A flat R100 floor here used to make the last partial payment on any
+  // period impossible whenever less than R100 remained owed — the schema
+  // has no idea what's actually still due, only what the *first* payment on
+  // a fresh period should look like. `submitManualPayment` knows the real
+  // remaining balance and enforces the R100 minimum there, capped at
+  // whatever is actually left, so this only guards against a non-positive
+  // amount and the top-level sanity ceiling.
+  amount:      z.number().positive('Amount must be greater than zero').max(10_000, 'Maximum contribution is R10,000'),
   periodMonth: z.number().int().min(1).max(12),
   periodYear:  z.number().int().min(2024).max(new Date().getFullYear() + 1, 'Cannot pay for periods too far in the future'),
   budgetOverrideConfirmed: z.boolean().optional(),

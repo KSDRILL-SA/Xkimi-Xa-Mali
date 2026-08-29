@@ -24,9 +24,9 @@ flowchart TD
 2. **Find stuck transactions:**
    ```sql
    SELECT t.id, t."idempotencyKey", t.amount, t."createdAt", u.email
-   FROM "Transaction" t
-   JOIN "Contribution" c ON t."contributionId" = c.id
-   JOIN "User" u ON c."userId" = u.id
+   FROM transactions t
+   JOIN contributions c ON t."contributionId" = c.id
+   JOIN users u ON c."userId" = u.id
    WHERE t.status = 'PENDING' AND t."createdAt" < NOW() - INTERVAL '2 hours'
    ORDER BY t."createdAt";
    ```
@@ -44,21 +44,25 @@ flowchart TD
 
 ```sql
 BEGIN;
-UPDATE "Transaction" SET status = 'SUCCESS', "processedAt" = NOW()
+UPDATE transactions SET status = 'SUCCESS', "processedAt" = NOW()
   WHERE id = '<txn_id>' AND status = 'PENDING';
-UPDATE "Contribution" SET status = 'PAID', "updatedAt" = NOW()
+UPDATE contributions SET status = 'PAID', "updatedAt" = NOW()
   WHERE id = '<contribution_id>';
 -- keep the pool balance correct (idempotent on refType/refId/direction):
-INSERT INTO "LedgerEntry" (id, account, direction, amount, "refType", "refId", "createdAt")
+INSERT INTO ledger_entries (id, account, direction, amount, "refType", "refId", "createdAt")
   VALUES (gen_random_uuid(), 'POOL', 'CREDIT', <amount>, 'Transaction', '<txn_id>', NOW())
   ON CONFLICT ("refType", "refId", direction) DO NOTHING;
-INSERT INTO "AuditLog" (id, "userId", action, entity, "entityId", payload, "ipAddress", "createdAt")
+INSERT INTO audit_logs (id, "userId", action, entity, "entityId", payload, "ipAddress", "createdAt")
   VALUES (gen_random_uuid(), '<admin_user_id>', 'MANUAL_RECONCILE', 'Transaction', '<txn_id>',
           '{"reason":"webhook delivery failure"}', NULL, NOW());
 COMMIT;
 ```
 
-> `AuditLog` columns are `userId, action, entity, entityId, payload, ipAddress` — match them exactly.
+> The `audit_logs` table (Prisma model `AuditLog`) has columns
+> `userId, action, entity, entityId, payload, ipAddress` — match them exactly.
+> The `entity`/`refType` *values* above ('Transaction') are free-text labels,
+> not table references — leave them as the Prisma model name for consistency
+> with what the app itself writes into these columns.
 
 ---
 

@@ -16,6 +16,9 @@ vi.mock('@/lib/db', () => ({ db: {} }))
 vi.mock('@xxm/observability', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 vi.mock('@/lib/authorization', () => ({ assertCanAccess: vi.fn() }))
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: mocks.audit }))
+vi.mock('@/integrations/payment', () => ({
+  paymentGateway: { submitOnceOffDebit: vi.fn(), mapTransactionStatus: vi.fn() },
+}))
 vi.mock('@/repositories', () => ({
   goalRepo: { findById: mocks.goalFindById },
   mandateRepo: { findActiveByUser: mocks.mandateFindActive },

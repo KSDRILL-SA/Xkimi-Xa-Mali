@@ -16,6 +16,10 @@ vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: mocks.error, debug: vi.fn() },
 }))
 
+vi.mock('@/integrations/payment', () => ({
+  paymentGateway: { submitScheduledDebit: vi.fn() },
+}))
+
 import { processMandateBatch } from '@/inngest/functions/debit-run'
 import { toTransactionStatus } from '@/lib/transaction-status'
 

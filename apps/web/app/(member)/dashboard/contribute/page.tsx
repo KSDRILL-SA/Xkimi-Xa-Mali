@@ -682,7 +682,11 @@ export default function ContributePage() {
                     <Input
                       id="amount"
                       type="number"
-                      min={MIN_CONTRIBUTION_ZAR}
+                      // Same reasoning as PaymentModal.tsx: the real floor is
+                      // R100 for a fresh period, but capped at whatever's
+                      // actually left once a partial payment has brought that
+                      // below R100 — see submitManualPayment's minimumPayment.
+                      min={Math.min(MIN_CONTRIBUTION_ZAR, remaining)}
                       step={CONTRIBUTION_STEP_ZAR}
                       error={errors.amount?.message}
                       {...register('amount', { valueAsNumber: true })}

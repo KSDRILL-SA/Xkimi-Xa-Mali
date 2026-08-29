@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client'
+import { createHash } from 'node:crypto'
 import { env } from '@/lib/env'
 import { db } from '@/lib/db'
 import { notificationRepo } from '@/repositories/notification.repository'
@@ -68,6 +69,25 @@ function interpolate(template: string, payload: Record<string, unknown>): string
     const value = payload[key]
     return value !== undefined && value !== null ? String(value) : `{{${key}}}`
   })
+}
+
+/**
+ * BulkSMS caps `userSuppliedId` at 20 characters — found live, 2026-08-29:
+ * `BulkSMS 400: Validation error: items[0].userSuppliedId size must be
+ * between 1 and 20`, on a real notification once BulkSMS credentials were
+ * finally configured. This system's notification ids are 25-character
+ * cuids, so *every* SMS would have failed this way, invisibly, the moment
+ * the original "credentials not configured" error stopped hiding it.
+ *
+ * A truncated cuid isn't safe (cuids share a timestamp-ish prefix, so the
+ * first 20 characters of many ids collide far more than the full id does).
+ * Hashing keeps this deterministic — the same notification id always
+ * produces the same short id, which matters for recovery: BulkSMS
+ * deduplicates a resend after a worker crash by this value, the same
+ * property the Resend idempotency key relies on for email.
+ */
+function shortSuppliedId(notificationId: string): string {
+  return createHash('sha256').update(notificationId).digest('hex').slice(0, 20)
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +185,15 @@ async function dispatchEmail(
       )
   }
 
-  await notificationRepo.update(notificationId, { status: 'SENT', sentAt: new Date() })
+  // `errorMessage: null` clears the 'in-flight' claim marker set while this
+  // batch was picked up (see `findReady`) — otherwise a row that sends
+  // successfully keeps that string forever, indistinguishable at a glance
+  // from a row still mid-flight or one that actually failed with that exact
+  // text as a real error. `countAbandonedNotifications` already had to
+  // special-case filtering 'in-flight' out as a fake error elsewhere in this
+  // file, which was the tell this was a known rough edge, just not closed
+  // everywhere it could leak.
+  await notificationRepo.update(notificationId, { status: 'SENT', sentAt: new Date(), errorMessage: null })
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +229,7 @@ async function dispatchSMS(
   const [message] = await smsProvider.send({
     to: normalised,
     body: text,
-    userSuppliedId: notificationId,
+    userSuppliedId: shortSuppliedId(notificationId),
   })
 
   const gatewayStatus = message?.status?.type ?? 'UNKNOWN'
@@ -210,9 +238,15 @@ async function dispatchSMS(
       ? 'SENT'
       : 'QUEUED'
 
+  // Same reasoning as dispatchEmail: this only runs after `smsProvider.send`
+  // returned without throwing, so neither branch here is an error — clear the
+  // 'in-flight' claim marker rather than leaving it stamped on a row that
+  // actually went out (or is genuinely QUEUED pending delivery confirmation,
+  // not stuck).
   await notificationRepo.update(notificationId, {
     status: delivered,
     sentAt: delivered === 'SENT' ? new Date() : null,
+    errorMessage: null,
   })
 }
 
@@ -398,31 +432,39 @@ export interface AbandonedNotifications {
  * a BulkSMS outage, a member with a malformed phone number.
  */
 export async function countAbandonedNotifications(): Promise<AbandonedNotifications> {
-  const abandoned = await notificationRepo.findMany(
-    { status: 'FAILED', retryCount: { gte: MAX_RETRIES } },
-    {
-      // A count would answer "how many" and leave the reader to go and find out
-      // "why". The cap keeps this bounded when something is broken at scale.
-      take: 200,
-      orderBy: { updatedAt: 'desc' },
-      select: { channel: true, errorMessage: true, updatedAt: true },
-    },
-  )
+  const where: Prisma.NotificationWhereInput = { status: 'FAILED', retryCount: { gte: MAX_RETRIES } }
 
-  const rows = abandoned as unknown as Array<{
-    channel: string
-    errorMessage: string | null
-    updatedAt: Date
-  }>
-
+  // The real count, never truncated. This used to come from `rows.length` on
+  // a `findMany` capped at `take: 200` — accurate only as long as the true
+  // backlog never crossed 200, and silently wrong forever after: a nightly
+  // alert that read "200 notifications" whether the real number was 200 or
+  // 2 000. `groupBy` with `_count` answers "how many" exactly, cheaply,
+  // without fetching every row's data — it was measured against exactly this
+  // backlog and found the real total, 229, when the old query had been
+  // reporting 200 (see docs/production-readiness/03-notification-delivery-recovery.md §21.1).
+  const counts = await notificationRepo.countByChannel(where)
   const byChannel: Record<string, number> = {}
-  for (const row of rows) byChannel[row.channel] = (byChannel[row.channel] ?? 0) + 1
+  let total = 0
+  for (const row of counts as unknown as Array<{ channel: string; _count: { _all: number } }>) {
+    byChannel[row.channel] = row._count._all
+    total += row._count._all
+  }
+
+  // A sample error and the most recent timestamp are examples, not facts
+  // being reported as exhaustive — a small bounded fetch is the right tool
+  // for these, unlike for `total`/`byChannel` above.
+  const sample = await notificationRepo.findMany(where, {
+    take: 50,
+    orderBy: { updatedAt: 'desc' },
+    select: { errorMessage: true, updatedAt: true },
+  })
+  const sampleRows = sample as unknown as Array<{ errorMessage: string | null; updatedAt: Date }>
 
   return {
-    total: rows.length,
+    total,
     byChannel,
-    sampleError: rows.find((r) => r.errorMessage && r.errorMessage !== 'in-flight')?.errorMessage ?? null,
-    latestAt: rows[0]?.updatedAt ?? null,
+    sampleError: sampleRows.find((r) => r.errorMessage && r.errorMessage !== 'in-flight')?.errorMessage ?? null,
+    latestAt: sampleRows[0]?.updatedAt ?? null,
   }
 }
 
