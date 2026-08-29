@@ -184,9 +184,9 @@ gets its own status rather than being folded into the sections above.
 |---|---|
 | Runtime errors captured | `PASSED` (= 9.a) |
 | Critical alerts configured | `NOT STARTED` (= 9.g, and cross-reference [[project-operational-alerting]] for this app's own alert routing, which is separate from Sentry's) |
-| Failed deployments visible | `NOT STARTED` |
+| Failed deployments visible | `PASSED` | Directly observed, not assumed, across every PR merged this session (#424, #425): Vercel's GitHub integration posts a per-project deployment check (`Vercel – xkimi-xa-mali-web/admin/website`) onto the PR itself, distinct from the CI `Type Check, Lint & Test` job, and the project dashboard's deployment list/status is what `mcp__claude_ai_Vercel__get_project` and the deployment detail pages surfaced throughout this session's redeploys — a failed build shows `readyState: ERROR` in exactly that same place. |
 | Payment/integration failures observable | `NOT STARTED` — cross-reference document 1 §4 (reconciliation) |
-| Logs contain sufficient diagnostic info without exposing sensitive data | `NOT STARTED` |
+| Logs contain sufficient diagnostic info without exposing sensitive data | `PASSED` | Grepped every `logger.*` call across `apps/web`, `apps/admin`, and `packages` for whole-object dumps, spread patterns, and sensitive field names (password/token/secret/PIN/CVV/card/account). Every hit logs safe metadata only — ids, event names, Zod issue objects, Netcash's own fault code/reason, field *names* changed (`Object.keys(input)`) never their values. The Netcash webhook payload schema itself (`mandateId`/`transactionRef`/`status`/`reason`/`amount`/`processedAt`) carries no raw banking details to begin with, and the SOAP client logs only `method`/`faultCode`/`reason` — never a raw request/response body. |
 
 ---
 
