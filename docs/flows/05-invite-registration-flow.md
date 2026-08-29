@@ -53,7 +53,7 @@ sequenceDiagram
     participant M as Resend
 
     Note over B,V: Step 1 — validate code
-    B->>V: { code } (rate limit 5/15min)
+    B->>V: { code } (rate limit 5/min/IP — authRatelimit,<br/>shared with the registration endpoint itself)
     V->>SVC: hash + lookup
     alt invalid / used / revoked / expired
         V-->>B: 400 INV_001..004

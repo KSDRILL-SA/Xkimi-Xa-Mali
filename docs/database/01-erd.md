@@ -1,8 +1,8 @@
 # Entity Relationship Diagram
 
-Visual map of the data model. Source of truth: [`packages/database/prisma/schema.prisma`](../../packages/database/prisma/schema.prisma) — **34 models, 17 enums, 16 migrations**. Next: [02-normalization.md](./02-normalization.md) · [03-schema-design.md](./03-schema-design.md).
+Visual map of the data model. Source of truth: [`packages/database/prisma/schema.prisma`](../../packages/database/prisma/schema.prisma) — **39 models, 21 enums, 46 migrations** (updated 2026-08-30; this doc previously undercounted at 34/17/16 — 5 models had been added since it was last checked against the schema directly: `GoalPayment`, `GoalPlan`, `JobHeartbeat`, `MemberDistinction`, `DataSubjectRequest`). Next: [02-normalization.md](./02-normalization.md) · [03-schema-design.md](./03-schema-design.md).
 
-The diagrams below group the model into four areas. Auth-adapter tables (`Account`, `Session`, `VerificationToken`) and config (`SystemConfig`, `LoginHistory`) are omitted for clarity — see the schema.
+The diagrams below group the model into four areas. Auth-adapter tables (`Account`, `Session`, `VerificationToken`) and pure internal-ops config (`SystemConfig`, `LoginHistory`, `JobHeartbeat`) are omitted for clarity — see the schema.
 
 ---
 
@@ -99,8 +99,32 @@ erDiagram
     GOAL_CHEER { string id PK; string goalId FK; string userId FK }
     GOAL_COMMENT { string id PK; string goalId FK; string userId FK; string body }
     GOAL_PLEDGE { string id PK; string goalId FK; string userId FK; decimal amount }
+    GOAL_PAYMENT {
+        string id PK
+        string goalId FK
+        string userId FK
+        decimal amount
+        enum status "shares TransactionStatus with the financial core"
+        string idempotencyKey UK
+    }
+    GOAL_PLAN {
+        string id PK
+        string userId FK
+        string goalId FK
+        decimal amount
+        int debitDay "1-31, clamped to short months — the 31st still<br/>collects in February"
+        enum status "ACTIVE PAUSED COMPLETED CANCELLED"
+        string lastCollectedPeriod "YYYY-MM — doubles as the<br/>idempotency key for the collection job"
+    }
     BADGE_SCORE { string id PK; string userId FK; enum tier; int score }
     BADGE_HISTORY { string id PK; string userId FK; enum tier }
+    MEMBER_DISTINCTION {
+        string id PK
+        string userId FK
+        enum kind "e.g. FOUNDER"
+        string grantedById FK "self-grants expected — one admin,<br/>himself a founder"
+        datetime grantedAt
+    }
     COMMUNITY_MESSAGE { string id PK; string userId FK; string body }
     USER_BUDGET { string id PK; string userId FK; enum type; decimal amount }
     BUDGET_OVERRIDE { string id PK; string userBudgetId FK; decimal amount }
@@ -110,12 +134,23 @@ erDiagram
     GOAL ||--o{ GOAL_CHEER : cheered
     GOAL ||--o{ GOAL_COMMENT : discussed
     GOAL ||--o{ GOAL_PLEDGE : pledged
+    GOAL ||--o{ GOAL_PAYMENT : "funded by (posts to LEDGER_ENTRY, same as TRANSACTION)"
+    USER ||--o{ GOAL_PAYMENT : makes
+    GOAL ||--o{ GOAL_PLAN : "auto-collected by"
+    USER ||--o{ GOAL_PLAN : commits
     USER ||--o| BADGE_SCORE : earns
     USER ||--o{ BADGE_HISTORY : "tier history"
+    USER ||--o{ MEMBER_DISTINCTION : holds
     USER ||--o{ COMMUNITY_MESSAGE : posts
     USER ||--o| USER_BUDGET : sets
     USER_BUDGET ||--o{ BUDGET_OVERRIDE : "overridden by"
 ```
+
+`GoalPlan` is a recurring commitment (like `PaymentMandate`, but scoped to
+one goal instead of the whole pool); `GoalPayment` is the once-off or
+plan-triggered payment record that actually moves money into a goal,
+posting to `LEDGER_ENTRY` through the same idempotent path as `Transaction`
+does for regular contributions.
 
 ---
 
@@ -134,6 +169,15 @@ erDiagram
     INVITATION { string id PK; string codeHash UK; string email UK; string phone UK; enum status "PENDING ACCEPTED REVOKED EXPIRED" }
     ADMIN_SIGNATURE { string id PK; string adminId FK; string blobUrl }
     ADMIN_SIGNATURE_HISTORY { string id PK; string adminId FK; string blobUrl }
+    DATA_SUBJECT_REQUEST {
+        string id PK
+        string subjectId FK "nullable — SetNull, never Cascade:<br/>deleting the member must not delete<br/>the evidence they asked to be deleted"
+        string requesterEmail
+        enum kind "ACCESS CORRECTION DELETION<br/>OBJECTION CONSENT_WITHDRAWAL"
+        enum status "RECEIVED IN_PROGRESS COMPLETED REFUSED"
+        datetime receivedAt
+        datetime dueBy "receivedAt + 30 days, stored not computed"
+    }
 
     NOTIFICATION_TEMPLATE ||--o{ NOTIFICATION : renders
     USER ||--o{ NOTIFICATION : receives
@@ -145,7 +189,13 @@ erDiagram
     USER ||--o{ INVITATION : sends
     USER ||--o| ADMIN_SIGNATURE : signs
     ADMIN_SIGNATURE ||--o{ ADMIN_SIGNATURE_HISTORY : "versioned by"
+    USER ||--o{ DATA_SUBJECT_REQUEST : "may be the subject of (nullable)"
 ```
+
+`DataSubjectRequest` is POPIA's access/erasure request log — reachable
+publicly and without a session (the person with the strongest claim to
+deletion may be a former member who can no longer authenticate), tracked
+in [../compliance/popia-compliance.md](../compliance/popia-compliance.md).
 
 ---
 
