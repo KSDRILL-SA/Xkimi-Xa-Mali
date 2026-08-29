@@ -9,11 +9,11 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FormGroup } from '@/components/ui/FormGroup'
 import { Alert } from '@/components/ui/Alert'
-import { PasswordResetSchema as Schema } from '@/lib/validation/auth'
-import type { PasswordResetInput } from '@/lib/validation/auth'
+import { PasswordResetFormSchema as Schema } from '@/lib/validation/auth'
+import type { PasswordResetFormInput } from '@/lib/validation/auth'
 import { api, ApiClientError } from '@/lib/api'
 
-type FormData = Omit<PasswordResetInput, 'token'>
+type FormData = PasswordResetFormInput
 
 interface Props { token: string }
 
