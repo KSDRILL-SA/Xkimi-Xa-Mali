@@ -2,9 +2,23 @@
 
 Registration, email verification, login, session validation, password reset, and route-tier enforcement. Registration is **invite-gated** (full flow: [05-invite-registration-flow.md](./05-invite-registration-flow.md)). Security model: [../security/01-security-architecture.md](../security/01-security-architecture.md).
 
+> **Updated 2026-08-30 — this doc previously described one app's middleware.**
+> `apps/web` and `apps/admin` are separate Vercel deployments, each with its
+> own NextAuth config and its own route-protection file — and in Next.js 16
+> that file is named `proxy.ts`, not `middleware.ts` (a breaking rename from
+> the version most training data reflects). See
+> [../architecture/01-system-context.md](../architecture/01-system-context.md)
+> for the 3-app boundary.
+
 ---
 
 ## Account states
+
+There are **four** states, not three — `RESIGNED` (a member who chose to
+leave; history stays, future collections stop) is easy to miss because it
+never appears in the login-rejection flow below: a resigned member can
+**still sign in**. Only certain writes are refused for them (see
+"Membership standing" further down).
 
 ```mermaid
 stateDiagram-v2
@@ -13,38 +27,57 @@ stateDiagram-v2
     PENDING --> ACTIVE : admin activates account
     ACTIVE --> SUSPENDED : admin suspends
     SUSPENDED --> ACTIVE : admin reactivates
+    ACTIVE --> RESIGNED : member chooses to leave<br/>(POST /api/v1/members/me/leave)
     note right of PENDING
         Login is blocked until ACTIVE.
         EMAIL_NOT_VERIFIED vs PENDING_ACTIVATION
         are surfaced as distinct messages.
     end note
+    note right of RESIGNED
+        Login still succeeds. History is kept.
+        Contribution-collection and every
+        state-changing write are refused —
+        enforced in proxy.ts, not per-service.
+    end note
 ```
 
 ## Login
 
+Rate limiting happens **inside** the `authorize()` callback
+(`assertLoginAllowed(ip)` in `lib/auth.ts`), not as a separate middleware
+step before it — the two used to be drawn as sequential stages; in the real
+code they're the same function call.
+
 ```mermaid
 sequenceDiagram
     participant B as Browser
-    participant MW as Middleware
     participant NA as NextAuth authorize()
     participant DB as PostgreSQL
 
-    B->>MW: POST sign-in (email + password)
-    MW->>MW: rate limit 5 / 15 min / IP
-    MW->>NA: forward
+    B->>NA: POST sign-in (email + password)
+    NA->>NA: rate limit 10 / 5 min / IP (Upstash sliding window)
     NA->>DB: user by email (lowercased — case-insensitive)
+    Note over NA,DB: bcrypt.compare always runs, even for a<br/>nonexistent user (against a decoy hash) —<br/>closes a timing side-channel for email enumeration
     alt not found / wrong password
-        NA-->>B: 401 AUTH_001 (no user enumeration)
+        NA-->>B: 401 (generic — no user enumeration)
     else status PENDING (unverified)
         NA-->>B: 401 EMAIL_NOT_VERIFIED
     else status PENDING (verified)
         NA-->>B: 401 PENDING_ACTIVATION
     else status SUSPENDED
         NA-->>B: 401 account suspended
+    else status ACTIVE or RESIGNED
+        NA->>NA: sign JWT { id, roles, roleVersion, status }
+        NA-->>B: Set-Cookie session (HTTP-only, Secure, SameSite) → /dashboard
     end
-    NA->>NA: bcrypt.compare → sign JWT { id, email, roles }
-    NA-->>B: Set-Cookie session (HTTP-only, Secure, SameSite) → /dashboard
 ```
+
+`apps/admin`'s own `authorize()` in `apps/admin/lib/auth.ts` runs the
+identical shape — same decoy-hash timing defence, same lockout counter —
+with one addition: it rejects at this exact point if the account does not
+hold the `ADMIN` role, before a session is ever issued. A member-only
+account gets the same generic 401 as a wrong password, not a hint that the
+account exists.
 
 ## Email verification & password reset
 
@@ -72,24 +105,53 @@ sequenceDiagram
 
 ---
 
-## Route-tier enforcement (`middleware.ts`)
+## Route-tier enforcement (`apps/web/proxy.ts`)
+
+There is no `/admin/*` UI tier inside `apps/web` — the admin console is a
+separate app (`apps/admin`) with its own `proxy.ts`. What `apps/web`'s
+proxy actually gates is its own `/api/v1/admin/*` **API** routes, reached
+two ways: a real admin's session (checked the same as any other route,
+plus an `ADMIN` role check), or a **trusted server-to-server call from
+`apps/admin` itself**, authenticated by a shared `ADMIN_API_SECRET` header
+compared in constant time — not a session at all.
 
 ```mermaid
 flowchart TD
-    REQ["request"] --> L0{"L0 public<br/>allowlist?"}
-    L0 -->|yes| PASS0["pass — no auth"]
-    L0 -->|no| JWT{"valid JWT cookie?"}
-    JWT -->|no| R401["401 / redirect to login"]
-    JWT -->|yes| L2{"admin (L2) route?"}
-    L2 -->|yes| ROLE{"ADMIN in claims?"}
-    ROLE -->|no| R403["403 forbidden"]
-    ROLE -->|yes| PASS2["admin handler"]
-    L2 -->|no| PASS1["member (L1) handler"]
+    REQ["request to apps/web"] --> ALWAYS{"health / webhooks /<br/>NextAuth internals?"}
+    ALWAYS -->|yes| PASS0["pass — self-verifying or public"]
+    ALWAYS -->|no| PUB{"public page or<br/>public API allowlist?"}
+    PUB -->|yes| PASS1["pass, no session required"]
+    PUB -->|no| ADMINROUTE{"/api/v1/admin/* ?"}
+    ADMINROUTE -->|yes| SECRET{"x-admin-secret header<br/>matches ADMIN_API_SECRET?<br/>(constant-time compare)"}
+    SECRET -->|yes| PASSTRUST["pass — trusted call from apps/admin"]
+    SECRET -->|no| SESS{"valid session?"}
+    ADMINROUTE -->|no| SESS
+    SESS -->|no| R401["401 (API) / redirect to /login (page)"]
+    SESS -->|yes| ROLEV{"role version stale?<br/>(Redis, live revocation)"}
+    ROLEV -->|yes| REAUTH["401 / redirect, reason=session_expired"]
+    ROLEV -->|no| STANDING{"resigned member,<br/>state-changing write?"}
+    STANDING -->|yes| R403A["403 SYS_008"]
+    STANDING -->|no| CSRF{"mutating method?<br/>origin header checked"}
+    CSRF -->|invalid| R403B["403 SYS_007"]
+    CSRF -->|ok/GET| ADMINCHECK{"/api/v1/admin/* and<br/>no valid trusted secret?"}
+    ADMINCHECK -->|ADMIN not in roles| R403C["403 SYS_003"]
+    ADMINCHECK -->|ok| PASS2["handler"]
 ```
 
-| Tier | Routes | Rule |
-|---|---|---|
-| **L0** Public | `/` · `/whatsapp` · `/auth/*` · `/api/v1/auth/*` · `health` · `stats/public` | No auth |
-| **L1** Member | `/dashboard/*` · members · mandates · contributions · transactions · notifications · insights · inbox | Any valid session; queries scoped to `x-user-id` — never a client-supplied id |
-| **L2** Admin | `/admin/*` · `/api/v1/admin/*` · goals (write) | ADMIN role in JWT |
-| **L3** System | `/api/v1/webhooks/*` | HMAC only — session cookies rejected |
+`apps/admin`'s own `proxy.ts` is much shorter: it only has to protect one
+app's worth of pages behind a session that carries the `ADMIN` role — it
+has no public-API allowlist, no trusted-secret bypass (it's the caller of
+that mechanism, not the receiver), and no membership-standing check (an
+admin is never "resigned" out of the console, only suspended or demoted).
+
+| Concern | Where it's actually enforced |
+|---|---|
+| Public pages/APIs | `apps/web/proxy.ts` — explicit allowlist, not a route prefix |
+| Any-valid-session pages | `apps/web/proxy.ts` — `!session` check; queries themselves are scoped to `session.user.id` via `assertCanAccess`, never a client-supplied id |
+| `apps/web`'s admin API | `apps/web/proxy.ts` — trusted-secret OR `ADMIN` role in session, both checked here |
+| Admin console UI | `apps/admin/proxy.ts` — session + `ADMIN` role, separately, plus `requireAdmin()` re-checking role live on every server action |
+| Webhooks | Both apps' `WEBHOOK_PREFIX` allowlist — HMAC/signing-key verified inside the handler itself, session cookies never consulted |
+| **Live role revocation** | Redis-cached `roleVersion`, seeded at login, bumped on any role/status change; a stale token forces re-authentication mid-session rather than waiting for JWT expiry — this is what makes suspending a member or demoting an admin take effect immediately instead of up to 24h later |
+| **Resigned-member write block** | `refuseForStanding()` in `apps/web/proxy.ts` — reads are untouched, only state-changing calls are refused, so a departed member keeps visibility into their own history |
+| **CSRF** | Origin-header check on every mutating method against authenticated API routes (`verifyCsrfOrigin`) |
+| **CSP** | A fresh nonce generated per request, threaded onto both the request and response headers — the previous version of this policy shipped `'unsafe-inline'` on scripts, which made the CSP decorative against XSS |

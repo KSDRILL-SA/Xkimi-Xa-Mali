@@ -6,7 +6,7 @@ The non-obvious choices in the schema — what was chosen, what was rejected, wh
 flowchart TD
     subgraph MONEY["Money"]
         D1["Decimal(10,2), never Float"]
-        D2["Decimal.js for all arithmetic"]
+        D2["Money crosses into JS as a plain<br/>number at the service boundary —<br/>every chained op goes through<br/>roundZAR/sumZAR/subtractZAR<br/>(money.ts), not raw + / -"]
     end
     subgraph KEYS["Keys & tokens"]
         D3["CUID PKs, not UUID/serial"]
@@ -29,7 +29,7 @@ flowchart TD
 
 | Decision | Rejected | Chosen — why |
 |---|---|---|
-| **Money type** | `Float` (IEEE-754 can't represent 0.1; `100.10 + 0.10` drifts) | `Decimal(10,2)` → Postgres `NUMERIC`, exact; Prisma maps to `Decimal.js`. Holds up to R99,999,999.99. **Every** currency column, no exceptions. |
+| **Money type** | `Float` (IEEE-754 can't represent 0.1; `100.10 + 0.10` drifts) | `Decimal(10,2)`/`(12,2)` → Postgres `NUMERIC`, exact; the database is the source of truth, and Postgres-side aggregation (`_sum`) is used for summing many rows rather than a JS reduce. Money crosses into JS as a plain `number` only at the service boundary — IEEE-754 doubles represent every 2-decimal rand value in range exactly, so the one real hazard is *chained* JS arithmetic accumulating float dust (`0.1 + 0.2 → 0.30000000000000004`). Every chained operation on a rand amount goes through `roundZAR`/`sumZAR`/`subtractZAR` (`apps/web/lib/money.ts`, contract "BACKEND-B12") instead of raw `+`/`-`/`*` — this was a real, twice-found bug class this session (ledger reconciliation and `badge.service.ts` both had raw arithmetic on money, fixed 2026-08-29). |
 | **Primary keys** | UUID v4 (random → B-tree fragmentation; 36 chars; no time order) | **CUID** — monotonic prefix (sequential inserts), embedded timestamp (rough chrono sort), URL-safe, collision-resistant. |
 | **Reset/verify/invite tokens** | Store raw token, or use JWT (can't revoke) | Store **SHA-256 hash**; plaintext only in the emailed link. A DB breach yields non-redeemable hashes; `usedAt` makes them one-time. |
 | **PII encryption** | DB-level TDE (plaintext to any connection; not on Neon standard tier) | **App-layer AES-256-GCM** before write; DB holds only ciphertext + auth tag (tamper-evident); key in `ENCRYPTION_KEY` env, never in DB/code; random IV per value defeats frequency analysis. Encrypts `idNumber`, `accountNumber` only. |
@@ -65,6 +65,8 @@ A self-contained JWT can't be revoked; a hashed DB token can (`usedAt`), survivi
 | Unique | `ledger_entries` | `refType, refId, direction` | Idempotent posting |
 | Unique | `processed_webhook_events` | `source, eventKey` | Exactly-once webhook |
 | Unique | `goal_cheers` | `goalId, userId` | Race-safe cheer toggle |
+| Unique | `goal_payments` | `idempotencyKey` | Same double-charge prevention as `transactions`, independent key space |
+| Composite | `goal_payments` | `goalId, status` | Goal funding progress lookups |
 | Composite | `contributions` | `status, dueDate` | Overdue sweep |
 | Composite | `transactions` | `status, createdAt` | Dashboard stats |
 | Composite | `notifications` | `userId, createdAt` | Inbox pagination |

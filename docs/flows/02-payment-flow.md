@@ -92,13 +92,14 @@ sequenceDiagram
     participant N as notifications
 
     NC->>WH: result (SUCCESS / FAILED / REVERSED)
-    WH->>WH: verify HMAC (timingSafeEqual)
+    WH->>WH: verify HMAC (timingSafeEqual) + IP allowlist
     WH->>DD: claim eventKey = sha256(body)
     alt duplicate
         DD-->>WH: already processed → 200, no-op
     end
     WH->>SVC: settle(gatewayRef, result)
     SVC->>DB: tx begin
+    SVC->>DB: compare-and-swap — UPDATE ... WHERE status = <old status><br/>(updateIfStatus). A second delivery that read the same<br/>pre-update status loses the race here and does none of the<br/>work below, instead of both posting a ledger credit.
     alt SUCCESS
         SVC->>DB: Transaction SUCCESS, Contribution amountPaid += amount, recompute status
         SVC->>LED: post pool CREDIT (idempotent on refType,refId,direction)
@@ -115,4 +116,6 @@ sequenceDiagram
     WH-->>NC: 200
 ```
 
-Pool balance = Σ CREDIT − Σ DEBIT, rebuilt nightly by `reconcileLedger`. A manual payment (`POST /contributions/pay`) follows the same settle path via its own once-off Netcash debit.
+Pool balance = Σ CREDIT − Σ DEBIT, rebuilt nightly by `reconcileLedger`. A manual payment (`POST /contributions/pay`) follows the same settle path via its own once-off Netcash debit. Its minimum is `Math.min(R100, whatever remains owed on the period)` — a flat R100 floor with no awareness of what's still due used to make the *last* partial payment of a period, or any payment on a period already partly paid, mathematically impossible to submit; fixed 2026-08-29.
+
+**Production is running the mock gateway as of 2026-08-30** — Netcash's own registration is submitted and under vetting, no live debit has ever been processed. `selectGateway()` refuses to silently pick the real gateway without `NETCASH_SERVICE_KEY` present, independent of whether the deployment is flagged "live" — see [../architecture/04-infrastructure-deployment.md](../architecture/04-infrastructure-deployment.md) for the full mock/live cutover mechanics.
