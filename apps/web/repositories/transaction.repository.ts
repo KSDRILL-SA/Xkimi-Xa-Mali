@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client'
-import type { PrismaClient } from '@prisma/client'
+import type { PrismaClient, TransactionStatus } from '@prisma/client'
 import { db } from '@/lib/db'
 
 export type TxClient = Omit<
@@ -71,6 +71,27 @@ export const transactionRepo = {
     tx: TxClient = db,
   ) {
     return tx.transaction.update({ where: { id }, data })
+  },
+
+  /**
+   * Update a transaction only if it is still at `expectedStatus`.
+   *
+   * The guard against two webhook deliveries for the same transaction racing
+   * each other: `processTransactionWebhook` reads the current status before
+   * this call, outside any lock, so a second concurrent delivery can read the
+   * same pre-update status and reach here too. An unconditional `update`
+   * would let both proceed — into `recalculateContributionStatus` and, worse,
+   * into the ledger posting after commit, posting the same credit twice.
+   * `updateMany`'s `count` tells the caller whether it actually won this
+   * compare-and-swap; only the winner should do the downstream work.
+   */
+  updateIfStatus(
+    id: string,
+    expectedStatus: TransactionStatus,
+    data: Prisma.TransactionUpdateManyMutationInput,
+    tx: TxClient = db,
+  ) {
+    return tx.transaction.updateMany({ where: { id, status: expectedStatus }, data })
   },
 
   /** Paginated list of transactions with optional includes. */
