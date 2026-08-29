@@ -97,10 +97,10 @@ the label, before trusting which branch is real.
 |---|---|
 | Notification failure is recorded | `PASSED` (live evidence, the SMS incident) |
 | Correct error message is stored | `PASSED` (the BulkSMS string is specific and accurate, not generic) |
-| Retry count increments correctly | `NOT STARTED` |
+| Retry count increments correctly | `PASSED` | `retryCount: { increment: 1 }` — an atomic DB-level increment, not a read-then-write in application code, so it's race-safe under concurrent retry processing too. Gated correctly against `MAX_RETRIES` in both directions: `requeueFailedNotifications` only promotes rows below it, permanently-failed status is derived as `retryCount >= MAX_RETRIES`. |
 | Notification does not disappear from the queue | `PASSED` (the 200 rows are still queryable, per the incident report existing at all) |
-| Failed notification remains traceable to its intended recipient | `NOT STARTED` |
-| Sensitive information not exposed in error logs | `NOT STARTED` |
+| Failed notification remains traceable to its intended recipient | `PASSED` | `userId` is a required, non-nullable field on the `Notification` model (`onDelete: Cascade` from `User`) — a failed row is always traceable to its recipient by schema, not by convention. |
+| Sensitive information not exposed in error logs | `PASSED` | = document 2's "Logs contain sufficient diagnostic info without exposing sensitive data" row — same audit, applies directly to notification error logging (`logger.error`/`.warn` calls in `notification.service.ts` log ids, statuses, and provider error strings only). |
 | System eventually marks exhausted notifications as permanently failed | `PASSED` (the incident report is exactly this happening) |
 
 ---
