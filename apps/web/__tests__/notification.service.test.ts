@@ -147,10 +147,27 @@ describe('updateSMSDeliveryStatus', () => {
 
     expect(db.notification.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ id: 'notif-1', channel: 'SMS' }),
         data: expect.objectContaining({ status: 'SENT' }),
       }),
     )
+  })
+
+  it('looks the row up by externalRef, never by id — BulkSMS only ever echoes back the userSuppliedId it was given', async () => {
+    // Regression guard: this used to match on `id`, which silently updated
+    // zero rows on every real delivery receipt once userSuppliedId became a
+    // hash of the id (BulkSMS's 20-char limit) rather than the id itself.
+    ;(db.notification.updateMany as MockedFunction<typeof db.notification.updateMany>)
+      .mockResolvedValue({ count: 1 } as never)
+
+    await updateSMSDeliveryStatus('some-hash-value', 'DELIVERED')
+
+    expect(db.notification.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { externalRef: 'some-hash-value', channel: 'SMS' },
+      }),
+    )
+    const call = (db.notification.updateMany as MockedFunction<typeof db.notification.updateMany>).mock.calls[0][0]
+    expect(call.where).not.toHaveProperty('id')
   })
 
   it('marks FAILED as FAILED', async () => {
@@ -486,6 +503,38 @@ describe('the SMS provider never sees an oversized userSuppliedId', () => {
 
     const sentArgs = (smsProvider.send as MockedFunction<typeof smsProvider.send>).mock.calls[0]![0]
     expect(sentArgs.userSuppliedId!.length).toBeLessThanOrEqual(20)
+  })
+
+  it('records the same short id as externalRef, so the delivery-receipt webhook can find this row again', async () => {
+    // BulkSMS's delivery receipt only ever echoes back userSuppliedId — never
+    // this system's real id. Without externalRef recorded here, matching that
+    // receipt back to a row is structurally impossible, not just untested.
+    const queued = [{
+      id: 'cmte4f48o0006ib045r783zg1',
+      userId: 'user-14',
+      channel: 'SMS',
+      status: 'QUEUED',
+      createdAt: new Date(),
+      template: mockTemplate,
+      user: mockUser,
+      payload: { amount: '100', firstName: 'Ada' },
+    }]
+
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: queued[0]!.id }])
+    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
+      .mockResolvedValue(queued as never)
+    ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
+      .mockResolvedValue([mockPrefs] as never)
+    ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
+      .mockResolvedValue([{ id: 'sms-x', status: { type: 'ACCEPTED' } }] as never)
+    ;(db.notification.update as MockedFunction<typeof db.notification.update>)
+      .mockResolvedValue({} as never)
+
+    await flushQueuedNotifications()
+
+    const sentArgs = (smsProvider.send as MockedFunction<typeof smsProvider.send>).mock.calls[0]![0]
+    const updateArgs = (db.notification.update as MockedFunction<typeof db.notification.update>).mock.calls[0]![0]
+    expect(updateArgs.data).toMatchObject({ externalRef: sentArgs.userSuppliedId })
   })
 
   it('derives the same short id from the same notification id every time', async () => {
