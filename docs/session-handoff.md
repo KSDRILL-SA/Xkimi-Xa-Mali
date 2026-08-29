@@ -1,5 +1,70 @@
 # Session Handoff
 
+> **This file stopped being updated after 2026-08-17.** Everything from
+> 2026-08-18 onward — the domain/deployment work, the founder-guide
+> gaps, auth/roles hardening, the mobile relaunch, and the overnight
+> 2026-08-29 production-readiness sweep (10 real bugs found and fixed
+> across 9 merged PRs) — lives in the memory system instead, not here.
+> Read `project-session-handoff-pointer` and
+> `project-production-readiness-tracker` first if you have access to
+> it; this file is a historical record below this point, not the
+> current state.
+
+## 2026-08-17 — six PRs: what the public was told, and who could read what
+
+Recovered from an unmerged branch (`docs/handoff-2026-08-17`) that sat
+alongside `main` for two weeks without ever landing — merged in on
+2026-08-29 rather than left to rot, since it documents real work that
+was otherwise going to be lost.
+
+| PR | What was actually wrong |
+|---|---|
+| #399 | The health route suite failed on machine load, not behaviour. The first case paid the cold TypeScript transform of the whole route graph inside its own timeout |
+| #400 | The public site **substituted the founder count for the active member count** during an outage, printed in the same typeface as two measured figures. Different facts, equal today by coincidence. Also `json.data as PublicStats` — a cast that cannot fail, so a drifted payload rendered `undefined` to the public |
+| #401 | The member app hardcoded the same facts the site had just stopped hardcoding — including the founder guide's **own cover blurb**, in a document generated from the constants everywhere except there |
+| #402 | `/api/v1/stats/public`, the only endpoint a stranger can reach, had no rate limit, no error shape and no trace id. **The first fix did not work**: `makeRatelimit` returns a no-op without Redis, which is the same condition that disables the cache — so a per-instance memo is the floor underneath it |
+| #403 | The website suite failed **two runs in three** on the same two cases, at ~50s against a 30s timeout. `@xxm/utils` is a ten-module barrel; whichever case is first in its process to pull it pays the whole transform |
+| #404 | An admin's signature sat at a **permanent public URL derivable from their id**. Three upload sites, not the two §4.5a recorded |
+
+### The two worth remembering
+
+**A number nobody measured must not be rendered beside numbers that were.**
+`FACTS` (`packages/utils/src/facts.ts`) is now the only source for a *stated*
+fact — founder count, member cap, contribution range, all derived from
+`constants.ts`. It deliberately exposes **nothing measured**: member counts and
+pooled totals live in the database, and a test asserts they stay out, because if
+one were available as a constant somebody would use the constant. Unavailable
+measured figures render `—`, never a substitute.
+
+**A suite that reports differently under load is worse than a red one.** Two
+separate flakes this session had the same mechanism — Vite transforms a module
+graph once per process and caches it, and `vi.resetModules()` clears evaluated
+instances but *not* that compile cache. Whichever test is first to touch a big
+graph pays for it inside its own budget. Warm it in `beforeAll` with its own
+timeout. CI runs on a quieter box and stayed green throughout, so CI was the
+*last* place this would have been noticed.
+
+> **One observation, probably confounded — recorded so it is not forgotten.**
+> After #403 a single full run failed at **file-collection** level in `@xxm/web`
+> (`FAIL __tests__/x.test.ts [ __tests__/x.test.ts ]` — the file never loads, a
+> different shape from the timeout above). It coincided exactly with three
+> `next dev` servers being killed mid-run, and **three consecutive full runs on
+> a quiet machine since have all been 9/9**. So the likeliest explanation is the
+> process kill, not a defect.
+>
+> Not written off, because one clean stretch does not disprove a one-in-six
+> event. If a bare `FAIL <file> [ <file> ]` with no assertion appears again,
+> this is the note to come back to — and the first thing to check is whether
+> anything else was competing for the machine.
+>
+> The wider lesson stands regardless: **do not run the suite next to three dev
+> servers and expect its result to mean anything.** Every flake this session was
+> found on a loaded machine and none reproduced on a quiet one.
+
+---
+
+## 2026-08-16 close (superseded by the note at the top of this file)
+
 **Session closed:** 2026-08-16
 **Branch state at close:** `main` is the **only** branch. No open pull requests.
 **Health at close:** typecheck 3/3 · lint 0 errors · **test 9/9 packages, 1714
