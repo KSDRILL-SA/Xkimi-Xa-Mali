@@ -423,6 +423,49 @@ describe('email dispatch is idempotent', () => {
 })
 
 // ---------------------------------------------------------------------------
+// The generic-template email path escapes payload values into its HTML
+// ---------------------------------------------------------------------------
+
+describe('a template with no dedicated function still gets HTML-escaped', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('escapes a payload value before it reaches sendGenericEmail\'s HTML body', async () => {
+    // Any slug without its own case in dispatchEmail's switch falls through
+    // to sendGenericEmail, wrapping interpolate(body, payload) in a <div>
+    // with no escaping of its own — this is the same class of hole as the
+    // named templates, reached through the payload-driven path instead.
+    const queued = [
+      {
+        id: 'notif-generic-1',
+        userId: 'user-10',
+        channel: 'EMAIL',
+        status: 'QUEUED',
+        createdAt: new Date(),
+        template: { id: 'tpl-g', slug: 'some-other-template', channel: 'EMAIL', body: 'Hi {{firstName}}, {{note}}' },
+        user: { email: 'member@example.com', phone: null },
+        payload: { firstName: '<img src=x onerror=alert(1)>', note: 'plain text' },
+      },
+    ]
+
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-generic-1' }])
+    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
+      .mockResolvedValue(queued as never)
+    ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
+      .mockResolvedValue([{ userId: 'user-10', sms: true, email: true, push: true }] as never)
+    ;(db.notification.update as MockedFunction<typeof db.notification.update>)
+      .mockResolvedValue({} as never)
+
+    await flushQueuedNotifications()
+
+    const html = (emailProvider.sendGenericEmail as MockedFunction<typeof emailProvider.sendGenericEmail>)
+      .mock.calls[0]![2]
+    expect(html).not.toContain('<img src=x onerror=alert(1)>')
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+    expect(html).toContain('plain text')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // countAbandonedNotifications — the real total, never capped
 // ---------------------------------------------------------------------------
 

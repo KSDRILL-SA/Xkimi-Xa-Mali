@@ -9,5 +9,6 @@ export * from './schemas'
 export * from './sms'
 export * from './deployment'
 export * from './client-ip'
+export * from './html'
 // `./keyring` is deliberately absent: it imports node:crypto, and this barrel is
 // reachable from client components. Import it by its subpath from server code.

@@ -6,6 +6,7 @@ import { notificationRepo } from '@/repositories/notification.repository'
 import { userRepo } from '@/repositories/user.repository'
 import { smsProvider } from '@/integrations/sms'
 import { smsCost } from '@xxm/utils/sms'
+import { escapeHtml } from '@xxm/utils'
 import { logger } from '@xxm/observability'
 import { emailProvider } from '@/integrations/email'
 
@@ -69,6 +70,28 @@ function interpolate(template: string, payload: Record<string, unknown>): string
     const value = payload[key]
     return value !== undefined && value !== null ? String(value) : `{{${key}}}`
   })
+}
+
+/**
+ * Same substitution as interpolate, but every value is HTML-escaped first.
+ *
+ * A plain `interpolate` is correct for the SMS body — plain text has no
+ * markup to inject into. The generic-template email path wraps its result
+ * directly in a `<div>`, so a payload value straight from `interpolate`
+ * (a member's own first name, among others) would be raw, unescaped HTML —
+ * the same class of hole fixed in lib/email.ts's own templates, just
+ * reachable through the payload-driven path instead of a named function.
+ */
+function interpolateHtml(template: string, payload: Record<string, unknown>): string {
+  return interpolate(
+    template,
+    Object.fromEntries(
+      Object.entries(payload).map(([key, value]) => [
+        key,
+        value !== undefined && value !== null ? escapeHtml(String(value)) : value,
+      ]),
+    ),
+  )
 }
 
 /**
@@ -180,7 +203,7 @@ async function dispatchEmail(
       await emailProvider.sendGenericEmail(
         to,
         `Xkimi Xa Mali Foundation`,
-        `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">${interpolate(body, payload)}</div>`,
+        `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">${interpolateHtml(body, payload)}</div>`,
         key,
       )
   }
