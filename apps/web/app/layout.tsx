@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import localFont from 'next/font/local'
+import { Analytics } from '@vercel/analytics/next'
 import { env } from '@/lib/env'
 import { NavigationProgressLoader } from '@/components/NavigationProgressLoader'
 import './globals.css'
@@ -77,6 +78,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-dvh bg-xxm-champagne antialiased">
         <NavigationProgressLoader />
         {children}
+        <Analytics />
         <script src="/nav-progress.js" defer />
         {/* Register the PWA service worker only in production. In dev a SW that
             caches Next.js chunks serves stale assets and crashes pages after

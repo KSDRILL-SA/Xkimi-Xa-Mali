@@ -12,6 +12,7 @@
     "test:watch": "vitest --config vitest.config.ts"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "@xxm/config": "*",
     "@xxm/ui": "*",
     "@xxm/utils": "*",
