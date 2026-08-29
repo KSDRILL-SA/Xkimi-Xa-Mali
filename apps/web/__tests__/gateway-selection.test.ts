@@ -46,7 +46,7 @@ vi.mock('@/integrations/payment/mock.adapter', () => ({
  * tests run in — CI sets DEPLOY_ENV at job level. Leaving either in place would
  * quietly turn every "in production" case below into a non-production one.
  */
-const CONTROLLED = ['PAYMENT_GATEWAY', 'NODE_ENV', 'DEPLOY_ENV', 'VERCEL_ENV']
+const CONTROLLED = ['PAYMENT_GATEWAY', 'NODE_ENV', 'DEPLOY_ENV', 'VERCEL_ENV', 'NETCASH_SERVICE_KEY']
 
 /**
  * Selection happens at module load, so each case needs a fresh module registry
@@ -76,14 +76,18 @@ afterEach(() => vi.unstubAllEnvs())
 
 describe('choosing a payment gateway', () => {
   it('uses the real gateway when nothing is set', async () => {
-    const mod = await loadGateway({ PAYMENT_GATEWAY: undefined, NODE_ENV: 'development' })
+    const mod = await loadGateway({
+      PAYMENT_GATEWAY: undefined, NODE_ENV: 'development', NETCASH_SERVICE_KEY: 'stub-key',
+    })
     expect(mod.IS_MOCK_GATEWAY).toBe(false)
   })
 
   it('uses the real gateway for any value other than the exact opt-in', async () => {
     // No fuzzy matching: a typo must not silently disable real payments.
     for (const value of ['MOCK', 'mocked', 'true', '1', 'netcash', '']) {
-      const mod = await loadGateway({ PAYMENT_GATEWAY: value, NODE_ENV: 'development' })
+      const mod = await loadGateway({
+        PAYMENT_GATEWAY: value, NODE_ENV: 'development', NETCASH_SERVICE_KEY: 'stub-key',
+      })
       expect(mod.IS_MOCK_GATEWAY, `PAYMENT_GATEWAY=${value}`).toBe(false)
     }
   })
@@ -115,7 +119,49 @@ describe('the mock can never run in production', () => {
   })
 
   it('still starts normally in production without the flag', async () => {
-    const mod = await loadGateway({ PAYMENT_GATEWAY: undefined, NODE_ENV: 'production' })
+    const mod = await loadGateway({
+      PAYMENT_GATEWAY: undefined, NODE_ENV: 'production', NETCASH_SERVICE_KEY: 'stub-key',
+    })
     expect(mod.IS_MOCK_GATEWAY).toBe(false)
+  })
+})
+
+describe('the real gateway can never be selected with no service key', () => {
+  // Real gap found while auditing this for go-live readiness (production-
+  // readiness tracker, document 1 §18/§20): `lib/env.ts` only requires
+  // NETCASH_SERVICE_KEY when `isLiveDeployment()` is true — but this project's
+  // own production deployment runs with DEPLOY_ENV=staging (deliberately, for
+  // other reasons), which makes `isLiveDeployment()` false even though it is
+  // genuinely serving real traffic. Before this fix, that combination meant
+  // the real gateway could be selected with nothing configured at all, and
+  // the first failure would be a throw deep inside `lib/netcash.ts` on an
+  // actual debit submission attempt — not caught at boot, on debit night.
+  it('refuses to start rather than selecting a gateway it cannot use', async () => {
+    await expect(
+      loadGateway({ PAYMENT_GATEWAY: undefined, NODE_ENV: 'development', NETCASH_SERVICE_KEY: undefined }),
+    ).rejects.toThrow(/NETCASH_SERVICE_KEY/)
+  })
+
+  it('refuses even when the deployment is not flagged live', async () => {
+    // The exact gap: DEPLOY_ENV=staging, PAYMENT_GATEWAY left at its default
+    // (real gateway), no credentials — the state that must never boot clean.
+    await expect(
+      loadGateway({
+        PAYMENT_GATEWAY: undefined, DEPLOY_ENV: 'staging', NETCASH_SERVICE_KEY: undefined,
+      }),
+    ).rejects.toThrow(/NETCASH_SERVICE_KEY/)
+  })
+
+  it('says why, and how to fix it', async () => {
+    await expect(
+      loadGateway({ PAYMENT_GATEWAY: undefined, NODE_ENV: 'development', NETCASH_SERVICE_KEY: undefined }),
+    ).rejects.toThrow(/every debit submission would throw|PAYMENT_GATEWAY=mock/)
+  })
+
+  it('does not affect the mock gateway, which needs no credentials', async () => {
+    const mod = await loadGateway({
+      PAYMENT_GATEWAY: 'mock', NODE_ENV: 'development', NETCASH_SERVICE_KEY: undefined,
+    })
+    expect(mod.IS_MOCK_GATEWAY).toBe(true)
   })
 })

@@ -48,6 +48,10 @@ vi.mock('@/services/contribution.service', () => ({
   generateMonthlyContributions: vi.fn(),
 }))
 
+vi.mock('@/integrations/payment', () => ({
+  paymentGateway: { cancelMandate: vi.fn().mockResolvedValue(undefined) },
+}))
+
 vi.mock('@/services/audit.service', () => ({
   writeAuditLog: vi.fn(),
 }))

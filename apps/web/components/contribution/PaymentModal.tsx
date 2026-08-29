@@ -61,6 +61,13 @@ function PaymentModalContent({ contribution, mandateBankName, mandateAccountMask
 
   const remaining = contribution.amountDue - contribution.amountPaid
   const maxPayable = Math.min(remaining, MAX_CONTRIBUTION_ZAR)
+  // The server's real floor for this contribution — see
+  // `submitManualPayment` in contribution.service.ts. R100 for a fresh
+  // period, but capped at whatever's actually left once a partial payment
+  // has brought that below R100 — otherwise the last bit of a period could
+  // never be paid off at all (below R100 fails the minimum, above what's
+  // left fails the remaining-balance check).
+  const minPayable = Math.min(MIN_CONTRIBUTION_ZAR, remaining)
 
   // Dialog semantics: Escape closes and body scroll is locked while open. We do
   // NOT dismiss on backdrop click here — an accidental outside click must never
@@ -129,7 +136,7 @@ function PaymentModalContent({ contribution, mandateBankName, mandateAccountMask
   }
 
   function handleChangeAmount(remainingAmount: number) {
-    setValue('amount', Math.max(MIN_CONTRIBUTION_ZAR, Math.min(remainingAmount, maxPayable)))
+    setValue('amount', Math.max(minPayable, Math.min(remainingAmount, maxPayable)))
     setBudgetGuard(null)
   }
 
@@ -260,7 +267,7 @@ function PaymentModalContent({ contribution, mandateBankName, mandateAccountMask
               <Input
                 id="amount"
                 type="number"
-                min={MIN_CONTRIBUTION_ZAR}
+                min={minPayable}
                 max={maxPayable}
                 step={CONTRIBUTION_STEP_ZAR}
                 error={errors.amount?.message}

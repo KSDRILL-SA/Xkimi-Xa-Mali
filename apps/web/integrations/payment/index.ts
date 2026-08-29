@@ -32,7 +32,27 @@ export type {
  * it fails on deploy rather than on debit night.
  */
 function selectGateway(): IPaymentGateway {
-  if (process.env.PAYMENT_GATEWAY !== 'mock') return netcashGateway
+  if (process.env.PAYMENT_GATEWAY !== 'mock') {
+    // `lib/env.ts` only requires NETCASH_SERVICE_KEY when `isLiveDeployment()`
+    // is also true — but this selection does not check that at all. A deploy
+    // with DEPLOY_ENV left at "staging" while genuinely serving real traffic
+    // (the exact state this project's production deployment was actually in)
+    // would select the real gateway here with nothing configured, and env.ts
+    // would not have caught it either, because it never considered the
+    // deployment live. The first anyone would hear of it is a throw inside
+    // `lib/netcash.ts` on an actual debit submission — on debit night, which
+    // is precisely the failure mode this file exists to convert into a
+    // refusal to start.
+    if (!process.env.NETCASH_SERVICE_KEY) {
+      throw new Error(
+        'PAYMENT_GATEWAY is not "mock", so the real Netcash gateway was selected, ' +
+        'but NETCASH_SERVICE_KEY is not set — every debit submission would throw. ' +
+        'Set NETCASH_SERVICE_KEY (and NETCASH_WEBHOOK_SECRET) before deploying, ' +
+        'or set PAYMENT_GATEWAY=mock to run against the stand-in instead.',
+      )
+    }
+    return netcashGateway
+  }
 
   if (isLiveDeployment()) {
     throw new Error(

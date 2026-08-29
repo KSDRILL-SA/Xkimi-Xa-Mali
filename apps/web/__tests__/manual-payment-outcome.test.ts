@@ -233,3 +233,58 @@ describe('the same payment submitted twice', () => {
     expect(result.status).toBe('SUCCESS')
   })
 })
+
+describe('the last bit of a period, once less than R100 remains', () => {
+  // Real bug, found by an adversarial API test against the running app
+  // (docs/production-readiness/01-financial-integration-test-plan.md §17.i):
+  // `ManualContributionSchema` used to enforce a flat R100 floor with no idea
+  // what was actually still owed. A first R50 payment on a fresh R100 period
+  // was rejected as expected — but so was the *second* payment closing out a
+  // R60 balance left after an earlier R40 payment, because R60 < R100 too.
+  // Since the schema's own comment says "a partial now and the balance
+  // later" is meant to work, and R100 is this system's own stated minimum
+  // monthly contribution, the smallest membership tier could never actually
+  // finish paying off a partial period. The fix moved the real minimum into
+  // `submitManualPayment`, capped at the remaining balance.
+
+  it('accepts a payment that exactly closes out a sub-R100 remaining balance', async () => {
+    mocks.findByPeriod.mockResolvedValue({
+      id: 'contrib-1', status: 'PARTIAL', amountDue: 100, amountPaid: 40,
+    })
+    mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
+
+    const result = await submitManualPayment(
+      'user-1', { periodMonth: 8, periodYear: 2026, amount: 60 }, 'user-1', [],
+    )
+
+    expect(result.status).toBe('SUCCESS')
+  })
+
+  it('still refuses a payment below R100 against a fresh, full-remaining period', async () => {
+    // The normal case must be unchanged: a first payment still needs real
+    // weight behind it, not a token R1.
+    mocks.findByPeriod.mockResolvedValue({
+      id: 'contrib-1', status: 'PENDING', amountDue: 450, amountPaid: 0,
+    })
+
+    await expect(
+      submitManualPayment('user-1', { periodMonth: 8, periodYear: 2026, amount: 50 }, 'user-1', []),
+    ).rejects.toMatchObject({ code: 'CTR_006' })
+
+    expect(mocks.submitOnceOffDebit).not.toHaveBeenCalled()
+  })
+
+  it('still refuses a payment below the sub-R100 remaining balance itself', async () => {
+    // R60 is left; R30 must not slip through just because it's "smaller than
+    // R100" — the effective floor is min(100, remaining), not zero.
+    mocks.findByPeriod.mockResolvedValue({
+      id: 'contrib-1', status: 'PARTIAL', amountDue: 100, amountPaid: 40,
+    })
+
+    await expect(
+      submitManualPayment('user-1', { periodMonth: 8, periodYear: 2026, amount: 30 }, 'user-1', []),
+    ).rejects.toMatchObject({ code: 'CTR_006' })
+
+    expect(mocks.submitOnceOffDebit).not.toHaveBeenCalled()
+  })
+})

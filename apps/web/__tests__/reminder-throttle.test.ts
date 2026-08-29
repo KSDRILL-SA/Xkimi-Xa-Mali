@@ -6,6 +6,9 @@ vi.mock('@/lib/env', () => ({
 vi.mock('@/lib/db', () => ({ db: { $queryRaw: vi.fn() } }))
 vi.mock('@/lib/cache', () => ({ cache: { get: vi.fn(), set: vi.fn(), del: vi.fn() }, CACHE_KEYS: {} }))
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: vi.fn() }))
+vi.mock('@/integrations/payment', () => ({
+  paymentGateway: { submitOnceOffDebit: vi.fn(), mapTransactionStatus: vi.fn() },
+}))
 vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))

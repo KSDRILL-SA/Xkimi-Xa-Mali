@@ -29,6 +29,7 @@ import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
 import { subtractZAR } from '@/lib/money'
 import type { ManualContributionInput, GenerateContributionsInput } from '@/lib/validation/contribution'
+import { MIN_CONTRIBUTION_ZAR } from '@xxm/utils'
 
 const MAX_OPTIMISTIC_RETRIES = 3
 
@@ -222,6 +223,21 @@ export async function submitManualPayment(
 
   if (data.amount < 0) {
     throw new ContributionConflictError('Payment amount must be positive', 'CTR_005')
+  }
+
+  // `ManualContributionSchema` only rejects a non-positive amount — it has no
+  // way to know what's actually still owed. The real R100 minimum belongs
+  // here, capped at whatever remains: a fresh R450 period still needs at
+  // least R100 to start, but a period with R60 left after an earlier partial
+  // payment needs to accept exactly R60, or that R60 could never be paid off
+  // by any amount at all (below R100 fails the minimum, above R60 fails the
+  // remaining-balance check above) — the exact bug this guards against.
+  const minimumPayment = Math.min(MIN_CONTRIBUTION_ZAR, remaining)
+  if (data.amount < minimumPayment - 0.01) {
+    throw new ContributionConflictError(
+      `Minimum payment is R${minimumPayment.toFixed(2)}`,
+      'CTR_006',
+    )
   }
 
   const budgetCheck = await checkBudget(userId, data.amount)

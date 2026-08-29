@@ -10,6 +10,7 @@ import { writeAuditLog } from '@/services/audit.service'
 import { raiseOperationalAlert } from '@/services/alert.service'
 import { alertOnFailure } from '@/inngest/on-failure'
 import { recordJobHeartbeat } from '@/lib/job-heartbeat'
+import { subtractZAR, sumZAR } from '@/lib/money'
 
 /**
  * Inngest's `step`, narrowed to what this job uses.
@@ -67,7 +68,7 @@ export async function executeLedgerReconciliation(step: ReconciliationStepRunner
         payload: {
           recordedAmount: item.recorded,
           actualAmount: item.actual,
-          drift: item.actual - item.recorded,
+          drift: subtractZAR(item.actual, item.recorded),
           source: 'ledger-reconciliation',
         },
       })
@@ -104,7 +105,11 @@ export async function executeLedgerReconciliation(step: ReconciliationStepRunner
   // both what was found and that it was dealt with.
   if (drifted.length > 0) {
     await step.run('alert-ledger-drift', () => {
-      const netDrift = drifted.reduce((sum, item) => sum + (item.actual - item.recorded), 0)
+      // Chained addition on rand amounts must go through the money helpers —
+      // this codebase's own documented rule (apps/web/lib/money.ts) — rather
+      // than a raw reduce, which is exactly the "accumulating float dust"
+      // shape the helper exists to prevent.
+      const netDrift = sumZAR(...drifted.map((item) => subtractZAR(item.actual, item.recorded)))
 
       return raiseOperationalAlert({
         code: 'LEDGER_DRIFT_DETECTED',
