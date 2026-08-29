@@ -440,7 +440,7 @@ would reject every real callback while debits still silently collect.
 | e | Malformed response | `NOT STARTED` | |
 | f | Temporary network failure | `NOT STARTED` | |
 | g | Authentication failure | `NOT STARTED` | |
-| h | Rate limiting | `IN PROGRESS` | Rate limiters exist (`makeRatelimit`) but are **no-ops when Redis is unconfigured** — a burst test run locally proves nothing, this was an explicit documented trap. Upstash Redis is now live in production ([[project-deployment-phase]]), which should mean rate limiting is now real there — **not yet reconfirmed against the actual production deployment since Redis was connected.** |
+| h | Rate limiting | `PASSED` | Reconfirmed against the real production deployment, not just env-var presence: `curl https://member.xkimixamali.co.za/api/v1/health` → `"redis":"ok"`. The health route's own code makes this a strong signal, not a weak one — it deliberately distinguishes `not_configured` (Redis unset) from `error` (configured but unreachable) from `ok` (configured **and** a real `redis.ping()` against Upstash succeeded), specifically so a misconfigured production deploy can't read as healthy. `makeRatelimit()` returns a no-op only when `REDIS_CONFIGURED` is false; since it's true and reachable, every limiter in `lib/redis.ts` is backed by the real thing in production right now. |
 
 ---
 
