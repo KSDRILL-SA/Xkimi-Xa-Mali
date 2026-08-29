@@ -1,4 +1,5 @@
 import { logger } from '@xxm/observability'
+import { escapeHtml } from '@xxm/utils'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { emailProvider } from '@/integrations/email'
@@ -179,20 +180,6 @@ async function deliverToFallback(alert: OperationalAlert): Promise<boolean> {
   )
 
   return sent !== null
-}
-
-/**
- * The alert title and body are assembled from job output — a gateway's failure
- * string, a Prisma error. None of it is authored by a person, and all of it is
- * about to be interpolated into HTML.
- */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
 }
 
 /**

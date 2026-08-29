@@ -123,6 +123,14 @@ that has never been watched to fail is not proven to catch anything.
 
 ---
 
+## 9.5 — HTML injection in email templates (not in the source audit — found this pass)
+
+| # | Item | Status | Evidence / Notes |
+|---|---|---|---|
+| a | Email templates escape user-controlled values | `PASSED` (found and fixed a real vulnerability) | Every named email function in `lib/email.ts` (verification, password reset, welcome, payment success/failed, invite, overdue reminder — 6 functions) interpolated a member's own `firstName` directly into a hand-written HTML template literal with **zero escaping**: `` `<h1>Welcome, ${firstName}!</h1>` ``. `firstName`'s validation schema only enforces `.min(2).max(50)` — no character restriction. A member setting their own first name to `<img src=x onerror=...>` would have that rendered raw in every email sent to them (welcome, payment confirmations, overdue reminders), a stored HTML-injection hole reachable through ordinary self-registration, no admin or compromise required. The same unescaped pattern existed in `admin.service.ts`'s broadcast function (both the recipient's `firstName` *and* the admin-composed message body) and in `notification.service.ts`'s generic-template fallback path (`interpolate(body, payload)` wrapped straight in a `<div>`). A correct `escapeHtml()` already existed, privately, in `alert.service.ts` — written for operational alerts, never applied anywhere a person's own input reaches an email. Fixed: extracted the existing implementation to `packages/utils/src/html.ts` (shared, single source of truth — `alert.service.ts` now imports it too instead of keeping a private copy), applied it to every `firstName` interpolation in `lib/email.ts` (subject lines deliberately left unescaped — plain text, not HTML, escaping there would show literal `&amp;` in a real ampersand name), to `admin.service.ts`'s broadcast, and added `interpolateHtml()` (an HTML-escaping variant of the existing `interpolate()`, kept separate because the same function also serves the SMS path, where escaping would incorrectly mangle plain text) to `notification.service.ts`. 8 new tests in a dedicated `email-html-escaping.test.ts` plus 2 more in the existing admin/notification test files — proved via revert on `lib/email.ts`: reverted `safeName` back to raw `firstName`, watched 7/8 tests fail (the subject-line test correctly still passed), restored, full suite clean (96 files, 1214 tests), typecheck clean across all 3 apps. | 2026-08-29 |
+
+---
+
 ## 10 — Required action plan (the audit's own 4 priorities)
 
 | # | Priority | Status | Notes |

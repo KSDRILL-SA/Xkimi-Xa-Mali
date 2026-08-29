@@ -41,6 +41,7 @@ vi.mock('@/integrations/sms', () => ({
 vi.mock('@/integrations/email', () => ({
   emailProvider: {
     sendWelcomeEmail: vi.fn(),
+    sendGenericEmail: vi.fn(),
   },
 }))
 
@@ -338,6 +339,29 @@ describe('broadcastNotification', () => {
 
     const result = await broadcastNotification('admin1', ADMIN_ROLES, 'Test msg', 'SMS', 'ALL')
     expect(result.failed).toBe(1)
+  })
+
+  it('escapes a member\'s own name and the broadcast body before building the email HTML', async () => {
+    // Both are attacker-reachable in different ways: a member sets their own
+    // first name, an admin (or a compromised admin account) types the
+    // message. Neither should be able to inject markup into an email every
+    // recipient's client renders.
+    const mockSendGenericEmail = emailProvider.sendGenericEmail as MockedFunction<typeof emailProvider.sendGenericEmail>
+    mockDb.user.findMany.mockResolvedValue([
+      { id: 'u1', email: 'a@x.co.za', phone: null, firstName: '<img src=x onerror=alert(1)>' },
+    ] as never)
+    mockSendGenericEmail.mockResolvedValue(undefined)
+    mockWriteAuditLog.mockResolvedValue(undefined)
+
+    await broadcastNotification(
+      'admin1', ADMIN_ROLES, 'Click <script>steal()</script> here', 'EMAIL', 'ALL',
+    )
+
+    const html = mockSendGenericEmail.mock.calls[0]![2]
+    expect(html).not.toContain('<img src=x onerror=alert(1)>')
+    expect(html).not.toContain('<script>steal()</script>')
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+    expect(html).toContain('&lt;script&gt;steal()&lt;/script&gt;')
   })
 })
 
