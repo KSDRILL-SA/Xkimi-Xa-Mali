@@ -4,6 +4,7 @@ export {
   RegisterStep2Schema,
   PasswordResetRequestSchema,
   PasswordResetSchema,
+  PasswordResetFormSchema,
   ChangePasswordSchema,
 } from '@xxm/utils/schemas'
 
@@ -13,5 +14,6 @@ export type {
   RegisterStep2Input,
   PasswordResetRequestInput,
   PasswordResetInput,
+  PasswordResetFormInput,
   ChangePasswordInput,
 } from '@xxm/utils/schemas'

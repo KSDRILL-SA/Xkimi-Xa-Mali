@@ -84,19 +84,42 @@ export const RegisterStep2Schema = z.object({
 })
 
 export const PasswordResetRequestSchema = z.object({
-  email: z.string().email(),
+  // Same normalisation as LoginSchema — without it, "Kurhula@x.com" silently
+  // fails to match the stored "kurhula@x.com" record. The route always
+  // returns a generic success message (no user enumeration), so a casing
+  // mismatch here is indistinguishable from "email not registered" to the
+  // person requesting the reset — this was a real, reported bug, not
+  // theoretical.
+  email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
 })
 
-export const PasswordResetSchema = z
-  .object({
-    token:           z.string().min(1),
-    password:        PasswordSchema,
-    confirmPassword: z.string(),
-  })
-  .refine((d) => d.password === d.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  })
+const PasswordResetFields = z.object({
+  token:           z.string().min(1),
+  password:        PasswordSchema,
+  confirmPassword: z.string(),
+})
+
+export const PasswordResetSchema = PasswordResetFields.refine((d) => d.password === d.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+})
+
+/**
+ * Same rules, minus `token` — for the form's own resolver.
+ *
+ * The token never has an input field; it arrives as a page prop (from the
+ * emailed link's query string) and is merged in only at submit time. Using
+ * the full `PasswordResetSchema` as the form's resolver was a real, shipped
+ * bug: react-hook-form validates the form's actual field values, which never
+ * include `token`, against a schema that requires it — validation fails
+ * silently on every submit, `onSubmit` never runs, and since no field is
+ * bound to `token` there's nowhere for `errors.token` to render. The button
+ * looks like it does nothing at all, with no visible error.
+ */
+export const PasswordResetFormSchema = PasswordResetFields.omit({ token: true }).refine(
+  (d) => d.password === d.confirmPassword,
+  { message: 'Passwords do not match', path: ['confirmPassword'] },
+)
 
 export const ChangePasswordSchema = z
   .object({
@@ -229,6 +252,7 @@ export type RegisterInput                 = z.infer<typeof RegisterSchema>
 export type RegisterStep2Input            = z.infer<typeof RegisterStep2Schema>
 export type PasswordResetRequestInput     = z.infer<typeof PasswordResetRequestSchema>
 export type PasswordResetInput            = z.infer<typeof PasswordResetSchema>
+export type PasswordResetFormInput        = z.infer<typeof PasswordResetFormSchema>
 export type ChangePasswordInput           = z.infer<typeof ChangePasswordSchema>
 export type CreateMandateInput            = z.infer<typeof CreateMandateSchema>
 export type UpdateMandateInput            = z.infer<typeof UpdateMandateSchema>
