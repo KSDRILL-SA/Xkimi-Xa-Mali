@@ -53,13 +53,13 @@ export const POST = withApiHandler(async (req: NextRequest) => {
 
   await Promise.all(
     receipts.map(async (receipt) => {
-      const notificationId = receipt.userSuppliedId
+      const userSuppliedId = receipt.userSuppliedId
       const deliveryStatus = receipt.status?.type
 
-      if (!notificationId || !deliveryStatus) return
+      if (!userSuppliedId || !deliveryStatus) return
 
       try {
-        await updateSMSDeliveryStatus(notificationId, deliveryStatus)
+        await updateSMSDeliveryStatus(userSuppliedId, deliveryStatus)
       } catch {
         // Non-fatal — BulkSMS will not retry based on our response body, only HTTP status.
       }

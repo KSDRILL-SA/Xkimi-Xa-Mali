@@ -247,6 +247,12 @@ async function dispatchSMS(
     status: delivered,
     sentAt: delivered === 'SENT' ? new Date() : null,
     errorMessage: null,
+    // BulkSMS's delivery-receipt webhook only ever echoes back the
+    // userSuppliedId it was given — which, since it has to fit BulkSMS's
+    // 20-char limit, is a hash of this row's real id, not the id itself.
+    // Recorded here so updateSMSDeliveryStatus can look a receipt back up by
+    // the same value it was actually sent, not by an id it will never see.
+    externalRef: shortSuppliedId(notificationId),
   })
 }
 
@@ -509,7 +515,7 @@ export async function recoverStalledNotifications(): Promise<number> {
 // ---------------------------------------------------------------------------
 
 export async function updateSMSDeliveryStatus(
-  notificationId: string,
+  userSuppliedId: string,
   deliveryStatus: string,
 ): Promise<void> {
   const terminal = ['DELIVERED', 'FAILED', 'UNKNOWN']
@@ -517,8 +523,14 @@ export async function updateSMSDeliveryStatus(
 
   const status: NotifStatus = deliveryStatus === 'DELIVERED' ? 'SENT' : 'FAILED'
 
+  // BulkSMS's own delivery-receipt payload has no notion of this system's row
+  // ids — it only ever echoes back the userSuppliedId it was originally given,
+  // which is a hash of the real id (see shortSuppliedId), not the id itself.
+  // Matched against externalRef, which dispatchSMS records at send time for
+  // exactly this lookup — matching against `id` here would silently update
+  // zero rows on every single delivery receipt.
   await notificationRepo.updateMany(
-    { id: notificationId, channel: 'SMS' },
+    { externalRef: userSuppliedId, channel: 'SMS' },
     {
       status,
       sentAt: status === 'SENT' ? new Date() : undefined,
