@@ -13,6 +13,7 @@ vi.mock('@/lib/db', () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(),
     },
     notificationPreference: { findUnique: vi.fn(), findMany: vi.fn() },
     user: { findUnique: vi.fn() },
@@ -64,6 +65,7 @@ import {
   updateSMSDeliveryStatus,
   flushQueuedNotifications,
   recoverStalledNotifications,
+  countAbandonedNotifications,
 } from '@/services/notification.service'
 
 // ---------------------------------------------------------------------------
@@ -399,6 +401,203 @@ describe('email dispatch is idempotent', () => {
     // is de-duplicated by Resend instead of sending a second email.
     expect(emailProvider.sendPaymentSuccessEmail).toHaveBeenCalledWith(
       'member@example.com', 'Zo', '500', '2025-01', 'notif-email-1',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// countAbandonedNotifications — the real total, never capped
+// ---------------------------------------------------------------------------
+
+describe('countAbandonedNotifications reports the real total', () => {
+  // Real bug, found live against production (docs/production-readiness/
+  // 03-notification-delivery-recovery.md §21.1): the old query fetched full
+  // rows with `take: 200` and reported `rows.length` as "the total" — correct
+  // only while the true backlog stayed under 200, silently wrong forever
+  // after. The actual backlog measured 229 (115 SMS, 114 EMAIL) while the
+  // operational alert had been reporting 200 for some time. Fixed with a real
+  // `GROUP BY` count, which this test pins directly rather than through the
+  // alert job that merely consumes whatever this function reports.
+  beforeEach(() => vi.clearAllMocks())
+
+  it('sums a real GROUP BY rather than the length of a capped row fetch', async () => {
+    ;(db.notification.groupBy as MockedFunction<typeof db.notification.groupBy>).mockResolvedValue([
+      { channel: 'SMS', _count: { _all: 115 } },
+      { channel: 'EMAIL', _count: { _all: 114 } },
+    ] as never)
+    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>).mockResolvedValue([
+      { errorMessage: 'Resend service error: RESEND_API_KEY not configured', updatedAt: new Date('2026-08-28T10:20:27Z') },
+    ] as never)
+
+    const result = await countAbandonedNotifications()
+
+    // 229, not 200 — the exact number this bug silently rounded down to.
+    expect(result.total).toBe(229)
+    expect(result.byChannel).toEqual({ SMS: 115, EMAIL: 114 })
+  })
+
+  it('never truncates the count query with a take, unlike the sample query', async () => {
+    ;(db.notification.groupBy as MockedFunction<typeof db.notification.groupBy>).mockResolvedValue([] as never)
+    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>).mockResolvedValue([] as never)
+
+    await countAbandonedNotifications()
+
+    const groupByArgs = (db.notification.groupBy as MockedFunction<typeof db.notification.groupBy>).mock.calls[0]![0] as { take?: number }
+    expect(groupByArgs.take).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// SMS userSuppliedId — BulkSMS caps it at 20 characters
+// ---------------------------------------------------------------------------
+
+describe('the SMS provider never sees an oversized userSuppliedId', () => {
+  // Real bug, found live 2026-08-29 against production once BulkSMS
+  // credentials were finally configured: `BulkSMS 400: Validation error:
+  // items[0].userSuppliedId size must be between 1 and 20`. This system's
+  // notification ids are 25-character cuids — every SMS would have failed
+  // this exact way, invisibly, the moment the "credentials not configured"
+  // error stopped hiding it.
+  beforeEach(() => vi.clearAllMocks())
+
+  it('never sends a userSuppliedId longer than 20 characters', async () => {
+    const queued = [{
+      id: 'cmte4f48o0006ib045r783zg1', // a real 25-character cuid from production
+      userId: 'user-12',
+      channel: 'SMS',
+      status: 'QUEUED',
+      createdAt: new Date(),
+      template: mockTemplate,
+      user: mockUser,
+      payload: { amount: '100', firstName: 'Ada' },
+    }]
+
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: queued[0]!.id }])
+    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
+      .mockResolvedValue(queued as never)
+    ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
+      .mockResolvedValue([mockPrefs] as never)
+    ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
+      .mockResolvedValue([{ id: 'sms-x', status: { type: 'ACCEPTED' } }] as never)
+    ;(db.notification.update as MockedFunction<typeof db.notification.update>)
+      .mockResolvedValue({} as never)
+
+    await flushQueuedNotifications()
+
+    const sentArgs = (smsProvider.send as MockedFunction<typeof smsProvider.send>).mock.calls[0]![0]
+    expect(sentArgs.userSuppliedId!.length).toBeLessThanOrEqual(20)
+  })
+
+  it('derives the same short id from the same notification id every time', async () => {
+    // Determinism matters for the same reason the Resend idempotency key
+    // does: a crash-recovered resend must correlate to the original attempt.
+    // Two genuinely separate runs, comparing the value carried out of the
+    // first against the value carried out of the second — not the same
+    // captured value compared to itself.
+    const sameId = 'cmte4f48o0006ib045r783zg1'
+    const buildQueued = () => [{
+      id: sameId, userId: 'user-13', channel: 'SMS', status: 'QUEUED', createdAt: new Date(),
+      template: mockTemplate, user: mockUser, payload: { amount: '100', firstName: 'Ada' },
+    }]
+
+    async function runOnceAndCapture(): Promise<string | undefined> {
+      vi.clearAllMocks()
+      ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: sameId }])
+      ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
+        .mockResolvedValue(buildQueued() as never)
+      ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
+        .mockResolvedValue([mockPrefs] as never)
+      ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
+        .mockResolvedValue([{ id: 'sms-y', status: { type: 'ACCEPTED' } }] as never)
+      ;(db.notification.update as MockedFunction<typeof db.notification.update>)
+        .mockResolvedValue({} as never)
+
+      await flushQueuedNotifications()
+      return (smsProvider.send as MockedFunction<typeof smsProvider.send>).mock.calls[0]?.[0].userSuppliedId
+    }
+
+    const first = await runOnceAndCapture()
+    const second = await runOnceAndCapture()
+
+    expect(first).toBeDefined()
+    expect(first).toBe(second)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A successful send clears the 'in-flight' claim marker
+// ---------------------------------------------------------------------------
+
+describe('a successful send does not leave the in-flight marker behind', () => {
+  // Real bug, found while auditing document 3 of the production-readiness
+  // tracker: `findReady` claims a batch by writing `errorMessage: 'in-flight'`
+  // before dispatch, and both dispatchEmail and dispatchSMS's success-path
+  // update used to write only `{ status, sentAt }` — never clearing it. A row
+  // that sent perfectly kept 'in-flight' as its errorMessage forever, which
+  // `countAbandonedNotifications` already had to special-case filtering out
+  // elsewhere in this file — the tell that this was a known rough edge, just
+  // not closed at the source.
+  beforeEach(() => vi.clearAllMocks())
+
+  it('clears errorMessage on a successful EMAIL send', async () => {
+    const queued = [{
+      id: 'notif-clear-email',
+      userId: 'user-10',
+      channel: 'EMAIL',
+      status: 'QUEUED',
+      createdAt: new Date(),
+      template: { id: 'tpl-e2', slug: 'payment-success-email', channel: 'EMAIL', body: 'x' },
+      user: { email: 'member@example.com', phone: null },
+      payload: { firstName: 'Ada', amount: '100', period: '2026-08' },
+    }]
+
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-clear-email' }])
+    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
+      .mockResolvedValue(queued as never)
+    ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
+      .mockResolvedValue([{ userId: 'user-10', sms: true, email: true, push: true }] as never)
+    ;(db.notification.update as MockedFunction<typeof db.notification.update>)
+      .mockResolvedValue({} as never)
+
+    await flushQueuedNotifications()
+
+    expect(db.notification.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'notif-clear-email' },
+        data: expect.objectContaining({ status: 'SENT', errorMessage: null }),
+      }),
+    )
+  })
+
+  it('clears errorMessage on a successful SMS send', async () => {
+    const queued = [{
+      id: 'notif-clear-sms',
+      userId: 'user-11',
+      channel: 'SMS',
+      status: 'QUEUED',
+      createdAt: new Date(),
+      template: mockTemplate,
+      user: mockUser,
+      payload: { amount: '100', firstName: 'Ada' },
+    }]
+
+    ;(db.$queryRaw as MockedFunction<typeof db.$queryRaw>).mockResolvedValue([{ id: 'notif-clear-sms' }])
+    ;(db.notification.findMany as MockedFunction<typeof db.notification.findMany>)
+      .mockResolvedValue(queued as never)
+    ;(db.notificationPreference.findMany as MockedFunction<typeof db.notificationPreference.findMany>)
+      .mockResolvedValue([mockPrefs] as never)
+    ;(smsProvider.send as MockedFunction<typeof smsProvider.send>)
+      .mockResolvedValue([{ id: 'sms-clear', status: { type: 'ACCEPTED' } }] as never)
+    ;(db.notification.update as MockedFunction<typeof db.notification.update>)
+      .mockResolvedValue({} as never)
+
+    await flushQueuedNotifications()
+
+    expect(db.notification.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'notif-clear-sms' },
+        data: expect.objectContaining({ status: 'SENT', errorMessage: null }),
+      }),
     )
   })
 })

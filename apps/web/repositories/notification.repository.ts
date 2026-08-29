@@ -92,6 +92,20 @@ export const notificationRepo = {
     return db.notification.updateMany({ where, data })
   },
 
+  /**
+   * Exact per-channel counts matching a where clause — a real `GROUP BY`,
+   * never truncated by a `take`. Use this whenever a count is reported as a
+   * fact rather than sampled as an example; `findMany` with a `take` silently
+   * undercounts once the true total exceeds it.
+   */
+  countByChannel(where: Prisma.NotificationWhereInput) {
+    return db.notification.groupBy({
+      by: ['channel'],
+      where,
+      _count: { _all: true },
+    })
+  },
+
   // ─── NotificationTemplate ─────────────────────────────────────────────────
 
   /** Find a template by slug. */
