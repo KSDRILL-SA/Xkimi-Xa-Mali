@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import localFont from 'next/font/local'
+import { Analytics } from '@vercel/analytics/next'
 import { siteEnv } from '@/lib/env'
 import './globals.css'
 
@@ -70,6 +71,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             the target (`#main-content`) with nothing pointing at it. */}
         <a href="#main-content" className="skip-to-main">Skip to main content</a>
         {children}
+        <Analytics />
         <script src="/nav-progress.js" defer />
       </body>
     </html>
