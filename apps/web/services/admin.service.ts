@@ -5,6 +5,7 @@ import { createInboxMessages } from './inbox.service'
 import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { assertAdmin, assertNotSelf } from '@/lib/authorization'
 import { isValidSAId } from '@xxm/utils/sa-id'
+import { escapeHtml } from '@xxm/utils'
 import { encrypt } from '@/lib/encryption'
 import { paymentGateway } from '@/integrations/payment'
 import { raiseGatewayDesyncAlert } from './mandate.service'
@@ -468,7 +469,7 @@ export async function broadcastNotification(
         await emailProvider.sendGenericEmail(
           m.email,
           'Message from Xkimi Xa Mali Foundation',
-          `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;"><p style="color:#374151;margin-bottom:24px;">Hi ${m.firstName},</p><p style="color:#374151;margin-bottom:24px;white-space:pre-wrap;">${message}</p><p style="color:#9CA3AF;font-size:12px;">Xkimi Xa Mali Foundation · "Blessed is the hand that giveth."</p></div>`,
+          `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;"><p style="color:#374151;margin-bottom:24px;">Hi ${escapeHtml(m.firstName)},</p><p style="color:#374151;margin-bottom:24px;white-space:pre-wrap;">${escapeHtml(message)}</p><p style="color:#9CA3AF;font-size:12px;">Xkimi Xa Mali Foundation · "Blessed is the hand that giveth."</p></div>`,
         )
         counts.email++
       }

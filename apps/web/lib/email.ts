@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { escapeHtml } from '@xxm/utils'
 import { env } from './env'
 import { withRetry } from './retry'
 import { ExternalServiceError } from './errors'
@@ -56,11 +57,12 @@ export async function sendVerificationEmail(
   to: string, firstName: string, token: string, baseUrl: string,
 ): Promise<void> {
   const url = `${baseUrl}/api/v1/auth/verify-email?token=${token}`
+  const safeName = escapeHtml(firstName)
   await send({
     from: FROM, to,
     subject: `Verify your ${APP_NAME} account`,
     html: layout(`
-      <h1 style="${S.heading}">Welcome, ${firstName}!</h1>
+      <h1 style="${S.heading}">Welcome, ${safeName}!</h1>
       <p style="${S.body}">Your <strong>${APP_NAME}</strong> account has been created.
         Please verify your email address to activate it.</p>
       <a href="${url}" style="${S.btn}">Verify Email Address</a>
@@ -73,12 +75,13 @@ export async function sendPasswordResetEmail(
   to: string, firstName: string, token: string, baseUrl: string,
 ): Promise<void> {
   const url = `${baseUrl}/reset-password?token=${token}`
+  const safeName = escapeHtml(firstName)
   await send({
     from: FROM, to,
     subject: `Reset your ${APP_NAME} password`,
     html: layout(`
       <h1 style="${S.heading}">Password Reset</h1>
-      <p style="${S.body}">Hi ${firstName}, we received a request to reset your <strong>${APP_NAME}</strong> password.</p>
+      <p style="${S.body}">Hi ${safeName}, we received a request to reset your <strong>${APP_NAME}</strong> password.</p>
       <a href="${url}" style="${S.btn}">Reset Password</a>
       <p style="${S.small}">This link expires in 1 hour. If you didn't request a reset, you can safely ignore this email.</p>
     `),
@@ -86,11 +89,12 @@ export async function sendPasswordResetEmail(
 }
 
 export async function sendWelcomeEmail(to: string, firstName: string, idempotencyKey?: string): Promise<void> {
+  const safeName = escapeHtml(firstName)
   await send({
     from: FROM, to,
     subject: `Welcome to ${APP_NAME}, ${firstName}!`,
     html: layout(`
-      <h1 style="${S.heading}">Karibu, ${firstName}!</h1>
+      <h1 style="${S.heading}">Karibu, ${safeName}!</h1>
       <p style="${S.body}">You have been successfully registered with <strong>${APP_NAME}</strong>.
         Your account is active and your first monthly contribution will be collected on your designated debit date.</p>
       <p style="${S.body}">Log in at any time to view your contribution history, update your banking details,
@@ -103,12 +107,13 @@ export async function sendWelcomeEmail(to: string, firstName: string, idempotenc
 export async function sendPaymentSuccessEmail(
   to: string, firstName: string, amount: string, period: string, idempotencyKey?: string,
 ): Promise<void> {
+  const safeName = escapeHtml(firstName)
   await send({
     from: FROM, to,
     subject: `Payment received — ${APP_NAME}`,
     html: layout(`
       <h1 style="${S.heading}">Payment Confirmed</h1>
-      <p style="${S.body}">Hi ${firstName}, your <strong>R${amount}</strong> contribution for
+      <p style="${S.body}">Hi ${safeName}, your <strong>R${amount}</strong> contribution for
         <strong>${period}</strong> has been processed successfully.
         Thank you for keeping your account up to date.</p>
       <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
@@ -128,12 +133,13 @@ export async function sendPaymentSuccessEmail(
 export async function sendPaymentFailedEmail(
   to: string, firstName: string, amount: string, period: string, dashboardUrl: string, idempotencyKey?: string,
 ): Promise<void> {
+  const safeName = escapeHtml(firstName)
   await send({
     from: FROM, to,
     subject: `Action required — debit declined — ${APP_NAME}`,
     html: layout(`
       <h1 style="${S.heading}">Payment Declined</h1>
-      <p style="${S.body}">Hi ${firstName}, your <strong>R${amount}</strong> debit for
+      <p style="${S.body}">Hi ${safeName}, your <strong>R${amount}</strong> debit for
         <strong>${period}</strong> was not successful. Please log in and ensure your banking
         details are correct or arrange an alternative payment.</p>
       <a href="${dashboardUrl}" style="${S.btn}">Go to Dashboard</a>
@@ -146,11 +152,12 @@ export async function sendPaymentFailedEmail(
 export async function sendInviteEmail(
   to: string, firstName: string, code: string, registrationUrl: string,
 ): Promise<void> {
+  const safeName = escapeHtml(firstName)
   await send({
     from: FROM, to,
     subject: `You have been invited to join ${APP_NAME}`,
     html: layout(`
-      <h1 style="${S.heading}">You're Invited, ${firstName}!</h1>
+      <h1 style="${S.heading}">You're Invited, ${safeName}!</h1>
       <p style="${S.body}">You have been invited to join <strong>${APP_NAME}</strong> — a secure
         group savings and contribution management platform.</p>
       <p style="${S.body}">Your one-time invite code is:</p>
@@ -174,12 +181,13 @@ export async function sendInviteEmail(
 export async function sendOverdueReminderEmail(
   to: string, firstName: string, amount: string, period: string, dashboardUrl: string, idempotencyKey?: string,
 ): Promise<void> {
+  const safeName = escapeHtml(firstName)
   await send({
     from: FROM, to,
     subject: `Overdue contribution — ${APP_NAME}`,
     html: layout(`
       <h1 style="${S.heading}">Contribution Overdue</h1>
-      <p style="${S.body}">Hi ${firstName}, your <strong>R${amount}</strong> contribution for
+      <p style="${S.body}">Hi ${safeName}, your <strong>R${amount}</strong> contribution for
         <strong>${period}</strong> is still outstanding. Please settle this as soon as possible
         to avoid any impact on your standing in the group.</p>
       <a href="${dashboardUrl}" style="${S.btn}">Pay Now</a>
