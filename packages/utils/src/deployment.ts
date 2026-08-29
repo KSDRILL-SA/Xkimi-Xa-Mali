@@ -40,3 +40,18 @@ export function isLiveDeployment(env: NodeJS.ProcessEnv = process.env): boolean 
 export function isNonLiveDeployment(env: NodeJS.ProcessEnv = process.env): boolean {
   return !isLiveDeployment(env)
 }
+
+/**
+ * A human-readable label for which deployment this is, for tagging
+ * observability data (Sentry's `environment` field and similar) — not for
+ * branching logic, which should use `isLiveDeployment` instead.
+ *
+ * Same resolution order as `isLiveDeployment`, but returns the actual value
+ * rather than collapsing it to a boolean, so a staging or preview deploy's
+ * errors show up labelled as such instead of merging into "production" the
+ * way a bare `NODE_ENV` tag would (Next sets NODE_ENV=production for every
+ * optimised build, preview included).
+ */
+export function deploymentEnvironmentName(env: NodeJS.ProcessEnv = process.env): string {
+  return env.DEPLOY_ENV ?? env.VERCEL_ENV ?? env.NODE_ENV ?? 'unknown'
+}

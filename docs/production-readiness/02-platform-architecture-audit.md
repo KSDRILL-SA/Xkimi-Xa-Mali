@@ -31,7 +31,7 @@ said so.
 | 3.d | Vercel deployment responds consistently | `PASSED` | Confirmed same session, both apex and `www`. | 2026-08-28 |
 | 3.e | DNS records match intended production config | `PASSED` | Apex/`www` → website, `member.` → member app, `admin.` → admin app — all three added and verified resolving via `nslookup` against `8.8.8.8`. | 2026-08-29 |
 | 3.f | Mobile and desktop networks can both access the platform | `IN PROGRESS` | Owner reported "works on PC, not on phone." Diagnosed as DNS-resolver propagation lag (different networks' resolvers — especially mobile-carrier DNS on cellular data vs. wifi/ISP DNS — catch up to a brand-new `.co.za` registration at different speeds), not a real config defect; both `8.8.8.8` and `1.1.1.1` already resolve correctly. **Not yet reconfirmed working from the owner's actual phone** — ask for a follow-up check. | 2026-08-29 |
-| 3.g | No unexpected redirects | `NOT STARTED` | | |
+| 3.g | No unexpected redirects | `PASSED` (found and fixed a real one) | `curl -I` against every domain/subdomain found `admin.xkimixamali.co.za` issuing a server-side 307 to the raw `xkimi-xa-mali-admin.vercel.app` login URL, with the `authjs` cookies scoped to that vercel.app host — meaning a user who followed it and logged in there would come back to the custom domain without a working session (cookie set on the wrong host). Root cause: the admin project's `NEXTAUTH_URL` was set to the vercel.app URL from before the custom domain was attached, never updated. Fixed via the Vercel dashboard (value is write-only once saved as Secret, so the wrong value couldn't be read — only overwritten with the objectively correct one, `https://admin.xkimixamali.co.za`), redeployed, and reverified: the redirect is now a same-domain relative path and the callback-url cookie correctly reads `https://admin.xkimixamali.co.za`. `xkimixamali.co.za`, `www.`, and `member.` all had clean redirect behavior already (HTTP→HTTPS only). | 2026-08-29 |
 | — | *Note on the audit's own IP claim* | `MOOT` | The audit cites "Observed Vercel IPv4: `76.76.21.21`" as the expected target. Current DNS actually resolves to `216.198.79.1` / `64.29.17.65` etc., under Vercel's newer `*.vercel-dns-017.com` scheme — Vercel's own UI states "We're expanding our IP range" and that the legacy `76.76.21.21` record still works too. Not a discrepancy to chase; both are valid, the audit's IP is just the older one. | 2026-08-29 |
 
 ---
@@ -116,8 +116,8 @@ that has never been watched to fail is not proven to catch anything.
 | 9.a | Runtime exceptions appear in Sentry | `PASSED` | Directly observed — the BulkSMS credential error and a separate `notification-flush` `TypeError` (fixed in PR #416) were both found by reading real captured Sentry issues. |
 | 9.b | Server-side failures captured | `PASSED` | Same evidence as 9.a. |
 | 9.c | Client-side failures captured where intended | `PASSED` | `window.__SENTRY__` confirmed `true` on the live page after moving both apps' client init from the dead `sentry.client.config.ts` (pre-v8 convention, never loaded) to `instrumentation-client.ts` (what current Next.js actually auto-loads). Found and fixed as a bonus while debugging an unrelated signature-save CSP bug. |
-| 9.d | Sensitive information not unnecessarily transmitted | `NOT STARTED` | |
-| 9.e | Production environment correctly identified | `NOT STARTED` | |
+| 9.d | Sensitive information not unnecessarily transmitted | `PASSED` | `sendDefaultPii` is never set to `true` anywhere in any of the 6 Sentry init calls (checked via grep across both apps) — on `@sentry/nextjs` v10 (pinned in both `package.json`s), that default (`false`) means IP addresses and sensitive request headers (`Authorization`, `Cookie`) are not attached to events in the first place. `beforeSend` additionally strips `event.request.cookies` explicitly in every config, as defense in depth on top of the SDK default rather than instead of it. |
+| 9.e | Production environment correctly identified | `PASSED` (found and fixed a real gap) | Found: all 4 server/edge Sentry configs (`web` and `admin`, server + edge) tagged `environment: process.env.NODE_ENV` — the same class of bug as the `DEPLOY_ENV`/`isLiveDeployment()` gap already central to this session's work, since Next sets `NODE_ENV=production` for every optimised build, preview deploys included. A preview deployment's errors would show up in Sentry labelled "production," indistinguishable from a real incident. Fixed by adding `deploymentEnvironmentName()` to `packages/utils/src/deployment.ts` (same `DEPLOY_ENV ?? VERCEL_ENV ?? NODE_ENV` resolution order as `isLiveDeployment`, but returns the actual string for tagging rather than collapsing to a boolean) and wiring it into all 4 server/edge configs. **Deliberately left unfixed:** the 2 client-side configs (`instrumentation-client.ts`) still tag `NODE_ENV`, because `DEPLOY_ENV`/`VERCEL_ENV` are server-only — the browser bundle never sees them — and fixing that properly needs a new `NEXT_PUBLIC_DEPLOY_ENV` var, which is a real (if small) infra change, not something to add silently as a side effect of this fix. | 2026-08-29 |
 | 9.f | Source maps/configuration handled appropriately | `NOT STARTED` | `SENTRY_AUTH_TOKEN` (source-map upload) was deliberately **not** set — creating a Sentry API token wasn't attempted. Monitoring works without it; stack traces just won't be de-minified. Worth deciding deliberately, not by default. |
 | 9.g | Alerts configured for critical failures | `NOT STARTED` | Distinct from this app's own operational alerting (`ALERT_FALLBACK_EMAIL`, [[project-operational-alerting]]) — this row is specifically about Sentry's own alert rules. |
 
@@ -148,7 +148,7 @@ gets its own status rather than being folded into the sections above.
 | Root domain resolves correctly | `PASSED` |
 | Required subdomains resolve correctly | `PASSED` (`member.`, `admin.` added 2026-08-29) |
 | HTTPS works correctly | `PASSED` |
-| Domain redirects verified | `NOT STARTED` (= 3.g) |
+| Domain redirects verified | `PASSED` (= 3.g) — found and fixed a real bug: admin login was bouncing to the raw vercel.app URL |
 
 ### Deployment
 | Item | Status |
@@ -166,7 +166,7 @@ gets its own status rather than being folded into the sections above.
 | Email credentials configured | `PASSED` (= 6.c) |
 | Sentry configured | `PASSED` (= 6.d) |
 | Go-live (`requiredWhenLive`) credentials configured | `NEEDS FIX` — see the `Runtime environment correctly configured` row above. None of the 7 vars exist yet in any environment on Vercel, not just Production. |
-| Secrets not committed to Git | `NOT STARTED` — worth an explicit `git log -p` / secret-scan pass rather than assuming |
+| Secrets not committed to Git | `PASSED` | `git log --all -p` scan of every `.env*` file in the repo's full history, plus a targeted scan for real-credential shapes (Resend `re_`, Stripe-style `sk_`, AWS `AKIA`, and `postgres://user:pass@` connection strings) across all history, not just `.env` files. Every hit is a placeholder (`ADMIN_API_SECRET=` with no value, `NETCASH_WEBHOOK_SECRET: 'webhook-secret'`/`'test-webhook-secret-do-not-use-in-prod'`, `DATABASE_URL: postgresql://xxm:xxm_test@...`) or a Zod schema definition (`requiredWhenLive(z.string().min(1))`) — never a real value. |
 | Production and development variables separated appropriately | `PASSED` — Vercel Production/Preview/Development scoping used throughout ([[project-deployment-phase]]) |
 
 ### Security
