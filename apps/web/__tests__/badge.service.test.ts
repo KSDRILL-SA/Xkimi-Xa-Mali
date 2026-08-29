@@ -190,6 +190,25 @@ describe('generosity rewards paying above the minimum', () => {
     await recalculateOne('u1', 'test')
     expect(written().generosityScore).toBe(100)
   })
+
+  /**
+   * Real bug, found while auditing §14.g of the production-readiness tracker
+   * (correct decimal/monetary representation): `avgContribution` used raw
+   * `reduce`/division on rand amounts instead of this codebase's own money
+   * helpers (`apps/web/lib/money.ts`). `[777.10, 777.20]` averages to
+   * `777.1500000000001` under plain JS floating-point math, not `777.15` —
+   * not a rounding edge case, a real, reproducible value. This isn't just an
+   * internal score input: it's displayed to the member as currency
+   * (`formatZAR(badge.avgContribution)` on the badges page).
+   */
+  it('averages fractional-cent contributions to a clean rand value, not float dust', async () => {
+    givenContributions([
+      contribution(2, { amountPaid: 777.10 }),
+      contribution(1, { amountPaid: 777.20 }),
+    ])
+    await recalculateOne('u1', 'test')
+    expect(written().avgContribution).toBe(777.15)
+  })
 })
 
 // ---------------------------------------------------------------------------
