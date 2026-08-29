@@ -57,7 +57,7 @@ finding")*
 
 | Document | Passed | Needs fix / Failed | Blocked | Moot | In progress | Not started |
 |---|---:|---:|---:|---:|---:|---:|
-| 1. Financial integration test plan | 76 | 0 | 41 | 0 | 7 | 71 |
+| 1. Financial integration test plan | 78 | 0 | 41 | 0 | 7 | 71 |
 | 2. Platform & architecture audit | 41 | 3 | 6 | 5 | 5 | 28 |
 | 3. Notification delivery & recovery | 45 | 0 | 13 | 0 | 2 | 34 |
 
@@ -130,3 +130,23 @@ anything in the three documents as fact:
 See [[project-deployment-phase]], [[project-mobile-relaunch-and-account-reset]],
 [[project-netcash-critical-path]] for the underlying session history any of
 these rows link back to.
+
+## Session close, 2026-08-29 night
+
+- **Netcash registration form submitted.** Reviewed section-by-section
+  before the owner clicked submit (2 real errors caught and fixed: a
+  postal-address city typo, and the bank dropdown stuck on "Other" instead
+  of "Capitec Business"). Netcash confirmed receipt by email same day.
+  Vetting is now entirely on their side — nothing left to do here.
+- **3 of the 7 go-live env vars are now set and live** on `xkimi-xa-mali-web`
+  (`NEXTAUTH_URL`, `ADMIN_WHATSAPP_NUMBER`, `SUPPORT_EMAIL`) — see document 2
+  §12. The remaining 4 are Netcash-issued and can't be filled until their
+  onboarding completes.
+- **Role separation and member-to-member data isolation explicitly
+  re-verified** at the owner's direct request, against current code (not
+  re-cited from memory) — document 1 §6 now has two new rows covering
+  authentication-level cross-role login attempts specifically, on top of
+  the authorization-level checks already there.
+- **A full system integration sweep found everything healthy**: all 3 apps'
+  health endpoints, deployment status, CI, and Sentry all checked clean;
+  see document 2's "Final integration sweep" note for the detail.

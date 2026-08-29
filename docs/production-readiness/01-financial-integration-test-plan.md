@@ -7,11 +7,15 @@ Source: *Financial Integration & Production Readiness Test Plan*. See
 
 **Production is currently running `PAYMENT_GATEWAY=mock`** — confirmed in
 `xkimi-xa-mali-web`'s Vercel environment variables
-([[project-deployment-phase]]). Netcash has not finished vetting the
-merchant application yet ([[project-netcash-critical-path]]): a registration
-token was sent and the owner is completing it, but no live account exists,
-and the adapter has **never spoken to a real Netcash account** — only to its
-own contract tests against the published WSDL/XSD.
+([[project-deployment-phase]]). **UPDATE 2026-08-29: the Netcash
+registration form is submitted** (reviewed section-by-section before
+submit, 2 real errors caught and fixed, confirmed received by email same
+day) — but Netcash has not yet finished *vetting* the application
+([[project-netcash-critical-path]]), no live account exists yet, and the
+adapter has **never spoken to a real Netcash account** — only to its own
+contract tests against the published WSDL/XSD. The blocker moved from "the
+owner needs to complete the form" to "Netcash needs to approve it" — this
+document's rows below are unaffected either way.
 
 This means a large fraction of this document's test cases are structurally
 **`BLOCKED`**, not `NOT STARTED` — no amount of engineering effort in this
@@ -212,6 +216,8 @@ there is a real provider record to reconcile against.**
 | Member: view another member's data | `PASSED` (denied correctly) | = §5 above. |
 | Member: manage members | `PASSED` (denied correctly) | = §5.c. |
 | Admin: manage financial records | `PASSED` | Checked the admin console's own server actions directly (not just the web API), since `docs/session-handoff.md` §8 flagged this as unaudited. `apps/admin/lib/admin-action.ts`'s `requireAdmin()` gates every admin server action — confirms session, confirms ADMIN role, rejects a *stale* session role via `isSessionRoleStale` (closes the gap where a demoted admin's still-valid JWT would otherwise keep working), throttles by admin identity, and resolves client IP through a spoofing-resistant trust model rather than trusting `cf-connecting-ip` blindly. Spot-checked on the data-subject-erasure action (POPIA right-to-erasure, about as high-stakes as this app gets): page-level role redirect *and* a named-permission `requireAdmin('dsr.erase')` check inside the server action itself, so the check can never be reached by crafting a request directly against a form that was never rendered to the caller. |
+| Member: log into the admin console | `PASSED` | **New row, 2026-08-29** — the owner asked directly what happens if a member account tries to sign into `admin.xkimixamali.co.za`. Not previously an explicit row: prior rows above verify *authorization* (a member-role session correctly denied specific actions/data) but not *authentication* (whether a member-only session is ever issued by the admin app's own login at all). Traced directly in `apps/admin/lib/auth.ts`: the `Credentials` provider's `authorize()` checks `roleNames.includes('ADMIN')` *before* returning a user object — a correct password on a member-only account still returns `null` (generic "invalid credentials", same response shape as a wrong password, so the attempt doesn't even confirm the account exists). No session is ever issued; there is nothing for a later authorization check to have to catch. |
+| Admin: log into the member app | `PASSED` (expected, not a gap) | **New row, 2026-08-29.** `apps/web/lib/auth.ts`'s `authorizeCredentials` does not check role at all — any active, non-suspended account with a correct password signs in. This is intentional, not a missed check: the admin/founder is also a stokvel member (one `User` row, ADMIN is an added role relation, not a separate account) and needs their own member dashboard/contributions like anyone else. |
 | Self-revocation of the sole admin | `PASSED` (blocked correctly) | PR #306 — the exact bug this closed: `setMemberRole` existed twice, the console called the unguarded copy, and the sole admin could remove his own admin role and leave the system with none. Fixed via a shared `refuseRoleChange` both apps import; a test asserts neither app restates the rule locally. |
 | `MEMBER` role revocation | `PASSED` (correctly refused) | `MEMBER` isn't a permission — nothing checks for it, so there's nothing to revoke; every member-facing service gates on `assertCanAccess` instead. Suspension, not role removal, is what actually ends access. |
 | Generate statements (Member: own / Admin: authorized) | `PASSED` | Double-gated in `app/api/v1/transactions/statement/route.ts`: a non-admin caller can never even set `targetUserId` to anything but their own (the `?userId=` override is only honoured `roles.includes('ADMIN') && ...`), and `generateMemberStatementPdf` independently calls `assertCanAccess(userId, requesterId, roles)` regardless — Member A cannot fetch Member B's statement by id even if the route-level guard were somehow bypassed. The route's own code comments document a *previously real* worse version of this exact class of bug (unauthenticated, permanent, guessable blob URLs) that was already fixed before this pass. |

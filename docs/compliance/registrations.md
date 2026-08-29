@@ -4,9 +4,24 @@
 
 | | |
 |---|---|
-| Owner | `[NAME]` |
-| Status | None started as at 2026-08-14 |
+| Owner | Kurhula Success Maluleke |
+| Status | **Superseded in practice as of 2026-08-24/29 — read this before item 1** |
 | Purpose | One register, in dependency order, of every external registration, application, and professional engagement |
+
+> **The legal-form decision below (§1) was overtaken by a fact discovered
+> after this doc was written, not resolved through it.** The owner already
+> has **KSDRILL SA (Pty) Ltd**, an existing registered CIPC company
+> (registration `2026/614917/07`) with its own Capitec business bank
+> account, used as the umbrella entity for this and several other systems.
+> That made the "voluntary association vs. registered entity" choice below
+> moot — item 3 (entity registration) and item 5 (bank account) were
+> already satisfied by an entity that predates this document, not achieved
+> by following the path it recommends. The general advice on constitutions,
+> NASASA, SARS, and POPIA items below is still accurate and was still
+> followed; only the "which legal form" framing and the status board are
+> stale. See the updated status board at the bottom and
+> `[[project-netcash-critical-path]]` in memory for the real, current
+> sequence of events.
 
 > **How to use this.** The items are in the order they unblock each other. Doing
 > them out of order mostly means being turned away and coming back. Items 1 and 2
@@ -199,18 +214,23 @@ yours.
 
 ## Status board
 
+*(rewritten 2026-08-29 to match what actually happened — the original board
+above assumed the voluntary-association path in §1 would be followed in
+order; in practice KSDRILL SA's pre-existing registration made several
+items moot rather than completed via this checklist)*
+
 | # | Item | Status | Blocked by |
 |---|---|---|---|
-| 1 | Legal form decided | ☐ Not started | — |
-| 2 | Constitution adopted | ☐ Drafted, not adopted | 1 |
-| 3 | Entity registered (if needed) | ☐ Not started | 1, 2 |
-| 4 | NASASA membership | ☐ Not started | 2 |
-| 5 | Bank account | ☐ Not started | 2, 3 |
-| 6 | SARS position settled | ☐ Not started | 1 |
-| 7 | Netcash onboarding | ☐ Not started | 5 |
+| 1 | Legal form decided | ☑ **Moot** — KSDRILL SA (Pty) Ltd already existed, registered with CIPC (`2026/614917/07`) before this question was asked | — |
+| 2 | Constitution adopted | ☑ **Signed 2026-08-24** by all four founders — `Constitution of Xkimi Xa Mali Foundation - SIGNED.pdf` | — |
+| 3 | Entity registered (if needed) | ☑ **Moot** — see item 1 | — |
+| 4 | NASASA membership | ☐ **Applied 2026-08-24**, still awaiting reply as of 2026-08-29 (3+ business days, no response yet) | 2 |
+| 5 | Bank account | ☑ **Done** — Capitec Business, KSDRILL SA's existing account, doubles as the Netcash settlement account and the dedicated member-funds account | 2, 3 |
+| 6 | SARS position settled | ☐ Not started — still a real open question for the accountant, unchanged | 1 |
+| 7 | Netcash onboarding | ☑ **Registration form submitted 2026-08-29**, confirmed received by Netcash the same day; vetting now on their side | 5 |
 | 8 | Information Officer registered | ☐ Not started | 1 |
 | 9 | PAIA manual published | ☑ Live at `/paia` — fill in the details once item 1 and 8 land | 1, 8 |
-| 10 | Attorney engaged | ☐ Not started | — |
+| 10 | Attorney engaged | ☐ Not started — decided not needed in practice once KSDRILL SA's existing registration made §1 moot | — |
 | 11 | Accountant engaged | ☐ Not started | — |
 | 12 | Backup & restore documented | ☑ Done | — |
 | 13 | Development restore drill | ☑ Run 2026-08-15 — found 3 defects | — |

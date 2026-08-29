@@ -205,20 +205,68 @@ gets its own status rather than being folded into the sections above.
 | Production infrastructure | ACTIVE | `PASSED` | Unchanged, still true. |
 | Domain | REGISTERED | `PASSED` | Unchanged. |
 | DNS | PROPAGATING | `PASSED` | Now fully propagated and verified, was mid-propagation when audited. |
-| Payment/financial integration | UNDER ONBOARDING/FINALIZATION | `BLOCKED` | Unchanged — see [[project-netcash-critical-path]]; Netcash is actively vetting, NASASA still silent. Not this tracker's job to resolve, only to track. |
-| Environment configuration | INCOMPLETE | `NEEDS FIX` | Email + Sentry + SMS all done now. What's left is go-live-only: 7 `requiredWhenLive` vars (Netcash × 4, `NEXTAUTH_URL`, `ADMIN_WHATSAPP_NUMBER`, `SUPPORT_EMAIL`) are completely unset — real blocker for flipping `DEPLOY_ENV=production`, not urgent while staying on `DEPLOY_ENV=staging`. |
+| Payment/financial integration | UNDER ONBOARDING/FINALIZATION | `BLOCKED` | **UPDATE 2026-08-29:** the Netcash registration form itself is now submitted (owner completed it after a full section-by-section review caught and fixed 2 real errors — a postal-city typo and the bank dropdown stuck on "Other" instead of "Capitec Business"). Netcash confirmed receipt by email same day. Vetting is now entirely on their side — see [[project-netcash-critical-path]]; NASASA still silent. Not this tracker's job to resolve, only to track. |
+| Environment configuration | INCOMPLETE | `NEEDS FIX` | Email + Sentry + SMS all done now. **UPDATE 2026-08-29:** 3 of the 7 `requiredWhenLive` vars are now set on `xkimi-xa-mali-web` (`NEXTAUTH_URL=https://member.xkimixamali.co.za`, `ADMIN_WHATSAPP_NUMBER=27810780859`, `SUPPORT_EMAIL=xkimxamali@gmail.com`) — all had known-correct values already established elsewhere in the project, they just hadn't been set on this specific Vercel project. Redeployed and confirmed live. **Still genuinely unset**: the 4 Netcash-specific vars (`NETCASH_SERVICE_KEY`, `NETCASH_API_URL`, `NETCASH_WEBHOOK_SECRET`, `NETCASH_DEBICHECK_TEMPLATE_ID`) — these only exist once Netcash's onboarding issues them, not something fillable from memory. Real blocker for flipping `DEPLOY_ENV=production` remains, not urgent while staying on `DEPLOY_ENV=staging`. |
 | Performance branches | UNSTABLE | `MOOT` | Neither branch exists. |
 | Security hotfix | PATCHED — REQUIRES VERIFICATION | `PASSED` | Fully verified this session, all 8 sub-items, plus a proven-working regression test added so it can't silently regress. |
 | Monitoring | INCOMPLETE | `IN PROGRESS` | Capturing works; alerting rules and the "no sensitive data in logs" check not yet done. |
 
 **Overall: still not fully production-ready**, same conclusion as the
-original audit — but the reasons have moved again. The domain/DNS/deployment
-picture is solid, and BulkSMS is now genuinely configured and working (not
-just "account created" — proven past credential validation with a real
-send). What's actually left: the registrar verification (§2.2, urgent),
-Netcash's own vetting (external, out of this tracker's control,
-[[project-netcash-critical-path]]), the 7 missing go-live env vars above
-(needed before `DEPLOY_ENV=production` can be flipped), a BulkSMS credit
-top-up before the 115-row SMS backlog can be retried, and a handful of
-individually-unverified checklist items that are cheap to close once picked
-up.
+original audit — but the reasons have moved again, and moved further this
+close-of-session (2026-08-29 night). The domain/DNS/deployment picture is
+solid, BulkSMS is genuinely configured and working (not just "account
+created" — proven past credential validation with a real send), the Netcash
+registration form is **submitted** (vetting now on their side, nothing left
+to do here), and 3 of the 7 go-live env vars are now set and live. A **full
+system integration sweep** (all 3 apps' health endpoints, deployment status,
+CI, Sentry, login pages, and a role-separation/data-isolation code audit)
+found nothing broken and nothing regressed by any of this session's changes
+— see the "Final integration sweep, 2026-08-29" note below. What's actually
+left: the registrar verification (§2.2, urgent), Netcash's own vetting
+(external, out of this tracker's control, [[project-netcash-critical-path]]),
+the 4 remaining Netcash-issued env vars (can't be filled until Netcash
+approves the account), a BulkSMS credit top-up before the 115-row SMS
+backlog can be retried, and a handful of individually-unverified checklist
+items that are cheap to close once picked up.
+
+### Final integration sweep, 2026-08-29 — everything healthy
+
+Ran a full cross-app health check after the env var and Netcash-form work
+above, specifically to confirm nothing broke before closing out the session:
+
+- **All 3 production domains**: `member.xkimixamali.co.za` (200,
+  `/api/v1/health` → `db/redis/jobs: ok`), `admin.xkimixamali.co.za`
+  (unauthenticated root correctly redirects same-domain to `/login`, not the
+  old stale `vercel.app` URL), `xkimixamali.co.za` + `www` (200). Login
+  pages for both member and admin apps visually confirmed rendering
+  correctly.
+- **All 3 Vercel projects' latest production deployments**: `READY`
+  (checked via the Vercel API directly — the deployments-list UI page has a
+  known rendering bug in this session, documented in
+  [[project-deployment-phase]], don't fight it, use the API).
+- **CI on `main`**: green, last 5 runs all `success`. Working tree clean,
+  no uncommitted changes.
+- **Sentry**: 3 unresolved issues surfaced in the last 24h, all confirmed
+  historical rather than ongoing — a Resend rate-limit spike from the
+  morning's notification-recovery run (single burst, flat since) and a
+  "BulkSMS credentials not configured" error whose last occurrence (13h ago)
+  predates the BulkSMS credential fix (10h ago) landing. All 3 resolved in
+  Sentry.
+- **Role separation & member data isolation** (owner explicitly asked for
+  this check before calling the session done): verified directly in code,
+  not just re-cited from a prior audit. `apps/admin/lib/auth.ts`'s
+  `authorize()` explicitly rejects a correct password on a non-ADMIN account
+  before any session is issued — a member cannot sign into the admin
+  console. `apps/admin/lib/admin-action.ts`'s `requireAdmin()` re-checks the
+  ADMIN role against the live database on every single admin server action,
+  independent of the session token, so a revoked admin role takes effect
+  immediately. An admin *can* sign into the member app — by design, since
+  the founder/admin is also a stokvel member, not a separate account.
+  Member-to-member data isolation runs through one centralized
+  `assertCanAccess(targetUserId, requesterId, requesterRoles)` in
+  `apps/web/lib/authorization.ts`, traced through every member-facing
+  service (profile, contributions, bank accounts, statement PDFs, exports)
+  — a member requesting another member's `id` gets a 403. Matches and
+  reconfirms document 1 §6's existing "20/20 member `:id` routes scope to
+  session user" finding, now re-verified against current code rather than
+  just cited.
