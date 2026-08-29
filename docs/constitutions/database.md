@@ -18,7 +18,9 @@
 [DB-D05]  Every table has createdAt (default now()). Tables with mutable
           records also have updatedAt (auto-updated via Prisma @updatedAt).
 
-[DB-D06]  Surrogate UUID primary keys (cuid()) on all tables.
+[DB-D06]  Surrogate cuid() primary keys on all tables — not UUID; cuid was
+          chosen specifically for its monotonic prefix (sequential inserts
+          avoid B-tree fragmentation) and embedded rough timestamp.
           No natural key as PK (email, phone, ID number are never PKs).
 
 [DB-D07]  Lookup/reference tables for any value that could expand:
@@ -37,7 +39,11 @@
           Reversals create a new Transaction record of type REVERSAL.
           No UPDATE or DELETE on transactions table except status progression.
 
-[DB-D11]  Soft deletes on User (status = SUSPENDED/DELETED).
+[DB-D11]  Soft deletes on User via a separate deletedAt timestamp column —
+          there is no DELETED value in UserStatus (which is PENDING,
+          ACTIVE, SUSPENDED, RESIGNED). A member who chooses to leave sets
+          resignedAt and moves to RESIGNED, keeping full history and login
+          access; deletedAt is the POPIA-erasure path, distinct from that.
           Hard delete only after 90-day retention window.
           Financial records (Contribution, Transaction) retained 5 years.
 

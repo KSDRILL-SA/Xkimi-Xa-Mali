@@ -86,9 +86,11 @@ flowchart TD
 
 ## Component Structure
 
+**Not shadcn/ui** — `@xxm/ui` (`packages/ui/`) is a hand-built component library shared across all 3 apps, not a copy-pasted shadcn primitive set. Roughly 26 components (Button, Card, DataTable, Dropdown, Toast, Stepper, Reveal, and more).
+
 ```
 components/
-  ui/                     — shadcn/ui primitives (Button, Input, Card, etc.)
+  ui/                     — thin app-local wrappers, if any; primitives live in @xxm/ui
   layout/
     Header.tsx
     Sidebar.tsx
@@ -114,49 +116,39 @@ components/
 
 ## Design Tokens
 
-Tokens are defined once in `tailwind.config.ts` and mirrored as CSS custom properties in `app/globals.css`. Tailwind utilities reference the config; custom CSS references the CSS vars. Both stay in sync from the single source of truth.
+Tokens are defined **once, shared**, in `packages/config/tailwind/base.ts` (`@xxm/config/tailwind`) — every app's `tailwind.config.ts` just imports `baseConfig` from it, rather than each app maintaining its own palette. **Updated 2026-08-30**: the version previously here (a flat 7-color list: `xxm-green`, `xxm-gold`, `xxm-light`, plus 4 semantic colors) undercounted the real system and named at least one token, `xxm-light`, that doesn't exist as such anymore — it's `xxm-green.50` now, a shade within a scale rather than its own name. None of the 4 semantic names (`success`/`warning`/`danger`/`info`) exist in the current config or in `globals.css` either.
 
-**tailwind.config.ts**
-```javascript
-// Brand colours
-'xxm-green':  '#1B4332'   // deep green — wealth
-'xxm-gold':   '#D4AF37'   // gold — prosperity
-'xxm-light':  '#F0FDF4'   // light green tint — backgrounds
+**The real palette, from `packages/config/tailwind/base.ts` directly** — 5 color families, most with a full shade scale, not flat single values:
 
-// Semantic
-'success': '#16A34A'
-'warning': '#D97706'
-'danger':  '#DC2626'
-'info':    '#2563EB'
-```
-
-**app/globals.css** (mirrored as CSS vars for custom CSS use)
-```css
-:root {
-  --xxm-green:   #1B4332;
-  --xxm-gold:    #D4AF37;
-  --xxm-light:   #F0FDF4;
-  --success:     #16A34A;
-  --warning:     #D97706;
-  --danger:      #DC2626;
-  --info:        #2563EB;
+```typescript
+export const xxmColors = {
+  'xxm-green':     { DEFAULT: '#1B4332', 50: '#F0FDF4', ..., 950: '#052E16' }, // 11 shades
+  'xxm-canopy':    { DEFAULT: '#2C5F47', light: '#3A7A5C', dark: '#1E4030' },
+  'xxm-gold':      { DEFAULT: '#D4AF37', 50: '#FEFCE8', 100: '#FEF9C3', 200: '#FEF08A', light: '#F0D060', dark: '#A88828', deep: '#8A6F20' },
+  'xxm-champagne': { DEFAULT: '#F5F0E6', 50: '#FDFBF7', 100: '#FAF6EE', 200: '#F5F0E6', 300: '#EDE4D2', 400: '#DDD3BA' },
+  'xxm-gray':      { 50: '#F9FAFB', ..., 900: '#111827' }, // 10 shades
 }
 ```
 
-**Usage rule:**
-- Tailwind utility → `className="bg-xxm-green text-xxm-gold"`
-- Custom CSS → `background: var(--xxm-green)`
-- Raw hex in either → not allowed
+The two anchor colors (`xxm-green` DEFAULT `#1B4332`, `xxm-gold` DEFAULT `#D4AF37`) are unchanged from the original palette — those two facts in the previous version of this doc were still correct.
+
+**Usage rule, unchanged:**
+- Tailwind utility → `className="bg-xxm-green text-xxm-gold"` (or a shade: `bg-xxm-green-100`)
+- Raw hex anywhere in app code → not allowed; add a token instead
 
 ## Currency Formatting
 
+Defined once, shared: `packages/utils/src/formatters.ts` (`@xxm/utils`), not per-app. `apps/web/lib/formatters.ts` is a thin re-export, not its own implementation.
+
 ```typescript
-// lib/formatters.ts
-export const formatZAR = (amount: number | Decimal) =>
-  new Intl.NumberFormat('en-ZA', {
+// packages/utils/src/formatters.ts
+/** Accepts plain numbers, strings, or Prisma Decimal-like values. */
+export function formatZAR(amount: number | string | { toString(): string }): string {
+  return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
     currency: 'ZAR',
   }).format(Number(amount))
+}
 
 // Usage: formatZAR(contribution.amountDue) → "R 100,00"
 ```
