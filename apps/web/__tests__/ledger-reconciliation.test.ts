@@ -114,6 +114,32 @@ describe('executeLedgerReconciliation — correcting drift', () => {
     expect(alert.payload).toMatchObject({ drifted: 2, corrected: 2, netDrift: 100 })
   })
 
+  /**
+   * Real bug, found while auditing this job for §14.g (production-readiness
+   * tracker, "correct decimal/monetary representation"): `drift` and
+   * `netDrift` were raw `a - b` / reduce-`+` on rand amounts, bypassing this
+   * codebase's own documented rule (apps/web/lib/money.ts) that chained JS
+   * arithmetic on money must go through `subtractZAR`/`sumZAR` to avoid
+   * accumulating binary-float dust. `10.20 - 10.10` in raw JS is
+   * `0.09999999999999964`, not `0.1` — exactly the shape of value this alert
+   * writes into an audit log and a critical SMS.
+   */
+  it('reports drift and net drift as clean rand values, not raw float dust', async () => {
+    mocks.queryRaw.mockResolvedValue([
+      { id: 'c1', recorded: 10.10, actual: 10.20 },
+      { id: 'c2', recorded: 5.10, actual: 5.20 },
+    ])
+
+    await executeLedgerReconciliation(freshStep)
+
+    expect(mocks.writeAuditLog).toHaveBeenNthCalledWith(1,
+      expect.objectContaining({ payload: expect.objectContaining({ drift: 0.1 }) }),
+    )
+    const alert = mocks.raiseAlert.mock.calls[0][0]
+    expect(alert.payload.netDrift).toBe(0.2)
+    expect(alert.body).toContain('R0.20')
+  })
+
   it('does nothing but the backfill when the books agree', async () => {
     const summary = await executeLedgerReconciliation(freshStep)
 

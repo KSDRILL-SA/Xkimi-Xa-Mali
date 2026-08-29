@@ -4,6 +4,7 @@ import { contributionRepo } from '@/repositories/contribution.repository'
 import { assertCanAccess, assertAdmin } from '@/lib/authorization'
 import { logger } from '@xxm/observability'
 import { queueNotification } from './notification.service'
+import { sumZAR, roundZAR } from '@/lib/money'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -58,8 +59,17 @@ async function calculateMetrics(userId: string): Promise<BadgeMetrics> {
   ).length
 
   const paidAmounts = paid.map((c) => Number(c.amountPaid)).filter((a) => a > 0)
+  // Raw `reduce` on rand amounts here used to bypass this codebase's own
+  // documented money-arithmetic rule (apps/web/lib/money.ts) — found while
+  // auditing that rule elsewhere (docs/production-readiness/
+  // 01-financial-integration-test-plan.md §14.g). Not purely cosmetic: this
+  // value is displayed to the member as currency on the badges page
+  // (`formatZAR(badge.avgContribution)`) and feeds `generosityScore`, which
+  // is part of the formula that decides a member's actual badge tier —
+  // `sumZAR`/`roundZAR` keep it free of binary-float dust the same way every
+  // other money computation in this codebase already is.
   const avgContribution = paidAmounts.length > 0
-    ? paidAmounts.reduce((sum, a) => sum + a, 0) / paidAmounts.length
+    ? roundZAR(sumZAR(...paidAmounts) / paidAmounts.length)
     : 0
 
   // Walk chronologically: an on-time paid month extends the streak, a still-pending
