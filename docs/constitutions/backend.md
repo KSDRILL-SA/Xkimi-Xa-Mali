@@ -42,8 +42,12 @@
 [BACKEND-B11]  Transactions (DB) used for any multi-table write.
                Partial writes are a data integrity failure.
 
-[BACKEND-B12]  All financial amounts handled as Decimal (not float).
-               No floating-point arithmetic on money values.
+[BACKEND-B12]  All financial amounts stored as Postgres Decimal, never
+               Float. In application code, money crosses into a plain JS
+               number at the service boundary — the rule is that every
+               chained arithmetic op on it goes through the rounding
+               helpers in apps/web/lib/money.ts (roundZAR/sumZAR/
+               subtractZAR), never raw +/-/*. See database/03-schema-design.md.
 
 [BACKEND-B13]  Strategy pattern for any operation with variants
                (payment methods, notification channels, exporters).
@@ -86,63 +90,51 @@ flowchart TD
 
 ## Service Layer Structure
 
-```
-services/
-  auth.service.ts           — registration, login, password, POPIA consent
-  member.service.ts         — profile management, bank accounts
-  mandate.service.ts        — debit order creation, updates, delay requests
-  contribution.service.ts   — monthly records, manual payments, status updates
-  transaction.service.ts    — transaction creation, gateway submission, reversals
-  notification.service.ts   — channel routing, template rendering, delivery
-  goal.service.ts           — goal CRUD, locking, progress tracking
-  statement.service.ts      — PDF generation, Blob storage, signed URLs
-  admin.service.ts          — reporting, member management, audit access
-  audit.service.ts          — audit log writes (called by all other services)
-```
+> **Updated 2026-08-30** — the list below named 10 services, 2 of which
+> (`transaction.service.ts`, `statement.service.ts`) no longer exist under
+> those names, and it was missing the other ~19. `apps/web/services/`
+> actually has **29** files as of this writing; the full current list with
+> one-line descriptions lives in
+> [../architecture/03-component-architecture.md](../architecture/03-component-architecture.md)
+> rather than duplicated here, specifically so this doesn't go stale the
+> same way again the next time a service is added. The structural rule
+> stands regardless of the exact count: **all business logic lives in
+> `services/*.service.ts`**, one file per bounded concern.
 
 ## Error Codes
 
+> **Updated 2026-08-30** — the code list previously here was substantially
+> wrong: wrong prefix for bank-account errors (`BANK_*` vs. the real
+> `BNK_*`), auth codes that don't exist as such (`AUTH_002`/`AUTH_003` are
+> actually raw NextAuth error strings like `EMAIL_NOT_VERIFIED`, not
+> `AppError` codes), and roughly 15 whole domains missing entirely
+> (invites, reports, admin, community messages, budgets, signatures,
+> external-service errors). **The source of truth is
+> `apps/web/lib/errors.ts`** — read it directly rather than trust a copy
+> here; a list this size re-drifts the moment one class is added. The
+> pattern it follows, which *is* stable and worth keeping in a doc:
+
 ```typescript
-export const ErrorCodes = {
-  // Auth
-  AUTH_INVALID_CREDENTIALS:    'AUTH_001',
-  AUTH_EMAIL_NOT_VERIFIED:     'AUTH_002',
-  AUTH_ACCOUNT_SUSPENDED:      'AUTH_003',
-  AUTH_TOKEN_EXPIRED:          'AUTH_004',
+// Base class every domain error extends
+export class AppError extends Error {
+  constructor(message: string, public readonly code: string, public readonly status: number) { ... }
+}
 
-  // Members
-  MEMBER_NOT_FOUND:            'MBR_001',
-  MEMBER_ALREADY_EXISTS:       'MBR_002',
-  MEMBER_SUSPENDED:            'MBR_003',
+// One convention per HTTP shape — domains extend these, not AppError directly
+export class NotFoundError extends AppError { constructor(message, code) { super(message, code, 404) } }
+export class ConflictError extends AppError { constructor(message, code) { super(message, code, 409) } }
+export class ValidationError extends AppError { constructor(message, code = 'VAL_001') { super(message, code, 422) } }
 
-  // Bank accounts
-  BANK_ACCOUNT_NOT_FOUND:      'BANK_001',
-  BANK_ACCOUNT_HAS_MANDATE:    'BANK_002',
-  BANK_ACCOUNT_INVALID:        'BANK_003',
-
-  // Mandates
-  MANDATE_NOT_FOUND:           'MND_001',
-  MANDATE_ALREADY_ACTIVE:      'MND_002',
-  MANDATE_MINIMUM_AMOUNT:      'MND_003',
-  MANDATE_DELAY_WINDOW_CLOSED: 'MND_004',
-
-  // Contributions
-  CONTRIBUTION_NOT_FOUND:      'CTR_001',
-  CONTRIBUTION_ALREADY_PAID:   'CTR_002',
-
-  // Transactions
-  TRANSACTION_DUPLICATE:       'TXN_001',
-  TRANSACTION_GATEWAY_ERROR:   'TXN_002',
-
-  // Goals
-  GOAL_NOT_FOUND:              'GOL_001',
-  GOAL_ALREADY_LOCKED:         'GOL_002',
-
-  // System
-  VALIDATION_ERROR:            'SYS_001',
-  UNAUTHORISED:                'SYS_002',
-  FORBIDDEN:                   'SYS_003',
-  INTERNAL_ERROR:              'SYS_004',
-  RATE_LIMITED:                'SYS_005',
-} as const
+// Domain prefix + sequential number, e.g.:
+export class MemberNotFoundError extends NotFoundError {
+  constructor() { super('Member not found', 'MBR_001') }
+}
 ```
+
+`SYS_*` is reserved for cross-cutting concerns, not a domain: `SYS_002`
+unauthorised, `SYS_003` forbidden, `SYS_005` rate-limited, `SYS_006`
+session expired (stale role version), `SYS_007` CSRF origin mismatch,
+`SYS_008` refused for membership standing (a resigned member's
+state-changing write) — the last three didn't exist when this doc was
+first written and were added alongside the security mechanisms they
+represent.

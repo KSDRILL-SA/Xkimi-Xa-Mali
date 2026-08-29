@@ -61,9 +61,11 @@ flowchart TD
            Auth endpoints: 5 req/min per IP.
            General endpoints: 60 req/min per IP.
 
-[SEC-S06]  Webhook endpoints verified by HMAC signature only.
+[SEC-S06]  Webhook endpoints verified by HMAC signature (Netcash) or an
+           IP allowlist alone where the provider doesn't sign payloads
+           (BulkSMS delivery receipts — documented as IP-only in the
+           handler itself, not an oversight).
            Session cookies on webhook endpoints → 403.
-           IP allowlist for Netcash webhooks.
 
 [SEC-S07]  Password reset always returns HTTP 200 regardless of email existence.
            No user enumeration through auth endpoints.
@@ -92,7 +94,13 @@ flowchart TD
            dangerouslySetInnerHTML is banned without explicit review.
            Content-Security-Policy header configured.
 
-[SEC-S15]  Financial amounts validated server-side for minimum (R100)
-           and maximum (configurable per mandate) on every payment request.
-           Client-side validation is UX only — never trusted.
+[SEC-S15]  Financial amounts validated server-side on every payment
+           request; client-side validation is UX only — never trusted.
+           The minimum is min(R100, whatever remains owed on the period),
+           not a flat R100 floor — a flat floor was a real, shipped bug
+           (2026-08-29) that made the *last* partial payment of a period,
+           or any payment on a period already partly paid, impossible to
+           submit. A floor that ignores what's still due is the bug this
+           rule exists to prevent recurring, not the rule itself.
+           Maximum is configurable per mandate.
 ```

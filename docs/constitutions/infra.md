@@ -3,8 +3,10 @@
 ## Rules
 
 ```
-[INFRA-I01]  Every service exposes GET /api/health.
-             Returns { status, db, redis, ts } with appropriate HTTP status.
+[INFRA-I01]  Every service exposes GET /api/v1/health (not /api/health —
+             corrected 2026-08-30, the version segment was missing).
+             Returns { status, checks: { db, redis, jobs }, ts } with
+             appropriate HTTP status.
              This endpoint is public (L0) and never requires auth.
 
 [INFRA-I02]  All environment config validated at startup with t3-env.
@@ -34,12 +36,19 @@
              Preview environments use Neon branch databases (isolated from production).
              Preview environments are ephemeral — cleaned up on PR close.
 
-[INFRA-I09]  Sentry configured for error tracking on all environments.
-             Source maps uploaded on production deploys.
-             Release tracking enabled.
+[INFRA-I09]  Sentry configured for error tracking — updated 2026-08-30 for
+             accuracy: `apps/web` and `apps/admin` each have their own
+             Sentry project; `apps/website` has none. Source maps are
+             NOT currently uploaded on production deploys — SENTRY_AUTH_TOKEN
+             was deliberately left unset (no Sentry API token created yet);
+             error capture itself still works without it, but a stack
+             trace in Sentry shows minified code until this is set up.
 
-[INFRA-I10]  Better Stack uptime monitor on /api/health.
-             Alert channel: email to admin. SLA target: 99.5%.
+[INFRA-I10]  Uptime monitoring on /api/v1/health — planned, not yet built.
+             A previous version of this rule named Better Stack as if it
+             were already wired up; no such dependency exists in the repo
+             as of 2026-08-30. Whichever service is eventually set up,
+             point it here and assert on `checks.jobs === "ok"`.
 ```
 
 ---
@@ -104,8 +113,8 @@ flowchart LR
 
     subgraph PROD["Production"]
         VPROD["Vercel — 3 projects<br/>web / admin / website"]
-        NEON["Neon production<br/>pooled connection"]
-        UPS["Upstash pro<br/>rate limit + cache"]
+        NEON["Neon 'staging' branch — the real one,<br/>see the naming trap in 04-infrastructure-deployment.md<br/>pooled connection"]
+        UPS["Upstash free tier<br/>rate limit + cache — one Redis DB per account"]
         VPROD --- NEON & UPS
     end
 
@@ -124,8 +133,13 @@ flowchart LR
 DATABASE_URL=postgresql://...?pgbouncer=true&connect_timeout=15
 
 # Auth
-NEXTAUTH_SECRET=           # random 32-char string
-NEXTAUTH_URL=              # http://localhost:3000 locally
+AUTH_SECRET=               # random 32-char string — NextAuth v5 renamed this
+                           # from v4's NEXTAUTH_SECRET; the old name is not read
+NEXTAUTH_URL=              # http://localhost:3000 locally; each app's own prod URL
+ADMIN_API_SECRET=          # shared verbatim between apps/web and apps/admin —
+                           # authenticates the admin app's trusted server-to-server
+                           # calls into apps/web's /api/v1/admin/* routes
+WEB_INTERNAL_URL=          # apps/admin's base URL for calling into apps/web
 
 # Encryption (AES-256-GCM key)
 ENCRYPTION_KEY=            # 32-byte hex string — never commit
@@ -162,4 +176,16 @@ SENTRY_AUTH_TOKEN=
 ENABLE_MANUAL_PAYMENTS=true
 ENABLE_GOAL_LOCKING=true
 WHATSAPP_GROUP_LINK=https://chat.whatsapp.com/...
+
+# The go-live switch — added here 2026-08-30, previously undocumented in
+# this reference despite being one of the most consequential vars in the
+# system
+DEPLOY_ENV=                # staging | production — gates which env vars
+                           # env.ts treats as required (`requiredWhenLive`)
+                           # and, independently, whether selectGateway() will
+                           # ever pick the real Netcash gateway over mock.
+                           # Flipping this without the 4 NETCASH_* vars in
+                           # place fails loud at deploy time, by design.
+SUPPORT_EMAIL=              # member-facing support contact
+ADMIN_WHATSAPP_NUMBER=      # E.164-ish, no + — e.g. 27810780859
 ```
