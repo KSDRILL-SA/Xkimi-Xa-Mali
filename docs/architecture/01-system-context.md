@@ -13,34 +13,55 @@ The system boundary: who uses XXM and every external system it depends on. Audie
 
 ## Context
 
+**Not one app — three, each its own Vercel deployment**, sharing one
+database and one set of internal packages. Prior versions of this diagram
+showed a single "Next.js platform" box; that stopped being accurate once
+`apps/admin` and `apps/website` became separate deployments
+(`admin.xkimixamali.co.za`, `xkimixamali.co.za`) rather than routes inside
+`apps/web`.
+
 ```mermaid
 flowchart TB
     MEMBER["Member<br/>views dashboard, manages<br/>mandate, tracks contributions"]
-    ADMIN["Admin (dual role)<br/>oversees members, goals,<br/>reports, ledger, audit"]
+    ADMIN["Admin (dual role — also a Member)<br/>oversees members, goals,<br/>reports, ledger, audit"]
+    PUBLIC["Public visitor<br/>marketing site, WhatsApp join link"]
 
-    subgraph XXM["Xkimi Xa Mali Foundation — Vercel"]
-        APP["Next.js 15 platform<br/>member portal · admin · API<br/>scheduled payment pipeline"]
+    subgraph XXM["Xkimi Xa Mali Foundation — 3 Vercel projects"]
+        WEBAPP["apps/web — Next.js 16<br/>member portal · REST API<br/>payment pipeline · Inngest webhook<br/>member.xkimixamali.co.za"]
+        ADMINAPP["apps/admin — Next.js 16<br/>admin console<br/>admin.xkimixamali.co.za"]
+        SITEAPP["apps/website — Next.js 16<br/>public marketing site<br/>xkimixamali.co.za + www"]
     end
 
     NETCASH["Netcash<br/>DebiCheck mandates<br/>recurring debits · webhooks"]
     BULKSMS["BulkSMS<br/>warnings · reminders · receipts"]
     RESEND["Resend<br/>verification · receipts · statements"]
-    NEON[("Neon PostgreSQL 16<br/>primary store · branching · backups")]
+    NEON[("Neon PostgreSQL<br/>primary store · branching · backups")]
     UPSTASH["Upstash Redis<br/>idempotency · rate limit · cache"]
     INNGEST["Inngest<br/>durable jobs · retries · history"]
-    BLOB["Vercel Blob<br/>signed-URL PDF statements"]
+    BLOB["Vercel Blob<br/>private-access PDF statements"]
+    SENTRY["Sentry<br/>error tracking, web + admin"]
 
-    MEMBER & ADMIN -->|HTTPS session| APP
-    APP -->|mandate + debit API| NETCASH
-    NETCASH -->|HMAC webhooks| APP
-    APP -->|REST| BULKSMS & RESEND
-    BULKSMS -->|delivery receipts| APP
-    APP -->|Prisma / pooler| NEON
-    APP -->|REST| UPSTASH
-    APP -->|publish + trigger| INNGEST
-    INNGEST -->|signed webhook| APP
-    APP -->|upload + fetch| BLOB
+    MEMBER -->|HTTPS session| WEBAPP
+    ADMIN -->|HTTPS session| ADMINAPP
+    PUBLIC -->|HTTPS, no auth| SITEAPP
+    ADMINAPP -->|server-to-server, ADMIN_API_SECRET| WEBAPP
+    WEBAPP -->|mandate + debit API| NETCASH
+    NETCASH -->|HMAC webhooks| WEBAPP
+    WEBAPP -->|REST| BULKSMS & RESEND
+    BULKSMS -->|delivery receipts| WEBAPP
+    WEBAPP & ADMINAPP -->|Prisma / pooler| NEON
+    WEBAPP & ADMINAPP -->|REST| UPSTASH
+    WEBAPP -->|publish + trigger| INNGEST
+    INNGEST -->|signed webhook| WEBAPP
+    WEBAPP -->|upload + fetch| BLOB
+    WEBAPP & ADMINAPP -->|exceptions| SENTRY
 ```
+
+Every app shares the same `packages/database` Prisma schema and the same
+`packages/utils`/`packages/ui`/`packages/observability` internal libraries
+— there is one data model and one set of business-rule helpers, not three
+copies. See [02-container-architecture.md](./02-container-architecture.md)
+for how the shared-package layer fits in.
 
 ---
 
@@ -80,10 +101,11 @@ flowchart TD
 
 | System | Protocol | Auth | Failure impact |
 |---|---|---|---|
-| Netcash (debit + webhook) | SOAP/REST + webhook | Service key · HMAC-SHA256 | No debit operations / status sync |
-| BulkSMS | REST + webhook | Basic auth · IP allowlist | No SMS / no receipts |
+| Netcash (debit + webhook) | SOAP 1.1 (hand-written client against the published WSDL) + HMAC webhook | Service key · HMAC-SHA256 + IP allowlist | No debit operations / status sync |
+| BulkSMS | REST/JSON + webhook | Basic auth · IP allowlist | No SMS / no receipts |
 | Resend | REST | API key | No email |
 | Neon | TCP via pgbouncer | TLS string | Full outage |
 | Upstash | REST | Bearer | Rate limit + idempotency disabled |
 | Inngest | Webhook | Signing key (HMAC) | Jobs paused |
-| Vercel Blob | REST | Bearer | PDFs unavailable |
+| Vercel Blob | REST | Bearer | PDFs unavailable (private access — not a public CDN URL) |
+| Sentry | HTTPS event ingest | DSN (public by design) | Errors go uncaptured, app itself unaffected |

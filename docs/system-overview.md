@@ -19,16 +19,26 @@ The whole system on one page. Deeper detail lives in [requirements](./requiremen
 
 ### Stack at a glance
 
+*(full detail, every package and version, in
+[architecture/02-container-architecture.md](./architecture/02-container-architecture.md)
+and [architecture/03-component-architecture.md](./architecture/03-component-architecture.md);
+this table is the one-line summary)*
+
 | Layer | Tech | Why |
 |---|---|---|
-| Framework | Next.js 15 App Router | UI + API + jobs in one deployment |
+| Apps | 3 × Next.js 16, App Router (`web`, `admin`, `website`) | One deployment per audience — a member session can never reach admin code, and the public site ships with zero database/auth/payment dependencies at all |
+| Shared code | `@xxm/database`, `@xxm/utils`, `@xxm/ui`, `@xxm/observability`, `@xxm/types`, `@xxm/config` — npm workspace packages, consumed as TS source (no build step) | One Prisma schema, one set of money/date/validation helpers, one component library — not re-implemented per app |
 | Database | PostgreSQL / Neon · Prisma 6 | ACID — non-negotiable for money |
-| Auth | NextAuth v5 · JWT cookies | No `localStorage` token exposure |
-| Payments | Netcash DebiCheck/NAEDO | SA-native recurring debit |
-| Jobs | Inngest | Durable + retryable ([ADR-002](./adr/002-inngest-job-engine.md)) |
+| Auth | NextAuth v5 (beta) · JWT cookies, `@auth/prisma-adapter` | No `localStorage` token exposure |
+| Validation | Zod, same schema on client (React Hook Form) and server | A malformed request is rejected at the edge, never reaches a service |
+| Payments | Netcash DebiCheck — a hand-written SOAP 1.1 client against Netcash's own WSDL, not REST | SA-native recurring debit ([ADR-001](./adr/001-netcash-over-payfast.md)) |
+| Jobs | Inngest, 22 functions | Durable + retryable ([ADR-002](./adr/002-inngest-job-engine.md)) |
 | Cache / limits | Upstash Redis | Serverless sliding windows |
-| SMS · Email · Files | BulkSMS · Resend · Vercel Blob | |
-| Monitoring | Sentry + Better Stack | Errors + uptime |
+| SMS · Email · Files | BulkSMS (REST/JSON) · Resend · Vercel Blob (private access) | |
+| PDF generation | `@react-pdf/renderer`, `apps/web` only | Statements, contribution reports, the founder guide |
+| Testing | Vitest everywhere; `apps/website` also has React Testing Library + `happy-dom` for component tests | The only app with DOM-level component tests — the other two test services/routes, not rendered output |
+| Error tracking | Sentry — `web` and `admin` each have their own project; `website` has none | |
+| Uptime monitoring | **Planned, not built.** No such dependency exists in the repo yet — do not assume it's live from an older doc mentioning it | |
 
 ---
 
@@ -195,6 +205,6 @@ flowchart LR
 
 **Key constraints:** `UNIQUE(userId, periodMonth, periodYear)` on Contribution (no double-billing) · `UNIQUE(idempotencyKey)` on Transaction (no double-charge) · `UNIQUE(refType, refId, direction)` on LedgerEntry (idempotent posting) · `UNIQUE(source, eventKey)` on ProcessedWebhookEvent (dedupe) · `Decimal(10,2)` on all money.
 
-**Environments:** Local (Neon dev branch, no Docker) → Preview (Neon PR branch, auto per PR) → Production (Neon pooled). **Monitoring:** Sentry (errors), Better Stack (uptime on `/health`), Vercel Analytics (Web Vitals), Inngest dashboard (jobs).
+**Environments:** Local (Neon dev branch, no Docker) → Preview (Neon PR branch, auto per PR) → Production (Neon `staging` branch — the real one, see [architecture/04-infrastructure-deployment.md](./architecture/04-infrastructure-deployment.md) for the naming trap). **Monitoring:** Sentry (errors, `web`+`admin`), Vercel Analytics (Web Vitals), Inngest dashboard (jobs). Uptime monitoring on `/health` is planned, not yet built — an earlier version of this line named Better Stack for it; nothing has actually been wired up.
 
 **Build status:** all 13 modules (M01–M12 + M11a) and Phase-2 hardening complete; Phase-3 backend (ledger, webhook dedupe, anomaly watch, insights, resilience) shipped. See [build-order.md](./build-order.md). Go-live steps: [../DEPLOYMENT.md](../DEPLOYMENT.md).

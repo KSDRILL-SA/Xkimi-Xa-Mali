@@ -302,7 +302,7 @@ SELECT email, status FROM users WHERE "passwordChangedAt" IS NULL AND "deletedAt
 
 | Tool | Check |
 |---|---|
-| Better Stack | `/api/v1/health` uptime, alert history |
+| *(uptime monitor — not yet set up, see note below)* | `/api/v1/health` uptime, alert history |
 | Sentry | errors by release, error-rate trends |
 | Inngest | job success/failure, retry depth |
 | Vercel / Neon | deploy status, function logs / pool usage, slow queries |
@@ -475,8 +475,10 @@ delivered to anybody at this moment — a window rather than a status. To find o
 *which* jobs, read the alert, the audit log, or `job_heartbeats`, all of which
 require being the operator.
 
-**Point the uptime monitor at it.** Better Stack already polls this endpoint;
-add a body assertion on `"jobs":"ok"`. A stale job deliberately **does not**
+**Point an uptime monitor at it.** No uptime monitor is set up yet as of
+2026-08-29 — this was previously written as if Better Stack were already
+polling this endpoint; it never was. Whichever service is set up, add a
+body assertion on `"jobs":"ok"`. A stale job deliberately **does not**
 return 503 — that status is read by hosting and failover tooling as "replace
 this instance", which is the wrong remedy for a stopped cron and would trade a
 working web app for no web app. The HTTP status stays tied to the database and
