@@ -153,9 +153,20 @@ export async function HeroSection() {
               which founder was showing, since the CTA-row fix above was tuned
               against only one of them. Scrolling sideways on mobile instead
               guarantees this block is always exactly one row tall, regardless
-              of the viewport or which of the four photos is up. */}
+              of the viewport or which of the four photos is up.
+
+              Same guarantee now applies at every breakpoint, not just mobile
+              — `md:flex-wrap` let the third pill (its label+sub text is the
+              longest of the three: "DebiCheck Mandates" / "Bank-authenticated")
+              wrap onto its own line at some in-between desktop widths, which
+              is the exact failure this comment already describes, just at a
+              different breakpoint: a pill sitting on a row by itself, out of
+              sync with the other two's shared `animate-float` phase because
+              it's no longer visually part of the same row at all. `flex-nowrap`
+              everywhere removes the condition that let it happen; `mt-2`
+              nudges the whole row down slightly, unrelated to that fix. */}
           <div
-            className="flex md:flex-wrap gap-3 overflow-x-auto md:overflow-visible -mx-4 px-4 md:mx-0 md:px-0 animate-fade-in-up"
+            className="flex flex-nowrap gap-3 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 mt-2 animate-fade-in-up"
             style={{ animationDelay: '1s' }}
           >
             {[
@@ -181,14 +192,32 @@ export async function HeroSection() {
             ].map(({ icon: Icon, label, sub }) => (
               <div
                 key={label}
+                // items-center here (not just on the row) so each pill's own
+                // icon+text is centered on ITS OWN box — doesn't depend on
+                // every pill in the row happening to end up the same height.
                 className="glass flex items-center gap-3 px-4 py-3 rounded-2xl shrink-0 animate-float"
               >
                 <div className="w-8 h-8 rounded-xl bg-xxm-gold/15 flex items-center justify-center shrink-0">
                   <Icon size={15} className="text-xxm-gold" aria-hidden />
                 </div>
-                <div>
-                  <p className="text-white text-sm font-bold leading-none">{label}</p>
-                  <p className="text-white/45 text-[11px] mt-0.5">{sub}</p>
+                {/*
+                  whitespace-nowrap on both lines: "DebiCheck Mandates" /
+                  "Bank-authenticated" is noticeably longer than the other two
+                  pills' text. If it ever wraps to a second line while its
+                  siblings stay single-line, that pill is a different height
+                  from the other two — and since animate-float's translateY
+                  bob is measured from each box's own resting position, a
+                  taller box's bob no longer lines up with its shorter
+                  siblings' even though all three share the identical
+                  keyframes. Forcing single-line removes the height variance
+                  at the source rather than trying to compensate for it after
+                  the fact — the row already scrolls horizontally
+                  (overflow-x-auto) on narrow screens, so a wider pill costs
+                  nothing.
+                */}
+                <div className="min-w-0">
+                  <p className="text-white text-sm font-bold leading-none whitespace-nowrap">{label}</p>
+                  <p className="text-white/45 text-[11px] mt-0.5 whitespace-nowrap">{sub}</p>
                 </div>
               </div>
             ))}

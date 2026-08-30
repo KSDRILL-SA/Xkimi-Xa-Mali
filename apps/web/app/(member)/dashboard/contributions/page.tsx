@@ -93,39 +93,47 @@ export default async function ContributionsPage({
   return (
     <div className="space-y-6">
 
-      {/* ── Header ─────────────────────────────────── */}
-      <Reveal variant="up" className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
-            <Wallet size={22} className="text-xxm-green" aria-hidden />
-          </div>
-          <div>
-            <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Contributions</h1>
-            <p className="text-sm text-xxm-gray-500 mt-1">Your monthly payment history and ledger.</p>
-          </div>
-        </div>
-        {hasOpen && (
-          <Button asChild className="shrink-0">
-            <Link href="/dashboard/contribute">Make a payment</Link>
-          </Button>
-        )}
-      </Reveal>
+      {/* ── Header + summary + group collection account: ONE Reveal ──── */}
+      {/* Round 4 merged the summary cards and the account box into one
+          Reveal (see the reasoning kept below) but left the header as its
+          own, separate, third Reveal right above them. Same mechanism,
+          different seam: the header and the summary cards sit close enough
+          together on a short mobile viewport that they cross the reveal
+          threshold within the same scroll/load moment, each with its own
+          IntersectionObserver and its own independently-settling
+          translateY transform — which is exactly what reads as a
+          torn/scratched line where the header meets the cards below it.
+          This is very likely why the page still "scratched" after Round 4
+          fixed the seam one row down: that fix was real, it just didn't
+          cover every boundary on the page.
 
-      {/* Summary + group collection account, one Reveal for both. */}
-      {/* These used to be two separate <Reveal> wrappers, even with an
-          identical `delay`. Each Reveal owns its own IntersectionObserver, so
-          "identical delay" only means the two transforms are scheduled the
-          same distance behind whenever *that element itself* crosses the
-          viewport threshold — not the same distance behind each other. On a
-          short mobile viewport the summary cards and the account box cross
-          that threshold at different scroll positions a frame or more apart,
-          so their translateY transitions still ended up landing at slightly
-          different times. Two adjacent rounded-corner boxes animating
-          transform independently and settling a few ms apart is exactly what
-          reads as a torn/scratched seam where they meet. One Reveal around
-          both means one observer, one transform, one settle — there is no
-          seam left to open. */}
-      <Reveal variant="up" delay={100} className="space-y-6">
+          Merging all three into one Reveal removes every remaining seam on
+          this page's initial load, not just the one between the cards and
+          the account box.
+
+          Original reasoning, still the mechanism at work: each Reveal owns
+          its own IntersectionObserver, so an identical `delay` between two
+          separate Reveals only means each transform is scheduled the same
+          distance behind *that element's own* threshold crossing — not the
+          same distance behind each other's. One Reveal, one observer, one
+          transform, one settle: there is no seam left to open. */}
+      <Reveal variant="up" className="space-y-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
+              <Wallet size={22} className="text-xxm-green" aria-hidden />
+            </div>
+            <div>
+              <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Contributions</h1>
+              <p className="text-sm text-xxm-gray-500 mt-1">Your monthly payment history and ledger.</p>
+            </div>
+          </div>
+          {hasOpen && (
+            <Button asChild className="shrink-0">
+              <Link href="/dashboard/contribute">Make a payment</Link>
+            </Button>
+          )}
+        </div>
         <ContributionSummaryCards summary={summary} />
         <GroupCollectionAccount />
       </Reveal>

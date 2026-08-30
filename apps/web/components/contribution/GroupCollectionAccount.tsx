@@ -19,22 +19,27 @@ export function GroupCollectionAccount({ compact = false }: { compact?: boolean 
         </div>
       </div>
 
+      {/* min-w-0 on every cell, same reason as SummaryCards.tsx: a
+          2-up grid on a narrow phone gives each cell ~150px, and
+          "Xkimi Xa Mali Foundation" plus a letter-spaced mono account
+          number are both wide enough to force the grid track past that —
+          stretching the whole card off-screen instead of wrapping. */}
       <div className={`grid ${compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'} gap-x-4 gap-y-3 px-4 py-3.5`}>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide">Account name</p>
-          <p className="text-sm font-bold text-xxm-green-900">{GROUP_ACCOUNT.accountName}</p>
+          <p className="text-sm font-bold text-xxm-green-900 break-words">{GROUP_ACCOUNT.accountName}</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide">Bank</p>
-          <p className="text-sm font-bold text-xxm-green-900">{GROUP_ACCOUNT.bankName}</p>
+          <p className="text-sm font-bold text-xxm-green-900 break-words">{GROUP_ACCOUNT.bankName}</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide">Account number</p>
-          <p className="text-sm font-bold text-xxm-green-900 font-mono tracking-wider">{GROUP_ACCOUNT.accountNumber}</p>
+          <p className="text-sm font-bold text-xxm-green-900 font-mono tracking-wider break-all">{GROUP_ACCOUNT.accountNumber}</p>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] text-xxm-gray-400 uppercase tracking-wide">Branch code</p>
-          <p className="text-sm font-bold text-xxm-green-900 font-mono tracking-wider">{GROUP_ACCOUNT.branchCode}</p>
+          <p className="text-sm font-bold text-xxm-green-900 font-mono tracking-wider break-all">{GROUP_ACCOUNT.branchCode}</p>
         </div>
       </div>
 
