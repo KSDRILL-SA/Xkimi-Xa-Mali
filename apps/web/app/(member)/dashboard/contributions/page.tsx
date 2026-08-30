@@ -91,45 +91,42 @@ export default async function ContributionsPage({
   )
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
 
-      {/* ── Header + summary + group collection account: ONE Reveal ──── */}
-      {/* Round 4 merged the summary cards and the account box into one
-          Reveal (see the reasoning kept below) but left the header as its
-          own, separate, third Reveal right above them. Same mechanism,
-          different seam: the header and the summary cards sit close enough
-          together on a short mobile viewport that they cross the reveal
-          threshold within the same scroll/load moment, each with its own
-          IntersectionObserver and its own independently-settling
-          translateY transform — which is exactly what reads as a
-          torn/scratched line where the header meets the cards below it.
-          This is very likely why the page still "scratched" after Round 4
-          fixed the seam one row down: that fix was real, it just didn't
-          cover every boundary on the page.
+      {/* ── Header + summary + group collection account: ONE Reveal ────
+          One `<Reveal>` for the whole block, not one per section. Each
+          Reveal owns its own IntersectionObserver, so adjacent Reveals
+          settle their transforms independently — a frame or two apart on a
+          slow phone, which reads as a torn seam where two sections meet.
+          One observer, one transform, one settle: no seam to open.
 
-          Merging all three into one Reveal removes every remaining seam on
-          this page's initial load, not just the one between the cards and
-          the account box.
-
-          Original reasoning, still the mechanism at work: each Reveal owns
-          its own IntersectionObserver, so an identical `delay` between two
-          separate Reveals only means each transform is scheduled the same
-          distance behind *that element's own* threshold crossing — not the
-          same distance behind each other's. One Reveal, one observer, one
-          transform, one settle: there is no seam left to open. */}
-      <Reveal variant="up" className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-xxm-green/10 flex items-center justify-center shrink-0">
-              <Wallet size={22} className="text-xxm-green" aria-hidden />
+          The other half of that bug lived in the children: cards and rows
+          declared `transition-all` next to a `hover:-translate-y`, which
+          arms a `transform` transition on every child while this ancestor
+          is animating one. Fixed in SummaryCards.tsx / ContributionRow.tsx
+          by transitioning only the properties that actually change. Both
+          halves had to go — that is why earlier passes at this did not
+          hold. */}
+      <Reveal variant="up" className="space-y-5 sm:space-y-6">
+        {/* Header stacks on mobile: at 360px a heading, a subtitle and a
+            button cannot share a row without the button crushing the text. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+          <div className="flex items-start gap-3 sm:gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-xxm-green/10 sm:h-12 sm:w-12">
+              <Wallet size={20} className="text-xxm-green sm:hidden" aria-hidden />
+              <Wallet size={22} className="hidden text-xxm-green sm:block" aria-hidden />
             </div>
-            <div>
-              <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Contributions</h1>
-              <p className="text-sm text-xxm-gray-500 mt-1">Your monthly payment history and ledger.</p>
+            <div className="min-w-0">
+              <h1 className="font-display text-xl font-extrabold tracking-tight text-xxm-green-900 sm:text-2xl">
+                Contributions
+              </h1>
+              <p className="mt-1 text-[13px] text-xxm-gray-500 sm:text-sm">
+                Your monthly payment history and ledger.
+              </p>
             </div>
           </div>
           {hasOpen && (
-            <Button asChild className="shrink-0">
+            <Button asChild className="w-full shrink-0 sm:w-auto">
               <Link href="/dashboard/contribute">Make a payment</Link>
             </Button>
           )}
@@ -140,13 +137,13 @@ export default async function ContributionsPage({
 
       {/* No active mandate warning */}
       {!mandateInfo && (
-        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
-          <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" aria-hidden />
-          <div>
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 sm:px-5 sm:py-4">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" aria-hidden />
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-amber-800">No active mandate</p>
-            <p className="text-xs text-amber-700 mt-0.5">
+            <p className="mt-0.5 text-xs text-amber-700">
               Set up a payment mandate to enable monthly debits and manual payments.{' '}
-              <Link href="/dashboard/mandates" className="underline font-bold hover:text-amber-900 transition-colors">
+              <Link href="/dashboard/mandates" className="font-bold underline transition-colors hover:text-amber-900">
                 Go to Mandates
               </Link>
             </p>
@@ -156,18 +153,20 @@ export default async function ContributionsPage({
 
       {/* Contribution list */}
       {contributions.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
-          <div className="w-16 h-16 rounded-3xl bg-xxm-green-50 flex items-center justify-center mx-auto mb-4">
+        // p-14 was 56px of padding on every side — on a 360px screen that
+        // leaves under 250px for the content it is meant to frame.
+        <div className="rounded-3xl border border-xxm-green/8 bg-white p-8 text-center shadow-xxm sm:p-14">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-xxm-green-50">
             <Wallet size={26} className="text-xxm-green/40" aria-hidden />
           </div>
-          <p className="text-xxm-green-900 font-bold">No contribution records yet</p>
-          <p className="text-xxm-gray-400 text-xs mt-1.5 max-w-xs mx-auto">
+          <p className="font-bold text-xxm-green-900">No contribution records yet</p>
+          <p className="mx-auto mt-1.5 max-w-xs text-xs text-xxm-gray-400">
             Records are generated automatically each month once your mandate is active.
           </p>
         </div>
       ) : (
         <section className="space-y-3">
-          <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest">History</h2>
+          <h2 className="text-xs font-bold uppercase tracking-widest text-xxm-gray-400">History</h2>
           <div className="space-y-2">
             {serialized.map((c: (typeof serialized)[number]) => (
               <ContributionRow key={c.id} contribution={c} mandate={mandateInfo} />

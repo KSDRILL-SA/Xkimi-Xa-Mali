@@ -12,6 +12,44 @@ type Summary = {
   totalContributions: number
 }
 
+/**
+ * Rebuilt mobile-first, 2026-08-30, after three earlier attempts at the
+ * "scratching"/tearing this component showed on phones.
+ *
+ * ── What was actually wrong ─────────────────────────────────────────────────
+ *
+ * These cards sit inside a `<Reveal>`, which animates `transform` on their
+ * shared parent. Each card ALSO declared `transition-all` alongside
+ * `hover:-translate-y-0.5`.
+ *
+ * `transition-all` does not mean "the hover effect" — it means every animatable
+ * property on this element, `transform` included. So during the reveal the
+ * parent's transform is settling while each child has its own live transform
+ * transition armed on the same frame. Four of them, in a grid, each compositing
+ * independently. On a phone (no hover to justify it, slower paint, and the
+ * reveal firing on load rather than after a deliberate scroll) that reads as a
+ * tear or shimmer across the group — the exact symptom reported, and the reason
+ * fixes aimed at `Reveal` alone kept not landing.
+ *
+ * The fix is not to remove the polish, it is to be precise about what animates:
+ *
+ *   - `transition-[box-shadow,border-color]` instead of `transition-all`, so a
+ *     card never animates `transform` on its own while an ancestor is animating
+ *     one for it.
+ *   - the lift is `sm:hover:` only. Hover does not exist on touch; on mobile it
+ *     was pure cost — a compositing layer per card for an effect nobody can
+ *     trigger.
+ *   - no `group-hover` scale on the icon below `sm:` either, for the same
+ *     reason.
+ *
+ * ── Mobile-first sizing ─────────────────────────────────────────────────────
+ *
+ * Base styles target the narrow viewport and widen at `sm:`/`lg:`, rather than
+ * desktop values being walked back down. `min-w-0` on each cell is load-bearing
+ * in a grid: a cell's default min-width is its content's min-content size, so a
+ * long unbreakable value like "R 123 456,78" would otherwise force its track
+ * wider than a 2-up row can hold and push the whole grid past the viewport.
+ */
 export function ContributionSummaryCards({ summary }: { summary: Summary }) {
   const currentYear = new Date().getFullYear()
 
@@ -68,27 +106,49 @@ export function ContributionSummaryCards({ summary }: { summary: Summary }) {
   ]
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {cards.map(({ icon: Icon, label, value, sub, gradient, iconBg, iconColor, border, valueColor }) => (
         <div
           key={label}
-          // min-w-0: without it, a grid cell's default min-width is its
-          // content's min-content size — an unbreakable value like
-          // "R 123 456,78" at text-2xl can force this track wider than a
-          // 2-up mobile row has room for, which stretches the whole grid
-          // past the viewport instead of the value wrapping or shrinking.
-          // Same fix already applied in ContributionRow.tsx; this component
-          // was missing it.
-          className={`group relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-4 sm:p-5 min-w-0 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
+          className={[
+            'group relative min-w-0 overflow-hidden rounded-2xl border',
+            'bg-gradient-to-b',
+            gradient,
+            border,
+            'p-4 sm:p-5',
+            'shadow-xxm-sm',
+            // Only these two properties animate. Never `transform` — see the
+            // component note above.
+            'transition-[box-shadow,border-color] duration-fast ease-smooth',
+            'sm:hover:shadow-xxm sm:hover:border-xxm-green/25',
+          ].join(' ')}
         >
-          <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-transform duration-slow group-hover:scale-110`}>
-            <Icon size={18} className={iconColor} aria-hidden />
+          <div
+            className={[
+              'flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10',
+              iconBg,
+              'mb-3 sm:mb-4',
+              'transition-transform duration-slow sm:group-hover:scale-110',
+            ].join(' ')}
+          >
+            <Icon size={16} className={`${iconColor} sm:hidden`} aria-hidden />
+            <Icon size={18} className={`${iconColor} hidden sm:block`} aria-hidden />
           </div>
-          <p className={`stat-number text-xl sm:text-2xl font-extrabold leading-tight break-words ${valueColor ?? 'text-xxm-green-900'}`}>
+
+          {/*
+            `break-words` rather than `truncate`: a member's own total is the
+            one number on this page they are most likely to check, and a
+            silently clipped amount is worse than a wrapped one.
+          */}
+          <p
+            className={`stat-number text-lg leading-tight font-extrabold break-words sm:text-2xl ${
+              valueColor ?? 'text-xxm-green-900'
+            }`}
+          >
             {value}
           </p>
-          <p className="text-xs font-semibold text-xxm-gray-600 mt-1.5">{label}</p>
-          {sub && <p className="text-[11px] text-xxm-gray-400 mt-0.5">{sub}</p>}
+          <p className="mt-1.5 text-[11px] font-semibold text-xxm-gray-600 sm:text-xs">{label}</p>
+          {sub && <p className="mt-0.5 text-[10px] text-xxm-gray-400 sm:text-[11px]">{sub}</p>}
         </div>
       ))}
     </div>

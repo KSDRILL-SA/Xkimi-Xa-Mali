@@ -59,43 +59,73 @@ export function ContributionRow({ contribution, mandate }: Props) {
 
   return (
     <>
-      <div className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden hover:shadow-xxm hover:border-xxm-green/15 hover:-translate-y-0.5 transition-all duration-slow ease-smooth">
+      {/*
+        `transition-[box-shadow,border-color]`, not `transition-all`, and the
+        lift is `sm:hover:` only — same reasoning as SummaryCards.tsx: rows
+        render inside a `<Reveal>` that animates `transform` on an ancestor, so
+        a row must never have its own live `transform` transition armed at the
+        same time, and a hover lift is unreachable on touch anyway.
+      */}
+      <div className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden transition-[box-shadow,border-color] duration-slow ease-smooth sm:hover:shadow-xxm sm:hover:border-xxm-green/15">
 
         {/* ── Main row ────────────────────────────────────── */}
+        {/*
+          Mobile-first two-line layout. Previously the amount was
+          `hidden sm:block` — on the page whose entire purpose is showing what
+          you have paid, phone users could not see the amount at all without
+          expanding each row. Now the period and amount share the first line,
+          the due date and status share the second, and nothing is dropped;
+          `sm:` restores the original single-line arrangement where the width
+          exists for it.
+        */}
         <div
-          className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-xxm-green-50/30 transition-colors"
+          className="cursor-pointer px-4 py-3.5 transition-colors sm:px-5 sm:py-4 sm:hover:bg-xxm-green-50/30"
           onClick={() => setExpanded((v) => !v)}
           role="button"
           tabIndex={0}
           aria-expanded={expanded}
           onKeyDown={(e) => e.key === 'Enter' && setExpanded((v) => !v)}
         >
-          {/* Period icon */}
-          <div className="w-9 h-9 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0 transition-transform duration-slow group-hover:scale-110">
-            <Wallet size={15} className="text-xxm-green" aria-hidden />
-          </div>
-
-          {/* Period info */}
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-xxm-green-900">
-              {formatMonth(contribution.periodMonth, contribution.periodYear)}
-            </p>
-            <p className="text-[11px] text-xxm-gray-400 mt-0.5">
-              Due {new Date(contribution.dueDate).toLocaleDateString('en-ZA')}
-            </p>
-          </div>
-
-          {/* Amount + status */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-bold text-xxm-green-900 tabular-nums">
-                {formatZAR(contribution.amountPaid)}
-              </p>
-              <p className="text-[11px] text-xxm-gray-400">of {formatZAR(contribution.amountDue)}</p>
+          <div className="flex items-center gap-3">
+            {/* Period icon */}
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-xxm-green-50 transition-transform duration-slow sm:group-hover:scale-110">
+              <Wallet size={15} className="text-xxm-green" aria-hidden />
             </div>
 
-            <ContributionStatusBadge status={contribution.status} />
+            {/* Period + amount */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="truncate text-sm font-bold text-xxm-green-900">
+                  {formatMonth(contribution.periodMonth, contribution.periodYear)}
+                </p>
+                <p className="shrink-0 text-sm font-bold tabular-nums text-xxm-green-900">
+                  {formatZAR(contribution.amountPaid)}
+                </p>
+              </div>
+              <div className="mt-0.5 flex items-baseline justify-between gap-2">
+                <p className="truncate text-[11px] text-xxm-gray-400">
+                  Due {new Date(contribution.dueDate).toLocaleDateString('en-ZA')}
+                </p>
+                <p className="shrink-0 text-[11px] tabular-nums text-xxm-gray-400">
+                  of {formatZAR(contribution.amountDue)}
+                </p>
+              </div>
+            </div>
 
+            {/* Chevron — always visible, so the row reads as expandable */}
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-xxm-gray-100">
+              {expanded
+                ? <ChevronUp size={13} className="text-xxm-gray-500" aria-hidden />
+                : <ChevronDown size={13} className="text-xxm-gray-500" aria-hidden />
+              }
+            </div>
+          </div>
+
+          {/* Status + pay action. Its own line on mobile so neither the badge
+              nor the button squeezes the amounts above; folded back up beside
+              them from `sm:`. */}
+          <div className="mt-2.5 flex items-center justify-end gap-2.5 sm:mt-2">
+            <ContributionStatusBadge status={contribution.status} />
             {canPay && (
               <Button
                 size="sm"
@@ -105,21 +135,18 @@ export function ContributionRow({ contribution, mandate }: Props) {
                 Pay
               </Button>
             )}
-
-            <div className="w-6 h-6 rounded-lg bg-xxm-gray-100 flex items-center justify-center">
-              {expanded
-                ? <ChevronUp size={13} className="text-xxm-gray-500" aria-hidden />
-                : <ChevronDown size={13} className="text-xxm-gray-500" aria-hidden />
-              }
-            </div>
           </div>
         </div>
 
         {/* ── Progress bar ─────────────────────────────────── */}
         {!isFullyPaid && (
-          <div className="h-1 bg-xxm-gray-100 mx-5 mb-3 rounded-full">
+          <div className="mx-4 mb-3 h-1 rounded-full bg-xxm-gray-100 sm:mx-5">
+            {/* `transition-[width]`, not `transition-all`: width is the only
+                thing that ever changes here, and `all` would arm a transform
+                transition on an element inside a `<Reveal>` that is animating
+                one. */}
             <div
-              className="h-full bg-gradient-to-r from-xxm-green to-xxm-canopy rounded-full transition-all duration-500"
+              className="h-full rounded-full bg-gradient-to-r from-xxm-green to-xxm-canopy transition-[width] duration-500"
               style={{ width: `${progress}%` }}
               role="progressbar"
               aria-valuenow={progress}
@@ -133,19 +160,22 @@ export function ContributionRow({ contribution, mandate }: Props) {
         {expanded && (
           <div className="border-t border-xxm-gray-100">
             {contribution.transactions.length === 0 ? (
-              <div className="px-5 py-4 bg-xxm-gray-50">
+              <div className="bg-xxm-gray-50 px-4 py-4 sm:px-5">
                 <p className="text-xs text-xxm-gray-400">No transactions recorded yet.</p>
               </div>
             ) : (
               <div className="divide-y divide-xxm-gray-50">
                 {contribution.transactions.map((tx) => (
-                  <div key={tx.id} className="flex items-center justify-between px-5 py-3 bg-xxm-gray-50 hover:bg-xxm-gray-100/50 transition-colors">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center shrink-0">
+                  <div
+                    key={tx.id}
+                    className="flex items-center justify-between gap-3 bg-xxm-gray-50 px-4 py-3 transition-colors sm:px-5 sm:hover:bg-xxm-gray-100/50"
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white">
                         <ArrowUpCircle size={13} className="text-xxm-green" aria-hidden />
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-xxm-gray-700 capitalize">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold capitalize text-xxm-gray-700">
                           {tx.type.toLowerCase().replace(/_/g, ' ')}
                         </p>
                         <p className="text-[10px] text-xxm-gray-400">
@@ -153,8 +183,8 @@ export function ContributionRow({ contribution, mandate }: Props) {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-xxm-green-900 tabular-nums">
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-bold tabular-nums text-xxm-green-900">
                         {formatZAR(tx.amount)}
                       </p>
                       <p className={`text-[10px] font-semibold ${TX_STATUS_COLORS[tx.status] ?? 'text-xxm-gray-400'}`}>
