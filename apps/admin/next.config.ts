@@ -50,7 +50,22 @@ const nextConfig: NextConfig = {
             // data: URIs same as any other origin, so without it here that
             // fetch throws "Failed to fetch" before the signature ever
             // reaches the server action — this is that bug's actual cause.
-            `connect-src 'self' data: ${WEB_URL} https://o*.ingest.sentry.io`,
+            //
+            // `*.sentry.io`, NOT `o*.ingest.sentry.io`. A CSP wildcard must be
+            // a whole leftmost label; a partial one is invalid syntax and the
+            // browser discards the entire source silently ("contains an
+            // invalid source ... It will be ignored"). So the ingest host was
+            // never actually in connect-src, and every client-side error
+            // report from this console was blocked by our own policy while
+            // appearing fully configured. Identical bug was found and fixed in
+            // the member app (`apps/web/proxy.ts` buildCsp) and never carried
+            // across to here — exactly the one-app-not-its-sibling drift that
+            // `packages/utils/src/csrf-origin.ts` was extracted to stop.
+            // A bare `*.sentry.io` rather than an exact host because the
+            // ingest hostname carries the org id and region
+            // (`o123.ingest.sentry.io`, `o123.ingest.us.sentry.io`), so a
+            // pinned list breaks the day the DSN's region changes.
+            `connect-src 'self' data: ${WEB_URL} https://*.sentry.io`,
             "frame-ancestors 'none'",
           ].join('; '),
         },
