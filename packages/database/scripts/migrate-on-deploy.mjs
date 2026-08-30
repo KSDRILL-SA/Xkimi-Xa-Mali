@@ -23,20 +23,25 @@
  * and not `prisma migrate deploy &&` inlined into the build command, where the
  * condition would be invisible and easy to drop.
  *
- * ── Why both `web` and `admin` run this ─────────────────────────────────────
+ * ── Only `web` runs this ────────────────────────────────────────────────────
  *
- * They deploy as independent Vercel projects against one database, in no
- * guaranteed order. If only one owned migrations, the other could go live
- * first with code expecting a schema that had not been applied yet.
+ * It was briefly wired into `admin` as well, on the reasoning that the two
+ * deploy as independent Vercel projects against one database in no guaranteed
+ * order, so whichever went live first should have applied the schema.
  *
- * Running it in both closes that window: whichever builds first applies the
- * migrations, and the second finds nothing pending. `prisma migrate deploy`
- * takes a Postgres advisory lock, so two concurrent builds serialise rather
- * than race — and it only ever applies migrations that have not been applied,
- * so the second run is a no-op rather than a repeat.
+ * That failed the admin production build immediately: the admin project has
+ * `DATABASE_URL` but no `DIRECT_DATABASE_URL`, so this script correctly
+ * refused to migrate over a pooled connection and exited non-zero. Only `web`
+ * is configured with a direct connection, so only `web` can own migrations.
  *
- * `website` does not run it: it has no Prisma dependency and never touches the
- * database.
+ * The consequence to be aware of: `admin` can go live a few seconds before
+ * `web` has applied a migration from the same commit. That window is harmless
+ * for additive changes and is the reason to keep migrations additive —
+ * add a column, deploy, backfill, and only drop the old one a release later.
+ * Giving the admin project a `DIRECT_DATABASE_URL` would close it, and is an
+ * environment change rather than a code one.
+ *
+ * `website` never runs it: it has no Prisma dependency and no database access.
  *
  * ── Failure is deliberately fatal ───────────────────────────────────────────
  *
