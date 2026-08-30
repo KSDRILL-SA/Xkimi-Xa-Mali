@@ -1,7 +1,59 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@xxm/utils'
+
+/**
+ * `useLayoutEffect` on the client, `useEffect` on the server.
+ *
+ * The decision below has to be made *before* the browser paints, or a device
+ * that skips the animation would still show one frame of `opacity: 0` — a
+ * blink on every page load, which is worse than the animation it replaces.
+ * React warns when `useLayoutEffect` runs during SSR, hence the swap.
+ */
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect
+
+/**
+ * Whether this device should skip the reveal animation and render the final
+ * state immediately.
+ *
+ * ── Why touch devices get no animation at all ───────────────────────────────
+ *
+ * Phones showed torn, doubled, "scratched" cards on the contributions page:
+ * whole bands of the page painted at a stale scroll offset, on top of the
+ * correct content, getting worse the further you scrolled. Screenshots showed
+ * one card drawn twice about 100px apart, and a section drawn both ghosted and
+ * solid at once.
+ *
+ * That is a compositor-invalidation failure, and this component causes it. A
+ * transform transition promotes the element to its own GPU layer for the
+ * duration of the animation. `reveal-done` then sets `transform: none`, which
+ * destroys that layer — and on Android Chrome the region the layer occupied is
+ * not reliably repainted, so its last frame stays on screen. Four `Reveal`s
+ * with staggered delays tear down four layers at four different moments, which
+ * is why the artifacts appeared in bands and at different offsets, and why
+ * they accumulated while scrolling rather than settling.
+ *
+ * `reveal-done` cannot simply be dropped — it exists because a lingering
+ * transform makes the element a containing block for `position: fixed`
+ * descendants and a stacking context, which broke dropdowns and modals. Both
+ * that fix and this one are necessary; the only way to have neither problem is
+ * for the transform never to exist on the devices where the teardown misbehaves.
+ *
+ * So the animation is desktop-only, and the test is `maxTouchPoints` rather
+ * than a `hover`/`pointer` media query. Chrome's "Desktop site" mode reports
+ * `hover: hover` and `pointer: fine` while still being the same phone and the
+ * same GPU — and the tearing was reported on the dashboard in exactly that
+ * mode. `maxTouchPoints` still reports the truth there.
+ *
+ * Nothing about layout, spacing or appearance changes: the element lands in
+ * the identical final state, just without travelling to it.
+ */
+function shouldSkipReveal(): boolean {
+  if (typeof window === 'undefined') return false
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true
+  return (navigator.maxTouchPoints ?? 0) > 0
+}
 
 type RevealVariant = 'up' | 'left' | 'right' | 'scale'
 
@@ -57,9 +109,18 @@ export function Reveal({ children, variant = 'up', delay = 0, className, as = 'd
   const [visible, setVisible] = useState(false)
   const [done, setDone] = useState(false)
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const el = ref.current
     if (!el) return
+
+    // Straight to the finished state: `revealed` supplies the final opacity,
+    // `reveal-done` supplies `transform: none; transition: none`. No transform
+    // is ever applied, so no layer is created and none has to be torn down.
+    if (shouldSkipReveal()) {
+      setVisible(true)
+      setDone(true)
+      return
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {

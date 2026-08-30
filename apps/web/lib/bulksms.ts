@@ -119,11 +119,53 @@ function senderFields(explicit?: string): { from: string } | Record<string, neve
   return explicit ? { from: explicit } : {}
 }
 
+/** The name every outgoing SMS must carry, because the sender field cannot. */
+const ORG_NAME = 'Xkimi Xa Mali Foundation'
+
+/**
+ * Guarantees the Foundation is named at the start of every SMS we send.
+ *
+ * ── Why this is enforced here and not in the copy ───────────────────────────
+ *
+ * Naming the sender is a *sending* rule, not a seed-data rule, and it was
+ * previously only true of the copy in `prisma/templates.ts`. Three separate
+ * paths went out without it:
+ *
+ *   1. **The seeded templates in production.** `prisma/seed.ts` upserts with
+ *      `update: {}` — deliberately create-only, so an admin can edit a body in
+ *      the DB without the next deploy stamping over it. The consequence is
+ *      that editing `templates.ts` changes nothing for a database that has
+ *      already been seeded. Every fix to that file since the first deploy has
+ *      been invisible in production, which is why the name still did not
+ *      appear after it was added there.
+ *   2. **Admin broadcasts** (`admin.service.ts`), where the body is typed by a
+ *      person into a box and has never passed through a template at all.
+ *   3. **Anything added later** — the rule is invisible, so the next
+ *      hard-coded message forgets it exactly the way the first two did.
+ *
+ * A recipient sees an unrecognised number. If the body does not say who sent
+ * it, an SMS about someone's money is indistinguishable from a scam, and the
+ * correct response to a scam is to ignore it — so an unattributed message is
+ * not merely unbranded, it is one the member is right not to act on.
+ *
+ * Idempotent: a body that already opens with the name is returned untouched,
+ * so the 25 templates that get this right are unaffected, and re-running it
+ * can never stack the prefix twice. The check is case-insensitive and
+ * tolerates leading whitespace so a stray space does not produce
+ * "Xkimi Xa Mali Foundation: Xkimi Xa Mali Foundation: ...".
+ */
+export function ensureSenderIdentity(body: string): string {
+  const trimmed = body.trimStart()
+  return trimmed.toLowerCase().startsWith(ORG_NAME.toLowerCase())
+    ? trimmed
+    : `${ORG_NAME}: ${trimmed}`
+}
+
 export async function sendSMS(input: BulkSMSSendInput): Promise<BulkSMSMessage[]> {
   return withRetry(
     () => post<BulkSMSMessage[]>('/messages', {
       to: input.to,
-      body: input.body,
+      body: ensureSenderIdentity(input.body),
       routingGroup: input.routingGroup ?? 'STANDARD',
       ...senderFields(input.from),
       ...(input.userSuppliedId && { userSuppliedId: input.userSuppliedId }),
@@ -140,7 +182,7 @@ export async function sendBulkSMS(messages: BulkSMSSendInput[]): Promise<BulkSMS
   return withRetry(
     () => post<BulkSMSMessage[]>('/messages', messages.map((m) => ({
       to: m.to,
-      body: m.body,
+      body: ensureSenderIdentity(m.body),
       routingGroup: m.routingGroup ?? 'STANDARD',
       ...senderFields(m.from),
       ...(m.userSuppliedId && { userSuppliedId: m.userSuppliedId }),
