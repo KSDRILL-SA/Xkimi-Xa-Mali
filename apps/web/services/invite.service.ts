@@ -218,8 +218,14 @@ export async function generateInvite(
 
   smsProvider.send({
     to: normPhone,
+    // Leads with the organisation name, per South African network rules:
+    // alphanumeric sender IDs are not available here, so every message must
+    // identify the sender at the START of the body and carry a contact number
+    // or website. The registration URL below satisfies the second half.
+    // See packages/database/prisma/templates.ts, where all 27 SMS templates
+    // follow the same shape.
     body: [
-      `Hi ${firstName}, you have been invited to join Xkimi Xa Mali Foundation.`,
+      `Xkimi Xa Mali Foundation: Hi ${firstName}, you have been invited to join.`,
       `Your invite code: ${code}`,
       `Tap to register: ${registrationUrl}`,
       `IMPORTANT: Never share this code with anyone. It expires in 7 days.`,

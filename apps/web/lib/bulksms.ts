@@ -36,7 +36,10 @@ export type BulkSMSMessage = {
 export type BulkSMSSendInput = {
   to: string
   body: string
-  /** Overrides `BULKSMS_SENDER_ID` for this message. Rarely needed. */
+  /**
+   * Sender ID for this message. Unset by default and unusable on South
+   * African networks — see `senderFields` below for why.
+   */
   from?: string
   userSuppliedId?: string
   routingGroup?: BulkSMSRoutingGroup
@@ -88,21 +91,32 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 /**
- * The `from` BulkSMS should show the recipient, when one is configured.
+ * The `from` BulkSMS should show the recipient, when one is supplied.
  *
- * `BulkSMSSendInput` has always declared a `from`, and the response type reads
- * one back, but neither send path ever put it in the request body — so every
- * message went out from BulkSMS's shared pool and arrived as an unknown
- * number. On a platform that asks members to trust it with money, an
- * unattributed SMS about a debit is indistinguishable from a scam.
+ * ── Deliberately unset in South Africa, which is this platform's only market ─
  *
- * Omitted entirely rather than defaulted when unset: an unregistered
- * alphanumeric sender ID is silently replaced or rejected by the networks, so
- * a guessed value would be worse than none.
+ * An earlier version of this file added a `BULKSMS_SENDER_ID` env var to fix
+ * "SMS arrives from an unknown number". That fix does not work here, and the
+ * var was removed rather than left as a setting nobody can use: BulkSMS states
+ * plainly that **"Sender IDs are not available in South Africa due to mobile
+ * network operator policies"** — it is not a registration step we have skipped,
+ * the networks refuse them outright.
+ *
+ * What SA requires instead: identify the organisation at the START of the
+ * message body, and include a contact number or website in the body. Every
+ * template in packages/database/prisma/templates.ts already leads with
+ * "Xkimi Xa Mali Foundation", and the two hard-coded messages
+ * (invite.service.ts, member.service.ts) were brought into line with it.
+ * Enforced by packages/database/prisma/__tests__/sms-sa-compliance.test.ts.
+ *
+ * The parameter is kept because the API supports it and a future non-SA
+ * destination could legitimately use one — it simply has no configured
+ * default.
+ *
+ * Source: https://www.bulksms.com/countries/s/south-africa
  */
 function senderFields(explicit?: string): { from: string } | Record<string, never> {
-  const from = explicit ?? env.BULKSMS_SENDER_ID
-  return from ? { from } : {}
+  return explicit ? { from: explicit } : {}
 }
 
 export async function sendSMS(input: BulkSMSSendInput): Promise<BulkSMSMessage[]> {
