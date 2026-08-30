@@ -5,18 +5,48 @@ import { getSession } from '@/lib/session'
 import { env } from '@/lib/env'
 import { getContributions, getContributionSummary } from '@/services/contribution.service'
 import { getMandates } from '@/services/mandate.service'
-import { ContributionSummaryCards } from '@/components/contribution/SummaryCards'
+import { ContributionSummary } from '@/components/contribution/ContributionSummary'
 import { GroupCollectionAccount } from '@/components/contribution/GroupCollectionAccount'
-import { ContributionRow } from '@/components/contribution/ContributionRow'
+import { ContributionHistory } from '@/components/contribution/ContributionHistory'
 import { RouterPagination } from '@/components/ui/RouterPagination'
 import { Button } from '@/components/ui/Button'
-import { Reveal } from '@xxm/ui'
 import { Wallet, AlertTriangle } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Contributions' }
 
 const PAGE_SIZE = 12
 
+/**
+ * ── Rebuilt from scratch, mobile-first, 2026-08-30 ──────────────────────────
+ *
+ * Six attempts to stop this page tearing on phones each fixed something real
+ * and none fixed the reported symptom: cards drawn twice about 100px apart,
+ * bands of the page painted at a previous scroll offset, getting worse the
+ * further you scrolled. That is a compositor failing to invalidate a region,
+ * not a layout problem — and the cause was never isolated because each attempt
+ * changed one suspect while the rest stayed.
+ *
+ * So this page is rebuilt to give the compositor as little as possible, all at
+ * once, rather than guessing at a seventh single cause:
+ *
+ *   - **No `Reveal` anywhere on this page.** Every section used to animate a
+ *     transform on scroll, which promotes it to its own GPU layer and then
+ *     destroys that layer when the animation ends. Content renders immediately
+ *     now. Nothing about the layout depends on it.
+ *   - **One box per section** instead of four floating summary cards and
+ *     twelve elevated history cards. Grouped panels with hairline dividers.
+ *   - **Opaque backgrounds**, no gradients, no translucent tints.
+ *   - **No shadows, hovers or transitions below `sm:`** — a phone has no
+ *     pointer to trigger them, so they were pure cost on the device that was
+ *     breaking.
+ *
+ * If tearing survives all of that, it is not coming from this page, and the
+ * next place to look is the app shell — the sticky header, `ScrollNav`, or the
+ * `animate-fade-in-up` on `<main>`. That result would be worth having.
+ *
+ * Mobile-first throughout: base styles target a 360px viewport and widen at
+ * `sm:`/`lg:`, rather than desktop values being walked back down.
+ */
 export default async function ContributionsPage({
   searchParams,
 }: {
@@ -24,9 +54,10 @@ export default async function ContributionsPage({
 }) {
   const session = await getSession()
   if (!session?.user?.id) redirect('/login')
-  const userId  = session.user.id
-  const roles   = session.user.roles ?? []
-  const params  = await searchParams
+  const userId = session.user.id
+  const roles = session.user.roles ?? []
+  const params = await searchParams
+
   // `?page=abc` produced NaN, which reached Prisma as `skip: NaN` and returned
   // a 500 to a member who mistyped a URL. Anything that is not a whole number
   // at or above one is page one.
@@ -40,19 +71,17 @@ export default async function ContributionsPage({
   ])
 
   const activeMandate = allMandates.find((m) => m.status === 'ACTIVE') ?? null
-
   const { items: contributions, total, totalPages } = paginated
 
-  const manualPaymentsEnabled = env.ENABLE_MANUAL_PAYMENTS
+  const mandateInfo =
+    activeMandate && env.ENABLE_MANUAL_PAYMENTS
+      ? {
+          bankName: activeMandate.bankAccount.bankName,
+          accountNumberMasked: activeMandate.bankAccount.accountNumberMasked,
+        }
+      : null
 
-  const mandateInfo = activeMandate && manualPaymentsEnabled
-    ? {
-        bankName: activeMandate.bankAccount.bankName,
-        accountNumberMasked: activeMandate.bankAccount.accountNumberMasked,
-      }
-    : null
-
-  type RawContrib = typeof contributions[number]
+  type RawContrib = (typeof contributions)[number]
   type RawTx = RawContrib['transactions'][number]
 
   // Named, not spread — and on the transactions especially.
@@ -66,7 +95,7 @@ export default async function ContributionsPage({
   // caused it.
   //
   // `idempotencyKey`, `gatewayRef`, `failureReason`, `mandateId` and
-  // `reversalOfId` went with it. `ContributionRow` declares five fields on a
+  // `reversalOfId` went with it. The row component declares five fields on a
   // transaction and renders exactly those five; TypeScript's structural typing
   // accepts an object carrying thirty, so nothing complained.
   const serialized = contributions.map((c: RawContrib) => ({
@@ -92,33 +121,16 @@ export default async function ContributionsPage({
 
   return (
     <div className="space-y-5 sm:space-y-6">
-
-      {/* ── Reveal structure: one per section, staggered ───────────────
-          Matches `dashboard/page.tsx`, `goals/page.tsx` and
-          `transactions/page.tsx`, none of which show the tearing this page
-          did — the dashboard in particular renders the *same*
-          `grid grid-cols-2 lg:grid-cols-4` of stat cards inside a Reveal
-          and is fine, which rules out the grid itself.
-
-          What this page did differently was collapse three stacked
-          sections into a single `<Reveal>` (an earlier attempt at the same
-          bug, on the theory that adjacent observers settling apart was the
-          cause). That made one tall element animate a transform across the
-          full height of the viewport on a phone, rather than three short
-          ones settling in sequence — a much larger composited layer, and
-          the thing that actually reads as tearing while scrolling.
-
-          Staggered delays are not decoration here: they are what keeps
-          each animated layer small and short-lived, which is why every
-          other page in this app is built this way. */}
-      {/* Header stacks on mobile: at 360px a heading, a subtitle and a
-          button cannot share a row without the button crushing the text. */}
-      <Reveal variant="up" className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      {/* Header stacks on mobile: at 360px a heading, a subtitle and a button
+          cannot share a row without the button crushing the text. */}
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
         <div className="flex items-start gap-3 sm:gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-xxm-green/10 sm:h-12 sm:w-12">
-            <Wallet size={20} className="text-xxm-green sm:hidden" aria-hidden />
-            <Wallet size={22} className="hidden text-xxm-green sm:block" aria-hidden />
-          </div>
+          <span
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-xxm-green-50 sm:h-12 sm:w-12"
+            aria-hidden
+          >
+            <Wallet size={20} className="text-xxm-green" />
+          </span>
           <div className="min-w-0">
             <h1 className="font-display text-xl font-extrabold tracking-tight text-xxm-green-900 sm:text-2xl">
               Contributions
@@ -133,17 +145,12 @@ export default async function ContributionsPage({
             <Link href="/dashboard/contribute">Make a payment</Link>
           </Button>
         )}
-      </Reveal>
+      </header>
 
-      <Reveal variant="up" delay={100}>
-        <ContributionSummaryCards summary={summary} />
-      </Reveal>
+      <ContributionSummary summary={summary} />
 
-      <Reveal variant="up" delay={150}>
-        <GroupCollectionAccount />
-      </Reveal>
+      <GroupCollectionAccount />
 
-      {/* No active mandate warning */}
       {!mandateInfo && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 sm:px-5 sm:py-4">
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" aria-hidden />
@@ -151,7 +158,7 @@ export default async function ContributionsPage({
             <p className="text-sm font-semibold text-amber-800">No active mandate</p>
             <p className="mt-0.5 text-xs text-amber-700">
               Set up a payment mandate to enable monthly debits and manual payments.{' '}
-              <Link href="/dashboard/mandates" className="font-bold underline transition-colors hover:text-amber-900">
+              <Link href="/dashboard/mandates" className="font-bold underline">
                 Go to Mandates
               </Link>
             </p>
@@ -159,32 +166,25 @@ export default async function ContributionsPage({
         </div>
       )}
 
-      {/* Contribution list */}
       {contributions.length === 0 ? (
         // p-14 was 56px of padding on every side — on a 360px screen that
         // leaves under 250px for the content it is meant to frame.
-        <div className="rounded-3xl border border-xxm-green/8 bg-white p-8 text-center shadow-xxm sm:p-14">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-xxm-green-50">
-            <Wallet size={26} className="text-xxm-green/40" aria-hidden />
-          </div>
+        <div className="rounded-2xl border border-xxm-green/10 bg-white p-8 text-center sm:p-14">
+          <span
+            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-xxm-green-50"
+            aria-hidden
+          >
+            <Wallet size={26} className="text-xxm-green/40" />
+          </span>
           <p className="font-bold text-xxm-green-900">No contribution records yet</p>
           <p className="mx-auto mt-1.5 max-w-xs text-xs text-xxm-gray-400">
             Records are generated automatically each month once your mandate is active.
           </p>
         </div>
       ) : (
-        // Wrapped like `transactions/page.tsx` wraps its own list: one
-        // Reveal around the section, never one per row. A Reveal per row
-        // would put an independently-settling transform on every item in a
-        // scrolling list, which is precisely the "gets worse as you scroll"
-        // shape of this bug.
-        <Reveal variant="up" delay={200} as="section" className="space-y-3">
+        <section className="space-y-3" aria-label="Contribution history">
           <h2 className="text-xs font-bold uppercase tracking-widest text-xxm-gray-400">History</h2>
-          <div className="space-y-2">
-            {serialized.map((c: (typeof serialized)[number]) => (
-              <ContributionRow key={c.id} contribution={c} mandate={mandateInfo} />
-            ))}
-          </div>
+          <ContributionHistory contributions={serialized} mandate={mandateInfo} />
           {totalPages > 1 && (
             <RouterPagination
               totalItems={total}
@@ -193,9 +193,8 @@ export default async function ContributionsPage({
               baseUrl="/dashboard/contributions"
             />
           )}
-        </Reveal>
+        </section>
       )}
     </div>
   )
 }
-

@@ -1,4 +1,5 @@
-export { ContributionRow } from './ContributionRow'
+export { ContributionHistory } from './ContributionHistory'
 export { PaymentModal } from './PaymentModal'
 export { ContributionStatusBadge } from './StatusBadge'
-export { ContributionSummaryCards as SummaryCards } from './SummaryCards'
+export { ContributionSummary } from './ContributionSummary'
+export { GroupCollectionAccount } from './GroupCollectionAccount'
