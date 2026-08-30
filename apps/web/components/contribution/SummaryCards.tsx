@@ -116,10 +116,12 @@ export function ContributionSummaryCards({ summary }: { summary: Summary }) {
             gradient,
             border,
             'p-4 sm:p-5',
-            'shadow-xxm-sm',
-            // Only these two properties animate. Never `transform` — see the
-            // component note above.
-            'transition-[box-shadow,border-color] duration-fast ease-smooth',
+            // Shadow and its transition are `sm:` only — see the note above.
+            // Four shadowed cards plus a page of shadowed rows is a lot of
+            // compositing layers for a phone; the border already separates
+            // them, and the dashboard's equivalent grid is fine without it.
+            'sm:shadow-xxm-sm',
+            'sm:transition-[box-shadow,border-color] sm:duration-fast sm:ease-smooth',
             'sm:hover:shadow-xxm sm:hover:border-xxm-green/25',
           ].join(' ')}
         >

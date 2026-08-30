@@ -40,9 +40,40 @@ export function AppHeader({
   const [atTop, setAtTop] = useState(true)
 
   useEffect(() => {
-    const onScroll = () => setAtTop(window.scrollY === 0)
+    // Read in a rAF and only set state when the value actually flips.
+    //
+    // This previously called `setAtTop(window.scrollY === 0)` directly on
+    // every scroll event. Two costs, both paid continuously while scrolling:
+    // reading `scrollY` in the event handler forces a synchronous layout
+    // (a "layout thrash"), and passing a fresh boolean to `setState` on every
+    // event asks React to re-render this header — which is `sticky`, so it
+    // owns a compositing layer the whole page is drawn against — dozens of
+    // times a second, when the value only ever changes at one pixel.
+    //
+    // On a phone that shows up as tearing/flicker that gets worse the further
+    // you scroll, and it is worst in "desktop site" mode, where the phone
+    // renders at full desktop width so the layer is larger and every
+    // `sm:`-and-up style is live. React bails out of a re-render when the
+    // state value is identical, but the layout read happens regardless — so
+    // the guard below is what actually removes the per-event cost.
+    let frame = 0
+    let last = true
+    const onScroll = () => {
+      if (frame) return
+      frame = requestAnimationFrame(() => {
+        frame = 0
+        const next = window.scrollY <= 0
+        if (next !== last) {
+          last = next
+          setAtTop(next)
+        }
+      })
+    }
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (frame) cancelAnimationFrame(frame)
+    }
   }, [])
 
   return (
@@ -50,7 +81,14 @@ export function AppHeader({
       className={`sticky top-0 z-40 bg-xxm-green border-b transition-shadow duration-300 ${
         atTop ? 'border-transparent shadow-none' : 'border-white/10 shadow-xxm'
       }`}
-      style={fixedHeight ? { height: 'var(--header-h)' } : undefined}
+      // `translateZ(0)` promotes this to its own compositing layer up front.
+      // A sticky element is composited anyway once it starts sticking; doing
+      // it eagerly stops the browser promoting/demoting it mid-scroll, which
+      // is itself a source of visible tearing on mobile GPUs.
+      style={{
+        ...(fixedHeight ? { height: 'var(--header-h)' } : {}),
+        transform: 'translateZ(0)',
+      }}
     >
       {showSkipLink && (
         <a href="#main-content" className="skip-to-main">Skip to main content</a>
