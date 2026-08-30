@@ -160,9 +160,14 @@ async function warnPreviousNumber(previousPhone: string, userId: string): Promis
   try {
     await smsProvider.send({
       to: previousPhone,
+      // Carries a website, not just "contact the Foundation": SA network rules
+      // require a contact number or website in the body, and this is the one
+      // message a member might act on precisely because they did NOT make the
+      // change — telling them to get in touch without saying how is useless.
       body:
         'Xkimi Xa Mali Foundation: the mobile number on your account has been changed. ' +
-        'Future alerts will go to the new number. If this was not you, contact the Foundation now.',
+        'Future alerts will go to the new number. If this was not you, contact us now at ' +
+        'xkimixamali.co.za',
       // BulkSMS caps userSuppliedId at 20 characters and rejects the whole
       // message otherwise. `phone-change-<25-char cuid>-<13-digit timestamp>`
       // is ~51, so this SMS ALWAYS failed — silently, because this function
