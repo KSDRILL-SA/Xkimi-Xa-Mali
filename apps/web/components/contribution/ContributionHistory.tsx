@@ -44,18 +44,19 @@ const TX_STATUS_COLORS: Record<string, string> = {
 /**
  * The contribution ledger, as one card of divided rows.
  *
- * ── Rebuilt from scratch, 2026-08-30 ────────────────────────────────────────
+ * ── The single card is load-bearing, not a style choice ─────────────────────
  *
  * Each period used to be its own elevated card: rounded, `overflow-hidden`,
  * shadowed, with a live box-shadow transition. Twelve of those down a
  * scrolling viewport is twelve independently clipped and shadowed boxes for a
- * phone GPU to composite, and this page tore worse the further it scrolled.
+ * phone GPU to composite, and this page tore worse the further it scrolled
+ * through six rounds of attempted fixes.
  *
- * This is modelled on the transactions list, which has never shown the
- * problem: **one** bordered card, with rows separated by a hairline and
- * nothing elevated inside it. A row carries no rounding, no clip and no
- * shadow of its own, so the whole list is a single box to paint rather than
- * one per period.
+ * This is modelled on the transactions list, which carries the same
+ * `rounded-3xl` + `shadow-xxm` treatment on **one** card and has never shown
+ * the problem. The elevation belongs to the list, not to each row: a row has
+ * no rounding, no clip and no shadow of its own. Do not promote rows back into
+ * cards.
  */
 export function ContributionHistory({
   contributions,
@@ -65,10 +66,20 @@ export function ContributionHistory({
   mandate: MandateInfo
 }) {
   return (
-    <div className="divide-y divide-xxm-gray-100 overflow-hidden rounded-2xl border border-xxm-green/10 bg-white">
-      {contributions.map((c) => (
-        <ContributionItem key={c.id} contribution={c} mandate={mandate} />
-      ))}
+    <div className="overflow-hidden rounded-3xl border border-xxm-green/8 bg-white shadow-xxm-sm sm:shadow-xxm">
+      {/* Column header, desktop only — the mobile rows are self-labelling. */}
+      <div className="hidden border-b border-xxm-gray-100 bg-xxm-gray-50 px-5 py-2.5 sm:grid sm:grid-cols-[1fr_auto] sm:gap-3">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-xxm-gray-400">Period</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-xxm-gray-400">
+          Paid of due
+        </span>
+      </div>
+
+      <div className="divide-y divide-xxm-gray-100">
+        {contributions.map((c) => (
+          <ContributionItem key={c.id} contribution={c} mandate={mandate} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -91,7 +102,9 @@ function ContributionItem({
 
   return (
     <>
-      <div>
+      {/* `transition-colors` only — never `transition-all`, which would arm a
+          transform transition on every row in a scrolling list. */}
+      <div className="transition-colors sm:hover:bg-xxm-green-50/40">
         {/*
           A real <button> rather than a div with role="button": it gets keyboard
           activation, focus handling and the correct semantics for free, where
@@ -104,7 +117,10 @@ function ContributionItem({
           className="w-full px-4 py-3.5 text-left outline-none focus-visible:bg-xxm-green-50 sm:px-5 sm:py-4"
         >
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-xxm-green-50" aria-hidden>
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-xxm-green/15 to-xxm-green/5 ring-1 ring-xxm-green/10 sm:h-10 sm:w-10"
+              aria-hidden
+            >
               <Wallet size={15} className="text-xxm-green" />
             </span>
 
@@ -116,7 +132,7 @@ function ContributionItem({
                 <span className="truncate text-sm font-bold text-xxm-green-900">
                   {formatMonth(contribution.periodMonth, contribution.periodYear)}
                 </span>
-                <span className="shrink-0 text-sm font-bold tabular-nums text-xxm-green-900">
+                <span className="stat-number shrink-0 text-sm font-bold text-xxm-green-900">
                   {formatZAR(paid)}
                 </span>
               </span>
@@ -124,7 +140,7 @@ function ContributionItem({
                 <span className="truncate text-[11px] text-xxm-gray-400">
                   Due {new Date(contribution.dueDate).toLocaleDateString('en-ZA')}
                 </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-xxm-gray-400">
+                <span className="stat-number shrink-0 text-[11px] text-xxm-gray-400">
                   of {formatZAR(due)}
                 </span>
               </span>
@@ -132,18 +148,25 @@ function ContributionItem({
 
             <ChevronDown
               size={15}
-              className={`shrink-0 text-xxm-gray-400 ${expanded ? 'rotate-180' : ''}`}
+              className={`shrink-0 text-xxm-gray-400 transition-transform duration-slow ${
+                expanded ? 'rotate-180' : ''
+              }`}
               aria-hidden
             />
           </div>
 
-          {/* Progress: a flat track, no gradient. Its own line so nothing above
-              gets squeezed on a narrow screen. */}
+          {/* `transition-[width]`, not `transition-all`: width is the only thing
+              that changes, and `all` would arm a transform transition here. */}
           {!isFullyPaid && (
-            <span className="mt-3 block h-1 w-full rounded-full bg-xxm-gray-100">
+            <span className="mt-3 block h-1.5 w-full overflow-hidden rounded-full bg-xxm-gray-100">
               <span
-                className="block h-full rounded-full bg-xxm-green"
+                className="block h-full rounded-full bg-gradient-to-r from-xxm-green to-xxm-canopy transition-[width] duration-500"
                 style={{ width: `${progress}%` }}
+                role="progressbar"
+                aria-valuenow={progress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label="Amount paid"
               />
             </span>
           )}
@@ -167,9 +190,15 @@ function ContributionItem({
             ) : (
               <ul className="divide-y divide-xxm-gray-100">
                 {contribution.transactions.map((tx) => (
-                  <li key={tx.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                  <li
+                    key={tx.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5"
+                  >
                     <span className="flex min-w-0 items-center gap-2.5">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white" aria-hidden>
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white ring-1 ring-xxm-green/10"
+                        aria-hidden
+                      >
                         <ArrowUpCircle size={13} className="text-xxm-green" />
                       </span>
                       <span className="min-w-0">
@@ -182,10 +211,14 @@ function ContributionItem({
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
-                      <span className="block text-sm font-bold tabular-nums text-xxm-green-900">
+                      <span className="stat-number block text-sm font-bold text-xxm-green-900">
                         {formatZAR(tx.amount)}
                       </span>
-                      <span className={`block text-[10px] font-semibold ${TX_STATUS_COLORS[tx.status] ?? 'text-xxm-gray-400'}`}>
+                      <span
+                        className={`block text-[10px] font-semibold ${
+                          TX_STATUS_COLORS[tx.status] ?? 'text-xxm-gray-400'
+                        }`}
+                      >
                         {tx.status}
                       </span>
                     </span>
