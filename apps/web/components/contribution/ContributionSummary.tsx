@@ -20,32 +20,34 @@ type Summary = {
  * gradient fill, coloured border, hover lift and the count-up animation — while
  * keeping the structure that stopped this page tearing on phones.
  *
- * ── One panel on mobile, four cards on desktop ──────────────────────────────
+ * ── What actually caused the tearing, and why these are cards again ─────────
  *
- * The tearing was never caused by any single CSS property. It was the number of
- * separately clipped, elevated boxes the page asked the phone's GPU to
- * composite: four floating summary cards plus twelve elevated history rows.
+ * It was never a single CSS property. It was the *number* of separately
+ * clipped, elevated boxes the page asked the phone's GPU to composite: four
+ * floating summary cards **plus twelve elevated history rows**. Sixteen.
  * Collapsing both into grouped panels is what fixed it, confirmed on a real
  * device after six failed attempts.
  *
- * Desktop never had the problem, so the split is by breakpoint rather than a
- * compromise on either side:
+ * The history list is now permanently one card of divided rows — that is the
+ * change that actually bought the headroom, and it is the one that must not be
+ * undone. With it in place the page carries roughly seven composited boxes:
+ * four stat cards, the ledger, the group account, the mandate notice.
  *
- *   - **Base (mobile):** one clipped, bordered container; the cells are flat
- *     panes separated by a hairline, which `gap-px` produces by letting the
- *     container's grey show through. One box to clip and elevate, not four.
- *     At 360px this is also simply the better layout — four floating cards with
- *     gaps and shadows leave each about 150px of usable width.
- *   - **`sm:` and up:** the container gives up its border, background, clip and
- *     shadow, and each cell becomes a card in its own right with the dashboard's
- *     treatment. Same component, same markup, no duplicated content.
+ * That is the same budget as the dashboard, which renders its own gradient,
+ * shadowed stat cards plus a badge, insights and recent-contributions card and
+ * does not tear on the same phone. So these are real cards at every size,
+ * matching it.
  *
- * The gradients are safe at both sizes: a gradient *fill* is cheap. What was
- * expensive was per-box rounding, clipping and shadow — which is exactly what
- * stays behind `sm:`.
+ * ── If tearing ever returns ─────────────────────────────────────────────────
  *
- * **Do not remove the base-size grouping.** It looks like an arbitrary style
- * choice and it is the fix.
+ * Look here first, and count boxes before changing properties. Re-grouping
+ * these four cells into one container — `gap-px` over a grey background, with
+ * the border, clip and shadow moved to the container — is a small, known-good
+ * change that restores the fixed layout. What must **not** happen is the
+ * history list going back to a card per row.
+ *
+ * The hover lift stays `sm:`-only: a per-box transform is the expensive kind,
+ * and no phone can trigger a hover state to justify it.
  */
 export function ContributionSummary({ summary }: { summary: Summary }) {
   const currentYear = new Date().getFullYear()
@@ -53,16 +55,7 @@ export function ContributionSummary({ summary }: { summary: Summary }) {
 
   return (
     <section aria-label="Contribution summary">
-      <div
-        className={[
-          // Mobile: one grouped, clipped panel. `gap-px` over the grey
-          // container is what draws the dividers.
-          'grid grid-cols-2 gap-px overflow-hidden rounded-3xl border border-xxm-green/8 bg-xxm-gray-100 shadow-xxm-sm',
-          // Desktop: dissolve the container, let the cells stand alone.
-          'sm:gap-4 sm:overflow-visible sm:rounded-none sm:border-0 sm:bg-transparent sm:shadow-none',
-          'lg:grid-cols-4',
-        ].join(' ')}
-      >
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCell
           icon={TrendingUp}
           label="Total contributed"
@@ -144,13 +137,12 @@ function StatCell({
   return (
     <div
       className={[
-        'group min-w-0 bg-gradient-to-b to-white p-4',
+        'group min-w-0 rounded-2xl border bg-gradient-to-b to-white p-4 shadow-xxm-sm sm:p-5',
         gradient,
-        // The card treatment is `sm:` only — see the note above. `-translate-y`
-        // and the shadow are the two things that must not exist per-box on a
-        // phone.
-        'sm:rounded-2xl sm:border sm:p-5 sm:shadow-xxm-sm',
         border,
+        // The lift is `sm:` only. A per-box transform is the expensive kind of
+        // compositing, and there is no hover on a touch screen to trigger it —
+        // so on a phone it would be cost with nothing to show for it.
         'sm:transition-[box-shadow,transform] sm:duration-fast sm:ease-smooth',
         'sm:hover:-translate-y-0.5 sm:hover:shadow-xxm',
       ].join(' ')}
