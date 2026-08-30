@@ -483,3 +483,79 @@ return 503 — that status is read by hosting and failover tooling as "replace
 this instance", which is the wrong remedy for a stopped cron and would trade a
 working web app for no web app. The HTTP status stays tied to the database and
 Redis, exactly as it was.
+
+---
+
+## Going live
+
+The production deployment is **not** in live mode today. `DEPLOY_ENV` is set to
+something other than `production`, and `isLiveDeployment()` reads `DEPLOY_ENV`
+first — so `VERCEL_ENV=production` does not make it live.
+
+That one variable is the switch. Flipping it makes nineteen variables mandatory
+**at the same moment**; any that is absent throws at boot and the deployment
+fails. Do not flip it first and find out.
+
+### Check before you switch
+
+Every production build now prints a `[go-live]` report saying which of the
+nineteen are set. Read the latest production build log, or run:
+
+```bash
+npm run golive:check -w @xxm/web
+```
+
+It prints names only, never values, and never fails a build. When it says
+nothing is missing, the switch is safe.
+
+Do not use `vercel env ls` for this. It does not list storage- or
+integration-managed variables (`BLOB_READ_WRITE_TOKEN`, injected by connecting
+the blob store), so it reports things missing that are present.
+
+### Order of operations
+
+1. **Netcash issues the account.** Nothing below can be completed before this —
+   the three values come from them.
+2. Set in Vercel → `xkimi-xa-mali-web` → Production:
+   - `NETCASH_SERVICE_KEY` — from Netcash
+   - `NETCASH_WEBHOOK_SECRET` — from Netcash
+   - `NETCASH_DEBICHECK_TEMPLATE_ID` — from Netcash, e.g. `NCDCT000000001`.
+     Identifies the collection terms the debtor's bank shows them; a wrong one
+     is rejected (325) or authorises the wrong agreement.
+   - `NETCASH_API_URL` = `https://ws.netcash.co.za/NIWS/NIWS_NIF.svc`
+     The live NIWS NIF endpoint. There is deliberately no default in production:
+     the old fallback pointed at the TEST endpoint, so forgetting it meant every
+     debit went to a gateway that moves no money, silently.
+   - `NETCASH_SOFTWARE_VENDOR_KEY` — **only** once Netcash issues a
+     vendor-specific GUID. `lib/netcash/batch-file.ts` carries the public
+     integrator default otherwise. An ISV agreement is *not* a prerequisite.
+3. Set `PAYMENT_GATEWAY` to the real gateway (it is currently the mock — while
+   it is `mock`, the Netcash credentials stay optional).
+4. Re-run the check. Confirm nothing is missing.
+5. Only then set `DEPLOY_ENV=production` and redeploy.
+
+### Still open, and needs the owner
+
+Both involve the database connection string, which embeds the password.
+
+- **Previews share the production database.** `DATABASE_URL` and
+  `DIRECT_DATABASE_URL` are scoped to *Production and Preview* with the same
+  values, so every preview deployment reads and writes live member data.
+  A Neon branch named `preview` already exists for this — schema-only, so it
+  carries no member data at all. Add its pooled and direct strings as
+  **Preview-scoped** variables, *then* untick Preview on the production pair.
+  That order matters: reversed, previews have no database and every PR's Vercel
+  check fails. The Vercel UI can change a variable's environments without
+  re-entering its value.
+- **`admin` has no `DIRECT_DATABASE_URL`.** Only `web` does, which is why only
+  `web` runs migrations on deploy. Adding it to the admin project (from the
+  `staging` branch, Production scope) lets admin run them too, closing the
+  window where admin can go live before web has applied a schema change.
+
+### The branch names are a trap
+
+Neon's **default** branch is called `production` and is idle. The live app runs
+on the branch called `staging`. Anything that maps environment variables from
+the default branch — the Neon↔Vercel integration especially — will repoint the
+live app at `production`, which is missing every write since `staging` was
+branched. Set the mapping explicitly, or rename the branches.
