@@ -93,45 +93,53 @@ export default async function ContributionsPage({
   return (
     <div className="space-y-5 sm:space-y-6">
 
-      {/* ── Header + summary + group collection account: ONE Reveal ────
-          One `<Reveal>` for the whole block, not one per section. Each
-          Reveal owns its own IntersectionObserver, so adjacent Reveals
-          settle their transforms independently — a frame or two apart on a
-          slow phone, which reads as a torn seam where two sections meet.
-          One observer, one transform, one settle: no seam to open.
+      {/* ── Reveal structure: one per section, staggered ───────────────
+          Matches `dashboard/page.tsx`, `goals/page.tsx` and
+          `transactions/page.tsx`, none of which show the tearing this page
+          did — the dashboard in particular renders the *same*
+          `grid grid-cols-2 lg:grid-cols-4` of stat cards inside a Reveal
+          and is fine, which rules out the grid itself.
 
-          The other half of that bug lived in the children: cards and rows
-          declared `transition-all` next to a `hover:-translate-y`, which
-          arms a `transform` transition on every child while this ancestor
-          is animating one. Fixed in SummaryCards.tsx / ContributionRow.tsx
-          by transitioning only the properties that actually change. Both
-          halves had to go — that is why earlier passes at this did not
-          hold. */}
-      <Reveal variant="up" className="space-y-5 sm:space-y-6">
-        {/* Header stacks on mobile: at 360px a heading, a subtitle and a
-            button cannot share a row without the button crushing the text. */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-xxm-green/10 sm:h-12 sm:w-12">
-              <Wallet size={20} className="text-xxm-green sm:hidden" aria-hidden />
-              <Wallet size={22} className="hidden text-xxm-green sm:block" aria-hidden />
-            </div>
-            <div className="min-w-0">
-              <h1 className="font-display text-xl font-extrabold tracking-tight text-xxm-green-900 sm:text-2xl">
-                Contributions
-              </h1>
-              <p className="mt-1 text-[13px] text-xxm-gray-500 sm:text-sm">
-                Your monthly payment history and ledger.
-              </p>
-            </div>
+          What this page did differently was collapse three stacked
+          sections into a single `<Reveal>` (an earlier attempt at the same
+          bug, on the theory that adjacent observers settling apart was the
+          cause). That made one tall element animate a transform across the
+          full height of the viewport on a phone, rather than three short
+          ones settling in sequence — a much larger composited layer, and
+          the thing that actually reads as tearing while scrolling.
+
+          Staggered delays are not decoration here: they are what keeps
+          each animated layer small and short-lived, which is why every
+          other page in this app is built this way. */}
+      {/* Header stacks on mobile: at 360px a heading, a subtitle and a
+          button cannot share a row without the button crushing the text. */}
+      <Reveal variant="up" className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-xxm-green/10 sm:h-12 sm:w-12">
+            <Wallet size={20} className="text-xxm-green sm:hidden" aria-hidden />
+            <Wallet size={22} className="hidden text-xxm-green sm:block" aria-hidden />
           </div>
-          {hasOpen && (
-            <Button asChild className="w-full shrink-0 sm:w-auto">
-              <Link href="/dashboard/contribute">Make a payment</Link>
-            </Button>
-          )}
+          <div className="min-w-0">
+            <h1 className="font-display text-xl font-extrabold tracking-tight text-xxm-green-900 sm:text-2xl">
+              Contributions
+            </h1>
+            <p className="mt-1 text-[13px] text-xxm-gray-500 sm:text-sm">
+              Your monthly payment history and ledger.
+            </p>
+          </div>
         </div>
+        {hasOpen && (
+          <Button asChild className="w-full shrink-0 sm:w-auto">
+            <Link href="/dashboard/contribute">Make a payment</Link>
+          </Button>
+        )}
+      </Reveal>
+
+      <Reveal variant="up" delay={100}>
         <ContributionSummaryCards summary={summary} />
+      </Reveal>
+
+      <Reveal variant="up" delay={150}>
         <GroupCollectionAccount />
       </Reveal>
 
@@ -165,7 +173,12 @@ export default async function ContributionsPage({
           </p>
         </div>
       ) : (
-        <section className="space-y-3">
+        // Wrapped like `transactions/page.tsx` wraps its own list: one
+        // Reveal around the section, never one per row. A Reveal per row
+        // would put an independently-settling transform on every item in a
+        // scrolling list, which is precisely the "gets worse as you scroll"
+        // shape of this bug.
+        <Reveal variant="up" delay={200} as="section" className="space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-widest text-xxm-gray-400">History</h2>
           <div className="space-y-2">
             {serialized.map((c: (typeof serialized)[number]) => (
@@ -180,7 +193,7 @@ export default async function ContributionsPage({
               baseUrl="/dashboard/contributions"
             />
           )}
-        </section>
+        </Reveal>
       )}
     </div>
   )

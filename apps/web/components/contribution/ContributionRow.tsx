@@ -60,13 +60,25 @@ export function ContributionRow({ contribution, mandate }: Props) {
   return (
     <>
       {/*
-        `transition-[box-shadow,border-color]`, not `transition-all`, and the
-        lift is `sm:hover:` only — same reasoning as SummaryCards.tsx: rows
-        render inside a `<Reveal>` that animates `transform` on an ancestor, so
-        a row must never have its own live `transform` transition armed at the
-        same time, and a hover lift is unreachable on touch anyway.
+        No shadow and no shadow transition on mobile — both are `sm:` only.
+
+        This is the difference between this list and the transaction list,
+        which never showed the tearing reported here. A transaction row is a
+        plain div inside one shared card, carrying only `transition-colors`.
+        Every contribution row was its own elevated card: `shadow-xxm-sm`,
+        rounded corners, `overflow-hidden`, and a live box-shadow transition —
+        so a page of twelve rows is twelve independently-shadowed compositing
+        layers stacked down a scrolling viewport. That is expensive enough on
+        a phone GPU to tear, and it gets worse the further you scroll, which
+        matches the report exactly.
+
+        On mobile the rows now separate by border alone, which is what the
+        transaction list already does. The shadow, the hover lift and the
+        shadow transition all return at `sm:`, where there is a pointer to
+        justify them and a GPU that is not being asked to composite a dozen
+        shadowed layers at once. Desktop is visually unchanged.
       */}
-      <div className="group bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm overflow-hidden transition-[box-shadow,border-color] duration-slow ease-smooth sm:hover:shadow-xxm sm:hover:border-xxm-green/15">
+      <div className="group overflow-hidden rounded-2xl border border-xxm-green/8 bg-white sm:shadow-xxm-sm sm:transition-[box-shadow,border-color] sm:duration-slow sm:ease-smooth sm:hover:shadow-xxm sm:hover:border-xxm-green/15">
 
         {/* ── Main row ────────────────────────────────────── */}
         {/*
