@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// notification.service is imported only for `shortSuppliedId`, a pure hashing
+// helper. Mocked so this suite does not pull the validated env module and the
+// db/provider clients in through it — the real implementation is covered by
+// __tests__/sms-supplied-id-length.test.ts.
+vi.mock('@/services/notification.service', () => ({
+  shortSuppliedId: (v: string) => v.slice(0, 20),
+}))
+
 /**
  * Changing a phone number was completely silent.
  *

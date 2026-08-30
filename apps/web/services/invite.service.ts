@@ -4,6 +4,7 @@ import { emailProvider } from '@/integrations/email'
 import { smsProvider } from '@/integrations/sms'
 import { writeAuditLog } from './audit.service'
 import { raiseOperationalAlert } from './alert.service'
+import { shortSuppliedId } from './notification.service'
 import { logger } from '@xxm/observability'
 import { encrypt, decrypt } from '@/lib/encryption'
 import {
@@ -223,7 +224,12 @@ export async function generateInvite(
       `Tap to register: ${registrationUrl}`,
       `IMPORTANT: Never share this code with anyone. It expires in 7 days.`,
     ].join('\n'),
-    userSuppliedId: `invite-${invite.id}`,
+    // `invite-` + a 25-character cuid is 32, over BulkSMS's 20-character
+    // userSuppliedId limit, which rejects the whole message. Same defect as
+    // the phone-change warning and the notification path — every invite SMS
+    // failed silently, swallowed by the `.catch` below, so an invited member
+    // simply never got their code by SMS.
+    userSuppliedId: shortSuppliedId(`invite-${invite.id}`),
   }).catch((err) => logger.warn('Invite SMS delivery failed', { err, inviteId: invite.id }))
 
   emailProvider.sendInviteEmail(email, firstName, code, registrationUrl)

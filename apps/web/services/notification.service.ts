@@ -57,7 +57,7 @@ type QueuedNotification = {
   status: string
   payload: unknown
   createdAt: Date
-  template: { id: string; slug: string; channel: string; body: string }
+  template: { id: string; slug: string; channel: string; body: string; subject: string | null }
   user: { email: string | null; phone: string | null }
 }
 
@@ -109,7 +109,7 @@ function interpolateHtml(template: string, payload: Record<string, unknown>): st
  * deduplicates a resend after a worker crash by this value, the same
  * property the Resend idempotency key relies on for email.
  */
-function shortSuppliedId(notificationId: string): string {
+export function shortSuppliedId(notificationId: string): string {
   return createHash('sha256').update(notificationId).digest('hex').slice(0, 20)
 }
 
@@ -175,6 +175,7 @@ async function dispatchEmail(
   slug: string,
   body: string,
   payload: Record<string, unknown>,
+  subject?: string | null,
 ): Promise<void> {
   const firstName = String(payload.firstName ?? '')
   const amount = String(payload.amount ?? '0')
@@ -200,10 +201,16 @@ async function dispatchEmail(
       await emailProvider.sendOverdueReminderEmail(to, firstName, amount, period, dashboardUrl, key)
       break
     default:
+      // The template's own `subject` column, when it has one. Every email used
+      // to arrive titled just "Xkimi Xa Mali Foundation" regardless of what it
+      // said — the schema has carried a `subject` field all along and nothing
+      // read it. A broadcast about a debit run and one about a new Goal are
+      // not the same email, and an inbox that cannot tell them apart is one
+      // people stop opening.
       await emailProvider.sendGenericEmail(
         to,
-        `Xkimi Xa Mali Foundation`,
-        `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">${interpolateHtml(body, payload)}</div>`,
+        interpolate(subject ?? '', payload).trim() || 'Xkimi Xa Mali Foundation',
+        interpolateHtml(body, payload),
         key,
       )
   }
@@ -342,7 +349,7 @@ export async function sendNotificationNow(params: {
 
   try {
     if (params.channel === 'EMAIL' && user.email) {
-      await dispatchEmail(notification.id, user.email, template.slug, template.body, payload)
+      await dispatchEmail(notification.id, user.email, template.slug, template.body, payload, template.subject)
     } else if (params.channel === 'SMS' && user.phone) {
       await dispatchSMS(notification.id, user.phone, template.slug, template.body, payload)
     }
@@ -413,7 +420,7 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
 
       try {
         if (notification.channel === 'EMAIL' && notification.user.email) {
-          await dispatchEmail(notification.id, notification.user.email, slug, notification.template.body, payload)
+          await dispatchEmail(notification.id, notification.user.email, slug, notification.template.body, payload, notification.template.subject)
           sent++
         } else if (notification.channel === 'SMS' && notification.user.phone) {
           await dispatchSMS(notification.id, notification.user.phone, slug, notification.template.body, payload)

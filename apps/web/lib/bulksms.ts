@@ -36,6 +36,8 @@ export type BulkSMSMessage = {
 export type BulkSMSSendInput = {
   to: string
   body: string
+  /** Overrides `BULKSMS_SENDER_ID` for this message. Rarely needed. */
+  from?: string
   userSuppliedId?: string
   routingGroup?: BulkSMSRoutingGroup
 }
@@ -85,12 +87,31 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return parseResponse<T>(res)
 }
 
+/**
+ * The `from` BulkSMS should show the recipient, when one is configured.
+ *
+ * `BulkSMSSendInput` has always declared a `from`, and the response type reads
+ * one back, but neither send path ever put it in the request body — so every
+ * message went out from BulkSMS's shared pool and arrived as an unknown
+ * number. On a platform that asks members to trust it with money, an
+ * unattributed SMS about a debit is indistinguishable from a scam.
+ *
+ * Omitted entirely rather than defaulted when unset: an unregistered
+ * alphanumeric sender ID is silently replaced or rejected by the networks, so
+ * a guessed value would be worse than none.
+ */
+function senderFields(explicit?: string): { from: string } | Record<string, never> {
+  const from = explicit ?? env.BULKSMS_SENDER_ID
+  return from ? { from } : {}
+}
+
 export async function sendSMS(input: BulkSMSSendInput): Promise<BulkSMSMessage[]> {
   return withRetry(
     () => post<BulkSMSMessage[]>('/messages', {
       to: input.to,
       body: input.body,
       routingGroup: input.routingGroup ?? 'STANDARD',
+      ...senderFields(input.from),
       ...(input.userSuppliedId && { userSuppliedId: input.userSuppliedId }),
     }),
     { maxAttempts: 3, baseDelayMs: 500, label: `BulkSMS.sendSMS(${input.to})` },
@@ -107,6 +128,7 @@ export async function sendBulkSMS(messages: BulkSMSSendInput[]): Promise<BulkSMS
       to: m.to,
       body: m.body,
       routingGroup: m.routingGroup ?? 'STANDARD',
+      ...senderFields(m.from),
       ...(m.userSuppliedId && { userSuppliedId: m.userSuppliedId }),
     }))),
     { maxAttempts: 3, baseDelayMs: 500, label: `BulkSMS.sendBulkSMS(${messages.length} msgs)` },
