@@ -5,12 +5,14 @@ import { formatZAR } from '@/lib/formatters'
 /**
  * Where the group's contributions are settled, shown for transparency.
  *
- * Rebuilt alongside the rest of this page, 2026-08-30. The backgrounds here
- * were translucent tints (`bg-xxm-green-50/40`, `bg-amber-50/70`) stacked
- * inside a clipped, rounded card. A non-opaque box has to be blended against
- * whatever is behind it every time it paints, which is exactly the work this
- * page needed less of. They are flat, opaque colours now — visually the same,
- * with nothing to blend.
+ * Styled to the system's card language — `rounded-3xl`, a hairline border, a
+ * tinted header strip and the gradient icon tile with its ring — as one card
+ * rather than nested tinted blocks.
+ *
+ * The cell backgrounds stay opaque. A translucent box has to be blended
+ * against whatever is behind it on every paint, and this page tore on phones
+ * for six rounds because of how much of that work it was asking a GPU to do.
+ * See `ContributionSummary` for the full account of what fixed it.
  */
 export function GroupCollectionAccount({ compact = false }: { compact?: boolean } = {}) {
   const fields = [
@@ -23,14 +25,19 @@ export function GroupCollectionAccount({ compact = false }: { compact?: boolean 
   return (
     <section
       aria-label="Group collection account"
-      className="overflow-hidden rounded-2xl border border-xxm-green/10 bg-white"
+      className={`overflow-hidden rounded-3xl border border-xxm-green/8 bg-white ${
+        compact ? '' : 'shadow-xxm-sm sm:shadow-xxm'
+      }`}
     >
-      <div className="flex items-center gap-2.5 border-b border-xxm-green/10 bg-xxm-green-50 px-4 py-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white" aria-hidden>
+      <div className="flex items-center gap-2.5 border-b border-xxm-gray-100 bg-xxm-gray-50 px-4 py-3 sm:px-5">
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-xxm-green/15 to-xxm-green/5 ring-1 ring-xxm-green/10"
+          aria-hidden
+        >
           <Landmark size={14} className="text-xxm-green" />
         </span>
         <div className="min-w-0">
-          <h2 className="text-[11px] font-bold uppercase tracking-wide text-xxm-green-700">
+          <h2 className="text-[11px] font-bold uppercase tracking-widest text-xxm-green-700">
             Group collection account
           </h2>
           <p className="text-[10px] text-xxm-gray-500">Where your contributions are settled</p>
@@ -40,20 +47,21 @@ export function GroupCollectionAccount({ compact = false }: { compact?: boolean 
       {/* `min-w-0` on each cell: a 2-up grid on a narrow phone gives each about
           150px, and both the account name and a letter-spaced account number
           are wide enough to force their track past that — stretching the card
-          off-screen rather than wrapping inside it. */}
-      {/* `compact` keeps two columns at every width — it renders inside the
+          off-screen rather than wrapping inside it.
+
+          `compact` keeps two columns at every width; it renders inside the
           payment modal, which is far narrower than the page. */}
       <dl
-        className={`grid gap-x-4 gap-y-3 px-4 py-4 ${
+        className={`grid gap-x-4 gap-y-3.5 px-4 py-4 sm:px-5 ${
           compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'
         }`}
       >
         {fields.map(({ label, value, mono }) => (
           <div key={label} className="min-w-0">
-            <dt className="text-[10px] uppercase tracking-wide text-xxm-gray-400">{label}</dt>
+            <dt className="text-[10px] uppercase tracking-widest text-xxm-gray-400">{label}</dt>
             <dd
-              className={`text-sm font-bold text-xxm-green-900 ${
-                mono ? 'break-all font-mono tracking-wider' : 'break-words'
+              className={`mt-0.5 text-sm font-bold text-xxm-green-900 ${
+                mono ? 'stat-number break-all font-mono tracking-wider' : 'break-words'
               }`}
             >
               {value}
@@ -63,7 +71,7 @@ export function GroupCollectionAccount({ compact = false }: { compact?: boolean 
       </dl>
 
       {NETCASH_FEE_BUFFER > 0 && (
-        <p className="flex items-start gap-2 border-t border-amber-100 bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-800">
+        <p className="flex items-start gap-2 border-t border-amber-100 bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-800 sm:px-5">
           <Info size={13} className="mt-0.5 shrink-0 text-amber-600" aria-hidden />
           <span>
             Netcash deducts a processing fee per debit. Budget about{' '}
