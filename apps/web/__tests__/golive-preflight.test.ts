@@ -1,0 +1,100 @@
+import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+// @ts-expect-error — plain .mjs build script, no type declarations
+import {
+  preflight,
+  REQUIRED_WHEN_LIVE,
+  CONFIGURED_WHEN_LIVE,
+  NETCASH_CREDENTIALS,
+} from '../scripts/golive-preflight.mjs'
+
+/**
+ * The go-live preflight reports which variables are still missing before
+ * `DEPLOY_ENV` is switched to `production` — the switch that makes all of them
+ * mandatory at once, at the worst possible moment to discover one is absent.
+ *
+ * A report like that is only worth having if it is complete. If someone adds a
+ * variable to `requiredWhenLive` in `lib/env.ts` and forgets to list it in the
+ * script, the preflight keeps saying everything is fine and the deployment
+ * still fails at boot — which is worse than having no preflight, because now
+ * there is something reassuring you.
+ *
+ * So the lists are not maintained by hand and hoped over: these tests read
+ * `lib/env.ts` and fail if the two ever disagree.
+ */
+const ENV_SOURCE = readFileSync(join(__dirname, '../lib/env.ts'), 'utf8')
+
+function declaredWith(helper: string): string[] {
+  const pattern = new RegExp(`^\\s+([A-Z][A-Z0-9_]*):\\s*${helper}\\(`, 'gm')
+  return [...ENV_SOURCE.matchAll(pattern)].map((m) => m[1]).sort()
+}
+
+describe('go-live preflight — lists match lib/env.ts', () => {
+  it('covers every requiredWhenLive variable', () => {
+    expect([...REQUIRED_WHEN_LIVE].sort()).toEqual(declaredWith('requiredWhenLive'))
+  })
+
+  it('covers every configuredWhenLive variable', () => {
+    expect([...CONFIGURED_WHEN_LIVE].sort()).toEqual(declaredWith('configuredWhenLive'))
+  })
+
+  it('covers every Netcash credential', () => {
+    expect([...NETCASH_CREDENTIALS].sort()).toEqual(declaredWith('netcashCredential'))
+  })
+
+  // If the regex ever stops matching the file's shape, every list above would
+  // compare empty-to-empty and pass while checking nothing.
+  it('actually found declarations to compare against', () => {
+    expect(declaredWith('requiredWhenLive').length).toBeGreaterThan(5)
+    expect(declaredWith('configuredWhenLive').length).toBeGreaterThan(2)
+    expect(declaredWith('netcashCredential').length).toBe(2)
+  })
+})
+
+describe('go-live preflight — reporting', () => {
+  const complete: Record<string, string> = {}
+  for (const name of [...REQUIRED_WHEN_LIVE, ...CONFIGURED_WHEN_LIVE, ...NETCASH_CREDENTIALS]) {
+    complete[name] = 'set'
+  }
+
+  it('reports nothing missing when everything is set', () => {
+    expect(preflight({ ...complete, DEPLOY_ENV: 'staging' }).missing).toEqual([])
+  })
+
+  it('names exactly what is absent', () => {
+    const { missing } = preflight({ ...complete, BLOB_READ_WRITE_TOKEN: undefined, DEPLOY_ENV: 'staging' })
+    expect(missing).toEqual(['BLOB_READ_WRITE_TOKEN'])
+  })
+
+  // An empty string satisfies "the key exists" but fails `z.string().min(1)`,
+  // so treating it as present would report a green light for a boot failure.
+  it('treats an empty value as missing', () => {
+    expect(preflight({ ...complete, ADMIN_API_SECRET: '', DEPLOY_ENV: 'staging' }).missing).toEqual([
+      'ADMIN_API_SECRET',
+    ])
+  })
+
+  it('skips the Netcash credentials while the gateway is the mock', () => {
+    const env = { ...complete, PAYMENT_GATEWAY: 'mock', DEPLOY_ENV: 'staging' }
+    delete env.NETCASH_SERVICE_KEY
+    delete env.NETCASH_WEBHOOK_SECRET
+    expect(preflight(env).missing).toEqual([])
+  })
+
+  it('requires the Netcash credentials once the gateway is real', () => {
+    const env = { ...complete, PAYMENT_GATEWAY: 'netcash', DEPLOY_ENV: 'staging' }
+    delete env.NETCASH_SERVICE_KEY
+    expect(preflight(env).missing).toContain('NETCASH_SERVICE_KEY')
+  })
+
+  // DEPLOY_ENV wins over VERCEL_ENV — this is why the production deployment
+  // runs in non-live mode today despite VERCEL_ENV being "production".
+  it('reads live-ness the same way lib/env.ts does', () => {
+    expect(preflight({ DEPLOY_ENV: 'production' }).live).toBe(true)
+    expect(preflight({ DEPLOY_ENV: 'staging', VERCEL_ENV: 'production' }).live).toBe(false)
+    expect(preflight({ VERCEL_ENV: 'production' }).live).toBe(true)
+    expect(preflight({ VERCEL_ENV: 'preview' }).live).toBe(false)
+    expect(preflight({ NODE_ENV: 'production' }).live).toBe(true)
+  })
+})
