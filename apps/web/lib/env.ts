@@ -183,6 +183,22 @@ export const env = createEnv({
     // debit warning and mandate notice is dropped.
     BULKSMS_USERNAME: requiredWhenLive(z.string().min(1)),
     BULKSMS_PASSWORD: requiredWhenLive(z.string().min(1)),
+    /**
+     * The alphanumeric sender ID members see instead of a bare number.
+     *
+     * Without it BulkSMS sends from a shared shortcode, so a debit warning or
+     * an OTP arrives from an unrecognised number — which is exactly the shape
+     * of a scam SMS, on a platform asking people to trust it with money.
+     *
+     * Hard limits, set by the GSM spec and the networks rather than by us:
+     * 11 characters, and alphanumeric sender IDs must be pre-registered with
+     * BulkSMS (and, in South Africa, cleared by the networks) before they
+     * deliver — an unregistered ID is silently replaced or the message is
+     * rejected outright. Left unset until that registration is done, which is
+     * why this is optional rather than `requiredWhenLive`: a wrong value here
+     * drops messages, and silence is better than that.
+     */
+    BULKSMS_SENDER_ID: z.string().min(1).max(11).optional(),
     RESEND_API_KEY: requiredWhenLive(z.string().min(1)),
     RESEND_FROM_EMAIL: configuredWhenLive(sendableFromAddress(), 'noreply@example.invalid'),
     // No Inngest keys means none of the 16 scheduled jobs fire — including the
@@ -276,6 +292,7 @@ export const env = createEnv({
     NETCASH_WEBHOOK_IPS: process.env.NETCASH_WEBHOOK_IPS,
     BULKSMS_USERNAME: process.env.BULKSMS_USERNAME,
     BULKSMS_PASSWORD: process.env.BULKSMS_PASSWORD,
+    BULKSMS_SENDER_ID: process.env.BULKSMS_SENDER_ID,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
     INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,

@@ -9,6 +9,7 @@ import {
 } from '@/lib/errors'
 import { assertCanAccess } from '@/lib/authorization'
 import { smsProvider } from '@/integrations/sms'
+import { shortSuppliedId } from './notification.service'
 import { tallyBy } from '@/lib/aggregate'
 import type {
   UpdateProfileInput,
@@ -162,7 +163,16 @@ async function warnPreviousNumber(previousPhone: string, userId: string): Promis
       body:
         'Xkimi Xa Mali Foundation: the mobile number on your account has been changed. ' +
         'Future alerts will go to the new number. If this was not you, contact the Foundation now.',
-      userSuppliedId: `phone-change-${userId}-${Date.now()}`,
+      // BulkSMS caps userSuppliedId at 20 characters and rejects the whole
+      // message otherwise. `phone-change-<25-char cuid>-<13-digit timestamp>`
+      // is ~51, so this SMS ALWAYS failed — silently, because this function
+      // deliberately never throws. It surfaced only as a recurring
+      // "Could not warn the previous number of a phone change" in Sentry,
+      // which is exactly what a member changing their number would never see.
+      // Same defect and same fix as the notification path (see
+      // `shortSuppliedId`); the timestamp is folded into the hash input so
+      // two changes by the same member still get distinct ids.
+      userSuppliedId: shortSuppliedId(`phone-change-${userId}-${Date.now()}`),
     })
   } catch (err) {
     logger.error('Could not warn the previous number of a phone change', {
