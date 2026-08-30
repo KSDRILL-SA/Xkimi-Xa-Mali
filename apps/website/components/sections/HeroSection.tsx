@@ -147,55 +147,62 @@ export async function HeroSection() {
           </div>
 
           {/* floating stat pills */}
-          {/* Three pills don't fit one row under 390px wide, and wrapping to a
-              second row is what pushed this block into the founder photo's
-              name band — the exact height that second row added varied with
-              which founder was showing, since the CTA-row fix above was tuned
-              against only one of them. Scrolling sideways on mobile instead
-              guarantees this block is always exactly one row tall, regardless
-              of the viewport or which of the four photos is up.
+          {/* Owner's explicit call, overriding the earlier horizontal-scroll
+              decision below: three pills genuinely don't fit one row on a
+              narrow phone, and side-scrolling a row of stat pills reads as
+              broken rather than intentional — worse than one pill sitting on
+              its own second line. So: grid-cols-2 on mobile (two pills top,
+              the third spans the full row underneath it), a single
+              non-wrapping row again from `sm:` up, where three pills already
+              fit comfortably and the original scroll/nowrap behavior is kept.
 
-              Same guarantee now applies at every breakpoint, not just mobile
-              — `md:flex-wrap` let the third pill (its label+sub text is the
-              longest of the three: "DebiCheck Mandates" / "Bank-authenticated")
-              wrap onto its own line at some in-between desktop widths, which
-              is the exact failure this comment already describes, just at a
-              different breakpoint: a pill sitting on a row by itself, out of
-              sync with the other two's shared `animate-float` phase because
-              it's no longer visually part of the same row at all. `flex-nowrap`
-              everywhere removes the condition that let it happen; `mt-2`
-              nudges the whole row down slightly, unrelated to that fix. */}
+              The reason wrapping was avoided in the first place, still worth
+              knowing: on mobile this whole text block sits *over* the
+              founder photo's own name-and-title band baked into the image,
+              and a taller block risks colliding with it depending on which
+              of the four founders is showing. That risk is real but
+              secondary to the owner's product call here — if it turns out to
+              collide on a specific photo, the fix is more bottom padding on
+              the photo's name band or an earlier vertical cutoff for this
+              block, not reintroducing horizontal scroll. */}
           <div
-            className="flex flex-nowrap gap-3 overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0 mt-2 animate-fade-in-up"
+            className="grid grid-cols-2 sm:flex sm:flex-nowrap gap-3 mt-2 animate-fade-in-up"
             style={{ animationDelay: '1s' }}
           >
-            {[
-              // Omitted rather than guessed when the member app is unreachable.
-              // A pill reading "4 Members" beside two true statements is a
-              // claim about the size of the collective, and an outage is not a
-              // licence to make one; the row simply carries two pills instead.
-              ...(stats
-                ? [{
-                    icon: Users,
-                    label: `${stats.members} Member${stats.members === 1 ? '' : 's'}`,
-                    sub: 'Brotherhood',
-                  }]
-                : []),
-              { icon: TrendingUp, label: `${FACTS.minMonthlyPlus} / Month`, sub: 'Per member' },
-              // "DebiCheck Verified" claimed a credential the Foundation does
-              // not hold — the Netcash merchant application has not been
-              // submitted, so nothing has verified anything. The system is
-              // built for DebiCheck and submits authenticated mandates, which
-              // is what this now says. A financial credential is exactly the
-              // claim a prospective member or a bank would rely on.
-              { icon: Shield,     label: 'DebiCheck Mandates', sub: 'Bank-authenticated' },
-            ].map(({ icon: Icon, label, sub }) => (
+            {(() => {
+              const pills = [
+                // Omitted rather than guessed when the member app is unreachable.
+                // A pill reading "4 Members" beside two true statements is a
+                // claim about the size of the collective, and an outage is not a
+                // licence to make one; the row simply carries two pills instead.
+                ...(stats
+                  ? [{
+                      icon: Users,
+                      label: `${stats.members} Member${stats.members === 1 ? '' : 's'}`,
+                      sub: 'Brotherhood',
+                    }]
+                  : []),
+                { icon: TrendingUp, label: `${FACTS.minMonthlyPlus} / Month`, sub: 'Per member' },
+                // "DebiCheck Verified" claimed a credential the Foundation does
+                // not hold — the Netcash merchant application has not been
+                // submitted, so nothing has verified anything. The system is
+                // built for DebiCheck and submits authenticated mandates, which
+                // is what this now says. A financial credential is exactly the
+                // claim a prospective member or a bank would rely on.
+                { icon: Shield, label: 'DebiCheck Mandates', sub: 'Bank-authenticated' },
+              ]
+              // An odd one out on mobile's 2-up grid — the third pill with no
+              // partner beside it — spans both columns instead of sitting
+              // alone in the left one with dead space to its right.
+              const isOddOneOut = (i: number) => pills.length % 2 !== 0 && i === pills.length - 1
+
+              return pills.map(({ icon: Icon, label, sub }, i) => (
               <div
                 key={label}
                 // items-center here (not just on the row) so each pill's own
                 // icon+text is centered on ITS OWN box — doesn't depend on
                 // every pill in the row happening to end up the same height.
-                className="glass flex items-center gap-3 px-4 py-3 rounded-2xl shrink-0 animate-float"
+                className={`glass flex items-center gap-3 px-4 py-3 rounded-2xl sm:shrink-0 animate-float ${isOddOneOut(i) ? 'col-span-2 sm:col-span-1' : ''}`}
               >
                 <div className="w-8 h-8 rounded-xl bg-xxm-gold/15 flex items-center justify-center shrink-0">
                   <Icon size={15} className="text-xxm-gold" aria-hidden />
@@ -211,16 +218,17 @@ export async function HeroSection() {
                   siblings' even though all three share the identical
                   keyframes. Forcing single-line removes the height variance
                   at the source rather than trying to compensate for it after
-                  the fact — the row already scrolls horizontally
-                  (overflow-x-auto) on narrow screens, so a wider pill costs
-                  nothing.
+                  the fact. Each pill can still be as wide as it needs to be
+                  — on mobile its grid column simply grows to fit it; on
+                  desktop the row has room regardless.
                 */}
                 <div className="min-w-0">
                   <p className="text-white text-sm font-bold leading-none whitespace-nowrap">{label}</p>
                   <p className="text-white/45 text-[11px] mt-0.5 whitespace-nowrap">{sub}</p>
                 </div>
               </div>
-            ))}
+              ))
+            })()}
           </div>
         </div>
       </div>
