@@ -22,6 +22,7 @@ const BRAND = {
   faint:     '#9CA3AF',
   hairline:  '#E5E7EB',
   canvas:    '#F5F0E6',
+  canvasSoft: '#FAF7F0',
   surface:   '#FFFFFF',
 }
 
@@ -33,69 +34,115 @@ const SITE_URL    = 'https://xkimixamali.co.za'
 const SUPPORT     = env.SUPPORT_EMAIL
 const WHATSAPP    = env.WHATSAPP_GROUP_LINK
 
+const FONT = `-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif`
+const SERIF = `Georgia,'Times New Roman',serif`
+
+/**
+ * Type and component styles.
+ *
+ * Every key that existed before is kept, because each is referenced by name
+ * from the individual email bodies further down this file — changing the
+ * design means changing these values, not renaming the tokens.
+ */
 const S = {
-  heading: `margin:0 0 12px;color:${BRAND.green};font-size:22px;line-height:1.3;font-weight:800;`,
-  body:    `margin:0 0 20px;color:${BRAND.body};font-size:15px;line-height:1.6;`,
-  btn:     `display:inline-block;background:${BRAND.green};color:#ffffff;text-decoration:none;padding:14px 30px;border-radius:10px;font-weight:700;font-size:15px;`,
-  small:   `margin:20px 0 0;color:${BRAND.muted};font-size:13px;line-height:1.55;`,
-  hr:      `border:none;border-top:1px solid ${BRAND.hairline};margin:28px 0;`,
-  footer:  `margin:0;color:${BRAND.faint};font-size:12px;line-height:1.6;`,
+  // -- Type scale ------------------------------------------------------------
+  eyebrow: `margin:0 0 10px;color:${BRAND.gold};font-size:11px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;`,
+  heading: `margin:0 0 14px;color:${BRAND.green};font-family:${SERIF};font-size:26px;line-height:1.25;font-weight:700;letter-spacing:-0.3px;`,
+  body:    `margin:0 0 22px;color:${BRAND.body};font-size:15px;line-height:1.65;`,
+  lead:    `margin:0 0 22px;color:${BRAND.ink};font-size:16px;line-height:1.6;`,
+  small:   `margin:22px 0 0;color:${BRAND.muted};font-size:13px;line-height:1.6;`,
+
+  // -- Call to action --------------------------------------------------------
+  // `mso-padding-alt` is ignored everywhere except Outlook, where it is the
+  // only padding that applies to a link.
+  btn:     `display:inline-block;background:${BRAND.green};color:#ffffff;text-decoration:none;padding:15px 34px;border-radius:10px;font-weight:700;font-size:15px;line-height:1;mso-padding-alt:15px 34px;`,
+  rawUrl:  `margin:14px 0 0;color:${BRAND.faint};font-size:12px;line-height:1.5;word-break:break-all;`,
+
+  // -- Structural ------------------------------------------------------------
+  hr:      `border:none;border-top:1px solid ${BRAND.hairline};margin:30px 0;`,
+  panel:   `background:${BRAND.canvasSoft};border:1px solid ${BRAND.hairline};border-radius:12px;padding:18px 20px;margin:0 0 22px;`,
+  panelLabel: `margin:0 0 4px;color:${BRAND.faint};font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;`,
+  panelValue: `margin:0;color:${BRAND.ink};font-size:15px;font-weight:700;line-height:1.4;`,
+
+  // -- Footer ----------------------------------------------------------------
+  footer:  `margin:0;color:${BRAND.faint};font-size:12px;line-height:1.65;`,
   flink:   `color:${BRAND.green};text-decoration:none;font-weight:600;`,
-  danger:  `background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:14px 16px;margin-top:20px;`,
+
+  // -- Alert block -----------------------------------------------------------
+  danger:  `background:#FEF2F2;border:1px solid #FECACA;border-left:4px solid #DC2626;border-radius:10px;padding:15px 17px;margin-top:22px;`,
   dtxt:    `margin:0;color:#991B1B;font-size:13px;font-weight:700;`,
   dbody:   `margin:8px 0 0;color:#7F1D1D;font-size:13px;line-height:1.55;`,
-  // A URL printed as a fallback under a button, for clients that strip links
-  // or recipients who do not trust one.
-  rawUrl:  `margin:12px 0 0;color:${BRAND.faint};font-size:12px;line-height:1.5;word-break:break-all;`,
 }
 
 /**
  * The full branded shell every transactional email is rendered into.
  *
- * ── Why this is tables and inline styles ────────────────────────────────────
+ * -- Why this is tables and inline styles ------------------------------------
  *
  * Gmail strips `<style>` blocks, Outlook renders through Word's engine, and
  * neither supports flexbox or grid. Nested tables with inline attributes are
  * the only layout that survives across clients — this is not legacy code, it
- * is the constraint the medium imposes.
+ * is the constraint the medium imposes. Every colour is a literal for the same
+ * reason: there are no CSS variables to reference.
  *
- * The logo is drawn in HTML rather than referenced as an image on purpose:
- * most clients block remote images by default, so an `<img>` logo shows as a
- * broken placeholder on first open — the exact first impression a financial
- * platform cannot afford. A styled table cell always renders.
+ * -- The logo is the real mark, as a PNG --------------------------------------
+ *
+ * An earlier version of this shell drew a letter "X" in a styled table cell,
+ * on the reasoning that clients block remote images and a broken placeholder
+ * is a bad first impression. That traded a rare failure for a guaranteed one:
+ * nobody ever saw the Foundation's actual logo, only a substitute letter.
+ *
+ * Gmail, Apple Mail and Outlook.com all load remote images by default now
+ * (Gmail proxies and caches them), so the image is the common case, not the
+ * exception. `alt` carries the organisation name for the clients that still
+ * block it, and the header keeps its green background and wordmark either way
+ * — so a blocked image costs the mark, not the branding.
+ *
+ * SVG is not an option: no major client renders inline SVG and Gmail strips
+ * it. The PNG is rendered from `packages/ui/src/brand/icon.svg` by
+ * `scripts/render-brand-png.mjs` at 192px and displayed at 48px, so it stays
+ * sharp on high-DPI screens. It is served from this app's own `public/`
+ * directory, which the proxy matcher excludes from auth, so the same deploy
+ * that sends the email also serves the logo and the two cannot drift apart.
  *
  * `preheader` is the grey line clients show beside the subject in the inbox
- * list. Left unset it leaks whatever text comes first — usually "Verify your
- * email address" fragments — so every email sets one deliberately.
+ * list. Left unset it leaks whatever text comes first — usually a fragment of
+ * the heading — so every email sets one deliberately.
  */
-function layout(content: string, preheader: string): string {
+export function layout(content: string, preheader: string): string {
   return `
-<div style="background:${BRAND.canvas};margin:0;padding:24px 12px;">
+<div style="background:${BRAND.canvas};margin:0;padding:28px 12px;font-family:${FONT};">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
   <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;margin:0 auto;">
+
     <tr>
-      <td style="background:${BRAND.green};border-radius:16px 16px 0 0;padding:26px 28px;">
+      <td style="background:${BRAND.green};border-radius:16px 16px 0 0;padding:26px 30px;">
         <table role="presentation" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td style="width:46px;height:46px;background:${BRAND.greenDeep};border-radius:12px;text-align:center;vertical-align:middle;">
-              <span style="color:${BRAND.gold};font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:700;line-height:46px;">X</span>
+            <td style="vertical-align:middle;" width="48">
+              <img src="${APP_URL}/brand/logo-192.png" width="48" height="48" alt="${APP_NAME}"
+                   style="display:block;border:0;outline:none;text-decoration:none;width:48px;height:48px;" />
             </td>
-            <td style="padding-left:14px;vertical-align:middle;">
-              <div style="color:#ffffff;font-size:17px;font-weight:800;letter-spacing:-0.2px;">${APP_NAME}</div>
-              <div style="color:${BRAND.gold};font-size:10px;font-weight:700;letter-spacing:2.4px;text-transform:uppercase;padding-top:3px;">Contributing · Growing · Securing</div>
+            <td style="padding-left:15px;vertical-align:middle;">
+              <div style="color:#ffffff;font-family:${SERIF};font-size:18px;font-weight:700;letter-spacing:-0.2px;">${APP_NAME}</div>
+              <div style="color:${BRAND.gold};font-size:10px;font-weight:700;letter-spacing:2.2px;text-transform:uppercase;padding-top:4px;">Contributing &middot; Growing &middot; Securing</div>
             </td>
           </tr>
         </table>
       </td>
     </tr>
+
+    <tr><td style="background:${BRAND.gold};font-size:0;line-height:0;height:3px;">&nbsp;</td></tr>
+
     <tr>
-      <td style="background:${BRAND.surface};padding:32px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+      <td style="background:${BRAND.surface};padding:36px 30px 34px;font-family:${FONT};">
         ${content}
       </td>
     </tr>
+
     <tr>
-      <td style="background:${BRAND.surface};border-radius:0 0 16px 16px;border-top:1px solid ${BRAND.hairline};padding:22px 28px 26px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-        <p style="margin:0 0 12px;font-size:13px;">
+      <td style="background:${BRAND.canvasSoft};border-radius:0 0 16px 16px;border-top:1px solid ${BRAND.hairline};padding:24px 30px 28px;font-family:${FONT};">
+        <p style="margin:0 0 14px;font-size:13px;">
           <a href="${APP_URL}/dashboard" style="${S.flink}">Dashboard</a>
           <span style="color:${BRAND.hairline};padding:0 8px;">|</span>
           <a href="${APP_URL}/dashboard/contributions" style="${S.flink}">Contributions</a>
@@ -112,18 +159,32 @@ function layout(content: string, preheader: string): string {
         <p style="${S.footer}margin-top:10px;">
           A private, invite-only savings collective. You are receiving this because you are a member of ${APP_NAME}.
         </p>
-        <p style="${S.footer}margin-top:12px;color:${BRAND.faint};font-style:italic;">
-          “Blessed is the hand that giveth.”
-        </p>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:16px;">
+          <tr><td style="border-top:1px solid ${BRAND.hairline};padding-top:14px;">
+            <p style="${S.footer}font-family:${SERIF};font-style:italic;color:${BRAND.muted};">
+              &ldquo;Blessed is the hand that giveth.&rdquo;
+            </p>
+          </td></tr>
+        </table>
       </td>
     </tr>
   </table>
 </div>`
 }
 
-/** A button plus the same URL in plain text, for clients that strip links. */
-function cta(url: string, label: string): string {
-  return `<a href="${url}" style="${S.btn}">${label}</a>
+/**
+ * A button plus the same URL in plain text, for clients that strip links.
+ *
+ * Wrapped in a table rather than left as a bare inline-block: Outlook ignores
+ * padding on an `<a>`, so an unwrapped button collapses to underlined text
+ * there. The table cell gives it real dimensions in every client.
+ */
+export function cta(url: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td style="background:${BRAND.green};border-radius:10px;">
+        <a href="${url}" style="${S.btn}">${label}</a>
+      </td>
+    </tr></table>
     <p style="${S.rawUrl}">Or paste this into your browser:<br/>${url}</p>`
 }
 

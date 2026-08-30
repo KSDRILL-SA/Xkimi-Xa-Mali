@@ -13,7 +13,9 @@
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "render:statement": "tsx --tsconfig scripts/tsconfig.json scripts/render-statement.ts",
     "render:guide": "tsx --tsconfig scripts/tsconfig.json scripts/render-guide.ts",
-    "render:handbook": "tsx --tsconfig scripts/tsconfig.json scripts/render-handbook.ts"
+    "render:handbook": "tsx --tsconfig scripts/tsconfig.json scripts/render-handbook.ts",
+    "render:logo": "node scripts/render-brand-png.mjs",
+    "render:email": "node --env-file-if-exists=.env.local --import tsx scripts/render-email-preview.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.4",
