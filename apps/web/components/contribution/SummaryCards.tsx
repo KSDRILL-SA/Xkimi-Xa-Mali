@@ -72,12 +72,19 @@ export function ContributionSummaryCards({ summary }: { summary: Summary }) {
       {cards.map(({ icon: Icon, label, value, sub, gradient, iconBg, iconColor, border, valueColor }) => (
         <div
           key={label}
-          className={`group relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-5 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
+          // min-w-0: without it, a grid cell's default min-width is its
+          // content's min-content size — an unbreakable value like
+          // "R 123 456,78" at text-2xl can force this track wider than a
+          // 2-up mobile row has room for, which stretches the whole grid
+          // past the viewport instead of the value wrapping or shrinking.
+          // Same fix already applied in ContributionRow.tsx; this component
+          // was missing it.
+          className={`group relative overflow-hidden bg-gradient-to-b ${gradient} rounded-2xl border ${border} shadow-xxm-sm p-4 sm:p-5 min-w-0 hover:shadow-xxm hover:-translate-y-0.5 transition-all duration-fast ease-smooth`}
         >
           <div className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center mb-4 transition-transform duration-slow group-hover:scale-110`}>
             <Icon size={18} className={iconColor} aria-hidden />
           </div>
-          <p className={`stat-number text-2xl font-extrabold leading-none ${valueColor ?? 'text-xxm-green-900'}`}>
+          <p className={`stat-number text-xl sm:text-2xl font-extrabold leading-tight break-words ${valueColor ?? 'text-xxm-green-900'}`}>
             {value}
           </p>
           <p className="text-xs font-semibold text-xxm-gray-600 mt-1.5">{label}</p>

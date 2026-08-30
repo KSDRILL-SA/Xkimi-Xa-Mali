@@ -22,7 +22,13 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
 
 const Ctx = createContext<DropdownCtx | null>(null)
 
-function useDropdown() {
+/**
+ * Exported so custom content inside `<DropdownContent>` — anything that
+ * isn't a `<DropdownItem>` and so doesn't get its auto-close for free, e.g.
+ * a grid of buttons rather than a list of menu rows — can still call
+ * `close()` itself after handling a selection.
+ */
+export function useDropdown() {
   const ctx = useContext(Ctx)
   if (!ctx) throw new Error('Dropdown subcomponent used outside <Dropdown>')
   return ctx

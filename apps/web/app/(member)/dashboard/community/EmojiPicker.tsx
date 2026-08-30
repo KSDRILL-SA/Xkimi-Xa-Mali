@@ -1,48 +1,59 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
 import { Smile } from 'lucide-react'
+import { Dropdown, DropdownTrigger, DropdownContent, useDropdown } from '@xxm/ui'
 import { EMOJIS } from './message-types'
 
-export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [open])
-
+/**
+ * Split out from EmojiPicker because `useDropdown()` only works inside the
+ * `<Dropdown>` provider's own descendants — calling it in the component that
+ * renders `<Dropdown>` itself throws, since the provider isn't mounted yet
+ * at that point in the tree.
+ */
+function EmojiGrid({ onPick }: { onPick: (emoji: string) => void }) {
+  const { close } = useDropdown()
   return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
+    <div className="grid grid-cols-8 gap-0.5">
+      {EMOJIS.map((emoji) => (
+        <button
+          key={emoji}
+          type="button"
+          onClick={() => { onPick(emoji); close() }}
+          className="w-7 h-7 rounded-lg text-lg leading-none flex items-center justify-center hover:bg-xxm-green-50 transition-colors"
+        >
+          {emoji}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Was its own `absolute bottom-full` popup, positioned relative to the
+// composer. That composer lives inside MessageBoard's outer card
+// (`overflow-hidden`, for its rounded corners) — and is reused again inline
+// inside MessageItem for edit/reply, anywhere in a scrollable message list.
+// A popup that opens upward next to its trigger gets its top edge clipped by
+// that ancestor's boundary the moment the trigger is near the top of the
+// card ("the top of it get lost... you only see the lower part of emojis").
+// Flipping the open direction only moves the same bug to whichever end of
+// the list is now too close to an edge.
+//
+// @xxm/ui's Dropdown already solves exactly this — portals the panel to
+// `document.body` and positions it with `fixed` coordinates measured from
+// the trigger, so no ancestor's overflow can clip it. Reusing it here
+// instead of maintaining a second, narrower copy of the same fix.
+export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
+  return (
+    <Dropdown>
+      <DropdownTrigger
         className="w-8 h-8 rounded-lg flex items-center justify-center text-xxm-gray-400 hover:text-xxm-gold-dark hover:bg-xxm-gold/10 transition-colors"
-        aria-label="Add emoji"
       >
         <Smile size={17} aria-hidden />
-      </button>
-      {open && (
-        <div className="absolute bottom-full left-0 mb-2 z-30 w-64 rounded-2xl border border-xxm-gray-100 bg-white shadow-xxm-lg p-2.5 animate-scale-in origin-bottom-left">
-          <div className="grid grid-cols-8 gap-0.5">
-            {EMOJIS.map((emoji) => (
-              <button
-                key={emoji}
-                type="button"
-                onClick={() => { onPick(emoji); setOpen(false) }}
-                className="w-7 h-7 rounded-lg text-lg leading-none flex items-center justify-center hover:bg-xxm-green-50 transition-colors"
-              >
-                {emoji}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+        <span className="sr-only">Add emoji</span>
+      </DropdownTrigger>
+      <DropdownContent className="w-64 p-2.5">
+        <EmojiGrid onPick={onPick} />
+      </DropdownContent>
+    </Dropdown>
   )
 }

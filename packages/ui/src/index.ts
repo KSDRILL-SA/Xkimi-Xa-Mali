@@ -16,6 +16,7 @@ export {
   DropdownItem,
   DropdownLabel,
   DropdownSeparator,
+  useDropdown,
 } from './components/Dropdown'
 export { EmptyState } from './components/EmptyState'
 export { FormGroup } from './components/FormGroup'
