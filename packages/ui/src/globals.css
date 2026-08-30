@@ -296,11 +296,32 @@ html {
  * keeps the animation and leaves nothing behind once it is done.
  *
  * Written as compound selectors rather than `!important`: `.reveal.revealed`
- * is two classes, so one class alone would lose. */
+ * is two classes, so one class alone would lose.
+ *
+ * ── `transition: none` here is load-bearing, not tidying ─────────────────────
+ *
+ * `transform: none` and `translateY(0)` are not the same value to the
+ * transition engine — one is a keyword, the other a matrix — so switching
+ * between them is an animatable change. Without killing the transition first,
+ * applying `.reveal-done` starts a *second* 0.7s transform animation on an
+ * element that already finished revealing, from a resting position to the
+ * identical resting position. It moves nothing and still costs a full
+ * composite pass per element.
+ *
+ * On a phone that reads as a shudder or tear across a group of cards a beat
+ * after they have settled — worst where several `Reveal`s sit adjacent (e.g.
+ * the contributions summary cards), because each one's second animation is
+ * scheduled off its own `transitionend`/timer and so lands a frame or two
+ * apart from its neighbours'. Two earlier attempts at this bug (merging
+ * adjacent Reveals into one; adding `min-w-0`/`break-words` for overflow)
+ * targeted plausible causes that were not this one, and did not fix it.
+ *
+ * `transition: none` makes the finished state an instant, uncomposited swap:
+ * the reveal animation still plays in full, and nothing animates afterwards. */
 .reveal.reveal-done,
 .reveal-left.reveal-done,
 .reveal-right.reveal-done,
-.reveal-scale.reveal-done { transform: none; }
+.reveal-scale.reveal-done { transform: none; transition: none; }
 
 .reveal-left {
   opacity: 0;
