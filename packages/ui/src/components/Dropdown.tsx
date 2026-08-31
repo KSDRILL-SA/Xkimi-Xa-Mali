@@ -108,17 +108,46 @@ export function DropdownTrigger({ children, className }: { children: React.React
  * table's edge, and no z-index helps: clipping is not a paint order.
  *
  * So it is portalled to the body and placed with `fixed` coordinates measured
- * from the trigger. It keeps its right edge aligned with the trigger's, as the
- * old `right-0` did, and flips above when there is not enough room below.
+ * from the trigger, and flips above when there is not enough room below.
+ *
+ * ── Horizontal placement, and the bug that motivated clamping it ───────────
+ *
+ * Default (`align="end"`) keeps the menu's right edge aligned with the
+ * trigger's, as the old `right-0` did — right for a menu whose trigger sits
+ * near the right/top of its own container, like a table row's "⋯" button.
+ *
+ * `align="center"` centres the menu under the trigger instead, for content
+ * that is not a right-anchored list — a wide grid (the emoji picker) opened
+ * from a small icon that can sit anywhere along a toolbar, including near the
+ * left edge of a narrow screen.
+ *
+ * Both modes are clamped to stay within the viewport (an 8px margin either
+ * side). Before this, `right` had a floor (`Math.max(8, …)`, so the menu could
+ * not be pushed past the *right* edge) but no ceiling — nothing stopped the
+ * menu's *left* edge from landing off-screen. A 256px-wide grid opened from a
+ * trigger in the left half of a 360px phone screen computed a `right` value
+ * that put most of the panel off the left edge: exactly "faded sideways,
+ * only half visible," reported against the emoji picker. The clamp caps how
+ * far either `left` or `right` can push the panel, so it always lands fully
+ * on screen regardless of where its trigger sits.
  *
  * The trade-off, stated: a fixed menu does not travel with a scrolling
  * container, so it is repositioned on scroll and resize, and any scroll outside
  * its own list closes it. That is the ordinary behaviour of a menu, and it is
  * better than one that is invisible.
  */
-export function DropdownContent({ children, className }: { children: React.ReactNode; className?: string }) {
+export function DropdownContent({
+  children,
+  className,
+  align = 'end',
+}: {
+  children: React.ReactNode
+  className?: string
+  /** `'end'` (default) right-anchors to the trigger; `'center'` centres under it. */
+  align?: 'end' | 'center'
+}) {
   const { open, menuId, triggerId, triggerRef, menuRef } = useDropdown()
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number } | null>(null)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => setMounted(true), [])
@@ -127,17 +156,29 @@ export function DropdownContent({ children, className }: { children: React.React
     const trigger = triggerRef.current
     if (!trigger) return
     const r = trigger.getBoundingClientRect()
-    const menuHeight = menuRef.current?.offsetHeight ?? 0
+    const menuEl = menuRef.current
+    const menuHeight = menuEl?.offsetHeight ?? 0
+    const menuWidth = menuEl?.offsetWidth ?? 0
     const below = window.innerHeight - r.bottom
     // Flip up only when it genuinely does not fit below and there is more room
     // above — otherwise a menu near the foot of a short page would jump upward
     // for no gain.
     const flip = menuHeight > 0 && below < menuHeight + 8 && r.top > below
-    setPos({
-      top: flip ? r.top - menuHeight - 4 : r.bottom + 4,
-      right: Math.max(8, window.innerWidth - r.right),
-    })
-  }, [triggerRef, menuRef])
+    const top = flip ? r.top - menuHeight - 4 : r.bottom + 4
+
+    // The upper bound can be narrower than the 8px floor when the menu is
+    // wider than the viewport itself; re-flooring it keeps the result >= 8
+    // rather than an inverted (and therefore ignored) clamp range.
+    const maxEdge = Math.max(8, window.innerWidth - menuWidth - 8)
+
+    if (align === 'center') {
+      const idealLeft = r.left + r.width / 2 - menuWidth / 2
+      setPos({ top, left: Math.min(Math.max(8, idealLeft), maxEdge) })
+    } else {
+      const idealRight = window.innerWidth - r.right
+      setPos({ top, right: Math.min(Math.max(8, idealRight), maxEdge) })
+    }
+  }, [triggerRef, menuRef, align])
 
   useIsomorphicLayoutEffect(() => {
     if (!open) { setPos(null); return }
@@ -164,7 +205,11 @@ export function DropdownContent({ children, className }: { children: React.React
       id={menuId}
       role="menu"
       aria-labelledby={triggerId}
-      style={{ position: 'fixed', top: pos?.top ?? -9999, right: pos?.right ?? 0 }}
+      style={{
+        position: 'fixed',
+        top: pos?.top ?? -9999,
+        ...(pos?.left !== undefined ? { left: pos.left } : { right: pos?.right ?? 0 }),
+      }}
       className={cn(
         'z-50 min-w-[180px] bg-white rounded-xl shadow-xxm border border-xxm-gray-100',
         'py-1 animate-scale-in',

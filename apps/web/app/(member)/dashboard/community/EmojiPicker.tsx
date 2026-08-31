@@ -42,6 +42,14 @@ function EmojiGrid({ onPick }: { onPick: (emoji: string) => void }) {
 // `document.body` and positions it with `fixed` coordinates measured from
 // the trigger, so no ancestor's overflow can clip it. Reusing it here
 // instead of maintaining a second, narrower copy of the same fix.
+//
+// `align="center"`, not the default right-anchor: this is a wide 256px grid
+// opened from a small icon that sits wherever it sits in the composer's
+// toolbar — often left-of-centre on a phone, unlike a typical dropdown
+// trigger near the edge of its own container. Right-anchoring it pushed the
+// panel's left edge off-screen ("faded sideways... I only see half of it").
+// Centring under the trigger, with the clamp `DropdownContent` now applies,
+// keeps the whole grid on screen regardless of where the button sits.
 export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
   return (
     <Dropdown>
@@ -51,7 +59,7 @@ export function EmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
         <Smile size={17} aria-hidden />
         <span className="sr-only">Add emoji</span>
       </DropdownTrigger>
-      <DropdownContent className="w-64 p-2.5">
+      <DropdownContent align="center" className="w-64 p-2.5">
         <EmojiGrid onPick={onPick} />
       </DropdownContent>
     </Dropdown>
