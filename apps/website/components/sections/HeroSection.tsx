@@ -2,6 +2,7 @@ import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } fro
 import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
 import { FoundersBackdrop } from './FoundersBackdrop'
+import { AmbientOrbs } from './AmbientOrbs'
 import { FACTS } from '@xxm/utils'
 
 export async function HeroSection() {
@@ -17,27 +18,7 @@ export async function HeroSection() {
       <FoundersBackdrop />
 
       {/* ── Ambient light + grain, above the portraits ────────────── */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        {/* animated light orbs */}
-        <div
-          className="absolute top-1/4 right-1/4 w-[600px] h-[600px] rounded-full opacity-10 animate-orb-drift-1 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 70%)' }}
-          aria-hidden
-        />
-        <div
-          className="absolute bottom-1/3 left-1/5 w-[400px] h-[400px] rounded-full opacity-8 animate-orb-drift-2 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #2C5F47 0%, transparent 70%)' }}
-          aria-hidden
-        />
-        <div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full opacity-5 animate-orb-drift-3 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #D4AF37 0%, transparent 60%)' }}
-          aria-hidden
-        />
-
-        {/* noise grain texture */}
-        <div className="noise-overlay" aria-hidden />
-      </div>
+      <AmbientOrbs />
 
       {/* ── Main content ──────────────────────────────────────────── */}
       {/* `--nav-height` is measured live off the header's real rendered box
@@ -74,7 +55,7 @@ export async function HeroSection() {
           {/* headline — word by word staggered */}
           <h1
             id="hero-headline"
-            className="font-display text-5xl sm:text-6xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-4 md:mb-6"
+            className="font-display text-5xl sm:text-6xl md:text-7xl font-black text-white leading-[1.05] tracking-tight mb-8 md:mb-6"
           >
             <span className="block overflow-hidden">
               <span
@@ -102,9 +83,18 @@ export async function HeroSection() {
             </span>
           </h1>
 
-          {/* subheadline */}
+          {/* subheadline — desktop only.
+              A phone hero showing badge, three-line headline, this
+              paragraph, two buttons and three stat pills before the fold is
+              too much competing for the same few hundred pixels of height —
+              it reads as crowded rather than considered, which is the exact
+              opposite of the first impression this section exists to make.
+              Cut here, not lost: Mission and Features further down carry the
+              same explanation, a scroll away, and the Sign In link this
+              paragraph used to sit above stays reachable from the nav's own
+              mobile pill row regardless. Desktop has the room and keeps it. */}
           <p
-            className="text-white/65 text-lg md:text-xl leading-relaxed max-w-xl mb-4 md:mb-10 animate-fade-in-up"
+            className="hidden md:block text-white/65 md:text-xl leading-relaxed max-w-xl mb-10 animate-fade-in-up"
             style={{ animationDelay: '0.65s' }}
           >
             Xkimi Xa Mali Foundation is a private, invite-only collective financial platform built
@@ -114,14 +104,40 @@ export async function HeroSection() {
             </em>
           </p>
 
-          {/* CTA row */}
+          {/* CTA row.
+              Desktop: Sign In (primary) and Join WhatsApp (secondary), as
+              before. Mobile: exactly one action, not two competing for
+              thumb space — and it takes the primary gold treatment rather
+              than the secondary/glass one it wears on desktop, because a
+              lone call to action should never look like the understudy.
+
+              Two separate elements per breakpoint rather than one whose
+              classes flip at `md:`: `.btn-primary` and `.btn-secondary` are
+              shared global styles used elsewhere on the site (see the note
+              below on `.btn-secondary` staying transparent everywhere else
+              it appears), so swapping between them on a single element
+              would mean writing breakpoint-scoped overrides into a shared
+              class rather than composing two that are each already correct.
+              The Navbar already does exactly this for its own Sign In link —
+              a different render for the desktop nav, the mobile scroll-pill
+              row, and the mobile menu — this follows that precedent. */}
           <div
             className="flex flex-wrap gap-4 mb-24 md:mb-16 animate-fade-in-up"
             style={{ animationDelay: '0.8s' }}
           >
             <a
+              href={adminWhatsAppUrl('Hi, I would like to join the Xkimi Xa Mali Foundation group. Please add me.')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary md:hidden w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
+            >
+              <MessageCircle size={16} aria-hidden />
+              Join WhatsApp
+            </a>
+
+            <a
               href={`${APP_URL}/login`}
-              className="btn-primary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
+              className="hidden md:inline-flex btn-primary items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
             >
               Sign In
               <ArrowRight size={16} aria-hidden />
@@ -138,7 +154,7 @@ export async function HeroSection() {
               // inline background (site's own dark green, not a shared class)
               // overrides it for this one instance without touching the
               // shared style other pages rely on.
-              className="btn-secondary inline-flex items-center gap-2.5 px-7 py-3.5 rounded-2xl border border-white/20 text-white/80 font-semibold text-base hover:border-xxm-gold/40"
+              className="hidden md:inline-flex btn-secondary items-center gap-2.5 px-7 py-3.5 rounded-2xl border border-white/20 text-white/80 font-semibold text-base hover:border-xxm-gold/40"
               style={{ background: 'rgba(5, 46, 22, 0.88)' }}
             >
               <MessageCircle size={16} aria-hidden />
