@@ -1,5 +1,5 @@
-import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
-import { APP_URL, adminWhatsAppUrl } from '@/lib/utils'
+import { ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
+import { adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
 import { FoundersBackdrop } from './FoundersBackdrop'
 import { AmbientOrbs } from './AmbientOrbs'
@@ -104,65 +104,53 @@ export async function HeroSection() {
             </em>
           </p>
 
-          {/* CTA row.
-              Desktop: Sign In (primary) and Join WhatsApp (secondary), as
-              before. Mobile: exactly one action, not two competing for
-              thumb space — and it takes the primary gold treatment rather
-              than the secondary/glass one it wears on desktop, because a
-              lone call to action should never look like the understudy.
+          {/* CTA row — one action, at every size.
+              Used to carry Sign In alongside Join WhatsApp. Removed: the
+              Navbar already owns Sign In everywhere — the top bar from
+              `lg:` up, a "Sign In →" pill in its own mobile scroll row below
+              that, and again in the mobile menu — so between `md:` (where
+              this button used to appear) and `lg:` (where the Navbar's own
+              switches on), a visitor saw two separate Sign In prompts on
+              screen at once: the nav's pill just under the header, and this
+              button a few hundred pixels down. A professional hero has
+              exactly one thing it is asking a new visitor to do; Sign In is
+              for an existing member, and that belongs to the nav, not here.
 
-              Two separate elements per breakpoint rather than one whose
-              classes flip at `md:`: `.btn-primary` and `.btn-secondary` are
-              shared global styles used elsewhere on the site (see the note
-              below on `.btn-secondary` staying transparent everywhere else
-              it appears), so swapping between them on a single element
-              would mean writing breakpoint-scoped overrides into a shared
-              class rather than composing two that are each already correct.
-              The Navbar already does exactly this for its own Sign In link —
-              a different render for the desktop nav, the mobile scroll-pill
-              row, and the mobile menu — this follows that precedent. */}
+              What's left is the one action this section actually exists to
+              drive for a first-time visitor — joining — styled as the
+              confident, singular thing it now is: full width on the
+              smallest screens so it reads as *the* answer rather than one
+              option among several, a soft ambient glow instead of a flat
+              drop shadow, and `.btn-shine` for a single sweep of light on
+              hover/focus rather than anything that runs on a loop. */}
           <div
             className="flex flex-wrap gap-4 mb-24 md:mb-16 animate-fade-in-up"
             style={{ animationDelay: '0.8s' }}
           >
-            <a
-              href={adminWhatsAppUrl('Hi, I would like to join the Xkimi Xa Mali Foundation group. Please add me.')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-primary md:hidden w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
-            >
-              <MessageCircle size={16} aria-hidden />
-              Join WhatsApp
-            </a>
-
-            <a
-              href={`${APP_URL}/login`}
-              className="hidden md:inline-flex btn-primary items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
-            >
-              Sign In
-              <ArrowRight size={16} aria-hidden />
-            </a>
-
-            <a
-              href={adminWhatsAppUrl('Hi, I would like to join the Xkimi Xa Mali Foundation group. Please add me.')}
-              target="_blank"
-              rel="noopener noreferrer"
-              // `.btn-secondary` is transparent by design everywhere else it's
-              // used — here specifically, this button sits over the rotating
-              // founder photo's own name band, close enough on some founders
-              // that the caption showed straight through the glass. The
-              // inline background (site's own dark green, not a shared class)
-              // overrides it for this one instance without touching the
-              // shared style other pages rely on.
-              className="hidden md:inline-flex btn-secondary items-center gap-2.5 px-7 py-3.5 rounded-2xl border border-white/20 text-white/80 font-semibold text-base hover:border-xxm-gold/40"
-              style={{ background: 'rgba(5, 46, 22, 0.88)' }}
-            >
-              <MessageCircle size={16} aria-hidden />
-              Join WhatsApp
-            </a>
+            <div className="relative w-full sm:w-auto">
+              {/* Ambient glow, behind the button rather than on it: a second,
+                  larger, heavily blurred copy of the same gold, so the button
+                  reads as lit from within instead of merely bordered. `-z-10`
+                  relative to this wrapper keeps it strictly behind; `inset-0`
+                  plus `scale-110` lets it bloom a little past the button's own
+                  edges rather than stopping exactly at them. */}
+              <span
+                className="absolute inset-0 -z-10 scale-110 rounded-2xl bg-xxm-gold/40 blur-xl"
+                aria-hidden
+              />
+              <a
+                href={adminWhatsAppUrl('Hi, I would like to join the Xkimi Xa Mali Foundation group. Please add me.')}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary btn-shine w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-2xl bg-xxm-gold text-xxm-green-950 font-bold text-base shadow-gold"
+              >
+                <MessageCircle size={18} aria-hidden />
+                Join WhatsApp
+              </a>
+            </div>
           </div>
 
-          {/* floating stat pills */}
+          {/* stat pills */}
           {/* Owner's explicit call, overriding the earlier horizontal-scroll
               decision below: three pills genuinely don't fit one row on a
               narrow phone, and side-scrolling a row of stat pills reads as
@@ -172,17 +160,29 @@ export async function HeroSection() {
               non-wrapping row again from `sm:` up, where three pills already
               fit comfortably and the original scroll/nowrap behavior is kept.
 
-              The reason wrapping was avoided in the first place, still worth
-              knowing: on mobile this whole text block sits *over* the
-              founder photo's own name-and-title band baked into the image,
-              and a taller block risks colliding with it depending on which
-              of the four founders is showing. That risk is real but
-              secondary to the owner's product call here — if it turns out to
-              collide on a specific photo, the fix is more bottom padding on
-              the photo's name band or an earlier vertical cutoff for this
-              block, not reintroducing horizontal scroll. */}
+              `mt-10` on mobile, not the `mt-2` this carried before removing
+              the paragraph and a duplicate button from the stack above:
+              those used to supply the separation between this row and
+              whatever sat above it more or less as a side effect of their
+              own height. With that content gone the stack is shorter, and
+              this row is the last thing in it, sitting directly over the
+              founder photo's own name-and-title band baked into the image —
+              reported as the two visibly overlapping. Rather than lean on
+              incidental height from neighbouring content again, this row
+              now carries its own explicit clearance, so its position does
+              not depend on how tall anything above it happens to be.
+              Desktop's spacing is untouched — not reported, and the photo
+              sits to the side there rather than behind the text, so there
+              is no name band to collide with in the first place.
+
+              No more `animate-float`: three pills bobbing forever reads as
+              busy rather than composed, and a credential — "bank-
+              authenticated", a member count — earns more trust sitting
+              still than gently wobbling in place indefinitely. They settle
+              once their entrance finishes rather than continuing to move
+              for as long as the page stays open. */}
           <div
-            className="grid grid-cols-2 sm:flex sm:flex-nowrap gap-3 mt-2 animate-fade-in-up"
+            className="grid grid-cols-2 sm:flex sm:flex-nowrap gap-3 mt-10 md:mt-2 animate-fade-in-up"
             style={{ animationDelay: '1s' }}
           >
             {(() => {
@@ -218,7 +218,7 @@ export async function HeroSection() {
                 // items-center here (not just on the row) so each pill's own
                 // icon+text is centered on ITS OWN box — doesn't depend on
                 // every pill in the row happening to end up the same height.
-                className={`glass flex items-center gap-3 px-4 py-3 rounded-2xl sm:shrink-0 animate-float ${isOddOneOut(i) ? 'col-span-2 sm:col-span-1' : ''}`}
+                className={`glass flex items-center gap-3 px-4 py-3 rounded-2xl sm:shrink-0 ${isOddOneOut(i) ? 'col-span-2 sm:col-span-1' : ''}`}
               >
                 <div className="w-8 h-8 rounded-xl bg-xxm-gold/15 flex items-center justify-center shrink-0">
                   <Icon size={15} className="text-xxm-gold" aria-hidden />
@@ -226,17 +226,15 @@ export async function HeroSection() {
                 {/*
                   whitespace-nowrap on both lines: "DebiCheck Mandates" /
                   "Bank-authenticated" is noticeably longer than the other two
-                  pills' text. If it ever wraps to a second line while its
-                  siblings stay single-line, that pill is a different height
-                  from the other two — and since animate-float's translateY
-                  bob is measured from each box's own resting position, a
-                  taller box's bob no longer lines up with its shorter
-                  siblings' even though all three share the identical
-                  keyframes. Forcing single-line removes the height variance
-                  at the source rather than trying to compensate for it after
-                  the fact. Each pill can still be as wide as it needs to be
-                  — on mobile its grid column simply grows to fit it; on
-                  desktop the row has room regardless.
+                  pills' text. Left free to wrap, that pill would be taller
+                  than its siblings the moment it broke to a second line —
+                  three pills meant to read as one consistent row, one
+                  visibly a different shape from the other two. Forcing
+                  single-line removes the height variance at the source
+                  rather than correcting for it after the fact. Each pill can
+                  still be as wide as it needs to be — on mobile its grid
+                  column simply grows to fit it; on desktop the row has room
+                  regardless.
                 */}
                 <div className="min-w-0">
                   <p className="text-white text-sm font-bold leading-none whitespace-nowrap">{label}</p>
