@@ -10,21 +10,43 @@ const ROTATE_MS = 7_000
 const FADE_MS = 1_200
 
 /**
- * The four founders, rotating behind the hero.
+ * The four founders, rotating behind the hero — desktop only.
  *
- * Each portrait renders TWICE. A blurred, scaled copy fills the frame edge to
- * edge so the brother genuinely is the background and his own colours bleed into
- * it; the sharp copy sits on top under `object-contain`, so the card is shown
- * whole — the name and title are part of the artwork, and cropping to fill a
- * landscape hero would cut that band off. The blur also absorbs the difference
- * between a dark studio card and a light grey one, which as hard-cut backgrounds
- * would flash on every change.
+ * ── Why this is desktop-only now ─────────────────────────────────────────
  *
- * The scrim is deliberately lopsided: heavy on the left where the headline sits,
- * light on the right where the portrait is, so the copy keeps its contrast
- * without burying the face.
+ * On desktop the portrait sits to the right (`object-right`) and the
+ * headline sits to the left — different halves of the screen, so the text
+ * never sits *on* a founder, only ever beside one.
  *
- * No caption — each card already carries its own name and title.
+ * On a single narrow column there is no "beside." The mobile treatment this
+ * replaces put the text directly on top of the photo instead, and the stat
+ * pills ended up on top of a founder's own printed name three separate
+ * times — three different fixes, each patching where the pills sat rather
+ * than the arrangement that made a collision possible at all. The one that
+ * actually holds is not putting text over a decorative background photo on
+ * a phone in the first place.
+ *
+ * So mobile carries no photo at all now — a plain brand gradient instead —
+ * and the founders get their own dedicated, accessible presentation in the
+ * hero's own content (real photo cards with real `alt` text, in
+ * HeroSection.tsx), the same treatment the About page's founder grid
+ * already uses. Nothing about who they are was lost by removing the
+ * backdrop; it moved to a place it can't collide with anything.
+ *
+ * ── What's kept, and why ─────────────────────────────────────────────────
+ *
+ * Each desktop portrait still renders twice: a blurred, scaled copy fills
+ * the frame edge to edge so the brother's own colours bleed into the
+ * background, and the sharp copy sits on top under `object-contain` so the
+ * card is shown whole — the name and title are baked into the artwork, and
+ * cropping to fill the frame would cut that band off. The blur also
+ * absorbs the difference between a dark studio card and a light grey one,
+ * which as a hard cut would flash on every rotation.
+ *
+ * The rotation timer itself still runs regardless of viewport — gating a
+ * `setInterval` by a `matchMedia` check would be one more thing to keep in
+ * sync with the CSS breakpoints below for a cost (one idle timer) not worth
+ * the risk of the two disagreeing.
  */
 export function FoundersBackdrop() {
   const [index, setIndex] = useState(0)
@@ -41,64 +63,66 @@ export function FoundersBackdrop() {
 
   return (
     <div className="absolute inset-0 z-0" aria-hidden>
-      {FOUNDERS.map((founder, i) => (
-        <div
-          key={founder.photo}
-          className="absolute inset-0 transition-opacity ease-in-out"
-          style={{ opacity: i === index ? 1 : 0, transitionDuration: `${FADE_MS}ms` }}
-        >
-          {/* Ambient fill — the portrait blown out and blurred to the edges. */}
-          <Image
-            src={founder.photo}
-            alt=""
-            fill
-            priority={i === 0}
-            quality={40}
-            className="object-cover scale-125 blur-2xl opacity-70"
-            sizes="100vw"
-          />
-          {/* The card itself, whole and uncropped. Held clear of the hero's
-              bottom bleed into the next section, which otherwise washes out the
-              name band printed across the foot of each portrait. */}
-          {/* `bottom-[var(--founder-caption-zone)]` rather than a literal
-              `bottom-28`: HeroSection's mobile content needs to know exactly
-              how much of this frame it must stay clear of, and a value
-              stated once in globals.css and read by both files can't drift
-              out of agreement the way two separately guessed ones already
-              did — repeatedly. Desktop keeps its own literal `bottom-32`:
-              the photo sits beside the text there rather than behind it,
-              so nothing on that side depends on this number. */}
-          <div className="absolute inset-x-0 top-0 bottom-[var(--founder-caption-zone)] md:bottom-32">
+      {/* Plain brand gradient — mobile's entire background now, since the
+          photo no longer renders there. Kept simple and dark rather than
+          matching the desktop scrim's lopsided treatment, which was
+          balancing text-contrast against a photo that mobile doesn't
+          show; nothing here needs balancing against. */}
+      <div className="absolute inset-0 md:hidden bg-gradient-to-b from-xxm-green-950 via-xxm-green-900 to-xxm-green-950" />
+
+      {/* Everything below is desktop-only: the rotating portraits, their
+          scrims, and the rotation dots that indicate which one is showing. */}
+      <div className="hidden md:block absolute inset-0">
+        {FOUNDERS.map((founder, i) => (
+          <div
+            key={founder.photo}
+            className="absolute inset-0 transition-opacity ease-in-out"
+            style={{ opacity: i === index ? 1 : 0, transitionDuration: `${FADE_MS}ms` }}
+          >
+            {/* Ambient fill — the portrait blown out and blurred to the edges. */}
             <Image
               src={founder.photo}
               alt=""
               fill
               priority={i === 0}
-              quality={85}
-              className="object-contain object-center md:object-right"
-              sizes="(max-width: 768px) 100vw, 55vw"
+              quality={40}
+              className="object-cover scale-125 blur-2xl opacity-70"
+              sizes="55vw"
             />
+            {/* The card itself, whole and uncropped. Held clear of the hero's
+                bottom bleed into the next section, which otherwise washes out
+                the name band printed across the foot of each portrait. */}
+            <div className="absolute inset-x-0 top-0 bottom-32">
+              <Image
+                src={founder.photo}
+                alt=""
+                fill
+                priority={i === 0}
+                quality={85}
+                className="object-contain object-right"
+                sizes="55vw"
+              />
+            </div>
           </div>
-        </div>
-      ))}
-
-      {/* Readability scrim. Weighted hard to the left, where the headline sits,
-          and let almost all the way up on the right so the brother is actually
-          seen — the whole point of putting him there. */}
-      <div className="absolute inset-0 bg-xxm-green-950/72 md:hidden" />
-      <div className="absolute inset-0 hidden md:block bg-gradient-to-r from-xxm-green-950 from-25% via-xxm-green-950/70 via-55% to-xxm-green-950/5" />
-      <div className="absolute inset-0 bg-gradient-to-b from-xxm-green-950/45 via-transparent to-xxm-green-950/75" />
-
-      {/* Which brother is showing — the only thing the artwork doesn't say. */}
-      <div className="absolute bottom-8 right-6 md:right-10 flex gap-1.5">
-        {FOUNDERS.map((founder, i) => (
-          <span
-            key={founder.photo}
-            className={`h-1 rounded-full transition-all duration-500 ${
-              i === index ? 'w-6 bg-xxm-gold' : 'w-1.5 bg-white/30'
-            }`}
-          />
         ))}
+
+        {/* Readability scrim. Heavy on the left where the headline sits, let
+            almost all the way up on the right so the brother is actually
+            seen — the whole point of putting him there. */}
+        <div className="absolute inset-0 bg-gradient-to-r from-xxm-green-950 from-25% via-xxm-green-950/70 via-55% to-xxm-green-950/5" />
+        <div className="absolute inset-0 bg-gradient-to-b from-xxm-green-950/45 via-transparent to-xxm-green-950/75" />
+
+        {/* Which brother is showing — the only thing the artwork doesn't say. */}
+        <div className="absolute bottom-8 right-10 flex gap-1.5">
+          {FOUNDERS.map((founder, i) => (
+            <span
+              key={founder.photo}
+              className={`h-1 rounded-full transition-all duration-500 ${
+                i === index ? 'w-6 bg-xxm-gold' : 'w-1.5 bg-white/30'
+              }`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )

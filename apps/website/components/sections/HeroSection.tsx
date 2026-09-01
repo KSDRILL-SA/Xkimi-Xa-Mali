@@ -1,8 +1,11 @@
-import { ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
 import { adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
 import { FoundersBackdrop } from './FoundersBackdrop'
 import { AmbientOrbs } from './AmbientOrbs'
+import { FOUNDERS } from '@/lib/founders'
 import { FACTS } from '@xxm/utils'
 
 export async function HeroSection() {
@@ -14,7 +17,9 @@ export async function HeroSection() {
       className="relative min-h-screen flex flex-col overflow-hidden bg-xxm-green-950"
       aria-labelledby="hero-headline"
     >
-      {/* ── Background: the four founders, rotating ───────────────── */}
+      {/* ── Background: the four founders, rotating — desktop only.
+          Mobile gets a plain brand gradient instead; see FoundersBackdrop's
+          own docstring for why. ─────────────────────────────────────── */}
       <FoundersBackdrop />
 
       {/* ── Ambient light + grain, above the portraits ────────────── */}
@@ -28,55 +33,16 @@ export async function HeroSection() {
       {/* `justify-start` on mobile, not `justify-center`. On desktop the
           founder's portrait sits to the right (`object-right`) and this text
           block to the left — different halves of the screen, so vertical
-          centering never brings them near each other. On mobile there is no
-          side-by-side split: the portrait is the full-bleed background
-          *behind* this same text. Anchoring to the top, rather than centring
-          a variable-height block, is what makes the top of this stack
-          predictable; what makes the BOTTOM of it predictable — clear of the
-          photo's own name band regardless of how tall the top ends up being —
-          is the split described below. */}
+          centring never brings them near each other. Mobile has no photo
+          behind this text at all any more (see FoundersBackdrop), so a
+          plain top-anchored stack is all this needs — nothing here can land
+          on top of anything else, because there is nothing behind it to
+          land on. */}
       <div
         className="relative z-10 flex-1 flex flex-col justify-start md:justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-16 md:pb-12 pt-[calc(var(--nav-height)+1rem)] md:pt-[calc(var(--nav-height)+2.5rem)]"
       >
-        {/* ── Two independently-anchored groups, not one long stack ──────
-            Third time this exact collision has been reported. The first two
-            passes each added another margin value and each one eventually
-            drifted wrong again, because the stat pills' position was a
-            function of everything stacked above them — remove a paragraph,
-            remove a button, and the pills land somewhere new, over the
-            photo's name band, without anything about the pills themselves
-            having changed. A value tuned against today's content is a value
-            that breaks the next time the content above it does.
+        <div className="max-w-3xl">
 
-            So mobile no longer has one stack whose last item's position is
-            whatever the content above it leaves behind. It has two:
-
-              - a TOP group (badge, headline) that flows normally from the
-                page's top, exactly as before;
-              - a BOTTOM group (the CTA, the stat pills) pinned to the
-                bottom of the available space via `mt-auto` — a flex
-                property, which is why this wrapper is `flex flex-col` on
-                mobile — and given its own explicit clearance
-                (`--founder-caption-zone`, the same constant
-                FoundersBackdrop reads to reserve that zone in the first
-                place) from the true bottom of the screen.
-
-            The bottom group's position now depends on the viewport and that
-            one shared constant — not on the top group's height. Change the
-            headline, add a badge, anything: the bottom group holds its
-            clearance regardless, because it is no longer computed from what
-            happens to be above it.
-
-            `md:block` on this wrapper cancels the flex context entirely
-            above `md:`, where `mt-auto` has no meaning in normal flow and
-            both groups render exactly as plain stacked children — identical
-            to how they rendered before this split, because desktop was
-            never the problem: the photo sits beside the text there, not
-            behind it, so there is no name band on that side to collide
-            with. */}
-        <div className="flex flex-col flex-1 md:block max-w-3xl">
-
-          <div>
           {/* badge */}
           <div
             className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-2 mb-6 md:mb-8 animate-fade-in-down"
@@ -119,6 +85,59 @@ export async function HeroSection() {
             </span>
           </h1>
 
+          {/* ── Founders — mobile only ───────────────────────────────
+              Desktop's headline sits beside the rotating photo
+              (FoundersBackdrop); mobile has no photo behind this content at
+              all any more, so the founders get their own presentation
+              instead of a background nobody can safely put anything on top
+              of.
+
+              Real photo cards, not a decorative image: `object-contain`
+              (never crop the name-and-title band baked into each portrait
+              off the foot — the same reason the About page's founder grid
+              uses it) and an `alt` that states the name and title as actual
+              text — legible to a screen reader and to search engines,
+              where the artwork's own printed caption is neither. No second,
+              visible name/title printed over the image in HTML: the About
+              page tried exactly that once, it double-printed every
+              caption — the overlay dulling the one already in the artwork —
+              and removed it. This follows that same, already-learned
+              precedent rather than repeating it.
+
+              Four small cards fit one row on a phone without wrapping or
+              scrolling (each ring colour is the same one the About page's
+              founder grid uses per founder, so the two presentations read
+              as the same set of people rather than two different systems)
+              — "Meet the founders" underneath links to that fuller
+              treatment for anyone who wants the actual bios, which belong
+              on the About page, not crowded into a hero. */}
+          <div className="md:hidden mb-8">
+            <div className="grid grid-cols-4 gap-2.5">
+              {FOUNDERS.map(({ photo, name, title, ring }, i) => (
+                <div
+                  key={name}
+                  className={`relative aspect-[3/4] overflow-hidden rounded-xl bg-xxm-green-900 ring-1 ${ring}`}
+                >
+                  <Image
+                    src={photo}
+                    alt={`${name} — ${title}`}
+                    fill
+                    priority={i === 0}
+                    sizes="25vw"
+                    className="object-contain object-center"
+                  />
+                </div>
+              ))}
+            </div>
+            <Link
+              href="/about#founders"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-xxm-gold/70 transition-colors hover:text-xxm-gold"
+            >
+              Meet the founders
+              <ArrowRight size={12} aria-hidden />
+            </Link>
+          </div>
+
           {/* subheadline — desktop only.
               A phone hero showing badge, three-line headline, this
               paragraph, two buttons and three stat pills before the fold is
@@ -139,21 +158,6 @@ export async function HeroSection() {
               money moves faster and further when it moves together.
             </em>
           </p>
-          </div>
-
-          {/* ── Bottom group: CTA + stat pills ────────────────────────
-              `mt-auto` pushes this to the bottom of the flex column above —
-              inert on desktop (`md:mt-0`), where the wrapper isn't a flex
-              container in the first place. `pb-[...]` adds real clearance
-              past `--founder-caption-zone` (not exactly it): the photo is
-              *letterboxed* into that reserved frame — `object-contain`
-              keeps its whole card visible rather than cropping it, which
-              means the card doesn't necessarily fill the frame edge to
-              edge, and the caption baked into the card could sit anywhere
-              within it depending on that photo's own proportions. The
-              extra margin is deliberate headroom against that uncertainty,
-              not a second guessed number standing in for the first. */}
-          <div className="mt-auto md:mt-0 pb-[calc(var(--founder-caption-zone)+2rem)] md:pb-0">
 
           {/* CTA row — one action, at every size.
               Used to carry Sign In alongside Join WhatsApp. Removed: the
@@ -211,23 +215,12 @@ export async function HeroSection() {
               non-wrapping row again from `sm:` up, where three pills already
               fit comfortably and the original scroll/nowrap behavior is kept.
 
-              Just `mt-2` — plain visual spacing from the CTA above it, the
-              same at every size. Clearance from the founder photo's name
-              band is no longer this margin's job: it used to be, briefly,
-              and that was exactly the fragility that put this row on top
-              of the photo's caption in the first place — a value tuned to
-              clear whatever happened to be stacked above it, broken the
-              next time that content changed. That job now belongs to the
-              bottom group's own `pb-[...]` (see above this pills row's
-              wrapping div), which is anchored to the viewport and a shared
-              constant, not to this row's neighbours.
-
-              No more `animate-float`: three pills bobbing forever reads as
-              busy rather than composed, and a credential — "bank-
-              authenticated", a member count — earns more trust sitting
-              still than gently wobbling in place indefinitely. They settle
-              once their entrance finishes rather than continuing to move
-              for as long as the page stays open. */}
+              No `animate-float`: three pills bobbing forever reads as busy
+              rather than composed, and a credential — "bank-authenticated",
+              a member count — earns more trust sitting still than gently
+              wobbling in place indefinitely. They settle once their
+              entrance finishes rather than continuing to move for as long
+              as the page stays open. */}
           <div
             className="grid grid-cols-2 sm:flex sm:flex-nowrap gap-3 mt-2 animate-fade-in-up"
             style={{ animationDelay: '1s' }}
@@ -290,7 +283,6 @@ export async function HeroSection() {
               </div>
               ))
             })()}
-          </div>
           </div>
         </div>
       </div>
