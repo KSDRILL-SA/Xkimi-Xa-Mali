@@ -30,17 +30,53 @@ export async function HeroSection() {
           block to the left — different halves of the screen, so vertical
           centering never brings them near each other. On mobile there is no
           side-by-side split: the portrait is the full-bleed background
-          *behind* this same text, name-and-title band baked into the
-          artwork's own foot. Centering a variable-height block over that
-          risked the stat pills — the last thing in it — landing right on
-          top of the photo's own caption depending on content length and
-          screen height. Anchoring to the top instead keeps this block's
-          footprint predictable and clear of that zone. */}
+          *behind* this same text. Anchoring to the top, rather than centring
+          a variable-height block, is what makes the top of this stack
+          predictable; what makes the BOTTOM of it predictable — clear of the
+          photo's own name band regardless of how tall the top ends up being —
+          is the split described below. */}
       <div
         className="relative z-10 flex-1 flex flex-col justify-start md:justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-16 md:pb-12 pt-[calc(var(--nav-height)+1rem)] md:pt-[calc(var(--nav-height)+2.5rem)]"
       >
-        <div className="max-w-3xl">
+        {/* ── Two independently-anchored groups, not one long stack ──────
+            Third time this exact collision has been reported. The first two
+            passes each added another margin value and each one eventually
+            drifted wrong again, because the stat pills' position was a
+            function of everything stacked above them — remove a paragraph,
+            remove a button, and the pills land somewhere new, over the
+            photo's name band, without anything about the pills themselves
+            having changed. A value tuned against today's content is a value
+            that breaks the next time the content above it does.
 
+            So mobile no longer has one stack whose last item's position is
+            whatever the content above it leaves behind. It has two:
+
+              - a TOP group (badge, headline) that flows normally from the
+                page's top, exactly as before;
+              - a BOTTOM group (the CTA, the stat pills) pinned to the
+                bottom of the available space via `mt-auto` — a flex
+                property, which is why this wrapper is `flex flex-col` on
+                mobile — and given its own explicit clearance
+                (`--founder-caption-zone`, the same constant
+                FoundersBackdrop reads to reserve that zone in the first
+                place) from the true bottom of the screen.
+
+            The bottom group's position now depends on the viewport and that
+            one shared constant — not on the top group's height. Change the
+            headline, add a badge, anything: the bottom group holds its
+            clearance regardless, because it is no longer computed from what
+            happens to be above it.
+
+            `md:block` on this wrapper cancels the flex context entirely
+            above `md:`, where `mt-auto` has no meaning in normal flow and
+            both groups render exactly as plain stacked children — identical
+            to how they rendered before this split, because desktop was
+            never the problem: the photo sits beside the text there, not
+            behind it, so there is no name band on that side to collide
+            with. */}
+        <div className="flex flex-col flex-1 md:block max-w-3xl">
+
+          <div>
           {/* badge */}
           <div
             className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-2 mb-6 md:mb-8 animate-fade-in-down"
@@ -103,6 +139,21 @@ export async function HeroSection() {
               money moves faster and further when it moves together.
             </em>
           </p>
+          </div>
+
+          {/* ── Bottom group: CTA + stat pills ────────────────────────
+              `mt-auto` pushes this to the bottom of the flex column above —
+              inert on desktop (`md:mt-0`), where the wrapper isn't a flex
+              container in the first place. `pb-[...]` adds real clearance
+              past `--founder-caption-zone` (not exactly it): the photo is
+              *letterboxed* into that reserved frame — `object-contain`
+              keeps its whole card visible rather than cropping it, which
+              means the card doesn't necessarily fill the frame edge to
+              edge, and the caption baked into the card could sit anywhere
+              within it depending on that photo's own proportions. The
+              extra margin is deliberate headroom against that uncertainty,
+              not a second guessed number standing in for the first. */}
+          <div className="mt-auto md:mt-0 pb-[calc(var(--founder-caption-zone)+2rem)] md:pb-0">
 
           {/* CTA row — one action, at every size.
               Used to carry Sign In alongside Join WhatsApp. Removed: the
@@ -124,7 +175,7 @@ export async function HeroSection() {
               drop shadow, and `.btn-shine` for a single sweep of light on
               hover/focus rather than anything that runs on a loop. */}
           <div
-            className="flex flex-wrap gap-4 mb-24 md:mb-16 animate-fade-in-up"
+            className="flex flex-wrap gap-4 mb-8 md:mb-16 animate-fade-in-up"
             style={{ animationDelay: '0.8s' }}
           >
             <div className="relative w-full sm:w-auto">
@@ -160,20 +211,16 @@ export async function HeroSection() {
               non-wrapping row again from `sm:` up, where three pills already
               fit comfortably and the original scroll/nowrap behavior is kept.
 
-              `mt-10` on mobile, not the `mt-2` this carried before removing
-              the paragraph and a duplicate button from the stack above:
-              those used to supply the separation between this row and
-              whatever sat above it more or less as a side effect of their
-              own height. With that content gone the stack is shorter, and
-              this row is the last thing in it, sitting directly over the
-              founder photo's own name-and-title band baked into the image —
-              reported as the two visibly overlapping. Rather than lean on
-              incidental height from neighbouring content again, this row
-              now carries its own explicit clearance, so its position does
-              not depend on how tall anything above it happens to be.
-              Desktop's spacing is untouched — not reported, and the photo
-              sits to the side there rather than behind the text, so there
-              is no name band to collide with in the first place.
+              Just `mt-2` — plain visual spacing from the CTA above it, the
+              same at every size. Clearance from the founder photo's name
+              band is no longer this margin's job: it used to be, briefly,
+              and that was exactly the fragility that put this row on top
+              of the photo's caption in the first place — a value tuned to
+              clear whatever happened to be stacked above it, broken the
+              next time that content changed. That job now belongs to the
+              bottom group's own `pb-[...]` (see above this pills row's
+              wrapping div), which is anchored to the viewport and a shared
+              constant, not to this row's neighbours.
 
               No more `animate-float`: three pills bobbing forever reads as
               busy rather than composed, and a credential — "bank-
@@ -182,7 +229,7 @@ export async function HeroSection() {
               once their entrance finishes rather than continuing to move
               for as long as the page stays open. */}
           <div
-            className="grid grid-cols-2 sm:flex sm:flex-nowrap gap-3 mt-10 md:mt-2 animate-fade-in-up"
+            className="grid grid-cols-2 sm:flex sm:flex-nowrap gap-3 mt-2 animate-fade-in-up"
             style={{ animationDelay: '1s' }}
           >
             {(() => {
@@ -243,6 +290,7 @@ export async function HeroSection() {
               </div>
               ))
             })()}
+          </div>
           </div>
         </div>
       </div>

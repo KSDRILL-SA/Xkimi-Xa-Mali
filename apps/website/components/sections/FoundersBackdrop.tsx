@@ -60,7 +60,15 @@ export function FoundersBackdrop() {
           {/* The card itself, whole and uncropped. Held clear of the hero's
               bottom bleed into the next section, which otherwise washes out the
               name band printed across the foot of each portrait. */}
-          <div className="absolute inset-x-0 top-0 bottom-28 md:bottom-32">
+          {/* `bottom-[var(--founder-caption-zone)]` rather than a literal
+              `bottom-28`: HeroSection's mobile content needs to know exactly
+              how much of this frame it must stay clear of, and a value
+              stated once in globals.css and read by both files can't drift
+              out of agreement the way two separately guessed ones already
+              did — repeatedly. Desktop keeps its own literal `bottom-32`:
+              the photo sits beside the text there rather than behind it,
+              so nothing on that side depends on this number. */}
+          <div className="absolute inset-x-0 top-0 bottom-[var(--founder-caption-zone)] md:bottom-32">
             <Image
               src={founder.photo}
               alt=""
