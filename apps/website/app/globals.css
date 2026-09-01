@@ -300,6 +300,35 @@ body {
 }
 .btn-secondary:active { transform: scale(0.97); }
 
+/* ─── Shine sweep ────────────────────────────────────────────────────
+   Additive, not a replacement for `.btn-primary`/`.btn-secondary` — combine
+   it onto either rather than folding it into those shared classes, which
+   are used elsewhere on the site without this effect. A single diagonal
+   highlight sweeps across on hover/focus: the kind of restrained, one-time
+   flourish a genuinely confident button gets, rather than something that
+   runs forever and asks to be watched. `overflow: hidden` on the button
+   itself clips the sweep to its own rounded shape; `pointer-events: none`
+   on the sweep keeps it decoration, never a hit target. */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: -75%;
+  width: 50%;
+  background: linear-gradient(115deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: skewX(-20deg);
+  transition: left 650ms ease;
+  pointer-events: none;
+}
+.btn-shine:hover::after,
+.btn-shine:focus-visible::after {
+  left: 125%;
+}
+
 /* ─── Section divider ───────────────────────────────────────────────── */
 .section-divider {
   height: 1px;
