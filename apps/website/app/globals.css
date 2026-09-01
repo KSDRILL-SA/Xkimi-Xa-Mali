@@ -9,17 +9,6 @@
   --green: #1B4332;
   --green-dark: #052E16;
   --champagne: #F5F0E6;
-  /* How much of the hero's own bottom, on mobile, FoundersBackdrop reserves
-     for the rotating founder photo's name-and-title band — the sharp
-     portrait renders only above this line (see FoundersBackdrop.tsx), so
-     the caption baked into the artwork lives somewhere within it.
-     HeroSection's mobile content must never render into this zone, and
-     three separate rounds of guessed margin values have already drifted out
-     of agreement with it at least once. Naming the number once, here, and
-     having both files reference it is what actually stops that — a shared
-     constant can't silently disagree with itself the way two independently
-     chosen ones already did. */
-  --founder-caption-zone: 7rem;
 }
 
 *, *::before, *::after {
