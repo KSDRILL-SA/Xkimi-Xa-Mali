@@ -83,7 +83,7 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 | `WHATSAPP_GROUP_LINK` / `NEXT_PUBLIC_WHATSAPP_GROUP_LINK` | the group invite link. |
 | `TRUSTED_PROXY` | `vercel` unless a CDN/WAF is genuinely in front. Decides which forwarded-IP header is believed — get it wrong and per-IP rate limiting can be bypassed by sending the header yourself. |
 
-**The Foundation's operational mailbox is `xkimxamali@gmail.com`.** Use it for
+**The Foundation's operational mailbox is `xkimixamali@gmail.com`.** Use it for
 `SUPPORT_EMAIL`, `NEXT_PUBLIC_SUPPORT_EMAIL` and `ALERT_FALLBACK_EMAIL` — all
 three are addresses that *receive*.
 

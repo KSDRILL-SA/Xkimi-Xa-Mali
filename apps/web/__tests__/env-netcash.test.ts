@@ -111,7 +111,7 @@ afterEach(() => vi.unstubAllEnvs())
 describe('an address Resend will never send from', () => {
   it('fails the live build rather than the first send', async () => {
     await expect(
-      loadEnv({ NODE_ENV: 'production', DEPLOY_ENV: 'production', ...NETCASH_ENV, RESEND_FROM_EMAIL: 'xkimxamali@gmail.com' }),
+      loadEnv({ NODE_ENV: 'production', DEPLOY_ENV: 'production', ...NETCASH_ENV, RESEND_FROM_EMAIL: 'xkimixamali@gmail.com' }),
     ).rejects.toThrow()
   })
 
