@@ -1,3 +1,4 @@
+import { isBlobStorageAvailable } from '@xxm/utils/deployment'
 import { put, get } from '@vercel/blob'
 import { withRetry } from '@/lib/resilience'
 import type {
@@ -10,7 +11,7 @@ import type {
 /**
  * Local-dev objects, held in memory.
  *
- * Without `BLOB_READ_WRITE_TOKEN` there is nowhere to put bytes, and the old
+ * Off Vercel there is nowhere to put bytes, and the old
  * adapter returned a `data:` URL so the feature still worked end to end. That
  * is kept — a `data:` URL is self-contained and carries no access question at
  * all — but the bytes are also remembered here so `download` can answer for a
@@ -40,7 +41,7 @@ export const vercelBlobStorage: IStorageProvider = {
     const buffer = data instanceof Buffer ? data : Buffer.from(data)
     const contentType = options.contentType ?? 'application/octet-stream'
 
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    if (!isBlobStorageAvailable()) {
       localObjects.set(path, { buffer, contentType })
       return {
         pathname: path,

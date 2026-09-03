@@ -80,3 +80,34 @@ export function isNonLiveDeployment(env: NodeJS.ProcessEnv = process.env): boole
 export function deploymentEnvironmentName(env: NodeJS.ProcessEnv = process.env): string {
   return env.DEPLOY_ENV ?? env.VERCEL_ENV ?? env.NODE_ENV ?? 'unknown'
 }
+
+/**
+ * Whether Vercel Blob can be reached from this process.
+ *
+ * Not "is BLOB_READ_WRITE_TOKEN set", which is what four separate call sites
+ * used to ask and what `lib/env.ts` used to demand on a live deployment.
+ *
+ * A Blob store connected to a Vercel project authenticates by **OIDC** —
+ * `@vercel/blob` v2 asks `@vercel/oidc` for a token and only falls back to a
+ * read-write token if one is configured. Vercel's own dashboard recommends
+ * revoking the read-write token when the store is only used from Vercel, so its
+ * absence is the *recommended* state, not a misconfiguration.
+ *
+ * Keying on the token therefore got it backwards in the one place it mattered.
+ * A correctly configured production deployment has no token, so every uploader
+ * concluded there was "nowhere to put bytes" and fell back to a base64 `data:`
+ * URL — a whole file inlined into a database column. For a proof of payment
+ * that also fails validation outright, because the column is capped at 1024
+ * characters, so the feature would have refused every upload while blob storage
+ * sat there working.
+ *
+ * `VERCEL_OIDC_TOKEN` is not checked directly: at runtime the token usually
+ * arrives per request in an `x-vercel-oidc-token` header rather than the
+ * environment, so it is absent from `process.env` exactly when it is working.
+ * Running on Vercel at all is the honest signal, and it is the one thing that
+ * distinguishes "a store is attached to this deployment" from "a developer's
+ * laptop with no cloud storage".
+ */
+export function isBlobStorageAvailable(env: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(env.BLOB_READ_WRITE_TOKEN) || env.VERCEL === '1'
+}

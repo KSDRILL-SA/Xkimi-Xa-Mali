@@ -15,7 +15,7 @@
  * deployment fails — and the failure arrives as a wall of Zod errors, at the
  * exact moment someone is trying to go live, usually under time pressure.
  *
- * That is a bad time to discover that, say, `BLOB_READ_WRITE_TOKEN` was never
+ * That is a bad time to discover that, say, `UPSTASH_REDIS_REST_TOKEN` was never
  * set. It is unrelated to the gateway credentials being wired up that day, so
  * it reads as a mysterious failure of whatever was actually being changed.
  *
@@ -50,7 +50,6 @@ export const REQUIRED_WHEN_LIVE = [
   'INNGEST_SIGNING_KEY',
   'UPSTASH_REDIS_REST_URL',
   'UPSTASH_REDIS_REST_TOKEN',
-  'BLOB_READ_WRITE_TOKEN',
   'ADMIN_API_SECRET',
 ]
 
