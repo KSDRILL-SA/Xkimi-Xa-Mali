@@ -124,6 +124,25 @@ enum InboxCategory {
   GOAL
 }
 
+/// Which hat the recipient was wearing when a message was addressed to them.
+///
+/// Orthogonal to InboxCategory, and it has to be: a statement notice and an
+/// operational alert are both SYSTEM, so the category cannot tell a member's
+/// own business apart from the running of the Foundation.
+///
+/// It exists because one person holds both roles. Everything technical already
+/// went only to ADMIN-role users, so no member was ever seeing it — but the
+/// founder's own inbox merged the two streams, and the operational half is the
+/// half a busy person scrolls past on the way to what actually concerns them.
+enum InboxAudience {
+  /// Addressed to the person as a member: their money, their goals, their
+  /// statement. What every member sees, and the only kind most will ever have.
+  MEMBER
+  /// Addressed to the person as an administrator: alerts, job failures, things
+  /// that need leadership to act. Only ever written to ADMIN-role users.
+  ADMIN
+}
+
 enum InvitationStatus {
   PENDING
   ACCEPTED
@@ -818,6 +837,9 @@ model InboxMessage {
   title       String
   body        String        @db.Text
   category    InboxCategory @default(BROADCAST)
+  /// Defaults to MEMBER so that anything written without an opinion lands where
+  /// a member would look. Only `notifyAdmins` sets ADMIN.
+  audience    InboxAudience @default(MEMBER)
   readAt      DateTime?
   createdById String?
   createdAt   DateTime      @default(now())
@@ -827,6 +849,8 @@ model InboxMessage {
 
   @@index([userId, readAt])
   @@index([userId, createdAt])
+  /// The inbox is read one audience at a time, with an unread count per tab.
+  @@index([userId, audience, readAt])
   @@map("inbox_messages")
 }
 

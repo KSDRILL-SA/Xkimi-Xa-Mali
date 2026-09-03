@@ -2,24 +2,50 @@ import { db } from '@/lib/db'
 
 export type InboxCategoryKey = 'BROADCAST' | 'SYSTEM' | 'PAYMENT' | 'GOAL'
 
+/**
+ * Which hat the recipient was wearing when the message was addressed to them.
+ *
+ * Separate from the category, and it has to be: a statement notice and an
+ * operational alert are both SYSTEM, so the category cannot tell a member's own
+ * business apart from the running of the Foundation.
+ */
+export type InboxAudienceKey = 'MEMBER' | 'ADMIN'
+
 export type InboxItem = {
   id: string
   title: string
   body: string
   category: InboxCategoryKey
+  audience: InboxAudienceKey
   read: boolean
   createdAt: string
 }
 
 const PAGE_SIZE = 30
 
-/** A member's in-app inbox: readable messages with read/unread state. */
+/**
+ * A member's in-app inbox: readable messages with read/unread state.
+ *
+ * `audience` narrows it to one of the two streams. Omitting it returns both,
+ * which is what a caller wanting a single unread total should do — the bell in
+ * the header counts everything waiting for this person, whichever hat it
+ * concerns.
+ *
+ * The counts come back scoped to the same filter, so a tab's badge describes
+ * that tab rather than the whole inbox.
+ */
 export async function getInbox(
   userId: string,
-  opts: { unreadOnly?: boolean; cursor?: string; limit?: number } = {},
+  opts: {
+    unreadOnly?: boolean
+    cursor?: string
+    limit?: number
+    audience?: InboxAudienceKey
+  } = {},
 ): Promise<{ items: InboxItem[]; total: number; unreadCount: number; nextCursor: string | null }> {
   const limit = opts.limit ?? PAGE_SIZE
-  const where = { userId, ...(opts.unreadOnly && { readAt: null }) }
+  const scope = { userId, ...(opts.audience && { audience: opts.audience }) }
+  const where = { ...scope, ...(opts.unreadOnly && { readAt: null }) }
 
   const [rows, total, unreadCount] = await Promise.all([
     db.inboxMessage.findMany({
@@ -27,10 +53,13 @@ export async function getInbox(
       orderBy: { createdAt: 'desc' },
       take: limit + 1,
       ...(opts.cursor && { cursor: { id: opts.cursor }, skip: 1 }),
-      select: { id: true, title: true, body: true, category: true, readAt: true, createdAt: true },
+      select: {
+        id: true, title: true, body: true, category: true,
+        audience: true, readAt: true, createdAt: true,
+      },
     }),
-    db.inboxMessage.count({ where: { userId } }),
-    db.inboxMessage.count({ where: { userId, readAt: null } }),
+    db.inboxMessage.count({ where: scope }),
+    db.inboxMessage.count({ where: { ...scope, readAt: null } }),
   ])
 
   const hasNext = rows.length > limit
@@ -42,6 +71,7 @@ export async function getInbox(
       title: r.title,
       body: r.body,
       category: r.category as InboxCategoryKey,
+      audience: r.audience as InboxAudienceKey,
       read: r.readAt !== null,
       createdAt: r.createdAt.toISOString(),
     })),
@@ -51,6 +81,13 @@ export async function getInbox(
   }
 }
 
+/**
+ * Everything unread for this person, both streams together.
+ *
+ * Deliberately unscoped: this is the number on the bell, and a founder with an
+ * unread operational alert has something waiting whether or not they are
+ * thinking about the Foundation as a member at that moment.
+ */
 export async function getUnreadInboxCount(userId: string): Promise<number> {
   return db.inboxMessage.count({ where: { userId, readAt: null } })
 }
@@ -98,7 +135,14 @@ export async function deleteInboxMessage(userId: string, id: string): Promise<bo
  */
 export async function createInboxMessages(
   userIds: string[],
-  msg: { title: string; body: string; category?: InboxCategoryKey; createdById?: string },
+  msg: {
+    title: string
+    body: string
+    category?: InboxCategoryKey
+    /** Defaults to MEMBER — see the enum note in the schema. */
+    audience?: InboxAudienceKey
+    createdById?: string
+  },
 ): Promise<number> {
   if (userIds.length === 0) return 0
   const res = await db.inboxMessage.createMany({
@@ -107,6 +151,7 @@ export async function createInboxMessages(
       title: msg.title,
       body: msg.body,
       category: msg.category ?? 'BROADCAST',
+      audience: msg.audience ?? 'MEMBER',
       createdById: msg.createdById ?? null,
     })),
   })
@@ -139,5 +184,10 @@ export async function notifyAdmins(msg: {
     title: msg.title,
     body: msg.body,
     category: msg.category ?? 'SYSTEM',
+    // The single place ADMIN audience is set. Everything else writes to a
+    // person as a member, so the default handles it — and a new caller that
+    // forgets to think about this lands a message where a member would look,
+    // which is the safe direction to be wrong in.
+    audience: 'ADMIN',
   })
 }

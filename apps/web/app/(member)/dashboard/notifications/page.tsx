@@ -6,7 +6,7 @@ import { getSession } from '@/lib/session'
 import { getInbox } from '@/services/inbox.service'
 import { getMemberNotifications } from '@/services/notification.service'
 import { Reveal } from '@xxm/ui'
-import { Inbox as InboxIcon, MessageSquare, Mail, Bell, ScrollText, type LucideIcon } from 'lucide-react'
+import { Inbox as InboxIcon, MessageSquare, Mail, Bell, ScrollText, ShieldAlert, type LucideIcon } from 'lucide-react'
 import { InboxList } from '@/components/inbox/InboxList'
 
 export const metadata: Metadata = { title: 'Inbox' }
@@ -55,12 +55,36 @@ export default async function NotificationsPage({
   if (!session?.user?.id) redirect('/login')
   const userId = session.user.id
   const params = await searchParams
-  const view = params.view === 'log' ? 'log' : 'inbox'
 
-  const [inbox, log] = await Promise.all([
-    getInbox(userId, { limit: 30 }),
+  /**
+   * The admin stream is a tab, not a separate account.
+   *
+   * Everything operational has always gone only to ADMIN-role users, so no
+   * member was ever seeing it. What this fixes is the other side of that: the
+   * founder holds both roles, and one merged list meant a failed debit run sat
+   * next to their own payment receipt. The operational half is what a busy
+   * person scrolls past on the way to what actually concerns them.
+   *
+   * Gated on the role rather than on whether any admin messages exist, so the
+   * tab does not appear and disappear as alerts come and go — and so a member
+   * who is not an admin never sees that the stream exists at all.
+   */
+  const isAdmin = ((session.user.roles as string[] | undefined) ?? []).includes('ADMIN')
+
+  const requested = params.view === 'log' ? 'log' : params.view === 'admin' ? 'admin' : 'inbox'
+  // A member who hand-types ?view=admin gets their own messages, not an empty
+  // tab that implies there is something they are not being shown.
+  const view = requested === 'admin' && !isAdmin ? 'inbox' : requested
+
+  const [inbox, adminInbox, log] = await Promise.all([
+    getInbox(userId, { limit: 30, audience: 'MEMBER' }),
+    isAdmin
+      ? getInbox(userId, { limit: 30, audience: 'ADMIN' })
+      : Promise.resolve(null),
     getMemberNotifications(userId, { limit: 30 }),
   ])
+
+  const shown = view === 'admin' && adminInbox ? adminInbox : inbox
 
   return (
     <div className="space-y-6">
@@ -74,8 +98,8 @@ export default async function NotificationsPage({
           <div>
             <h1 className="font-display text-2xl font-extrabold text-xxm-green-900 tracking-tight">Inbox</h1>
             <p className="text-sm text-xxm-gray-500 mt-1">
-              {inbox.unreadCount > 0
-                ? <><span className="font-semibold text-xxm-gold-dark">{inbox.unreadCount}</span> unread message{inbox.unreadCount !== 1 ? 's' : ''}</>
+              {shown.unreadCount > 0
+                ? <><span className="font-semibold text-xxm-gold-dark">{shown.unreadCount}</span> unread message{shown.unreadCount !== 1 ? 's' : ''}</>
                 : 'You’re all caught up'}
             </p>
           </div>
@@ -89,15 +113,27 @@ export default async function NotificationsPage({
       </Reveal>
 
       {/* ── Tabs ───────────────────────────────────── */}
-      <Reveal variant="up" delay={100} className="flex items-center gap-2">
+      <Reveal variant="up" delay={100} className="flex items-center gap-2 flex-wrap">
         <TabLink href="/dashboard/notifications" label="Messages" icon={InboxIcon} active={view === 'inbox'} badge={inbox.unreadCount} />
+        {/* Only for somebody who actually runs the Foundation. */}
+        {adminInbox && (
+          <TabLink
+            href={'/dashboard/notifications?view=admin' as Route}
+            label="Admin"
+            icon={ShieldAlert}
+            active={view === 'admin'}
+            badge={adminInbox.unreadCount}
+          />
+        )}
         <TabLink href="/dashboard/notifications?view=log" label="Delivery log" icon={ScrollText} active={view === 'log'} />
       </Reveal>
 
       {/* ── Content ────────────────────────────────── */}
       <Reveal variant="up" delay={200}>
-        {view === 'inbox' ? (
-          <InboxList initial={inbox} />
+        {view === 'inbox' || view === 'admin' ? (
+          // Keyed on the view so switching tabs remounts the list rather than
+          // leaving the previous stream's state behind.
+          <InboxList key={view} initial={shown} />
         ) : log.items.length === 0 ? (
           <div className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-14 text-center">
             <div className="w-16 h-16 rounded-3xl bg-sky-50 flex items-center justify-center mx-auto mb-4">
