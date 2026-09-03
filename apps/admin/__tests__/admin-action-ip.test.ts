@@ -43,6 +43,7 @@ const TAKES_IP = [
   'approveMandate',
   'correctMemberIdNumber',
   'generateContributions',
+  'recalculateBadges',
   'recordGoalOutcome',
   // Declares its `ip` inside an options object rather than positionally. The
   // obligation is the same — it forwards the caller's origin to the web app,

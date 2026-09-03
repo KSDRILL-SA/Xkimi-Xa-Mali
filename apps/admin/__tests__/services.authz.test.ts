@@ -88,6 +88,9 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['getNudgeOutcomes',         (r) => services.getNudgeOutcomes(r, 1, 2026)],
   ['getContributionsForExport',(r) => services.getContributionsForExport(r, 1, 2026)],
   ['listAllBadges',            (r) => services.listAllBadges(r)],
+  // Derives rather than decides, but it still reaches every member's score —
+  // and it refuses before the fetch, not after.
+  ['recalculateBadges',        (r) => services.recalculateBadges('a1', r)],
   ['getSignatureMetadata',     (r) => services.getSignatureMetadata('a1', r)],
   ['getLockStatus',            (r) => services.getLockStatus('a1', r)],
   ['getSignatureHistory',      (r) => services.getSignatureHistory('a1', r)],
