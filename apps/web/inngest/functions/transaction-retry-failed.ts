@@ -31,6 +31,14 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
         status: 'FAILED',
         retryCount: { lt: MAX_TRANSACTION_RETRY },
         createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+        // This job's whole purpose is resubmitting a payment to the gateway.
+        // An OFFLINE row never went near one — it records cash or an EFT that
+        // already reached the bank account — so there is nothing to resubmit,
+        // and trying would mean attempting to charge a member through a
+        // gateway for money they have already handed over. Excluded at the
+        // query rather than skipped in the loop so it can never be counted as
+        // a candidate at all.
+        type: { not: 'OFFLINE' },
       },
       include: {
         mandate: { select: { id: true, netcashMandateId: true, status: true, userId: true } },
@@ -48,10 +56,28 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
   let errored = 0
 
   for (const tx of candidates) {
-    if (tx.mandate.status !== 'ACTIVE' || !tx.mandate.netcashMandateId) {
+    // `mandate` is nullable on the model (OFFLINE rows have none) and the query
+    // above already excludes those, so this is a belt-and-braces guard rather
+    // than an expected branch — but it is the difference between a future
+    // mandate-less transaction type being skipped and this job throwing
+    // mid-run, taking the rest of the recovery pool down with it.
+    if (!tx.mandate || tx.mandate.status !== 'ACTIVE' || !tx.mandate.netcashMandateId) {
       skipped++
       continue
     }
+
+    // Captured after the guard rather than reaching through `tx.mandate` below.
+    // The narrowing from that check does not survive into the `step.run`
+    // closures further down, so without this every use inside them needs a
+    // non-null assertion — which is the same claim made repeatedly and
+    // unverifiably, instead of once where it is actually proven.
+    //
+    // `netcashMandateId` is captured separately for the same reason: it is
+    // nullable on the model too, and reading it back off `mandate` inside a
+    // closure re-widens it to `string | null` even though the guard has
+    // already established otherwise.
+    const mandate = tx.mandate
+    const netcashMandateId = tx.mandate.netcashMandateId
 
     if (tx.contribution.status === 'PAID') {
       skipped++
@@ -63,7 +89,7 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
 
       try {
         const gatewayRes = await submitFn({
-          mandateId: tx.mandate.netcashMandateId!,
+          mandateId: netcashMandateId,
           amount: debitAmountWithFee(Number(tx.amount)),
           reference: `XXM-RETRY-${tx.id.slice(-8)}`,
           idempotencyKey: `retry:${tx.idempotencyKey}:${tx.retryCount + 1}`,
@@ -135,11 +161,11 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
       if ('newStatus' in result && result.newStatus === 'SUCCESS') {
         await step.run(`notify-${tx.id}`, () =>
           queueNotification({
-            userId: tx.mandate.userId,
+            userId: mandate.userId,
             templateSlug: 'debit-success',
             channel: 'SMS',
             payload: {
-              mandateId: tx.mandate.id,
+              mandateId: mandate.id,
               amount: Number(tx.amount).toString(),
               transactionId: tx.id,
             },

@@ -94,7 +94,19 @@ beforeEach(() => {
   mocks.txFindUnique.mockResolvedValue(null)
   mocks.txCreate.mockImplementation(({ data }: never) => Promise.resolve({ id: 'tx-1', ...(data as object) }))
   mocks.contribFindUnique.mockResolvedValue(null)
-  mocks.contribCreate.mockResolvedValue({ id: 'contrib-1', status: 'PENDING' })
+  // amountDue/amountPaid are not decoration here. Both are NOT NULL columns —
+  // a contribution without them cannot exist — and the run now collects the
+  // outstanding balance (amountDue - amountPaid) rather than the full mandate
+  // amount, so a fixture omitting them models a row the database would reject
+  // and silently produces a zero balance, skipping every mandate. These are the
+  // values the run's own upsert step writes for a fresh period: the mandate's
+  // amount, nothing paid yet.
+  mocks.contribCreate.mockResolvedValue({
+    id: 'contrib-1',
+    status: 'PENDING',
+    amountDue: 500,
+    amountPaid: 0,
+  })
   mocks.queueNotification.mockResolvedValue(undefined)
   mocks.notifyAdmins.mockResolvedValue(1)
   mocks.raiseAlert.mockResolvedValue(undefined)
@@ -262,6 +274,77 @@ describe('executeDebitRun — mandates it must leave alone', () => {
 
     expect(mocks.submitScheduledDebit).not.toHaveBeenCalled()
     expect(summary.due).toBe(0)
+  })
+
+  it('collects only what is outstanding when part of the period is already paid', async () => {
+    // The bug this covers: every amount in the run used to be the mandate's
+    // monthly figure, whatever had already been paid against the period. A
+    // member who settled R200 of a R500 month by EFT was still debited the
+    // full R500 — R200 more than they owed, taken from their account.
+    //
+    // Unreachable while every payment came through the gateway. Recording cash
+    // and EFT payments makes a part-paid period an ordinary mid-month state,
+    // which is exactly what this used to get wrong.
+    mocks.findMandates.mockResolvedValue([mandate('a')])
+    mocks.contribFindUnique.mockResolvedValue({
+      id: 'contrib-1',
+      status: 'PARTIAL',
+      amountDue: 500,
+      amountPaid: 200,
+    })
+    mocks.submitScheduledDebit.mockResolvedValue({ status: 'SUCCESS', transactionRef: 'ref-a' })
+
+    await executeDebitRun(step)
+
+    // 300 outstanding, not the mandate's 500. Asserted on the gateway call
+    // because that is the one that moves real money. `debitAmountWithFee` is
+    // mocked to identity at the top of this file, so the figure here is the
+    // base amount the run chose rather than the fee-adjusted total.
+    expect(mocks.submitScheduledDebit).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 300 }),
+    )
+    // The recorded transaction has to agree with what was charged, or the
+    // member's statement and their bank disagree about the same debit.
+    expect(mocks.txCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amount: 300 }) }),
+    )
+  })
+
+  it('charges nothing when a part-payment already covered the whole period', async () => {
+    // Balance closed to exactly zero without the status having caught up to
+    // PAID. Submitting here would debit zero at best and the full amount at
+    // worst, for a period that owes nothing.
+    mocks.findMandates.mockResolvedValue([mandate('a')])
+    mocks.contribFindUnique.mockResolvedValue({
+      id: 'contrib-1',
+      status: 'PARTIAL',
+      amountDue: 500,
+      amountPaid: 500,
+    })
+
+    const summary = await executeDebitRun(step)
+
+    expect(mocks.submitScheduledDebit).not.toHaveBeenCalled()
+    expect(summary.skipped).toBe(1)
+  })
+
+  it('still collects the full amount when nothing has been paid', async () => {
+    // The ordinary case, kept honest: the outstanding-balance change must not
+    // quietly alter what an untouched period collects.
+    mocks.findMandates.mockResolvedValue([mandate('a')])
+    mocks.contribFindUnique.mockResolvedValue({
+      id: 'contrib-1',
+      status: 'PENDING',
+      amountDue: 500,
+      amountPaid: 0,
+    })
+    mocks.submitScheduledDebit.mockResolvedValue({ status: 'SUCCESS', transactionRef: 'ref-a' })
+
+    await executeDebitRun(step)
+
+    expect(mocks.submitScheduledDebit).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 500 }),
+    )
   })
 
   it('records a heartbeat, so a month in which it never runs is visible', async () => {
