@@ -927,17 +927,28 @@ export async function recordOfflineContribution(
     )
   }
 
-  // Find or raise the period. `amountDue` for a new one comes from the member's
-  // mandate if they have one, and falls back to the amount being recorded when
-  // they do not — which is the normal case here, since a member with no mandate
-  // is precisely who this feature exists for. Recording R500 against a period
-  // that claims R0 is due would mark it overpaid; claiming the platform minimum
-  // instead would invent an obligation nobody agreed to.
+  // Find or raise the period.
+  //
+  // `amountDue` on a new period, in order of authority:
+  //
+  //   1. the member's active mandate, when they have one — that is the
+  //      obligation they actually agreed to, and an admin recording a payment
+  //      has no business restating it;
+  //   2. an explicit `amountDue` from the admin, for a member with no mandate,
+  //      where the system holds no record of what was owed;
+  //   3. the amount received.
+  //
+  // The third is a last resort and its consequence is worth being explicit
+  // about: a period created owing exactly what arrived is settled in full by
+  // that payment. For a member with no mandate — which is precisely who this
+  // feature is for — a part payment would otherwise mark them up to date.
+  // Somebody who owed R500 and paid R200 would read as settled. That is what
+  // (2) exists to prevent, and why the form asks.
   let contribution = await contributionRepo.findByPeriod(data.userId, data.periodMonth, data.periodYear)
 
   if (!contribution) {
     const mandate = await mandateRepo.findFirst({ userId: data.userId, status: 'ACTIVE' })
-    const amountDue = mandate ? Number(mandate.amount) : data.amount
+    const amountDue = mandate ? Number(mandate.amount) : (data.amountDue ?? data.amount)
     const debitDay = mandate?.debitDay ?? 1
 
     contribution = await contributionRepo.create({
@@ -954,7 +965,11 @@ export async function recordOfflineContribution(
       userId: data.userId,
       period: `${data.periodYear}-${data.periodMonth}`,
       amountDue,
-      derivedFrom: mandate ? 'mandate' : 'payment amount',
+      derivedFrom: mandate
+        ? 'mandate'
+        : data.amountDue !== undefined
+          ? 'admin-stated'
+          : 'payment amount',
     })
   }
 
@@ -1014,6 +1029,7 @@ export async function recordOfflineContribution(
       periodMonth: data.periodMonth,
       periodYear: data.periodYear,
       amount: data.amount,
+      amountDue: data.amountDue ?? null,
       reference: data.reference,
       receivedAt: data.receivedAt.toISOString(),
       note: data.note ?? null,

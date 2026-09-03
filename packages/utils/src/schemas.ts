@@ -213,6 +213,24 @@ export const OfflineContributionSchema = z.object({
   // either side.
   periodYear: z.number().int().min(2024),
   /**
+   * What the member owed for this period, when the system has no way to know.
+   *
+   * Optional, and only consulted when the period does not exist yet. Where the
+   * member has an active mandate the obligation is already established and that
+   * amount wins — an admin should not be able to quietly restate what somebody
+   * agreed to pay.
+   *
+   * It matters for exactly the members this feature was built for: someone with
+   * no mandate has no recorded obligation at all, so without this the period is
+   * created owing precisely what was received, and a part payment settles it in
+   * full. Somebody who owed R500 and paid R200 would be marked up to date.
+   */
+  amountDue: z
+    .number()
+    .positive('Amount due must be greater than zero')
+    .max(MAX_CONTRIBUTION_ZAR, `Maximum contribution is R${MAX_CONTRIBUTION_ZAR.toLocaleString('en-ZA')}`)
+    .optional(),
+  /**
    * When the money actually reached the account — not when somebody got round
    * to capturing it. This is the date the member's statement will show, and
    * for the June–August backlog it is months before the record is written.

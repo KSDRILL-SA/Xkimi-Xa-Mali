@@ -51,7 +51,7 @@ type TxRow = {
 
 /** The only statuses and types a filter may name. Anything else is dropped. */
 const TRANSACTION_STATUSES = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED'] as const
-const TRANSACTION_TYPES = ['DEBIT_ORDER', 'MANUAL', 'REVERSAL', 'SCHEDULED'] as const
+const TRANSACTION_TYPES = ['DEBIT_ORDER', 'MANUAL', 'OFFLINE', 'REVERSAL', 'SCHEDULED'] as const
 type TxStatusName = (typeof TRANSACTION_STATUSES)[number]
 type TxTypeName = (typeof TRANSACTION_TYPES)[number]
 
