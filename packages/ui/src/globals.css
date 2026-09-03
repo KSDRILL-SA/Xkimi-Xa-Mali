@@ -267,6 +267,33 @@ html {
 .skip-to-main:focus { top: 1rem; }
 
 /* ── Scroll-reveal system ─────────────────────────────────────────────────── */
+/*
+ * Set by RevealGuard before the first paint, on touch devices and wherever
+ * reduced motion is asked for.
+ *
+ * This has to neutralise the *base* classes, not just the finished ones. The
+ * base class is what the server-rendered HTML carries, and its `transform` is
+ * what promotes the element to its own GPU layer. Destroying that layer later —
+ * which is what `reveal-done` did on hydration — is the compositor-invalidation
+ * failure that tore the contributions page on phones for six rounds of fixes.
+ *
+ * Under this class the transform never exists in any frame, so there is no
+ * layer to create and none to tear down. `transition: none` matters too: a
+ * transition on `transform` is enough on its own to keep some engines
+ * compositing the element.
+ *
+ * `!important` because these must beat the `.revealed` and `.reveal-done`
+ * combinations regardless of the order React applies them in.
+ */
+.no-reveal .reveal,
+.no-reveal .reveal-left,
+.no-reveal .reveal-right,
+.no-reveal .reveal-scale {
+  opacity: 1 !important;
+  transform: none !important;
+  transition: none !important;
+}
+
 .reveal {
   opacity: 0;
   transform: translateY(28px);

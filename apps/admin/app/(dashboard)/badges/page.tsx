@@ -1,14 +1,13 @@
 import type { Metadata } from 'next'
 import { formatDate } from '@xxm/utils'
 import type { BadgeTier } from '@prisma/client'
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listAllBadges, recalculateBadges } from '@/lib/services'
 import { requireAdmin } from '@/lib/admin-action'
 import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 import { Alert } from '@xxm/ui'
-import { Breadcrumb, PageHeader, Reveal, RouterPagination } from '@xxm/ui'
+import { Breadcrumb, PageHeader, Reveal, RouterPagination, FilterSelect, FilterBar } from '@xxm/ui'
 import { Trophy, RefreshCw } from 'lucide-react'
 import { BADGE_TIERS, BADGE_TIER_LABELS } from '@/lib/badge-tier'
 import { BadgesTable, type BadgeRow } from './BadgesTable'
@@ -109,11 +108,18 @@ export default async function BadgesPage({
         <Alert variant="error" title="That did not go through">{params.recalcError}</Alert>
       )}
 
-      <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5">
-        <FilterChip label="All" href="/badges" active={!tier} />
-        {BADGE_TIERS.map((t) => (
-          <FilterChip key={t} label={BADGE_TIER_LABELS[t]} href={`/badges?tier=${t}`} active={tier === t} />
-        ))}
+      {/* One dropdown rather than five chips — the closed control says which
+          tier is being shown. */}
+      <Reveal variant="up" delay={100}>
+        <FilterBar>
+          <FilterSelect
+            label="Tier"
+            name="tier"
+            value={tier}
+            allLabel="All tiers"
+            options={BADGE_TIERS.map((t) => ({ value: t, label: BADGE_TIER_LABELS[t] }))}
+          />
+        </FilterBar>
       </Reveal>
 
       <Reveal variant="up" delay={200} className="space-y-4">
@@ -121,20 +127,5 @@ export default async function BadgesPage({
         <RouterPagination totalItems={total} itemsPerPage={20} currentPage={page} baseUrl="/badges" className="justify-center" />
       </Reveal>
     </div>
-  )
-}
-
-function FilterChip({ label, href, active }: { label: string; href: string; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-        active
-          ? 'bg-xxm-green text-white shadow-sm'
-          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gray-200'
-      }`}
-    >
-      {label}
-    </Link>
   )
 }

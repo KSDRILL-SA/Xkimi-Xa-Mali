@@ -6,6 +6,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { env } from '@/lib/env'
 import { NavigationProgressLoader } from '@/components/NavigationProgressLoader'
 import './globals.css'
+import { RevealGuard } from '@xxm/ui'
 
 /**
  * Self-hosted rather than fetched from Google at build time.
@@ -75,6 +76,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${playfairDisplay.variable}`}>
+      {/* Before the stylesheet touches anything. See RevealGuard: the reveal
+          transform must never exist on a touch device, and only a blocking
+          script in the head runs early enough to decide that. */}
+      <head>
+        <RevealGuard />
+      </head>
       <body className="min-h-dvh bg-xxm-champagne antialiased">
         <NavigationProgressLoader />
         {children}
