@@ -1,6 +1,7 @@
 import { BadgeTier } from '@prisma/client'
 import { db, Prisma } from '@/lib/db'
-import { assertAdmin } from './shared'
+import { assertAdmin, AdminConflictError } from './shared'
+import { internalAdminPost } from '@/lib/api'
 
 // ─── Dashboard stats ──────────────────────────────────────────────────────────
 
@@ -86,6 +87,45 @@ export async function getContributionsForExport(adminRoles: string[], month: num
 }
 
 // ─── Badges ───────────────────────────────────────────────────────────────────
+
+/**
+ * Ask the member app to re-derive badge scores.
+ *
+ * Badges recalculate when a contribution changes status and on the first of
+ * each month, and neither of those reaches a badge that is *already* wrong. A
+ * reversal that happened before the recalculation job was fixed left a member
+ * credited for money the Foundation does not have, and the only remedies were
+ * to wait up to a month or hope some unrelated change fired the event. This is
+ * the button for it.
+ *
+ * Safe to press repeatedly: `recalculateOne` derives everything from the
+ * contribution rows, so asking twice is the same answer twice. It cannot invent
+ * a promotion, only find one the data already supports.
+ *
+ * Server-to-server, like every other admin action that touches member records —
+ * the scoring rules live beside the contribution data they read.
+ */
+export async function recalculateBadges(
+  adminId: string,
+  adminRoles: string[],
+  /** One member, or every active member when omitted. */
+  userId?: string,
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const res = await internalAdminPost<{ recalculated: number }>(
+    '/api/v1/admin/badges/recalculate',
+    userId ? { userId } : {},
+    { adminUserId: adminId, adminIp: ip },
+  )
+
+  if (!res.ok || !res.data) {
+    throw new AdminConflictError(res.error?.message ?? 'The recalculation could not be run.')
+  }
+
+  return { recalculated: res.data.recalculated }
+}
 
 export async function listAllBadges(
   adminRoles: string[],
