@@ -5,7 +5,6 @@ import { createInboxMessages } from './inbox.service'
 import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import { assertAdmin, assertNotSelf } from '@/lib/authorization'
 import { isValidSAId } from '@xxm/utils/sa-id'
-import { escapeHtml } from '@xxm/utils'
 import { encrypt } from '@/lib/encryption'
 import { paymentGateway } from '@/integrations/payment'
 import { raiseGatewayDesyncAlert } from './mandate.service'
@@ -446,8 +445,23 @@ export async function broadcastNotification(
   channel: BroadcastChannel,
   filter: BroadcastFilter,
   ip?: string,
+  /**
+   * What this announcement is about, in a few words.
+   *
+   * Used as the email subject, the email heading, and the title of the in-app
+   * message. All three were the constant string "Message from Xkimi Xa Mali
+   * Foundation", which told a member nothing and made two broadcasts
+   * indistinguishable in an inbox list.
+   *
+   * Optional only so an older caller cannot break; the console requires it, and
+   * the fallback is a plain descriptive line rather than the Foundation's name
+   * standing in for a subject.
+   */
+  subject?: string,
 ) {
   assertAdmin(adminRoles)
+
+  const heading = subject?.trim() || 'An announcement from leadership'
 
   const statusFilter = filter !== 'ALL' ? { status: filter as UserStatus } : {}
 
@@ -466,11 +480,11 @@ export async function broadcastNotification(
         }
       }
       if ((channel === 'EMAIL' || channel === 'BOTH') && m.email) {
-        await emailProvider.sendGenericEmail(
-          m.email,
-          'Message from Xkimi Xa Mali Foundation',
-          `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;"><p style="color:#374151;margin-bottom:24px;">Hi ${escapeHtml(m.firstName)},</p><p style="color:#374151;margin-bottom:24px;white-space:pre-wrap;">${escapeHtml(message)}</p><p style="color:#9CA3AF;font-size:12px;">Xkimi Xa Mali Foundation · "Blessed is the hand that giveth."</p></div>`,
-        )
+        // Through the same shell and the same type scale as every other email.
+        // This used to hand-roll a bare div with grey paragraphs, so the one
+        // email a member is most likely to read was the only one that looked
+        // undesigned.
+        await emailProvider.sendBroadcastEmail(m.email, m.firstName, heading, message)
         counts.email++
       }
     } catch {
@@ -488,7 +502,7 @@ export async function broadcastNotification(
   let inAppSent = 0
   if (channel === 'IN_APP') {
     inAppSent = await createInboxMessages(members.map((m) => m.id), {
-      title: 'Message from Xkimi Xa Mali Foundation',
+      title: heading,
       body: message,
       category: 'BROADCAST',
       createdById: adminId,

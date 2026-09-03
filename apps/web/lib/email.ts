@@ -462,6 +462,54 @@ export async function sendOverdueReminderEmail(
  * in notification.service.ts does that for templated values. This function
  * cannot escape it wholesale, because a template's own markup is intentional.
  */
+/**
+ * A message leadership wrote, sent to the membership.
+ *
+ * It had no email of its own. The broadcast built its own markup inline in
+ * `admin.service.ts` — a bare `<div style="font-family:sans-serif">` with grey
+ * paragraphs — and handed it to `sendGenericEmail`, which wrapped that in the
+ * branded shell. So the one email a member is most likely to actually read was
+ * the only one that used none of the type system: no eyebrow, no heading, no
+ * hierarchy, and its own padding nested inside the shell's.
+ *
+ * The subject was the constant string "Message from Xkimi Xa Mali Foundation"
+ * on every send, which tells a member nothing about which message this is and
+ * makes two broadcasts indistinguishable in an inbox list.
+ *
+ * `subject` is now written by whoever sends it and does three jobs: the email
+ * subject, the heading, and the preheader line beside it in the inbox.
+ */
+export async function sendBroadcastEmail(
+  to: string,
+  firstName: string,
+  subject: string,
+  message: string,
+  idempotencyKey?: string,
+): Promise<void> {
+  const safeName = escapeHtml(firstName)
+  // Paragraph breaks survive as paragraphs. The composer is a textarea, so what
+  // somebody types as two thoughts should not arrive as one block.
+  const paragraphs = message
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p style="${S.body}">${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
+    .join('')
+
+  await send({
+    from: FROM, to,
+    subject,
+    html: layout(`
+      ${eyebrow('Announcement')}
+      <h1 style="${S.heading}">${escapeHtml(subject)}</h1>
+      ${lead(`Hi ${safeName},`)}
+      ${paragraphs}
+      ${divider()}
+      ${note(`Sent to members of ${APP_NAME}. Reply to this email or contact <a href="mailto:${SUPPORT}" style="${S.flink}">${SUPPORT}</a> if you have a question.`)}
+    `, subject),
+  }, idempotencyKey)
+}
+
 export async function sendGenericEmail(
   to: string,
   subject: string,

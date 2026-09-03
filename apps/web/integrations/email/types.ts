@@ -6,5 +6,6 @@ export interface IEmailProvider {
   sendPaymentFailedEmail(to: string, firstName: string, amount: string, period: string, dashboardUrl: string, idempotencyKey?: string): Promise<void>
   sendInviteEmail(to: string, firstName: string, code: string, registrationUrl: string): Promise<void>
   sendOverdueReminderEmail(to: string, firstName: string, amount: string, period: string, dashboardUrl: string, idempotencyKey?: string): Promise<void>
+  sendBroadcastEmail(to: string, firstName: string, subject: string, message: string, idempotencyKey?: string): Promise<void>
   sendGenericEmail(to: string, subject: string, html: string, idempotencyKey?: string): Promise<void>
 }
