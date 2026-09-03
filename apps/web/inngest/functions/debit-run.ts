@@ -5,6 +5,7 @@ import { todaySAST } from '@/lib/date'
 import { redis } from '@/lib/redis'
 import { paymentGateway } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
+import { subtractZAR } from '@/lib/money'
 import { recalculateContributionStatus, invalidateContributionSummaryCache } from '@/services/contribution.service'
 import { syncPrimaryGoalProgress } from '@/services/goal.service'
 import { checkBudget } from '@/services/budget.service'
@@ -153,6 +154,41 @@ export async function executeDebitRun(step: DebitStepRunner) {
       return
     }
 
+    // Collect what is still outstanding, not the full mandate amount.
+    //
+    // Every figure below used to be `mandate.amount` — what the member agreed
+    // to pay each month — regardless of what had already been paid against
+    // this period. A partly-settled contribution was therefore charged in
+    // full: pay R200 of R500 by hand, and the debit run still took R500,
+    // over-collecting by the R200 already banked.
+    //
+    // That was unreachable while every payment came through the gateway,
+    // because nothing could partly settle a period before debit day. Recording
+    // cash and EFT payments makes it reachable — an admin banking R200 mid-
+    // month is now an ordinary event, and it is exactly the case this would
+    // have got wrong.
+    //
+    // `contribution.amountDue` rather than `mandate.amount` as the base: the
+    // contribution is the obligation for this period and already carries the
+    // amount that was due when it was raised, which is the figure the member's
+    // statement shows. `subtractZAR` for the same reason the rest of the money
+    // path uses it — see lib/money.
+    const outstanding = subtractZAR(Number(contribution.amountDue), Number(contribution.amountPaid))
+
+    // Fully covered without being marked PAID — a partial payment that exactly
+    // closed the balance, or a status not yet recalculated. Either way there is
+    // nothing to collect, and submitting a zero or negative debit would be
+    // rejected by the gateway at best and charged at worst.
+    if (outstanding <= 0) {
+      tally.skipped += 1
+      logger.info('Debit run: period already covered, nothing outstanding', {
+        mandateId: mandate.id,
+        userId: mandate.userId,
+        period: periodKey,
+      })
+      return
+    }
+
     // The step keeps Inngest's own retries, so a blip is retried in seconds.
     // Only an exhausted retry reaches this catch, and it means the submission
     // never landed — which has to be recorded, or the member is skipped for
@@ -162,7 +198,7 @@ export async function executeDebitRun(step: DebitStepRunner) {
       gatewayRes = await step.run(`submit-debit-${mandate.id}`, () =>
         paymentGateway.submitScheduledDebit({
           mandateId: mandate.netcashMandateId!,
-          amount: debitAmountWithFee(Number(mandate.amount)),
+          amount: debitAmountWithFee(outstanding),
           reference: `XXM-${yearStr}-${monthStr}`,
           idempotencyKey,
         }),
@@ -178,7 +214,7 @@ export async function executeDebitRun(step: DebitStepRunner) {
           data: {
             contributionId: contribution.id,
             mandateId: mandate.id,
-            amount: Number(mandate.amount),
+            amount: outstanding,
             type: 'DEBIT_ORDER',
             status: 'FAILED',
             idempotencyKey,
@@ -221,7 +257,7 @@ export async function executeDebitRun(step: DebitStepRunner) {
         data: {
           contributionId: contribution.id,
           mandateId: mandate.id,
-          amount: Number(mandate.amount),
+          amount: outstanding,
           type: 'DEBIT_ORDER',
           status: txStatus,
           gatewayRef: gatewayRes.transactionRef ?? null,
@@ -243,14 +279,14 @@ export async function executeDebitRun(step: DebitStepRunner) {
       })
 
       await step.run(`budget-check-${mandate.id}`, async () => {
-        const budgetCheck = await checkBudget(mandate.userId, Number(mandate.amount))
+        const budgetCheck = await checkBudget(mandate.userId, outstanding)
         if (budgetCheck.status === 'OVER_BUDGET') {
           await queueNotification({
             userId: mandate.userId,
             templateSlug: 'budget-auto-exceeded',
             channel: 'SMS',
             payload: {
-              amount: Number(mandate.amount).toString(),
+              amount: outstanding.toString(),
               budget: budgetCheck.budget.toString(),
               type: 'monthly',
             },
@@ -267,7 +303,7 @@ export async function executeDebitRun(step: DebitStepRunner) {
     const notifyPayload = {
       mandateId: mandate.id,
       firstName: mandate.user.firstName ?? '',
-      amount: Number(mandate.amount).toString(),
+      amount: outstanding.toString(),
       period: periodKey,
       transactionId: transaction.id,
       url: `${env.NEXTAUTH_URL ?? ''}/dashboard/contribute`,

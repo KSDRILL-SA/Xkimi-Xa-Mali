@@ -14,12 +14,14 @@ import { cache, CACHE_KEYS } from '@/lib/cache'
 import { tallyBy } from '@/lib/aggregate'
 import { postPoolCredit, postPoolDebit } from './ledger.service'
 import { queueNotification } from './notification.service'
+import { createInboxMessages } from './inbox.service'
 import { env } from '@/lib/env'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import {
   ContributionNotFoundError,
   ContributionConflictError,
   MandateConflictError,
+  MemberNotFoundError,
   TransactionNotFoundError,
   BudgetExceededError,
 } from '@/lib/errors'
@@ -28,8 +30,8 @@ import { toTransactionStatus } from '@/lib/transaction-status'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
 import { subtractZAR } from '@/lib/money'
-import type { ManualContributionInput, GenerateContributionsInput } from '@/lib/validation/contribution'
-import { MIN_CONTRIBUTION_ZAR } from '@xxm/utils'
+import type { ManualContributionInput, GenerateContributionsInput, OfflineContributionInput } from '@/lib/validation/contribution'
+import { MIN_CONTRIBUTION_ZAR, MONTHS } from '@xxm/utils'
 
 const MAX_OPTIMISTIC_RETRIES = 3
 
@@ -852,6 +854,268 @@ export async function invalidateContributionSummaryCache(userId: string) {
   // Also clear the member's dashboard insights — their streak, forecast and
   // consistency stats all move when a contribution/payment does.
   await cache.del(userSummaryCacheKey(userId), CACHE_KEYS.memberInsights(userId))
+}
+
+// ─── Admin: record an offline (cash / EFT) contribution ────────────────────
+
+/**
+ * Record money that reached the group's bank account without the gateway.
+ *
+ * Netcash declined the DebiCheck application — their processing bank requires
+ * an applicant to already hold an active debit-order base, which a new stokvel
+ * by definition cannot. Members have been paying by EFT since June 2026
+ * regardless, and none of it could be recorded: every payment path here
+ * required a gateway mandate, and `generateMonthlyContributions` only raises a
+ * period for members who have one. So those months exist in the bank statement
+ * and nowhere in this system.
+ *
+ * This is the way in. It is deliberately NOT `submitManualPayment` with the
+ * gateway call removed — that function charges a member, this one writes down
+ * that a member already paid. The differences are the whole point:
+ *
+ *   - No gateway, no mandate. `mandateId` is null (see the schema note), and
+ *     `type` is OFFLINE rather than MANUAL so the ledger stays readable: MANUAL
+ *     means "the member pressed pay and we submitted it", and conflating the
+ *     two would leave nobody able to tell which rows ever touched a provider.
+ *   - The transaction is written SUCCESS immediately. There is no settlement to
+ *     wait for; the money is already in the account, which is why an admin is
+ *     recording it.
+ *   - It creates the period if none exists. That is the June–August backlog
+ *     case, and refusing would make the feature useless for the exact situation
+ *     it was built for.
+ *   - No budget check. `submitManualPayment` runs one because a member spending
+ *     money can exceed what they set aside; writing down money that has already
+ *     moved cannot.
+ *
+ * What it shares with every other payment path is the part that must not fork:
+ * `recalculateContributionStatus` derives amountPaid and PENDING/PARTIAL/PAID
+ * from the transaction rows, so an offline payment settles a period by exactly
+ * the same rule as a gateway one, and the debit run's "already PAID, skip" and
+ * outstanding-balance logic both see it without knowing it exists.
+ */
+export async function recordOfflineContribution(
+  data: OfflineContributionInput,
+  adminId: string,
+  adminRoles: string[],
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const member = await db.user.findUnique({
+    where: { id: data.userId },
+    select: { id: true, status: true, firstName: true },
+  })
+  if (!member) throw new MemberNotFoundError()
+
+  // RESIGNED and SUSPENDED members are deliberately allowed. Money that arrived
+  // is a fact about the past, and the commonest reason to record a late payment
+  // is settling up with somebody on their way out. Refusing would leave real
+  // money unrecordable for the members most likely to need the record.
+
+  // One offline payment per bank reference. The reference identifies a specific
+  // real-world payment, so recording it twice is either a double-submitted form
+  // or two admins capturing the same statement line — and the second would
+  // silently double the member's paid balance and mark a period settled that is
+  // not. Scoped by member and period so an unimaginative reference ("EFT") on
+  // two genuinely different payments is not blocked.
+  const idempotencyKey = `offline:${data.userId}:${data.periodYear}-${String(data.periodMonth).padStart(2, '0')}:${data.reference.toLowerCase()}`
+
+  const duplicate = await transactionRepo.findByIdempotencyKey(idempotencyKey)
+  if (duplicate) {
+    throw new ContributionConflictError(
+      `A payment with reference "${data.reference}" is already recorded for this member and period`,
+      'CTR_007',
+    )
+  }
+
+  // Find or raise the period.
+  //
+  // `amountDue` on a new period, in order of authority:
+  //
+  //   1. the member's active mandate, when they have one — that is the
+  //      obligation they actually agreed to, and an admin recording a payment
+  //      has no business restating it;
+  //   2. an explicit `amountDue` from the admin, for a member with no mandate,
+  //      where the system holds no record of what was owed;
+  //   3. the amount received.
+  //
+  // The third is a last resort and its consequence is worth being explicit
+  // about: a period created owing exactly what arrived is settled in full by
+  // that payment. For a member with no mandate — which is precisely who this
+  // feature is for — a part payment would otherwise mark them up to date.
+  // Somebody who owed R500 and paid R200 would read as settled. That is what
+  // (2) exists to prevent, and why the form asks.
+  let contribution = await contributionRepo.findByPeriod(data.userId, data.periodMonth, data.periodYear)
+
+  // A waiver is a decision leadership made — that this member owes nothing for
+  // this month. Recording a payment against it would quietly undo that decision
+  // instead of asking anybody to revisit it, so it is refused and said plainly.
+  if (contribution?.status === 'WAIVED') {
+    throw new ContributionConflictError(
+      'That month was waived, so nothing is owed against it. If money did arrive for it, reverse the waiver first.',
+      'CTR_008',
+    )
+  }
+
+  if (!contribution) {
+    const mandate = await mandateRepo.findFirst({ userId: data.userId, status: 'ACTIVE' })
+    const amountDue = mandate ? Number(mandate.amount) : (data.amountDue ?? data.amount)
+    const debitDay = mandate?.debitDay ?? 1
+
+    contribution = await contributionRepo.create({
+      userId: data.userId,
+      periodMonth: data.periodMonth,
+      periodYear: data.periodYear,
+      amountDue,
+      amountPaid: 0,
+      dueDate: new Date(data.periodYear, data.periodMonth - 1, debitDay),
+      status: 'PENDING',
+    })
+
+    logger.info('Offline payment raised a contribution period that did not exist', {
+      userId: data.userId,
+      period: `${data.periodYear}-${data.periodMonth}`,
+      amountDue,
+      derivedFrom: mandate
+        ? 'mandate'
+        : data.amountDue !== undefined
+          ? 'admin-stated'
+          : 'payment amount',
+    })
+  }
+
+  const periodContribution = contribution
+
+  const written = await runTransaction(async (tx) => {
+    const created = await transactionRepo.create(
+      {
+        contributionId: periodContribution.id,
+        // Null, not a placeholder. Faking a mandate would need a bank account
+        // beneath it — inventing banking details for somebody who handed over
+        // cash and never supplied any.
+        mandateId: null,
+        amount: data.amount,
+        type: 'OFFLINE',
+        // SUCCESS on write: the money is already in the account. There is no
+        // webhook coming to confirm it, so anything else would leave the row
+        // waiting forever for a settlement that already happened.
+        status: 'SUCCESS',
+        idempotencyKey,
+        offlineReference: data.reference,
+        recordedById: adminId,
+        processedAt: data.receivedAt,
+      },
+      tx,
+    )
+
+    const change = await recalculateContributionStatus(periodContribution.id, tx)
+    return { created, change }
+  })
+
+  const { created: transaction, change: statusChange } = written
+
+  // After the commit, never inside it — same reason as every other payment
+  // path: the announcement is an HTTP call and the transaction has a timeout.
+  if (statusChange) await emitContributionStatusChange(statusChange)
+
+  await Promise.all([
+    cache.del(CACHE_KEYS.DASHBOARD_STATS),
+    invalidateContributionSummaryCache(data.userId),
+  ])
+
+  await syncPrimaryGoalProgress().catch((err) =>
+    logger.error('Primary goal sync failed after an offline payment', {
+      error: err instanceof Error ? err.message : String(err),
+    }),
+  )
+
+  await writeAuditLog({
+    userId: adminId,
+    action: 'OFFLINE_PAYMENT_RECORDED',
+    entity: 'Transaction',
+    entityId: transaction.id,
+    payload: {
+      memberId: data.userId,
+      contributionId: periodContribution.id,
+      periodMonth: data.periodMonth,
+      periodYear: data.periodYear,
+      amount: data.amount,
+      amountDue: data.amountDue ?? null,
+      reference: data.reference,
+      receivedAt: data.receivedAt.toISOString(),
+      note: data.note ?? null,
+    } as Prisma.InputJsonValue,
+    ipAddress: ip,
+  })
+
+  // What the period looks like now the payment is on it. Read back rather than
+  // computed here: `recalculateContributionStatus` derives amountPaid from the
+  // transaction rows, so anything worked out separately would be a second
+  // opinion about the same thing and free to disagree with it.
+  const settledState = await contributionRepo.findById(periodContribution.id)
+  const amountDue = Number(settledState?.amountDue ?? periodContribution.amountDue)
+  const amountPaid = Number(settledState?.amountPaid ?? data.amount)
+  const outstanding = subtractZAR(amountDue, amountPaid)
+  const status = settledState?.status ?? 'PARTIAL'
+
+  const period = `${MONTHS[data.periodMonth - 1] ?? data.periodMonth} ${data.periodYear}`
+
+  // Tell the member. Leadership recording money against somebody's name is a
+  // change to their financial record that they had no part in making, and the
+  // one thing worse than money going unrecorded is it being recorded silently.
+  // Best-effort: the payment is already committed, and a failed inbox write
+  // must not turn a recorded payment into an error the admin retries.
+  await createInboxMessages([data.userId], {
+    title: `R${data.amount.toFixed(2)} recorded against ${period}`,
+    body:
+      `Leadership has recorded a payment of R${data.amount.toFixed(2)} towards your ${period} contribution. ` +
+      (outstanding <= 0
+        ? 'That month is now settled in full.'
+        : `R${outstanding.toFixed(2)} is still outstanding.`) +
+      ` Reference: ${data.reference}.` +
+      ' If you do not recognise this, contact leadership.',
+    category: 'PAYMENT',
+    createdById: adminId,
+  }).catch((err) =>
+    logger.error('Inbox notify failed after an offline payment', {
+      error: err instanceof Error ? err.message : String(err),
+      userId: data.userId,
+    }),
+  )
+
+  logger.info('Offline payment recorded', {
+    adminId,
+    memberId: data.userId,
+    contributionId: periodContribution.id,
+    amount: data.amount,
+    period: `${data.periodYear}-${data.periodMonth}`,
+    status,
+    outstanding,
+  })
+
+  return {
+    transactionId: transaction.id,
+    contributionId: periodContribution.id,
+    receiptRef: `XXM-OFF-${transaction.id.slice(-8).toUpperCase()}`,
+    period,
+    amount: data.amount,
+    amountDue,
+    amountPaid,
+    outstanding,
+    status,
+    /**
+     * True when more has now been paid against this period than was owed.
+     *
+     * Deliberately reported rather than refused. The admin path this replaces
+     * rejected anything above the outstanding balance, which is the wrong
+     * answer for the members this exists for: nobody with no mandate has a
+     * reliable `amountDue`, and turning away a deposit that is already sitting
+     * in the bank account does not un-receive the money — it just leaves it
+     * unrecorded. So it is written, and the caller is told plainly so a person
+     * can decide whether it was a mistake worth reversing.
+     */
+    overpaid: outstanding < 0,
+  }
 }
 
 // ─── Admin: generate monthly contribution records ──────────────────────────

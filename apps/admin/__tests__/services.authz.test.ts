@@ -16,8 +16,12 @@ vi.mock('@/lib/db', () => {
 vi.mock('@/lib/signature-storage', () => ({
   storeSignaturePng: () => { throw new Error('reached storage past the admin guard') },
 }))
+// WEB_BASE_URL as well as `env`: the contributions service now reaches the web
+// app through lib/api, which imports it by name. A mock missing an export the
+// import list names fails at import time, before a single guard is tested.
 vi.mock('@/lib/env', () => ({
   env: { UPSTASH_REDIS_REST_URL: undefined, UPSTASH_REDIS_REST_TOKEN: undefined },
+  WEB_BASE_URL: 'http://web.test',
 }))
 
 import * as services from '@/lib/services'
@@ -46,6 +50,15 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   ['previewGeneration',        (r) => services.previewGeneration(r, 1, 2026)],
   ['waiveContribution',        (r) => services.waiveContribution('a1', r, 'c1', 'A perfectly good reason')],
   ['recordPayment',            (r) => services.recordPayment('a1', r, 'c1', 40, 'Cash at the meeting')],
+  // Both refuse before the fetch, not after. A console that forwards whatever a
+  // non-admin submits is one misconfigured shared secret away from being the
+  // hole, and the hostile db mock above cannot catch that — this one does not
+  // touch the database at all.
+  ['recordOfflinePaymentForMember', (r) => services.recordOfflinePaymentForMember({
+    adminId: 'a1', adminRoles: r, userId: 'm1', amount: 40,
+    periodMonth: 6, periodYear: 2026, reference: 'EFT 8231', receivedAt: new Date(),
+  })],
+  ['listPayableMembers',       (r) => services.listPayableMembers(r)],
   ['getBroadcastAudience',     (r) => services.getBroadcastAudience(r)],
   ['correctMemberIdNumber',    (r) => services.correctMemberIdNumber('a1', r, 'm1', '9001015800088', 'Captured wrong at registration')],
   ['listAllGoals',             (r) => services.listAllGoals(r)],

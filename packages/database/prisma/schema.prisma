@@ -51,9 +51,21 @@ enum ContributionStatus {
 
 enum TransactionType {
   DEBIT_ORDER
+  /// Member-initiated, but still submitted through the payment gateway.
+  /// NOT an offline payment — see OFFLINE.
   MANUAL
   REVERSAL
   SCHEDULED
+  /// Money that reached the group's bank account without touching the gateway
+  /// at all — a cash deposit or an EFT the member made themselves, recorded
+  /// after the fact by an admin who verified it against the bank statement.
+  ///
+  /// Deliberately distinct from MANUAL. MANUAL means "the member pressed pay
+  /// and we submitted it to Netcash"; these rows never had a gateway, have no
+  /// mandate, and carry no gatewayRef. Collapsing the two would make the
+  /// transaction history unauditable — nobody could later tell which rows had
+  /// ever been near a real payment provider.
+  OFFLINE
 }
 
 enum TransactionStatus {
@@ -411,7 +423,12 @@ model Contribution {
 model Transaction {
   id              String            @id @default(cuid())
   contributionId  String
-  mandateId       String
+  /// Null only for OFFLINE transactions. Every gateway-borne payment is
+  /// authorised by a mandate and must carry one; money handed over as cash or
+  /// pushed by EFT genuinely has none, and inventing a placeholder mandate
+  /// (which would need a placeholder bank account under it) would mean
+  /// fabricating banking details for someone who never gave any.
+  mandateId       String?
   amount          Decimal           @db.Decimal(12, 2)
   currency        String            @default("ZAR")
   type            TransactionType
@@ -427,11 +444,24 @@ model Transaction {
   /// reversal. Distinct from failureReason, which is the gateway refusing.
   reversalReason  String?
   reversalOfId    String?           @unique
+  /// What the admin matched this OFFLINE payment against on the bank statement
+  /// — an EFT reference, a deposit slip number. Required by the service layer
+  /// for OFFLINE rows and null for everything else: a gateway payment already
+  /// has gatewayRef, and this is the offline equivalent of that evidence.
+  offlineReference String?
+  /// The admin who recorded an OFFLINE payment. Unlike a gateway transaction,
+  /// which no person asserts, an offline row is somebody's claim that money
+  /// arrived — so the claim is attributable. Plain id, no relation, matching
+  /// PaymentMandate.approvedById.
+  recordedById    String?
+  /// When the money actually reached the account. For gateway rows this is set
+  /// when the gateway settles; for OFFLINE rows the admin states it, and it is
+  /// the date that matters — not when somebody got round to capturing it.
   processedAt     DateTime?
   createdAt       DateTime          @default(now())
 
-  contribution Contribution   @relation(fields: [contributionId], references: [id], onDelete: Restrict)
-  mandate      PaymentMandate @relation(fields: [mandateId], references: [id], onDelete: Restrict)
+  contribution Contribution    @relation(fields: [contributionId], references: [id], onDelete: Restrict)
+  mandate      PaymentMandate? @relation(fields: [mandateId], references: [id], onDelete: Restrict)
   reversalOf   Transaction?   @relation("TransactionReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
   reversal     Transaction?   @relation("TransactionReversal")
 

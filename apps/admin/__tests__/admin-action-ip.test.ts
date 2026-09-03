@@ -44,6 +44,11 @@ const TAKES_IP = [
   'correctMemberIdNumber',
   'generateContributions',
   'recordGoalOutcome',
+  // Declares its `ip` inside an options object rather than positionally. The
+  // obligation is the same — it forwards the caller's origin to the web app,
+  // which writes the audit row — and the scan below reads the whole argument
+  // list, so an object field counts exactly as a positional one does.
+  'recordOfflinePaymentForMember',
   'recordPayment',
   'rejectGoal',
   'rejectMandate',

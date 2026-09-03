@@ -82,6 +82,13 @@ export const goalProposalRatelimit    = makeRatelimit('xxm:ratelimit:goal-propos
 export const adminInviteRatelimit     = makeRatelimit('xxm:ratelimit:admin-invite',    Ratelimit.slidingWindow(20, '1 h'))
 export const adminBroadcastRatelimit  = makeRatelimit('xxm:ratelimit:admin-broadcast', Ratelimit.slidingWindow(5,  '1 h'))
 export const adminBulkRatelimit       = makeRatelimit('xxm:ratelimit:admin-bulk',      Ratelimit.slidingWindow(3,  '1 h'))
+// Recording offline payments comes in bursts, not a trickle: catching up a
+// backlog means capturing one row per member per month in a single sitting, and
+// the first real use of this is three months for four members. The bulk bucket
+// (3/hour) is sized for sweeps that write an obligation for everyone at once
+// and would stop that halfway through; this is a single row for a single
+// member, so it gets its own bucket wide enough for the job and still bounded.
+export const adminOfflinePaymentRatelimit = makeRatelimit('xxm:ratelimit:admin-offline-payment', Ratelimit.slidingWindow(40, '1 h'))
 
 /**
  * Posting to the community board.

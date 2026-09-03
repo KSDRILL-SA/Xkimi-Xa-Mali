@@ -182,6 +182,85 @@ export const ManualContributionSchema = z.object({
   idempotencyKey: z.string().uuid().optional(),
 })
 
+/**
+ * A contribution that reached the group's bank account without the gateway —
+ * cash handed over, or an EFT the member pushed themselves — recorded after
+ * the fact by an admin who has seen it on the statement.
+ *
+ * This exists because Netcash declined the DebiCheck application: their
+ * processing bank requires an applicant to already hold an active debit-order
+ * base, which a new stokvel by definition cannot. Members have been paying by
+ * EFT since June 2026 regardless, and until now none of it could be recorded —
+ * every payment path in the system required a gateway mandate.
+ *
+ * Note what is NOT here: no budget-override fields, no idempotency token. This
+ * is not a member spending money, it is an admin recording money that has
+ * already arrived, so a budget cannot be exceeded by writing it down. Double
+ * submission is guarded in the service instead, against the reference — the
+ * one thing that identifies a specific real-world payment.
+ */
+export const OfflineContributionSchema = z.object({
+  userId: z.string().min(1, 'Choose a member'),
+  amount: z
+    .number()
+    .positive('Amount must be greater than zero')
+    .max(MAX_CONTRIBUTION_ZAR, `Maximum contribution is R${MAX_CONTRIBUTION_ZAR.toLocaleString('en-ZA')}`),
+  periodMonth: z.number().int().min(1).max(12),
+  // No `.max(currentYear + 1)` like ManualContributionSchema: that schema is a
+  // member paying forward, this one is an admin recording something that has
+  // already happened, and the backlog being recorded here is months in the
+  // past. The window is enforced by refusePeriod below, which allows a year
+  // either side.
+  periodYear: z.number().int().min(2024),
+  /**
+   * What the member owed for this period, when the system has no way to know.
+   *
+   * Optional, and only consulted when the period does not exist yet. Where the
+   * member has an active mandate the obligation is already established and that
+   * amount wins — an admin should not be able to quietly restate what somebody
+   * agreed to pay.
+   *
+   * It matters for exactly the members this feature was built for: someone with
+   * no mandate has no recorded obligation at all, so without this the period is
+   * created owing precisely what was received, and a part payment settles it in
+   * full. Somebody who owed R500 and paid R200 would be marked up to date.
+   */
+  amountDue: z
+    .number()
+    .positive('Amount due must be greater than zero')
+    .max(MAX_CONTRIBUTION_ZAR, `Maximum contribution is R${MAX_CONTRIBUTION_ZAR.toLocaleString('en-ZA')}`)
+    .optional(),
+  /**
+   * When the money actually reached the account — not when somebody got round
+   * to capturing it. This is the date the member's statement will show, and
+   * for the June–August backlog it is months before the record is written.
+   */
+  receivedAt: z.coerce
+    .date()
+    .max(new Date(Date.now() + 24 * 60 * 60 * 1000), 'That date is in the future — money cannot have arrived yet'),
+  /**
+   * What this was matched against on the bank statement: an EFT reference, a
+   * deposit slip number. Required, and deliberately so.
+   *
+   * A gateway transaction is self-evidencing — the provider holds the record
+   * and gatewayRef points at it. An offline row is one person's claim that
+   * money arrived, and the only thing that makes the claim checkable by
+   * somebody else later is a pointer back to the bank statement. Without it
+   * this feature is an admin being able to mark contributions paid on their
+   * word alone.
+   */
+  reference: z
+    .string()
+    .trim()
+    .min(3, 'Enter the bank reference or deposit slip number this payment appears under')
+    .max(120, 'Reference cannot exceed 120 characters'),
+  /** Optional context — "paid in cash at the August meeting", etc. */
+  note: z.string().trim().max(500, 'Note cannot exceed 500 characters').optional(),
+}).refine(
+  (v) => refusePeriod({ month: v.periodMonth, year: v.periodYear }) === null,
+  { message: PERIOD_REFUSAL_MESSAGE.OUTSIDE_WINDOW, path: ['periodYear'] },
+)
+
 export const GenerateContributionsSchema = z.object({
   month: z.number().int().min(1, 'Month must be 1–12').max(12, 'Month must be 1–12'),
   year:  z.number().int().min(2024, 'Year must be 2024 or later'),
@@ -258,6 +337,7 @@ export type CreateMandateInput            = z.infer<typeof CreateMandateSchema>
 export type UpdateMandateInput            = z.infer<typeof UpdateMandateSchema>
 export type DelayMandateInput             = z.infer<typeof DelayMandateSchema>
 export type ManualContributionInput       = z.infer<typeof ManualContributionSchema>
+export type OfflineContributionInput      = z.infer<typeof OfflineContributionSchema>
 export type GenerateContributionsInput    = z.infer<typeof GenerateContributionsSchema>
 export type AddressInput                  = z.infer<typeof AddressSchema>
 export type UpdateProfileInput            = z.infer<typeof UpdateProfileSchema>
