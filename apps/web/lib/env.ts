@@ -236,8 +236,21 @@ export const env = createEnv({
     // quietly by design off production; on it, it is an open door.
     UPSTASH_REDIS_REST_URL: requiredWhenLive(z.string().url()),
     UPSTASH_REDIS_REST_TOKEN: requiredWhenLive(z.string().min(1)),
-    // PDF statements and signature storage.
-    BLOB_READ_WRITE_TOKEN: requiredWhenLive(z.string().min(1)),
+    /**
+     * PDF statements, signatures and proof-of-payment storage.
+     *
+     * Optional, and deliberately so even on a live deployment. A Blob store
+     * connected to a Vercel project authenticates by OIDC; `@vercel/blob` asks
+     * for an OIDC token and only falls back to this if one is set. Vercel's own
+     * dashboard recommends revoking the read-write token when the store is used
+     * only from Vercel, so its absence is the recommended configuration rather
+     * than a missing one.
+     *
+     * Requiring it here stopped the production build outright, for a value the
+     * platform is telling people not to keep. `isBlobStorageAvailable` in
+     * @xxm/utils is what the uploaders ask instead.
+     */
+    BLOB_READ_WRITE_TOKEN: z.string().min(1).optional(),
     WHATSAPP_GROUP_LINK: z.string().url(),
     WHATSAPP_GROUP_NAME: z.string().default('Xkimi Xa Mali Foundation'),
     ADMIN_WHATSAPP_NUMBER: configuredWhenLive(z.string().min(1), '27000000000'),

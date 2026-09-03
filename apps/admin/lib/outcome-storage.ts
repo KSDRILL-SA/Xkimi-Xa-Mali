@@ -1,3 +1,4 @@
+import { isBlobStorageAvailable } from '@xxm/utils/deployment'
 import { put } from '@vercel/blob'
 
 /** What a proof photo or receipt is allowed to be. */
@@ -22,9 +23,12 @@ export class OutcomeProofError extends Error {
  * fallback, so there is one story about how this repository stores an uploaded
  * file rather than two that drift.
  *
- * - Configured (`BLOB_READ_WRITE_TOKEN`): uploads privately and returns the
- *   **pathname**. Serve it through `/api/media`, which requires an admin
- *   session and refuses a reference no row claims.
+ * - On Vercel (`isBlobStorageAvailable`): uploads privately and returns the
+ *   **pathname**. Authenticated by OIDC where the store is connected to the
+ *   project, or by a read-write token where one is set — the SDK resolves
+ *   whichever exists, which is why neither is named here.
+ *   Serve it through `/api/media`, which requires an admin session and refuses
+ *   a reference no row claims.
  * - Local development: returns a self-contained base64 `data:` URL, so the
  *   feature works end to end without cloud storage.
  *
@@ -45,7 +49,7 @@ export async function storeGoalOutcomeProof(
     throw new OutcomeProofError('Proof must be 8 MB or smaller')
   }
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (isBlobStorageAvailable()) {
     const blob = await put(`goal-outcomes/${goalId}.${ext}`, file.buffer, {
       // A proof is a receipt for money the collective spent — who was paid, for
       // how much, sometimes a member's name on an invoice. `addRandomSuffix`

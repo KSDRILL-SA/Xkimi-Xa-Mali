@@ -82,8 +82,11 @@ describe('go-live preflight — reporting', () => {
   })
 
   it('names exactly what is absent', () => {
-    const { missing } = preflight({ ...complete, BLOB_READ_WRITE_TOKEN: undefined, DEPLOY_ENV: 'staging' })
-    expect(missing).toEqual(['BLOB_READ_WRITE_TOKEN'])
+    // Was BLOB_READ_WRITE_TOKEN, until that stopped being required: a Blob
+    // store connected to a Vercel project authenticates by OIDC, and Vercel
+    // recommends revoking the token, so its absence is the intended state.
+    const { missing } = preflight({ ...complete, UPSTASH_REDIS_REST_TOKEN: undefined, DEPLOY_ENV: 'staging' })
+    expect(missing).toEqual(['UPSTASH_REDIS_REST_TOKEN'])
   })
 
   // An empty string satisfies "the key exists" but fails `z.string().min(1)`,

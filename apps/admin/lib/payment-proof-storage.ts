@@ -1,3 +1,4 @@
+import { isBlobStorageAvailable } from '@xxm/utils/deployment'
 import { put } from '@vercel/blob'
 
 /**
@@ -78,11 +79,14 @@ export class PaymentProofError extends Error {
  * repository keeps one story about how it stores an uploaded file rather than
  * three that drift.
  *
- * - Configured (`BLOB_READ_WRITE_TOKEN`): uploads **privately** and returns the
- *   pathname. A proof of payment shows a bank account number, a name and often
- *   a balance; `addRandomSuffix` makes a path unguessable, which is not the
- *   same as private. Served through the media routes, which check that a
- *   transaction row claims the reference before returning any bytes.
+ * - On Vercel (`isBlobStorageAvailable`): uploads privately and returns the
+ *   **pathname**. Authenticated by OIDC where the store is connected to the
+ *   project, or by a read-write token where one is set — the SDK resolves
+ *   whichever exists, which is why neither is named here.
+ *   A proof of payment shows a bank account number, a name and often a balance;
+ *   `addRandomSuffix` makes a path unguessable, which is not the same as
+ *   private. Served through the media routes, which check that a transaction
+ *   row claims the reference before returning any bytes.
  * - Local development: a self-contained base64 `data:` URL, so the whole flow
  *   works end to end without cloud storage.
  *
@@ -111,7 +115,7 @@ export async function storePaymentProof(
     )
   }
 
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (isBlobStorageAvailable()) {
     const blob = await put(`payment-proofs/proof.${format.ext}`, file.buffer, {
       access: 'private',
       contentType: format.contentType,

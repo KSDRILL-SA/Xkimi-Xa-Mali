@@ -1,3 +1,4 @@
+import { isBlobStorageAvailable } from '@xxm/utils/deployment'
 import { put } from '@vercel/blob'
 
 /**
@@ -14,14 +15,14 @@ import { put } from '@vercel/blob'
  * Leaving one world-readable means anyone who can guess an id can lift it and
  * put it on a document the Foundation did not issue.
  *
- * - Configured (`BLOB_READ_WRITE_TOKEN`): uploads privately, returns the
+ * - On Vercel (`isBlobStorageAvailable`): uploads privately, returns the
  *   pathname. Anything that renders it in a browser goes through `/api/media`,
  *   which requires an admin session and refuses a reference no row claims.
  * - Local development: returns a self-contained base64 `data:` URL, so the
  *   feature works end to end without cloud storage. The consumers accept both.
  */
 export async function storeSignaturePng(path: string, pngBuffer: Buffer): Promise<string> {
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
+  if (isBlobStorageAvailable()) {
     const blob = await put(path, pngBuffer, {
       access: 'private',
       contentType: 'image/png',
