@@ -41,6 +41,7 @@ vi.mock('@/integrations/sms', () => ({
 vi.mock('@/integrations/email', () => ({
   emailProvider: {
     sendWelcomeEmail: vi.fn(),
+    sendBroadcastEmail: vi.fn(),
     sendGenericEmail: vi.fn(),
   },
 }))
@@ -341,27 +342,52 @@ describe('broadcastNotification', () => {
     expect(result.failed).toBe(1)
   })
 
-  it('escapes a member\'s own name and the broadcast body before building the email HTML', async () => {
+  it('hands the name, subject and body to the email layer unrendered', async () => {
     // Both are attacker-reachable in different ways: a member sets their own
-    // first name, an admin (or a compromised admin account) types the
-    // message. Neither should be able to inject markup into an email every
+    // first name, an admin (or a compromised admin account) types the message
+    // and the subject. None of them may inject markup into an email every
     // recipient's client renders.
-    const mockSendGenericEmail = emailProvider.sendGenericEmail as MockedFunction<typeof emailProvider.sendGenericEmail>
+    //
+    // The escaping moved with the markup. The broadcast used to build its own
+    // HTML inline here; it now calls `sendBroadcastEmail`, which owns the
+    // template and escapes every interpolation. So what this asserts is that
+    // the raw values are handed over rather than pre-rendered — the escaping
+    // itself is covered against the real function, not a mock of it.
+    const mockSendBroadcast = emailProvider.sendBroadcastEmail as MockedFunction<typeof emailProvider.sendBroadcastEmail>
     mockDb.user.findMany.mockResolvedValue([
       { id: 'u1', email: 'a@x.co.za', phone: null, firstName: '<img src=x onerror=alert(1)>' },
     ] as never)
-    mockSendGenericEmail.mockResolvedValue(undefined)
+    mockSendBroadcast.mockResolvedValue(undefined)
     mockWriteAuditLog.mockResolvedValue(undefined)
 
     await broadcastNotification(
       'admin1', ADMIN_ROLES, 'Click <script>steal()</script> here', 'EMAIL', 'ALL',
+      undefined, 'Meeting moved',
     )
 
-    const html = mockSendGenericEmail.mock.calls[0]![2]
-    expect(html).not.toContain('<img src=x onerror=alert(1)>')
-    expect(html).not.toContain('<script>steal()</script>')
-    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
-    expect(html).toContain('&lt;script&gt;steal()&lt;/script&gt;')
+    const [, firstName, subject, message] = mockSendBroadcast.mock.calls[0]!
+    expect(firstName).toBe('<img src=x onerror=alert(1)>')
+    expect(subject).toBe('Meeting moved')
+    expect(message).toBe('Click <script>steal()</script> here')
+  })
+
+  it('titles the message with the subject rather than the Foundation name', async () => {
+    // Every broadcast used to arrive as "Message from Xkimi Xa Mali Foundation"
+    // — the same words for a meeting reminder and a change to the contribution
+    // amount, and the only line most members read before deciding to open it.
+    const mockSendBroadcast = emailProvider.sendBroadcastEmail as MockedFunction<typeof emailProvider.sendBroadcastEmail>
+    mockDb.user.findMany.mockResolvedValue([
+      { id: 'u1', email: 'a@x.co.za', phone: null, firstName: 'Kurhula' },
+    ] as never)
+    mockSendBroadcast.mockResolvedValue(undefined)
+    mockWriteAuditLog.mockResolvedValue(undefined)
+
+    await broadcastNotification(
+      'admin1', ADMIN_ROLES, 'We meet on Saturday.', 'EMAIL', 'ALL',
+      undefined, 'September meeting moved',
+    )
+
+    expect(mockSendBroadcast.mock.calls[0]![2]).toBe('September meeting moved')
   })
 })
 

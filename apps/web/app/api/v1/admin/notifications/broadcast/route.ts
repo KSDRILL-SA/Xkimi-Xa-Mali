@@ -53,10 +53,17 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   let body: unknown
   try { body = await req.json() } catch { return apiError('VAL_001', 'Invalid JSON', 400) }
 
-  const { message, channel, filter } = body as Record<string, unknown>
+  const { message, channel, filter, subject } = body as Record<string, unknown>
 
   if (typeof message !== 'string' || message.trim().length < 5)
     return apiError('VAL_002', '"message" must be at least 5 characters', 400)
+  // Required, and long enough to say something. It becomes the email subject
+  // and the inbox title, which are the only parts most members read before
+  // deciding whether to open it.
+  if (typeof subject !== 'string' || subject.trim().length < 3)
+    return apiError('VAL_002', '"subject" must be at least 3 characters', 400)
+  if (subject.trim().length > 120)
+    return apiError('VAL_002', '"subject" cannot exceed 120 characters', 400)
   if (!VALID_CHANNELS.includes(channel as BroadcastChannel))
     return apiError('VAL_003', `"channel" must be one of: ${VALID_CHANNELS.join(', ')}`, 400)
 
@@ -68,7 +75,7 @@ export const POST = withApiHandler(async (req: NextRequest) => {
 
   const result = await broadcastNotification(
     adminId, adminRoles,
-    message.trim(), channel as BroadcastChannel, resolvedFilter, ip,
+    message.trim(), channel as BroadcastChannel, resolvedFilter, ip, subject.trim(),
   )
   return apiSuccess(result)
 })

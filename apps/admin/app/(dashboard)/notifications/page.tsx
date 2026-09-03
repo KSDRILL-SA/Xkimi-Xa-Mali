@@ -5,7 +5,7 @@ import { auth } from '@/lib/auth'
 import { internalAdminPost } from '@/lib/api'
 import { getBroadcastAudience } from '@/lib/services'
 import { Alert, Reveal } from '@xxm/ui'
-import { Megaphone, MessageSquare, Mail, Layers, Inbox, Users, UserCheck, Clock, Ban, Send } from 'lucide-react'
+import { Megaphone, MessageSquare, Mail, Layers, Inbox, Users, UserCheck, Clock, Ban, Send, Type } from 'lucide-react'
 import { requireAdmin } from '@/lib/admin-action'
 
 export const metadata: Metadata = { title: 'Broadcast' }
@@ -30,11 +30,13 @@ export default async function NotificationsPage({
     'use server'
     const { userId, ip } = await requireAdmin('notifications.broadcast', { bulk: true })
 
+    const subject = (fd.get('subject') as string)?.trim()
     const message = (fd.get('message') as string)?.trim()
     const channel = fd.get('channel') as Channel
     const filter  = fd.get('filter')  as Filter
 
     if (!message || message.length < 5) redirect('/notifications?failed=1')
+    if (!subject || subject.length < 3) redirect('/notifications?failed=1')
 
     // The acting admin must travel with the request. Without these the web app
     // has no session to read — this is a server-to-server call, so no cookies —
@@ -44,7 +46,7 @@ export default async function NotificationsPage({
     // records our own server as the origin rather than the admin who clicked.
     const result = await internalAdminPost(
       '/api/v1/admin/notifications/broadcast',
-      { message, channel, filter },
+      { subject, message, channel, filter },
       { adminUserId: userId, adminIp: ip },
     )
     redirect(result.ok ? '/notifications?sent=1' : '/notifications?failed=1')
@@ -89,6 +91,34 @@ export default async function NotificationsPage({
 
       <div className="max-w-2xl">
         <form action={broadcast} className="space-y-6">
+
+          {/* ── Subject ──────────────────────────────────────── */}
+          {/* Every broadcast used to arrive titled "Message from Xkimi Xa Mali
+              Foundation" — the same words for a meeting reminder and a change
+              to the contribution amount. It is the only line most members read
+              before deciding whether to open it, so it is written per message
+              and required. */}
+          <Reveal variant="up" delay={50} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Type size={16} className="text-xxm-gray-500" aria-hidden />
+              <label htmlFor="bc-subject" className="text-sm font-bold text-xxm-green-900">
+                Subject <span className="text-red-400">*</span>
+              </label>
+            </div>
+            <input
+              id="bc-subject"
+              name="subject"
+              required
+              minLength={3}
+              maxLength={120}
+              placeholder="e.g. September meeting moved to Saturday"
+              className="w-full rounded-xl border border-xxm-gray-200 px-4 py-3 text-sm text-xxm-green-900 focus:outline-none focus:ring-2 focus:ring-xxm-green/25 bg-white placeholder:text-xxm-gray-400"
+            />
+            <p className="text-[11px] text-xxm-gray-400">
+              Becomes the email subject, the email heading and the title in each member&apos;s inbox.
+              Say what it is about, not who it is from.
+            </p>
+          </Reveal>
 
           {/* ── Message ──────────────────────────────────────── */}
           <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-6 space-y-3">
