@@ -12,6 +12,7 @@ import { RouterPagination } from '@/components/ui/RouterPagination'
 import { Button } from '@/components/ui/Button'
 import { Reveal } from '@xxm/ui'
 import { Wallet, AlertTriangle } from 'lucide-react'
+import { MEMBER_PAYMENTS_ENABLED } from '@/lib/payments-enabled'
 
 export const metadata: Metadata = { title: 'Contributions' }
 
@@ -83,7 +84,7 @@ export default async function ContributionsPage({
   const { items: contributions, total, totalPages } = paginated
 
   const mandateInfo =
-    activeMandate && env.ENABLE_MANUAL_PAYMENTS
+    activeMandate && MEMBER_PAYMENTS_ENABLED
       ? {
           bankName: activeMandate.bankAccount.bankName,
           accountNumberMasked: activeMandate.bankAccount.accountNumberMasked,

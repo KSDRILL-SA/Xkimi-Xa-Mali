@@ -11,7 +11,7 @@ import { isLiveDeployment, isNonLiveDeployment, deploymentEnvironmentName } from
 
 const env = (vars: Record<string, string | undefined>) => vars as NodeJS.ProcessEnv
 
-describe('DEPLOY_ENV wins when set', () => {
+describe('DEPLOY_ENV decides, except against the platform', () => {
   // The escape hatch. Without it, a CI build and a developer checking their work
   // locally both look exactly like production to NODE_ENV, and a compile check
   // turns into a hunt for a dozen production secrets.
@@ -22,13 +22,41 @@ describe('DEPLOY_ENV wins when set', () => {
     expect(isLiveDeployment(env({ DEPLOY_ENV: 'development' }))).toBe(false)
   })
 
-  it('overrides both VERCEL_ENV and NODE_ENV', () => {
-    expect(
-      isLiveDeployment(env({ DEPLOY_ENV: 'ci', VERCEL_ENV: 'production', NODE_ENV: 'production' })),
-    ).toBe(false)
-    expect(
-      isLiveDeployment(env({ DEPLOY_ENV: 'production', VERCEL_ENV: 'preview' })),
-    ).toBe(true)
+  it('overrides NODE_ENV', () => {
+    expect(isLiveDeployment(env({ DEPLOY_ENV: 'ci', NODE_ENV: 'production' }))).toBe(false)
+  })
+
+  it('may make a deployment stricter than the platform says', () => {
+    // The direction that stays allowed: claiming live on a preview, to rehearse
+    // production rules before anything real depends on them.
+    expect(isLiveDeployment(env({ DEPLOY_ENV: 'production', VERCEL_ENV: 'preview' }))).toBe(true)
+  })
+
+  it('may NOT make a live deployment look like something else', () => {
+    /**
+     * This case asserted the opposite, and the opposite is what happened.
+     *
+     * DEPLOY_ENV used to be read first and short-circuit, so any value other
+     * than "production" answered outright and VERCEL_ENV was never reached.
+     * Production ran with DEPLOY_ENV set to a non-live value, so the app
+     * believed it was not live — and the guard that refuses the stand-in
+     * payment gateway on a live deployment never fired. The stand-in was
+     * selected on the real site and answered SUCCESS to every debit. A member
+     * paid R100 in the app; a settled transaction was written, the pool was
+     * credited and the contribution marked paid, and no bank was ever
+     * contacted.
+     *
+     * VERCEL_ENV is set by Vercel itself and says "production" only for the
+     * deployment serving the production domain. Nothing a person types may
+     * contradict it, because everything that keeps this system honest hangs off
+     * this one boolean.
+     */
+    for (const declared of ['ci', 'staging', 'development', 'test', '']) {
+      expect(
+        isLiveDeployment(env({ DEPLOY_ENV: declared, VERCEL_ENV: 'production' })),
+        `DEPLOY_ENV=${declared} must not hide a production deployment`,
+      ).toBe(true)
+    }
   })
 })
 

@@ -220,13 +220,25 @@ describe('the mock gateway exemption', () => {
     expect(mod.env.NETCASH_SERVICE_KEY).toBeUndefined()
   })
 
-  it('is not a way to deploy without them', async () => {
-    // The exemption applies in a production build too, but it buys nothing:
-    // integrations/payment refuses to start with the mock selected there, so the
-    // deploy fails either way. This asserts that second gate still holds, so the
-    // exemption cannot quietly become a loophole.
+  it('is not a way to take payments without them', async () => {
+    // The exemption applies in a production build too, and it buys nothing:
+    // integrations/payment will not select the mock there. This asserts that
+    // second gate still holds, so the exemption cannot quietly become a
+    // loophole.
+    //
+    // The gate used to be a throw at module load and is now the disabled
+    // gateway instead — not a softening. A throw would take down statements,
+    // invitations and the admin console along with the payment path, for a
+    // feature deliberately not in use since the DebiCheck application was
+    // declined. What matters is unchanged and asserted directly: the stand-in
+    // is not selected, and nothing can report money as collected.
     vi.resetModules()
     applyEnv({ ...BASE_ENV, ...NETCASH_ENV, NODE_ENV: 'production', PAYMENT_GATEWAY: 'mock' })
-    await expect(import('@/integrations/payment')).rejects.toThrow(/Refusing to start/)
+
+    const mod = await import('@/integrations/payment')
+
+    expect(mod.IS_MOCK_GATEWAY).toBe(false)
+    expect(mod.GATEWAY_CAN_MOVE_MONEY).toBe(false)
+    await expect(mod.paymentGateway.submitOnceOffDebit({} as never)).rejects.toThrow()
   })
 })

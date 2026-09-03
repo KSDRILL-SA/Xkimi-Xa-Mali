@@ -2,10 +2,10 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
-import { env } from '@/lib/env'
 import { enrolInPlan, getMyPlans, suggestPlan } from '@/services/goal-plan.service'
 import { withApiHandler } from '@/lib/api-handler'
 import { getClientIP } from '@/lib/request'
+import { MEMBER_PAYMENTS_ENABLED, PAYMENTS_DISABLED_MESSAGE } from '@/lib/payments-enabled'
 
 const EnrolSchema = z.object({
   goalId: z.string().min(1),
@@ -31,17 +31,20 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 /**
  * Start a monthly commitment to a goal.
  *
- * Behind ENABLE_MANUAL_PAYMENTS like the one-off goal payment: a plan is a
- * standing instruction to collect, so leaving it open while manual payments are
- * disabled would let members queue up collections the kill switch was meant to
- * stop.
+ * Behind the same switch as the one-off goal payment: a plan is a standing
+ * instruction to collect, so leaving it open while payments are disabled would
+ * let members queue up collections the switch was meant to stop.
+ *
+ * `MEMBER_PAYMENTS_ENABLED` rather than the raw flag, because the flag alone is
+ * only somebody's intention — it stayed on while production ran a gateway that
+ * moved no money. See lib/payments-enabled.
  */
 export const POST = withApiHandler(async (req: NextRequest) => {
   const session = await auth()
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
-  if (!env.ENABLE_MANUAL_PAYMENTS) {
-    return apiError('SYS_006', 'Manual payments are currently disabled', 403)
+  if (!MEMBER_PAYMENTS_ENABLED) {
+    return apiError('SYS_006', PAYMENTS_DISABLED_MESSAGE, 403)
   }
 
   const body = await req.json().catch(() => null)

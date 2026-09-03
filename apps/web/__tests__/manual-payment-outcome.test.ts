@@ -143,11 +143,16 @@ describe('what the bank actually said', () => {
 })
 
 describe('the page can tell the member which of the three happened', () => {
+  // ContributeForm.tsx, not page.tsx. The form moved out from behind a server
+  // gate that decides whether a payment can be made at all — a client component
+  // cannot ask whether a usable payment gateway exists, which is how the page
+  // came to take a payment and report it settled while production was running
+  // the stand-in gateway. The form itself is unchanged; only its file is.
   const page = async () => {
     const { readFileSync } = await import('node:fs')
     const { resolve } = await import('node:path')
     return readFileSync(
-      resolve(__dirname, '../app/(member)/dashboard/contribute/page.tsx'),
+      resolve(__dirname, '../app/(member)/dashboard/contribute/ContributeForm.tsx'),
       'utf8',
     )
   }
