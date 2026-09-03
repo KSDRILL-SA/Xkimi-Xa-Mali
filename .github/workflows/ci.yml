@@ -90,17 +90,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Nothing was checking this, and a high-severity advisory sat open behind
-      # an overrides block that was not being applied at all. typecheck, lint,
-      # test and build are all blind to it.
-      #
-      # `npm ls --all` is deliberately NOT gated here: it exits 1 on upstream
-      # transitive conflicts this repo does not control (magicast via
-      # @prisma/config, brace-expansion via two incompatible minimatch ranges).
-      # Gating on it would fail CI for something no change here can fix.
-      - name: Security advisories
-        run: npm audit --audit-level=high
-
       - name: Generate Prisma client
         run: npm run db:generate
 
@@ -137,6 +126,46 @@ jobs:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL_TEST || 'https://redis.example.invalid' }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN_TEST || 'ci-placeholder-token' }}
         run: npm run build
+
+      # Nothing was checking this, and a high-severity advisory sat open behind
+      # an overrides block that was not being applied at all. typecheck, lint,
+      # test and build are all blind to it.
+      #
+      # `npm ls --all` is deliberately NOT gated here: it exits 1 on upstream
+      # transitive conflicts this repo does not control (magicast via
+      # @prisma/config, brace-expansion via two incompatible minimatch ranges).
+      # Gating on it would fail CI for something no change here can fix.
+      #
+      # ── Last, and tolerant of the registry being down ─────────────────────
+      #
+      # This used to run immediately after `npm ci`, before anything else. On
+      # 2026-09-03 npmjs.org answered the audit endpoint with a 500, the step
+      # exited non-zero, and every check behind it — typecheck, lint, tests,
+      # build — was skipped. A pull request sat for ten minutes reporting
+      # failure while nothing about it had been examined at all.
+      #
+      # Two changes, for two different faults:
+      #
+      #   - It runs last. A supply-chain question is worth failing the build
+      #     over, but it must not decide whether the correctness checks get to
+      #     run. Their answers are useful even on a day the registry is down.
+      #   - A transport error is not an advisory. `npm audit` exits non-zero for
+      #     both, so they are told apart by what it printed, and only a real
+      #     finding fails the job. An unreachable registry is a loud warning
+      #     rather than a red build — and deliberately NOT a silent pass, since
+      #     "we could not check" is not the same as "there is nothing to find".
+      - name: Security advisories
+        run: |
+          if out=$(npm audit --audit-level=high 2>&1); then
+            echo "$out"
+          else
+            echo "$out"
+            if echo "$out" | grep -qiE 'audit endpoint returned an error|Internal Server Error|ECONNRESET|ENOTFOUND|ETIMEDOUT|socket hang up|EAI_AGAIN'; then
+              echo "::warning::npm audit could not reach the registry. Advisories were NOT checked on this run."
+              exit 0
+            fi
+            exit 1
+          fi
 
       - name: Validate Prisma schema
         run: cd packages/database && npx prisma validate

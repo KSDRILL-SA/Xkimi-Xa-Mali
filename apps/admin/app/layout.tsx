@@ -5,6 +5,7 @@ import localFont from 'next/font/local'
 import NextTopLoader from 'nextjs-toploader'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { RevealGuard } from '@xxm/ui'
 
 /**
  * Self-hosted rather than fetched from Google at build time.
@@ -47,6 +48,12 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable} ${playfairDisplay.variable}`}>
+      {/* Before the stylesheet touches anything. See RevealGuard: the reveal
+          transform must never exist on a touch device, and only a blocking
+          script in the head runs early enough to decide that. */}
+      <head>
+        <RevealGuard />
+      </head>
       <body>
         <NextTopLoader color="#D4AF37" height={3} showSpinner={false} />
         {children}

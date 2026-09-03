@@ -19,6 +19,18 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  *
  * ── Why touch devices get no animation at all ───────────────────────────────
  *
+ * ── Corrected 2026-09-04: the guard alone was not enough ───────────────────
+ *
+ * Everything below was right about the cause and wrong about the cure. A
+ * layout effect cannot run before hydration, and the server-rendered HTML
+ * already carries the bare `reveal` class — `opacity: 0` **and**
+ * `transform: translateY(28px)`. The browser paints that first, creating the
+ * very layer this was meant to prevent, and hydration then destroys it.
+ *
+ * `RevealGuard` now settles it in the document head, before any paint, and the
+ * stylesheet neutralises the base classes under `.no-reveal`. This function
+ * reads that decision rather than making a second one.
+ *
  * Phones showed torn, doubled, "scratched" cards on the contributions page:
  * whole bands of the page painted at a stale scroll offset, on top of the
  * correct content, getting worse the further you scrolled. Screenshots showed
@@ -51,6 +63,17 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  */
 function shouldSkipReveal(): boolean {
   if (typeof window === 'undefined') return false
+
+  // The decision was already made, before the first paint, by `RevealGuard` in
+  // the document head. Reading it back rather than asking again is the point:
+  // this code cannot run until React has hydrated, and by then the
+  // server-rendered `reveal` class has already applied its transform and had a
+  // GPU layer created for it. Two answers to one question is how the guard came
+  // to be correct and ineffective at the same time.
+  if (document.documentElement.classList.contains('no-reveal')) return true
+
+  // Fallbacks, for a host that has not mounted the guard. Late is better than
+  // never, and the stylesheet has nothing to neutralise in that case.
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true
   return (navigator.maxTouchPoints ?? 0) > 0
 }

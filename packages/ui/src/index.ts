@@ -27,6 +27,8 @@ export { Pagination } from './components/Pagination'
 export { RouterPagination } from './components/RouterPagination'
 export { ProgressBar } from './components/ProgressBar'
 export { Reveal } from './components/Reveal'
+export { FilterSelect, FilterBar, type FilterOption } from './components/FilterSelect'
+export { RevealGuard } from './components/RevealGuard'
 export { StatCard } from './components/StatCard'
 export { Select } from './components/Select'
 export {

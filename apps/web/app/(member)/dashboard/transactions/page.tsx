@@ -1,12 +1,11 @@
 import type { Metadata } from 'next'
-import type { Route } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { TRANSACTION_TYPES, TRANSACTION_STATUSES } from '@xxm/utils'
 import { RouterPagination } from '@/components/ui/RouterPagination'
-import { Reveal } from '@xxm/ui'
+import { Reveal, FilterSelect, FilterBar } from '@xxm/ui'
 import { FileText, ArrowUpCircle } from 'lucide-react'
 import { getTransactionHistory } from '@/services/report.service'
 
@@ -70,12 +69,6 @@ export default async function TransactionsPage({
     limit: PAGE_SIZE,
   })
 
-  const buildUrl = (overrides: Record<string, string | undefined>) => {
-    const p = new URLSearchParams()
-    const merged = { status: statusFilter, type: typeFilter, page: String(page), ...overrides }
-    Object.entries(merged).forEach(([k, v]) => { if (v) p.set(k, v) })
-    return `/dashboard/transactions?${p.toString()}`
-  }
 
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
@@ -102,21 +95,28 @@ export default async function TransactionsPage({
       </Reveal>
 
       {/* ── Filters ────────────────────────────────── */}
-      <Reveal variant="up" delay={100} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-5 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest w-10 shrink-0">Status</span>
-          <FilterPill label="All" href={buildUrl({ status: undefined, page: '1' }) as Route} active={!statusFilter} />
-          {validStatuses.map((s) => (
-            <FilterPill key={s} label={STATUS_CONFIG[s].label} href={buildUrl({ status: s, page: '1' }) as Route} active={statusFilter === s} />
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold text-xxm-gray-400 uppercase tracking-widest w-10 shrink-0">Type</span>
-          <FilterPill label="All" href={buildUrl({ type: undefined, page: '1' }) as Route} active={!typeFilter} />
-          {validTypes.map((t) => (
-            <FilterPill key={t} label={TYPE_LABELS[t]} href={buildUrl({ type: t, page: '1' }) as Route} active={typeFilter === t} />
-          ))}
-        </div>
+      {/* Two dropdowns, not twelve pills. Every option used to be equally loud
+          whether or not anybody wanted it, and on a phone the two rows wrapped
+          into a block of tapping targets taller than the first transaction. A
+          closed dropdown shows the one thing that is true and hides the rest
+          until asked. */}
+      <Reveal variant="up" delay={100}>
+        <FilterBar>
+          <FilterSelect
+            label="Status"
+            name="status"
+            value={statusFilter}
+            allLabel="All statuses"
+            options={validStatuses.map((s) => ({ value: s, label: STATUS_CONFIG[s].label }))}
+          />
+          <FilterSelect
+            label="Type"
+            name="type"
+            value={typeFilter}
+            allLabel="All types"
+            options={validTypes.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+          />
+        </FilterBar>
       </Reveal>
 
       {/* ── Transaction list ───────────────────────── */}
@@ -261,20 +261,5 @@ export default async function TransactionsPage({
         </Link>
       </Reveal>
     </div>
-  )
-}
-
-function FilterPill({ label, href, active }: { label: string; href: Route; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-        active
-          ? 'bg-xxm-green text-white shadow-sm'
-          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gray-200'
-      }`}
-    >
-      {label}
-    </Link>
   )
 }

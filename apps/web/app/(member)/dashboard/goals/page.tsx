@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR } from '@/lib/formatters'
-import { Reveal } from '@xxm/ui'
+import { Reveal, FilterSelect, FilterBar } from '@xxm/ui'
 import { Target, Trophy, Sparkles, TrendingUp, Star, ArrowRight } from 'lucide-react'
 import { getGoals, getGoalStatusCounts } from '@/services/goal.service'
 import { isAdmin } from '@/lib/authorization'
@@ -121,12 +121,19 @@ export default async function GoalsPage({
         <ProposeGoalForm />
       </Reveal>
 
-      {/* ── Filter chips ──────────────────────────────────────── */}
-      <Reveal variant="up" delay={100} className="flex flex-wrap gap-1.5">
-        <FilterChip label="All" href="/dashboard/goals" active={!statusFilter} />
-        {validStatuses.map((s) => (
-          <FilterChip key={s} label={FILTER_LABELS[s]} href={`/dashboard/goals?status=${s}`} active={statusFilter === s} />
-        ))}
+      {/* ── Filter ────────────────────────────────────────────── */}
+      {/* One dropdown rather than a row of chips: the closed control states
+          the one status being shown instead of listing every status equally. */}
+      <Reveal variant="up" delay={100}>
+        <FilterBar>
+          <FilterSelect
+            label="Status"
+            name="status"
+            value={statusFilter}
+            allLabel="All goals"
+            options={validStatuses.map((s) => ({ value: s, label: FILTER_LABELS[s] }))}
+          />
+        </FilterBar>
       </Reveal>
 
       {/* ── Goals grid ────────────────────────────────────────── */}
@@ -163,20 +170,5 @@ function HeroStat({ icon, value, label, sub }: { icon: React.ReactNode; value: s
       <p className="stat-number text-xl font-black leading-none">{value}</p>
       {sub && <p className="text-[10px] text-green-100/60 mt-1">{sub}</p>}
     </div>
-  )
-}
-
-function FilterChip({ label, href, active }: { label: string; href: Route; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex items-center px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-fast ${
-        active
-          ? 'bg-xxm-green text-white shadow-sm'
-          : 'bg-xxm-gray-100 text-xxm-gray-600 hover:bg-xxm-gray-200 hover:-translate-y-0.5'
-      }`}
-    >
-      {label}
-    </Link>
   )
 }
