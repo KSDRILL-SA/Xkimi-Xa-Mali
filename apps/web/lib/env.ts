@@ -59,6 +59,24 @@ const configuredWhenLive = <T extends z.ZodType<string, z.ZodTypeDef, string>>(
   devPlaceholder: string,
 ) => (LIVE ? schema : schema.default(devPlaceholder))
 
+/** As `configuredWhenLive`, but keyed on Netcash actually being called. */
+const configuredWhenNetcashInUse = <T extends z.ZodType<string, z.ZodTypeDef, string>>(
+  schema: T,
+  devPlaceholder: string,
+) => (NETCASH_IN_USE ? schema : schema.default(devPlaceholder))
+
+/**
+ * As `requiredWhenLive`, but keyed on Netcash actually being called.
+ *
+ * A named helper rather than an inline ternary, because
+ * `__tests__/golive-preflight.test.ts` reads this file looking for
+ * `NAME: helper(` and keeps the go-live report in step with it. A variable
+ * gated by an expression it cannot see would drop out of that report silently —
+ * which is the one thing a preflight must not do.
+ */
+const requiredWhenNetcashInUse = (schema: z.ZodString) =>
+  (NETCASH_IN_USE ? schema : schema.optional())
+
 /**
  * Mailbox providers whose domain nobody but the provider can verify.
  *
@@ -122,6 +140,26 @@ const sendableFromAddress = () =>
  * selected on the live deployment, so there is no configuration in which a live
  * deploy runs without these set.
  */
+/**
+ * True when the real Netcash adapter is the one that will actually be selected.
+ *
+ * Extracted because three fields need it, not one, and two of them had it
+ * spelled differently — they keyed on LIVE alone. That was dormant while
+ * `isLiveDeployment()` was wrongly answering false in production, and the moment
+ * that was fixed the build began demanding Netcash endpoint configuration on a
+ * deployment that has no Netcash account and never will: the DebiCheck
+ * application was declined.
+ *
+ * Netcash configuration is required exactly when Netcash is going to be called.
+ * Not when the deployment is live — a live deployment with no provider is the
+ * state this Foundation is actually in, and it needs to boot.
+ *
+ * `integrations/payment` makes the same decision from the same two inputs and
+ * returns the disabled adapter here, so the two cannot disagree about which
+ * gateway is in play.
+ */
+const NETCASH_IN_USE = LIVE && process.env.PAYMENT_GATEWAY !== 'mock' && Boolean(process.env.NETCASH_SERVICE_KEY)
+
 const netcashCredential = () =>
   LIVE && process.env.PAYMENT_GATEWAY !== 'mock'
     ? z.string().min(1)
@@ -158,7 +196,10 @@ export const env = createEnv({
     // No default. It used to fall back to the TEST endpoint, so forgetting it in
     // production meant every debit was submitted to a gateway that moves no
     // money — with nothing in the logs to say so.
-    NETCASH_API_URL: configuredWhenLive(
+    // Required when Netcash is in use, not merely when the deployment is live.
+    // With no provider there is no endpoint to point at, and demanding one
+    // stops a live deployment from booting for a service it does not call.
+    NETCASH_API_URL: configuredWhenNetcashInUse(
       z.string().url(),
       // The NIWS NIF endpoint, per the live WSDL. The previous default pointed
       // at NSWSSX/NetcashTest.asmx — a different, older service that does not
@@ -175,7 +216,9 @@ export const env = createEnv({
     // with the account. No default is possible: it identifies the collection
     // terms the debtor's bank shows them, and a wrong one is either rejected
     // (325, non-real-time template) or authorises the wrong agreement.
-    NETCASH_DEBICHECK_TEMPLATE_ID: requiredWhenLive(z.string().min(1)),
+    // Same rule: it identifies the collection terms Netcash shows a debtor's
+    // bank, and there is nothing to identify when nothing is submitted.
+    NETCASH_DEBICHECK_TEMPLATE_ID: requiredWhenNetcashInUse(z.string().min(1)),
     // Netcash's webhook source IPs. Defaulted in lib/netcash.ts; set this only if
     // Netcash tells you the range has changed. Wrong values reject every callback.
     NETCASH_WEBHOOK_IPS: z.string().min(1).optional(),
