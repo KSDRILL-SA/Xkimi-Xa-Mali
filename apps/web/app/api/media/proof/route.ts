@@ -43,14 +43,22 @@ export async function GET(req: NextRequest) {
     return new NextResponse('Missing or invalid reference', { status: 400 })
   }
 
-  // Ownership and existence in one question. Note the path from the object back
-  // to the person: a transaction has no userId of its own — it belongs to a
-  // contribution, which belongs to the member. Matching any other way would
-  // either never find anything or, worse, find everything.
-  const owned = await db.transaction.findFirst({
-    where: { proofUrl: ref, contribution: { userId } },
-    select: { id: true },
-  })
+  // Ownership and existence in one question, asked of both places a proof can
+  // live. Note the two different paths back to the person: a transaction has no
+  // userId of its own — it belongs to a contribution, which belongs to the
+  // member — while a goal payment names the member directly. Matching either
+  // one the other's way would find nothing, or, worse, find everything.
+  const [ownedTx, ownedGoalPayment] = await Promise.all([
+    db.transaction.findFirst({
+      where: { proofUrl: ref, contribution: { userId } },
+      select: { id: true },
+    }),
+    db.goalPayment.findFirst({
+      where: { proofUrl: ref, userId },
+      select: { id: true },
+    }),
+  ])
+  const owned = ownedTx ?? ownedGoalPayment
 
   // 404 rather than 403 on someone else's file. A distinct "forbidden" would
   // confirm the object exists, turning this into a way to test guesses about

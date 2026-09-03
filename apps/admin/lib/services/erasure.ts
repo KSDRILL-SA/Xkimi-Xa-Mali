@@ -134,6 +134,7 @@ export async function assessErasure(
     staleNotifications,
     contributions,
     transactions,
+    goalPayments,
     paymentProofs,
     mandates,
     bankAccounts,
@@ -148,15 +149,27 @@ export async function assessErasure(
     // which belongs to the member. Counting them any other way would silently
     // report zero.
     db.transaction.count({ where: { contribution: { userId: subjectId } } }),
+    // Money the member gave toward a specific goal. Counted because it was not
+    // counted: the financial tally below was contributions plus transactions,
+    // and a goal payment is neither — so a member asking what the Foundation
+    // holds about them was told a figure that left out every rand they had
+    // directed at a goal.
+    db.goalPayment.count({ where: { userId: subjectId } }),
     // Counted separately from the transactions themselves, because it is a
     // different kind of thing to hold. A ledger row is a number; a proof of
     // payment is the member's own bank document, showing an account number and
     // often a balance. Somebody asking what the Foundation holds about them is
     // entitled to be told that specifically, not to have it folded silently
     // into "payments".
-    db.transaction.count({
-      where: { contribution: { userId: subjectId }, proofUrl: { not: null } },
-    }),
+    db.transaction
+      .count({ where: { contribution: { userId: subjectId }, proofUrl: { not: null } } })
+      .then(async (onContributions) =>
+        onContributions +
+        // Proofs live in two tables, because payments do. One count over one of
+        // them would under-report a member's own bank documents by exactly the
+        // ones attached to goals.
+        (await db.goalPayment.count({ where: { userId: subjectId, proofUrl: { not: null } } })),
+      ),
     db.paymentMandate.count({ where: { userId: subjectId } }),
     db.bankAccount.count({ where: { userId: subjectId } }),
     db.auditLog.count({ where: { userId: subjectId } }),
@@ -182,8 +195,8 @@ export async function assessErasure(
     },
     {
       key: 'financial',
-      label: 'Contributions, payments and ledger entries',
-      count: contributions + transactions,
+      label: 'Contributions, payments toward goals, and ledger entries',
+      count: contributions + transactions + goalPayments,
       disposition: 'RETAINED',
       // Deliberately not computed per-record. The period runs from the end of
       // the financial year each record falls in, and the Foundation's financial

@@ -48,6 +48,7 @@ const TAKES_IP = [
   // obligation is the same — it forwards the caller's origin to the web app,
   // which writes the audit row — and the scan below reads the whole argument
   // list, so an object field counts exactly as a positional one does.
+  'recordOfflineGoalPaymentForMember',
   'recordOfflinePaymentForMember',
   'recordPayment',
   'rejectGoal',

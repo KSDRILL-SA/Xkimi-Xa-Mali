@@ -487,6 +487,66 @@ export const GoalPaymentSchema = z.object({
     .max(MAX_GOAL_PAYMENT, `Maximum payment is R${MAX_GOAL_PAYMENT.toLocaleString('en-ZA')}`),
 })
 
+/**
+ * A member's cash or EFT payment toward a goal, recorded by an admin.
+ *
+ * The sibling of OfflineContributionSchema, and deliberately its twin: the same
+ * evidence rule, the same date handling, the same reference. What differs is
+ * only what the money is FOR — a period there, a goal here — because that is
+ * the one thing the two are not allowed to be vague about. A payment whose
+ * purpose is unclear cannot be checked for having already happened, and
+ * "already recorded" is scoped to the thing being paid for.
+ *
+ * It exists because a member with no mandate cannot reach a goal at all.
+ * `payToGoal` requires an active Netcash mandate, which the DebiCheck rejection
+ * makes impossible, and the only other route — an admin recording goal progress
+ * — credits nobody and refuses the primary fund. Cash handed over for a goal
+ * was simply not recordable.
+ *
+ * The primary fund is not a valid destination here, and that is enforced in the
+ * service rather than the type: it fills automatically from monthly
+ * contributions, so money for it is a contribution and belongs on the other
+ * schema. Recording it as a goal payment would leave the member's month still
+ * showing unpaid while the fund total rose — the same money counted once and
+ * owed twice.
+ */
+export const OfflineGoalPaymentSchema = z.object({
+  userId: z.string().min(1, 'Choose a member'),
+  goalId: z.string().min(1, 'Choose which goal this payment is for'),
+  amount: z
+    .number()
+    .min(MIN_GOAL_PAYMENT, `The minimum payment toward a goal is R${MIN_GOAL_PAYMENT}`)
+    .max(MAX_GOAL_PAYMENT, `Maximum payment is R${MAX_GOAL_PAYMENT.toLocaleString('en-ZA')}`),
+  receivedAt: z.coerce
+    .date()
+    .max(new Date(Date.now() + 24 * 60 * 60 * 1000), 'That date is in the future — money cannot have arrived yet'),
+  reference: z
+    .string()
+    .trim()
+    .min(3, 'Enter the bank reference or deposit slip number this payment appears under')
+    .max(120, 'Reference cannot exceed 120 characters'),
+  note: z.string().trim().max(500, 'Note cannot exceed 500 characters').optional(),
+  proofUrl: z.string().trim().min(1).max(1024).optional(),
+  proofWitness: z
+    .string()
+    .trim()
+    .min(10, 'Say who counted the money and where — one name is not a witness')
+    .max(300, 'Witness note cannot exceed 300 characters')
+    .optional(),
+}).refine(
+  // The same one-of-two rule the contribution schema states, for the same
+  // reason: neither is an unevidenced claim about money, and both leaves a
+  // later reader unable to tell which one the payment rests on.
+  (v) => (v.proofUrl ? 1 : 0) + (v.proofWitness ? 1 : 0) === 1,
+  {
+    message:
+      'Attach the proof of payment, or say who counted the cash — one or the other, not both and not neither',
+    path: ['proofUrl'],
+  },
+)
+
+export type OfflineGoalPaymentInput = z.infer<typeof OfflineGoalPaymentSchema>
+
 export type CreateGoalInput      = z.infer<typeof CreateGoalSchema>
 export type UpdateGoalInput      = z.infer<typeof UpdateGoalSchema>
 export type RecordProgressInput  = z.infer<typeof RecordProgressSchema>

@@ -7,6 +7,11 @@ import { debitAmountWithFee } from '@/lib/group-account'
 import { assertCanAccess } from '@/lib/authorization'
 import { GoalNotFoundError, GoalConflictError, MandateConflictError, isUniqueViolation } from '@/lib/errors'
 import { MIN_GOAL_PAYMENT } from '@/lib/validation/goal'
+import type { OfflineGoalPaymentInput } from '@xxm/utils'
+import { db } from '@/lib/db'
+import { assertAdmin } from '@/lib/authorization'
+import { MemberNotFoundError } from '@/lib/errors'
+import { createInboxMessages } from './inbox.service'
 import { roundZAR } from '@/lib/money'
 import { writeAuditLog } from './audit.service'
 import { postPoolCredit, postPoolDebit } from './ledger.service'
@@ -308,4 +313,181 @@ export async function processGoalPaymentWebhook(event: GoalPaymentEvent): Promis
   logger.info('Goal payment settled via webhook', {
     paymentId: payment.id, goalId: payment.goalId, amount: Number(payment.amount),
   })
+}
+
+// ─── Admin: record an offline (cash / EFT) payment toward a goal ───────────
+
+/**
+ * Record money a member gave toward a goal without the gateway.
+ *
+ * The sibling of `recordOfflineContribution`, and it exists for the same
+ * reason. `payToGoal` above requires an active Netcash mandate, and the
+ * DebiCheck application was declined — so no member can reach a goal through
+ * the gateway at all. The only other route was an admin recording goal
+ * progress, and that is a different thing wearing similar clothes: it moves a
+ * goal's total with **no member attached**, does not touch the pool ledger, and
+ * refuses the primary fund outright. A member who handed over cash for a goal
+ * could not be recorded as having given anything.
+ *
+ * What it shares with the gateway path is the part that must not fork:
+ * `applySettledPayment` re-derives the goal total, credits the pool ledger and
+ * thanks the member. A goal's figure is DERIVED from the SUCCESS sum rather
+ * than accumulated, which is what makes an offline payment reversal-safe for
+ * free — remove the row and the next sync reflects the smaller total.
+ *
+ * ── Why the primary fund is refused ────────────────────────────────────────
+ *
+ * `syncPrimaryGoalProgress` adds directed payments ON TOP of monthly
+ * contributions. That is right for the gateway path, where a member
+ * deliberately gives extra beyond their obligation. It is wrong here, because
+ * the mistake an admin is actually likely to make is recording somebody's
+ * ordinary monthly money as a payment to the fund: the fund total would rise
+ * while the member's month still showed unpaid, and the debit run would go on
+ * trying to collect money already in the account. Money for the primary fund IS
+ * a monthly contribution and belongs on `recordOfflineContribution`, where
+ * paying more than the month owes is already accepted and reported.
+ */
+export async function recordOfflineGoalPayment(
+  data: OfflineGoalPaymentInput,
+  adminId: string,
+  adminRoles: string[],
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const member = await db.user.findUnique({
+    where: { id: data.userId },
+    select: { id: true, status: true, firstName: true },
+  })
+  if (!member) throw new MemberNotFoundError()
+
+  const goal = await goalRepo.findById(data.goalId)
+  if (!goal) throw new GoalNotFoundError()
+  const g = goal as unknown as GoalForPayment
+
+  if (g.isPrimary) {
+    throw new GoalConflictError(
+      'The fund fills from monthly contributions. Record this against the month it was paid for, not as a goal payment.',
+      'GOL_014',
+    )
+  }
+  if (g.status !== 'ACTIVE') {
+    throw new GoalConflictError('Money can only be recorded against an active goal', 'GOL_015')
+  }
+
+  // Scoped to the member AND the goal, which is the whole point of asking what
+  // the payment is for. The same reference against two different goals is two
+  // real payments; the same reference against the same goal twice is one
+  // payment being recorded again — a double-submitted form, or two admins
+  // working from the same bank statement. Without the goal in the key, giving
+  // to two goals on one day under a lazy reference would be refused as a
+  // duplicate. Without the reference, nothing would be refused at all.
+  const idempotencyKey = `goal-offline:${data.goalId}:${data.userId}:${data.reference.toLowerCase()}`
+
+  const duplicate = await goalRepo.findPaymentByIdempotencyKey(idempotencyKey)
+  if (duplicate) {
+    throw new GoalConflictError(
+      `A payment with reference "${data.reference}" is already recorded for this member against "${g.title}"`,
+      'GOL_016',
+    )
+  }
+
+  const amount = roundZAR(data.amount)
+
+  const payment = await goalRepo.createPayment({
+    goalId: data.goalId,
+    userId: data.userId,
+    amount,
+    // SUCCESS on write. The money is already in the account — that is why an
+    // admin is recording it — and no webhook is coming to confirm it.
+    status: 'SUCCESS',
+    idempotencyKey,
+    // Null, not a placeholder: nothing was submitted to a gateway, so there is
+    // no gateway reference to hold. The bank reference has its own column.
+    gatewayRef: null,
+    offlineReference: data.reference,
+    recordedById: adminId,
+    proofUrl: data.proofUrl ?? null,
+    proofWitness: data.proofWitness ?? null,
+    // When the money arrived, not when it was typed. For a payment caught up
+    // months later these are far apart, and only the first is true.
+    processedAt: data.receivedAt,
+  })
+
+  // The same tail every settled payment runs: re-derive the goal, credit the
+  // pool, thank the member. Not reimplemented here — a second copy of "what it
+  // means for a goal payment to have landed" is how the two would drift.
+  await applySettledPayment(
+    { id: payment.id, goalId: data.goalId, userId: data.userId, amount },
+    g,
+  )
+
+  await writeAuditLog({
+    userId: adminId,
+    action: 'OFFLINE_GOAL_PAYMENT_RECORDED',
+    entity: 'GoalPayment',
+    entityId: payment.id,
+    payload: {
+      memberId: data.userId,
+      goalId: data.goalId,
+      goalTitle: g.title,
+      amount,
+      reference: data.reference,
+      receivedAt: data.receivedAt.toISOString(),
+      note: data.note ?? null,
+      // Which kind of evidence, never the pathname — this log is read by people
+      // who are not entitled to open the document.
+      evidence: data.proofUrl ? 'DOCUMENT' : 'WITNESSED',
+      witness: data.proofWitness ?? null,
+    } as Prisma.InputJsonValue,
+    ipAddress: ip,
+  })
+
+  // Read back rather than computed. The goal total is derived from the SUCCESS
+  // sum, so working it out separately here would be a second opinion about the
+  // same thing, free to disagree with it.
+  const after = await goalRepo.findById(data.goalId)
+  const currentAmount = Number((after as unknown as { currentAmount: unknown })?.currentAmount ?? 0)
+  const targetAmount = Number(g.targetAmount)
+
+  // Leadership recording money against somebody's name is a change to their
+  // financial record that they had no part in making. Best-effort: the payment
+  // is committed, and a failed inbox write must not turn it into an error the
+  // admin retries — which is how the same money gets recorded twice.
+  await createInboxMessages([data.userId], {
+    title: `R${amount.toFixed(2)} recorded toward ${g.title}`,
+    body:
+      `Leadership has recorded your payment of R${amount.toFixed(2)} toward "${g.title}". ` +
+      `That goal now stands at R${currentAmount.toFixed(2)} of R${targetAmount.toFixed(2)}. ` +
+      `Reference: ${data.reference}.` +
+      ' If you do not recognise this, contact leadership.',
+    category: 'GOAL',
+    createdById: adminId,
+  }).catch((err) =>
+    logger.error('Inbox notify failed after an offline goal payment', {
+      error: err instanceof Error ? err.message : String(err),
+      userId: data.userId,
+    }),
+  )
+
+  logger.info('Offline goal payment recorded', {
+    adminId,
+    memberId: data.userId,
+    goalId: data.goalId,
+    paymentId: payment.id,
+    amount,
+    currentAmount,
+  })
+
+  return {
+    paymentId: payment.id,
+    goalId: data.goalId,
+    goalTitle: g.title,
+    receiptRef: `XXM-GOF-${payment.id.slice(-8).toUpperCase()}`,
+    amount,
+    currentAmount,
+    targetAmount,
+    /** True when this payment took the goal to or past its target. */
+    achieved: currentAmount >= targetAmount,
+  }
 }

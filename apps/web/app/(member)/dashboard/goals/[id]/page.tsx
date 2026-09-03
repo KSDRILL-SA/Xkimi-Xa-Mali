@@ -4,7 +4,7 @@ import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR, formatDate } from '@/lib/formatters'
 import { Reveal } from '@xxm/ui'
-import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2, Star, Camera, Paperclip } from 'lucide-react'
+import { ChevronLeft, Lock, Clock, TrendingUp, Wallet, Target as TargetIcon, Flag, CheckCircle2, Star, Camera, Paperclip, FileText, HandCoins } from 'lucide-react'
 import { env } from '@/lib/env'
 import { getGoal } from '@/services/goal.service'
 import { getGoalEngagement } from '@/services/goal-engagement.service'
@@ -259,6 +259,78 @@ export default async function GoalDetailPage({
       <Reveal variant="up" delay={175}>
         <GoalEngagement goalId={id} initial={engagement} contributable={goal.status === 'ACTIVE'} />
       </Reveal>
+
+      {/* ── What this member has given ────────────────────────── */}
+      {/*
+          Their own payments toward this goal, and nobody else's — what everyone
+          together has given is already public as the goal's total; who gave
+          what is not.
+
+          This section did not exist, and the gap mattered more than it looked.
+          A member's transactions page lists `Transaction` rows and a goal
+          payment is not one, so somebody who gave to a goal had no record of it
+          anywhere in the app. That was survivable while every goal payment was
+          one the member made themselves in-app — their own bank statement said
+          so. It stopped being survivable when leadership began recording these
+          on their behalf from cash and EFTs: a payment entered against your
+          name that you cannot see is the exact thing the proof-of-payment work
+          exists to prevent.
+      */}
+      {engagement.payments.length > 0 && (
+        <Reveal variant="up" delay={180}>
+          <h2 className="text-xs font-bold text-xxm-gray-400 uppercase tracking-widest mb-3">
+            Your payments toward this goal ({engagement.payments.length})
+          </h2>
+
+          <ul className="space-y-2">
+            {engagement.payments.map((pmt) => (
+              <li key={pmt.id} className="bg-white rounded-2xl border border-xxm-green/8 shadow-xxm-sm p-4">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  <span className="w-8 h-8 rounded-xl bg-xxm-green-50 flex items-center justify-center shrink-0">
+                    <HandCoins size={14} className="text-xxm-green" aria-hidden />
+                  </span>
+                  <span className="stat-number text-sm font-bold text-xxm-green-900">
+                    {formatZAR(pmt.amount)}
+                  </span>
+                  {pmt.recordedByLeadership && (
+                    <span className="inline-flex px-2 py-0.5 rounded-full bg-xxm-gold/15 text-[10px] font-bold text-xxm-gold-dark">
+                      Recorded by leadership
+                    </span>
+                  )}
+                  <span className="text-xs text-xxm-gray-400 ml-auto">{formatDate(pmt.paidAt)}</span>
+                </div>
+
+                {pmt.reference && (
+                  <p className="mt-2 font-mono text-[11px] text-xxm-gray-400 break-all">{pmt.reference}</p>
+                )}
+
+                {/* Their own document, behind a route that re-checks ownership
+                    rather than trusting this href. */}
+                {pmt.proofUrl && (
+                  <p className="mt-2">
+                    <a
+                      href={`/api/media/proof?ref=${encodeURIComponent(pmt.proofUrl)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-xxm-green hover:text-xxm-canopy underline underline-offset-2"
+                    >
+                      <FileText size={12} aria-hidden />
+                      View proof of payment
+                    </a>
+                  </p>
+                )}
+
+                {pmt.proofWitness && (
+                  <p className="mt-2 text-xs text-xxm-gray-500">
+                    <span className="font-semibold text-xxm-gray-600">Cash, counted by: </span>
+                    {pmt.proofWitness}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Reveal>
+      )}
 
       {/* ── Progress history ──────────────────────────────────── */}
       <Reveal variant="up" delay={200}>

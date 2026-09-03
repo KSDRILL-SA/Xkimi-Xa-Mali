@@ -610,21 +610,38 @@ model Goal {
 // SUCCESS money counts toward the goal; a unique idempotency key makes a retried
 // submission a no-op.
 model GoalPayment {
-  id             String            @id @default(cuid())
-  goalId         String
-  userId         String
-  amount         Decimal           @db.Decimal(12, 2)
-  status         TransactionStatus @default(PENDING)
-  idempotencyKey String            @unique
-  gatewayRef     String?
-  createdAt      DateTime          @default(now())
-  processedAt    DateTime?
+  id               String            @id @default(cuid())
+  goalId           String
+  userId           String
+  amount           Decimal           @db.Decimal(12, 2)
+  status           TransactionStatus @default(PENDING)
+  idempotencyKey   String            @unique
+  gatewayRef       String?
+  createdAt        DateTime          @default(now())
+  processedAt      DateTime?
+  /// What an admin matched an offline payment against on the bank statement.
+  /// Set only when a member gave toward a goal in cash or by EFT rather than
+  /// through the gateway; null on every gateway payment, which has gatewayRef.
+  /// Mirrors Transaction.offlineReference deliberately — the two are the same
+  /// claim about two kinds of money, and one story is easier to trust.
+  offlineReference String?
+  /// The admin who recorded an offline payment. A gateway payment is asserted
+  /// by nobody; an offline one is somebody's word that money arrived.
+  recordedById     String?
+  /// The proof of payment, as a private blob pathname. See
+  /// Transaction.proofUrl — same rule, same media routes, same reason.
+  proofUrl         String?
+  /// Who counted the money, when cash means there is no document. Exactly one
+  /// of this and proofUrl is required on an offline row.
+  proofWitness     String?
 
   goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
   user User @relation("GoalPaymentUser", fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([goalId, status])
   @@index([userId])
+  /// Looked up by pathname on every media request, before any bytes are served.
+  @@index([proofUrl])
   @@map("goal_payments")
 }
 
