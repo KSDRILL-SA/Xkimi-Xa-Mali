@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 
   // The authorisation check. Not "is this a plausible path" — "is this an object
   // the console is entitled to show at all".
-  const [signature, goal, proof] = await Promise.all([
+  const [signature, goal, proof, goalProof] = await Promise.all([
     db.adminSignature.findFirst({ where: { signatureUrl: ref }, select: { id: true } }),
     db.goal.findFirst({ where: { outcomeProofUrl: ref }, select: { id: true } }),
     // A proof of payment. Admins see every member's, which is the job — they
@@ -55,9 +55,13 @@ export async function GET(req: NextRequest) {
     // view of the same file is a separate route in the member app, scoped to
     // the transactions on their own contributions.
     db.transaction.findFirst({ where: { proofUrl: ref }, select: { id: true } }),
+    // The same document for a payment toward a goal. A separate table, so a
+    // separate question — one lookup covering both would have quietly served
+    // nothing for goal payments while looking correct.
+    db.goalPayment.findFirst({ where: { proofUrl: ref }, select: { id: true } }),
   ])
 
-  if (!signature && !goal && !proof) {
+  if (!signature && !goal && !proof && !goalProof) {
     return new NextResponse('Not found', { status: 404 })
   }
 

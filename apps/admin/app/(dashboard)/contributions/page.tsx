@@ -6,6 +6,7 @@ import {
   listAllContributions, generateContributions, listTransactionsForContributions,
   previewGeneration, waiveContribution, recordPayment,
   recordOfflinePaymentForMember, listPayableMembers,
+  recordOfflineGoalPaymentForMember, listFundableGoals,
 } from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
 import { Alert, Reveal, RouterPagination } from '@xxm/ui'
@@ -138,7 +139,7 @@ function recordedParams(res: {
 export default async function ContributionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string; created?: string; skipped?: string; total?: string; reversed?: string; reverseError?: string; waived?: string; recorded?: string; amount?: string; period?: string; actionError?: string; outstanding?: string; over?: string; who?: string }>
+  searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string; created?: string; skipped?: string; total?: string; reversed?: string; reverseError?: string; waived?: string; recorded?: string; amount?: string; period?: string; actionError?: string; outstanding?: string; over?: string; who?: string; goalPaid?: string; goal?: string; goalNow?: string; goalTarget?: string; goalHit?: string }>
 }) {
   const session = await auth()
   const roles   = (session?.user?.roles as string[] | undefined) ?? []
@@ -300,6 +301,11 @@ export default async function ContributionsPage({
     const { userId, roles: r, ip } = await requireAdmin('contribution.record-payment')
 
     const memberId = String(fd.get('userId') ?? '')
+    // What the money is FOR. Everything downstream depends on it: which table
+    // the row lands in, and — the reason it has to be explicit — what counts as
+    // "already recorded". A duplicate is scoped to the thing being paid for, so
+    // a payment with no stated purpose cannot be checked against anything.
+    const target   = String(fd.get('target') ?? 'contribution')
     const amount   = Number(fd.get('amount') ?? 0)
     const dueRaw   = String(fd.get('amountDue') ?? '').trim()
     const pm       = parseInt(String(fd.get('periodMonth') ?? ''), 10)
@@ -329,6 +335,38 @@ export default async function ContributionsPage({
     // the cheap thing to check first.
     const resolved = await resolveEvidence(fd)
     if ('error' in resolved) redirect(stay(`&actionError=${encodeURIComponent(resolved.error)}`))
+
+    // ── Money for a goal ────────────────────────────────────────────────
+    //
+    // A different table, a different duplicate rule, and no period at all — a
+    // goal is not owed monthly. The period fields the form still shows are
+    // ignored here rather than quietly recorded against something.
+    if (target.startsWith('goal:')) {
+      const goalId = target.slice('goal:'.length)
+      if (!goalId) redirect(stay('&actionError=Choose+which+goal+this+payment+is+for'))
+
+      try {
+        const g = await recordOfflineGoalPaymentForMember({
+          adminId: userId, adminRoles: r,
+          userId: memberId,
+          goalId,
+          amount,
+          reference: ref,
+          receivedAt,
+          ...(note ? { note } : {}),
+          ...resolved.evidence,
+          ip,
+        })
+        redirect(stay(
+          `&goalPaid=1&amount=${g.amount}&who=${encodeURIComponent(g.memberName)}` +
+          `&goal=${encodeURIComponent(g.goalTitle)}&goalNow=${g.currentAmount}` +
+          `&goalTarget=${g.targetAmount}${g.achieved ? '&goalHit=1' : ''}`,
+        ))
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+        redirect(stay(`&actionError=${encodeURIComponent(err instanceof Error ? err.message : 'That did not go through')}`))
+      }
+    }
 
     try {
       const res = await recordOfflinePaymentForMember({
@@ -364,9 +402,10 @@ export default async function ContributionsPage({
     redirect(`/contributions?month=${m}&year=${y}&generated=1&created=${result.created}&skipped=${result.skipped}&total=${result.total}`)
   }
 
-  const [preview, payableMembers] = await Promise.all([
+  const [preview, payableMembers, fundableGoals] = await Promise.all([
     previewGeneration(roles, month, year),
     listPayableMembers(roles),
+    listFundableGoals(roles),
   ])
 
   // Said before the press, not discovered after it. A period already behind us
@@ -497,6 +536,22 @@ export default async function ContributionsPage({
         )
       )}
 
+      {params.goalPaid === '1' && (
+        <Alert
+          variant="success"
+          title={params.goalHit === '1' ? 'Payment recorded — goal reached' : 'Payment recorded toward a goal'}
+        >
+          R{Number(params.amount ?? 0).toFixed(2)} recorded toward{' '}
+          <strong>{params.goal ?? 'that goal'}</strong>
+          {params.who ? ` for ${params.who}` : ''}, now at R
+          {Number(params.goalNow ?? 0).toFixed(2)} of R{Number(params.goalTarget ?? 0).toFixed(2)}.
+          {params.goalHit === '1'
+            ? ' That target has been reached, and every member has been told.'
+            : ''}{' '}
+          The member has been told, and it counts toward their standing.
+        </Alert>
+      )}
+
       {/* ── Filters ─────────────────────────────────────────── */}
       <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-4">
         <form method="GET" action="/contributions" className="flex flex-wrap items-center gap-2">
@@ -569,7 +624,7 @@ export default async function ContributionsPage({
             <span className="min-w-0">
               <span className="block text-sm font-bold text-xxm-green-900">Record a cash or EFT payment</span>
               <span className="block text-xs text-xxm-gray-500 mt-0.5">
-                For money already in the bank account — including months that were never generated.
+                For money already in the bank account — toward a month, or toward a goal.
               </span>
             </span>
             <ChevronDown
@@ -606,6 +661,45 @@ export default async function ContributionsPage({
                 </span>
               </label>
 
+              <label className="sm:col-span-2">
+                <span className={labelCls}>What is this payment for?</span>
+                <div className="relative">
+                  {/*
+                      The field the whole form hangs off. It decides which table
+                      the row lands in and — the reason it cannot be left vague
+                      — what "already recorded" is measured against: a duplicate
+                      is scoped to the thing being paid for, so a payment with
+                      no stated purpose cannot be checked against anything.
+
+                      The monthly fund is not in the goal list on purpose. It
+                      fills from monthly contributions, so money for it IS a
+                      contribution — recording it as a goal payment would raise
+                      the fund total while leaving the member's month unpaid,
+                      and the debit run would keep trying to collect money
+                      already in the account. The service refuses it too; this
+                      just keeps the mistake off the screen.
+                  */}
+                  <select name="target" defaultValue="contribution" className={`${inputCls} appearance-none pr-8 cursor-pointer`}>
+                    <option value="contribution">Monthly contribution — the fund</option>
+                    {fundableGoals.length > 0 && (
+                      <optgroup label="Goals">
+                        {fundableGoals.map((g) => (
+                          <option key={g.id} value={`goal:${g.id}`}>
+                            {g.title} — {formatZAR(g.current)} of {formatZAR(g.target)}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-xxm-gray-400 pointer-events-none" aria-hidden />
+                </div>
+                <span className="block text-[11px] text-xxm-gray-400 mt-1">
+                  {fundableGoals.length > 0
+                    ? 'The month below applies to a monthly contribution; a goal payment is not owed monthly and ignores it.'
+                    : 'No active goals to pay toward right now, so this is a monthly contribution.'}
+                </span>
+              </label>
+
               <label>
                 <span className={labelCls}>Month paid for</span>
                 <div className="relative">
@@ -625,10 +719,8 @@ export default async function ContributionsPage({
                   <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-xxm-gray-400 pointer-events-none" aria-hidden />
                 </div>
               </label>
-            </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <label>
+              <label className="sm:col-span-2">
                 <span className={labelCls}>Amount received</span>
                 <input
                   name="amount" type="number" step="0.01" min="0.01" required
@@ -636,6 +728,9 @@ export default async function ContributionsPage({
                   className={`${inputCls} stat-number`}
                 />
               </label>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 
               {/*
                   The field that stops a part payment reading as settled.
@@ -654,6 +749,9 @@ export default async function ContributionsPage({
                   placeholder="If they owed more"
                   className={`${inputCls} stat-number`}
                 />
+                <span className="block text-[11px] text-xxm-gray-400 mt-1">
+                  Monthly contributions only — a goal is not owed by the month.
+                </span>
               </label>
 
               <label>
@@ -733,7 +831,7 @@ export default async function ContributionsPage({
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
               <ConfirmSubmitButton
                 title="Record this payment?"
-                message="This writes money onto the member's record, stores the proof of payment against it, and tells them it arrived. Only do this once you have seen it on the bank statement or taken the cash. It can be reversed afterwards, but not deleted."
+                message="This writes money onto the member's record against the month or goal you chose, stores the proof of payment with it, and tells them it arrived. Only do this once you have seen it on the bank statement or taken the cash. It can be reversed afterwards, but not deleted."
                 confirmLabel="Record it"
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-xxm-green text-white text-sm font-bold hover:bg-xxm-canopy transition-colors shrink-0"
               >

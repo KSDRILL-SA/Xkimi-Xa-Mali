@@ -59,6 +59,11 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
     periodMonth: 6, periodYear: 2026, reference: 'EFT 8231', receivedAt: new Date(),
   })],
   ['listPayableMembers',       (r) => services.listPayableMembers(r)],
+  ['listFundableGoals',        (r) => services.listFundableGoals(r)],
+  ['recordOfflineGoalPaymentForMember', (r) => services.recordOfflineGoalPaymentForMember({
+    adminId: 'a1', adminRoles: r, userId: 'm1', goalId: 'g1', amount: 500,
+    reference: 'EFT 4471', receivedAt: new Date(),
+  })],
   ['getBroadcastAudience',     (r) => services.getBroadcastAudience(r)],
   ['correctMemberIdNumber',    (r) => services.correctMemberIdNumber('a1', r, 'm1', '9001015800088', 'Captured wrong at registration')],
   ['listAllGoals',             (r) => services.listAllGoals(r)],

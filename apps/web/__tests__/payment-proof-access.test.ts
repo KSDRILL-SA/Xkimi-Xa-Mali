@@ -16,10 +16,16 @@ import { OfflineContributionSchema } from '@xxm/utils'
  * nothing about the response would look wrong.
  */
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), findFirst: vi.fn(), get: vi.fn() }))
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), findFirst: vi.fn(), findGoalPayment: vi.fn(), get: vi.fn() }))
 
 vi.mock('@/lib/auth', () => ({ auth: mocks.auth }))
-vi.mock('@/lib/db', () => ({ db: { transaction: { findFirst: mocks.findFirst } } }))
+vi.mock('@/lib/db', () => ({
+  db: {
+    transaction: { findFirst: mocks.findFirst },
+    // A proof can hang off either kind of payment, so the route asks both.
+    goalPayment: { findFirst: mocks.findGoalPayment },
+  },
+}))
 vi.mock('@vercel/blob', () => ({ get: mocks.get }))
 
 import { GET } from '@/app/api/media/proof/route'
@@ -33,6 +39,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.auth.mockResolvedValue({ user: { id: 'member-1' } })
   mocks.findFirst.mockResolvedValue({ id: 'tx-1' })
+  mocks.findGoalPayment.mockResolvedValue(null)
   mocks.get.mockResolvedValue({
     statusCode: 200,
     stream: new ReadableStream(),
@@ -68,6 +75,7 @@ describe('who may open a proof of payment', () => {
     // A distinct "forbidden" would confirm the object exists, which turns this
     // route into a way to test guesses about other members' records.
     mocks.findFirst.mockResolvedValue(null)
+    mocks.findGoalPayment.mockResolvedValue(null)
 
     const res = await GET(req('payment-proofs/someone-elses.pdf'))
 
@@ -103,6 +111,32 @@ describe('who may open a proof of payment', () => {
 
     expect(res.headers.get('Cache-Control')).toBe('private, no-store')
     expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff')
+  })
+
+  it('finds a proof attached to a goal payment, not only to a contribution', async () => {
+    // Two tables hold payments, so two lookups. One covering only transactions
+    // would have refused every goal payment's proof while looking correct — the
+    // member would be told their own document does not exist.
+    mocks.findFirst.mockResolvedValue(null)
+    mocks.findGoalPayment.mockResolvedValue({ id: 'gp-1' })
+
+    const res = await GET(req('payment-proofs/proof-goal.pdf'))
+
+    expect(res.status).toBe(200)
+    expect(mocks.findGoalPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { proofUrl: 'payment-proofs/proof-goal.pdf', userId: 'member-1' } }),
+    )
+  })
+
+  it('scopes the goal-payment lookup to the viewer too', async () => {
+    // A goal payment names the member directly rather than through a
+    // contribution — a different path back to the same question, and the one
+    // that would be easy to write without the ownership clause at all.
+    await GET(req('payment-proofs/proof-abc.pdf'))
+
+    expect(mocks.findGoalPayment).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: 'member-1' }) }),
+    )
   })
 
   it('reports a missing object rather than streaming a non-200 from the store', async () => {

@@ -28,6 +28,37 @@ export type GoalEngagement = {
   hasCheered: boolean
   comments: GoalComment[]
   pledge: PledgeSummary
+  /** What the viewer has actually paid toward this goal. See `myPayments`. */
+  payments: MyGoalPayment[]
+}
+
+/**
+ * One payment the viewer made toward this goal.
+ *
+ * A pledge is a promise and was already visible; a payment is money, and until
+ * now the member could see it nowhere at all. Their transactions page lists
+ * `Transaction` rows, and a goal payment is not one — so a member who gave to a
+ * goal had no record of having done so anywhere in the app.
+ *
+ * That was tolerable while every goal payment went through the gateway, because
+ * the member initiated it themselves and their bank statement said so. It is
+ * not tolerable now: leadership records these on the member's behalf from cash
+ * or an EFT, and a payment somebody else entered against your name that you
+ * cannot see is exactly the thing the proof-of-payment work exists to prevent.
+ */
+export type MyGoalPayment = {
+  id: string
+  amount: number
+  /** When the money arrived, falling back to when the row was written. */
+  paidAt: string
+  /** The bank reference for an offline payment; the gateway's otherwise. */
+  reference: string | null
+  /** Openable only through /api/media/proof, which re-checks ownership. */
+  proofUrl: string | null
+  /** Who counted the cash, when there was no document. */
+  proofWitness: string | null
+  /** True when leadership recorded this rather than the member paying in-app. */
+  recordedByLeadership: boolean
 }
 
 const MIN_PLEDGE = 10
@@ -69,7 +100,7 @@ const COMMENT_SELECT = {
 export async function getGoalEngagement(goalId: string, userId: string, roles: string[]): Promise<GoalEngagement> {
   await assertGoalVisible(goalId, roles)
 
-  const [cheerCount, myCheer, comments, pledge] = await Promise.all([
+  const [cheerCount, myCheer, comments, pledge, payments] = await Promise.all([
     db.goalCheer.count({ where: { goalId } }),
     db.goalCheer.findUnique({ where: { goalId_userId: { goalId, userId } } }),
     db.goalComment.findMany({
@@ -79,6 +110,18 @@ export async function getGoalEngagement(goalId: string, userId: string, roles: s
       select: COMMENT_SELECT,
     }),
     getGoalPledgeSummary(goalId, userId),
+    // Scoped to this viewer, never the goal's payments at large. What everyone
+    // together has given is already public as the goal's total; who gave what
+    // is not, and this endpoint is reached by any member who can see the goal.
+    db.goalPayment.findMany({
+      where: { goalId, userId, status: 'SUCCESS' },
+      orderBy: [{ processedAt: 'desc' }, { createdAt: 'desc' }],
+      select: {
+        id: true, amount: true, processedAt: true, createdAt: true,
+        gatewayRef: true, offlineReference: true,
+        proofUrl: true, proofWitness: true, recordedById: true,
+      },
+    }),
   ])
 
   return {
@@ -86,6 +129,15 @@ export async function getGoalEngagement(goalId: string, userId: string, roles: s
     hasCheered: myCheer !== null,
     comments: comments.map((c) => serializeComment(c, userId, roles)),
     pledge,
+    payments: payments.map((p) => ({
+      id: p.id,
+      amount: Number(p.amount),
+      paidAt: (p.processedAt ?? p.createdAt).toISOString(),
+      reference: p.offlineReference ?? p.gatewayRef,
+      proofUrl: p.proofUrl,
+      proofWitness: p.proofWitness,
+      recordedByLeadership: p.recordedById !== null,
+    })),
   }
 }
 

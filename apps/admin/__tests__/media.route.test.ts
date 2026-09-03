@@ -30,6 +30,7 @@ const blobGet = vi.fn()
 const findSignature = vi.fn()
 const findGoal = vi.fn()
 const findProof = vi.fn()
+const findGoalProof = vi.fn()
 
 async function loadRoute() {
   vi.resetModules()
@@ -39,9 +40,13 @@ async function loadRoute() {
     db: {
       adminSignature: { findFirst: findSignature },
       goal: { findFirst: findGoal },
-      // The third kind of private object this route serves: the proof of
-      // payment on an offline contribution.
+      // The third and fourth kinds of private object this route serves: the
+      // proof of payment on an offline contribution, and the same document on
+      // a payment toward a goal. Two tables, so two lookups — one covering
+      // only the first would have refused every goal payment's proof while
+      // looking correct.
       transaction: { findFirst: findProof },
+      goalPayment: { findFirst: findGoalProof },
     },
   }))
   const { GET } = await import('@/app/api/media/route')
@@ -67,6 +72,7 @@ beforeEach(() => {
   findSignature.mockResolvedValue(null)
   findGoal.mockResolvedValue(null)
   findProof.mockResolvedValue(null)
+  findGoalProof.mockResolvedValue(null)
   blobGet.mockResolvedValue(ok200())
 })
 
@@ -239,5 +245,21 @@ describe('a proof of payment', () => {
 
     expect(res.status).toBe(404)
     expect(blobGet).not.toHaveBeenCalled()
+  })
+})
+
+describe('a proof attached to a goal payment', () => {
+  it('is served when a goal payment row claims it', async () => {
+    // Its own table, so its own question. Without this lookup the console would
+    // refuse to open a document it had just stored itself.
+    findGoalProof.mockResolvedValue({ id: 'gp-1' })
+    blobGet.mockResolvedValue(ok200())
+
+    const GET = await loadRoute()
+    auth.mockResolvedValue(ADMIN)
+
+    const res = await GET(req('payment-proofs/proof-goal.pdf'))
+
+    expect(res.status).toBe(200)
   })
 })

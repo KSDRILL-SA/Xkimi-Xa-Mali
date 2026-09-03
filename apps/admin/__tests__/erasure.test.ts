@@ -10,6 +10,11 @@ const { models, auditCreate, transaction } = vi.hoisted(() => {
       notification: counter(),
       contribution: counter(),
       transaction: counter(),
+      // Money a member directed at a specific goal. Its own table, so its own
+      // counter — the financial tally used to be contributions plus
+      // transactions, which left every rand given to a goal out of the answer a
+      // data subject is entitled to.
+      goalPayment: counter(),
       paymentMandate: counter(),
       bankAccount: counter(),
       auditLog: counter(),
@@ -209,6 +214,7 @@ describe('erasing', () => {
 
     expect(models.contribution.deleteMany).not.toHaveBeenCalled()
     expect(models.transaction.deleteMany).not.toHaveBeenCalled()
+    expect(models.goalPayment.deleteMany).not.toHaveBeenCalled()
     expect(models.paymentMandate.deleteMany).not.toHaveBeenCalled()
     expect(models.bankAccount.deleteMany).not.toHaveBeenCalled()
     expect(models.auditLog.deleteMany).not.toHaveBeenCalled()

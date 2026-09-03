@@ -35,6 +35,105 @@ const MONTH_NAMES = [
  * month, which is the figure an admin would otherwise have to go and look up in
  * another tab before they could fill in "amount due".
  */
+/**
+ * The goals a payment can actually be recorded against.
+ *
+ * ACTIVE only, because money cannot be given to something already achieved or
+ * still a proposal — the service refuses it, and offering a choice that is
+ * certain to be rejected is worse than not offering it.
+ *
+ * The primary fund is excluded, and that is the important half. It fills
+ * automatically from monthly contributions, so money for it IS a contribution:
+ * recording it here would raise the fund total while leaving the member's month
+ * showing unpaid, and the debit run would go on trying to collect money already
+ * in the account. The service refuses it too — this only keeps the mistake off
+ * the screen in the first place.
+ */
+export async function listFundableGoals(adminRoles: string[]) {
+  assertAdmin(adminRoles)
+
+  const goals = await db.goal.findMany({
+    where: { status: 'ACTIVE', isPrimary: false },
+    orderBy: { deadline: 'asc' },
+    select: { id: true, title: true, targetAmount: true, currentAmount: true, deadline: true },
+  })
+
+  return goals.map((g) => ({
+    id: g.id,
+    title: g.title,
+    target: Number(g.targetAmount),
+    current: Number(g.currentAmount),
+    deadline: g.deadline,
+  }))
+}
+
+/**
+ * Record a member's cash or EFT payment toward a goal.
+ *
+ * The sibling of `recordOfflinePaymentForMember`, and server-to-server for the
+ * same reason: what a goal's total means, what makes a duplicate, and what
+ * happens to the pool ledger when a payment lands all live in the web app
+ * beside the gateway path that has to agree with them.
+ */
+export async function recordOfflineGoalPaymentForMember(input: {
+  adminId: string
+  adminRoles: string[]
+  userId: string
+  goalId: string
+  amount: number
+  reference: string
+  receivedAt: Date
+  note?: string
+  proofUrl?: string
+  proofWitness?: string
+  ip?: string
+}) {
+  assertAdmin(input.adminRoles)
+
+  const member = await db.user.findUnique({
+    where: { id: input.userId },
+    select: { firstName: true, lastName: true },
+  })
+  if (!member) throw new AdminNotFoundError('Member not found')
+
+  const res = await internalAdminPost<{
+    paymentId: string
+    goalId: string
+    goalTitle: string
+    receiptRef: string
+    amount: number
+    currentAmount: number
+    targetAmount: number
+    achieved: boolean
+  }>('/api/v1/admin/goals/offline-payment', {
+    userId: input.userId,
+    goalId: input.goalId,
+    amount: input.amount,
+    receivedAt: input.receivedAt.toISOString(),
+    reference: input.reference,
+    ...(input.note ? { note: input.note } : {}),
+    ...(input.proofUrl ? { proofUrl: input.proofUrl } : {}),
+    ...(input.proofWitness ? { proofWitness: input.proofWitness } : {}),
+  }, { adminUserId: input.adminId, adminIp: input.ip })
+
+  if (!res.ok || !res.data) {
+    // The web app's own message. It names which goal, or which reference is
+    // already recorded — the part that says what to do next.
+    throw new AdminConflictError(res.error?.message ?? 'That payment could not be recorded.')
+  }
+
+  const d = res.data
+  return {
+    amount: d.amount,
+    goalTitle: d.goalTitle,
+    currentAmount: d.currentAmount,
+    targetAmount: d.targetAmount,
+    achieved: d.achieved,
+    receiptRef: d.receiptRef,
+    memberName: `${member.firstName} ${member.lastName}`,
+  }
+}
+
 export async function listPayableMembers(adminRoles: string[]) {
   assertAdmin(adminRoles)
 
