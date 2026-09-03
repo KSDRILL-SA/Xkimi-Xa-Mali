@@ -7,6 +7,7 @@ import {
   REQUIRED_WHEN_LIVE,
   CONFIGURED_WHEN_LIVE,
   NETCASH_CREDENTIALS,
+  NETCASH_CONFIG,
 } from '../scripts/golive-preflight.mjs'
 
 /**
@@ -43,18 +44,36 @@ describe('go-live preflight — lists match lib/env.ts', () => {
     expect([...NETCASH_CREDENTIALS].sort()).toEqual(declaredWith('netcashCredential'))
   })
 
+  it('covers every variable gated on Netcash being in use', () => {
+    // The third gate, and the reason it exists: these are Netcash endpoint
+    // configuration, needed when Netcash is called rather than whenever the
+    // deployment is live. They were in the two lists above, and once
+    // `isLiveDeployment` was corrected that demanded an endpoint for a service
+    // this Foundation has no account with — the DebiCheck application was
+    // declined — and the production build stopped.
+    expect([...NETCASH_CONFIG].sort()).toEqual(
+      [...declaredWith('requiredWhenNetcashInUse'), ...declaredWith('configuredWhenNetcashInUse')].sort(),
+    )
+  })
+
   // If the regex ever stops matching the file's shape, every list above would
   // compare empty-to-empty and pass while checking nothing.
   it('actually found declarations to compare against', () => {
     expect(declaredWith('requiredWhenLive').length).toBeGreaterThan(5)
     expect(declaredWith('configuredWhenLive').length).toBeGreaterThan(2)
     expect(declaredWith('netcashCredential').length).toBe(2)
+    expect(
+      declaredWith('requiredWhenNetcashInUse').length +
+        declaredWith('configuredWhenNetcashInUse').length,
+    ).toBe(2)
   })
 })
 
 describe('go-live preflight — reporting', () => {
   const complete: Record<string, string> = {}
-  for (const name of [...REQUIRED_WHEN_LIVE, ...CONFIGURED_WHEN_LIVE, ...NETCASH_CREDENTIALS]) {
+  for (const name of [
+    ...REQUIRED_WHEN_LIVE, ...CONFIGURED_WHEN_LIVE, ...NETCASH_CREDENTIALS, ...NETCASH_CONFIG,
+  ]) {
     complete[name] = 'set'
   }
 
@@ -88,13 +107,29 @@ describe('go-live preflight — reporting', () => {
     expect(preflight(env).missing).toContain('NETCASH_SERVICE_KEY')
   })
 
-  // DEPLOY_ENV wins over VERCEL_ENV — this is why the production deployment
-  // runs in non-live mode today despite VERCEL_ENV being "production".
+  /**
+   * This case used to assert the opposite, and its comment explained why:
+   * "DEPLOY_ENV wins over VERCEL_ENV — this is why the production deployment
+   * runs in non-live mode today despite VERCEL_ENV being production."
+   *
+   * That was written as an observation and read as a permission. The
+   * consequence went untraced: with the deployment believing it was not live,
+   * the guard refusing the stand-in payment gateway never fired, and a member's
+   * R100 was recorded as a settled payment against a bank nobody had contacted.
+   *
+   * The platform's answer now outranks the declaration, here and in
+   * `isLiveDeployment`, which this must keep agreeing with — it is a second
+   * copy of that logic and it carried the same defect.
+   */
   it('reads live-ness the same way lib/env.ts does', () => {
     expect(preflight({ DEPLOY_ENV: 'production' }).live).toBe(true)
-    expect(preflight({ DEPLOY_ENV: 'staging', VERCEL_ENV: 'production' }).live).toBe(false)
     expect(preflight({ VERCEL_ENV: 'production' }).live).toBe(true)
     expect(preflight({ VERCEL_ENV: 'preview' }).live).toBe(false)
     expect(preflight({ NODE_ENV: 'production' }).live).toBe(true)
+
+    // A declaration may make a preview stricter, never a production deployment
+    // looser.
+    expect(preflight({ DEPLOY_ENV: 'production', VERCEL_ENV: 'preview' }).live).toBe(true)
+    expect(preflight({ DEPLOY_ENV: 'staging', VERCEL_ENV: 'production' }).live).toBe(true)
   })
 })

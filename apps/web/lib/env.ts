@@ -66,6 +66,18 @@ const configuredWhenNetcashInUse = <T extends z.ZodType<string, z.ZodTypeDef, st
 ) => (NETCASH_IN_USE ? schema : schema.default(devPlaceholder))
 
 /**
+ * As `requiredWhenLive`, but keyed on Netcash actually being called.
+ *
+ * A named helper rather than an inline ternary, because
+ * `__tests__/golive-preflight.test.ts` reads this file looking for
+ * `NAME: helper(` and keeps the go-live report in step with it. A variable
+ * gated by an expression it cannot see would drop out of that report silently —
+ * which is the one thing a preflight must not do.
+ */
+const requiredWhenNetcashInUse = (schema: z.ZodString) =>
+  (NETCASH_IN_USE ? schema : schema.optional())
+
+/**
  * Mailbox providers whose domain nobody but the provider can verify.
  *
  * Not an exhaustive list and not meant to be — it catches the mistake somebody
@@ -206,9 +218,7 @@ export const env = createEnv({
     // (325, non-real-time template) or authorises the wrong agreement.
     // Same rule: it identifies the collection terms Netcash shows a debtor's
     // bank, and there is nothing to identify when nothing is submitted.
-    NETCASH_DEBICHECK_TEMPLATE_ID: NETCASH_IN_USE
-      ? z.string().min(1)
-      : z.string().min(1).optional(),
+    NETCASH_DEBICHECK_TEMPLATE_ID: requiredWhenNetcashInUse(z.string().min(1)),
     // Netcash's webhook source IPs. Defaulted in lib/netcash.ts; set this only if
     // Netcash tells you the range has changed. Wrong values reject every callback.
     NETCASH_WEBHOOK_IPS: z.string().min(1).optional(),

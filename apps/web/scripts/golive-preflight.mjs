@@ -43,7 +43,6 @@ import { fileURLToPath } from 'node:url'
 /** Required outright on a live deployment (`requiredWhenLive` in lib/env.ts). */
 export const REQUIRED_WHEN_LIVE = [
   'NEXTAUTH_URL',
-  'NETCASH_DEBICHECK_TEMPLATE_ID',
   'BULKSMS_USERNAME',
   'BULKSMS_PASSWORD',
   'RESEND_API_KEY',
@@ -62,7 +61,6 @@ export const REQUIRED_WHEN_LIVE = [
  * value in production.
  */
 export const CONFIGURED_WHEN_LIVE = [
-  'NETCASH_API_URL',
   'RESEND_FROM_EMAIL',
   'ADMIN_WHATSAPP_NUMBER',
   'SUPPORT_EMAIL',
@@ -74,23 +72,44 @@ export const CONFIGURED_WHEN_LIVE = [
 export const NETCASH_CREDENTIALS = ['NETCASH_SERVICE_KEY', 'NETCASH_WEBHOOK_SECRET']
 
 /**
+ * Netcash endpoint configuration — needed when Netcash is actually called, not
+ * merely when the deployment is live.
+ *
+ * These sat in the two lists above until the DebiCheck application was declined
+ * and it became clear the distinction was real: a live deployment with no
+ * provider is a state this system is in, and demanding an endpoint to point at
+ * for a service nothing submits to blocked it from booting at all.
+ */
+export const NETCASH_CONFIG = ['NETCASH_API_URL', 'NETCASH_DEBICHECK_TEMPLATE_ID']
+
+/**
  * @param {Record<string, string | undefined>} env
  * @returns {{ live: boolean, mockGateway: boolean, missing: string[], checked: string[] }}
  */
 export function preflight(env) {
-  const deployEnv = env.DEPLOY_ENV
-  const live = deployEnv
-    ? deployEnv === 'production'
-    : env.VERCEL_ENV
-      ? env.VERCEL_ENV === 'production'
-      : env.NODE_ENV === 'production'
+  // The platform's answer first, and unconditionally. This duplicated
+  // `isLiveDeployment` — including its defect, where a hand-set DEPLOY_ENV
+  // short-circuited and VERCEL_ENV was never read. That is how production came
+  // to believe it was not live while serving real members, and this copy would
+  // have gone on agreeing with the mistake and reporting nothing missing.
+  const live =
+    env.VERCEL_ENV === 'production'
+      ? true
+      : env.DEPLOY_ENV
+        ? env.DEPLOY_ENV === 'production'
+        : env.VERCEL_ENV
+          ? false
+          : env.NODE_ENV === 'production'
 
   const mockGateway = env.PAYMENT_GATEWAY === 'mock'
+  // The same question lib/env.ts and integrations/payment both ask.
+  const netcashInUse = !mockGateway && Boolean(env.NETCASH_SERVICE_KEY)
 
   const checked = [
     ...REQUIRED_WHEN_LIVE,
     ...CONFIGURED_WHEN_LIVE,
     ...(mockGateway ? [] : NETCASH_CREDENTIALS),
+    ...(netcashInUse ? NETCASH_CONFIG : []),
   ]
 
   const missing = checked.filter((name) => {
