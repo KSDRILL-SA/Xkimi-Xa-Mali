@@ -5,10 +5,11 @@ import { auth } from '@/lib/auth'
 import {
   listAllContributions, generateContributions, listTransactionsForContributions,
   previewGeneration, waiveContribution, recordPayment,
+  recordOfflinePaymentForMember, listPayableMembers,
 } from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
 import { Alert, Reveal, RouterPagination } from '@xxm/ui'
-import { Wallet, ChevronDown, Zap, Undo2, HandCoins, CircleSlash } from 'lucide-react'
+import { Wallet, ChevronDown, Zap, Undo2, HandCoins, CircleSlash, Banknote, TriangleAlert } from 'lucide-react'
 import { requireAdmin } from '@/lib/admin-action'
 import { internalAdminPost } from '@/lib/api'
 import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
@@ -42,6 +43,7 @@ type TxRow = {
   id: string; contributionId: string; amount: unknown
   type: string; status: string; gatewayRef: string | null
   reversalReason: string | null; createdAt: Date
+  offlineReference: string | null; processedAt: Date | null
   reversal: { id: string } | null
 }
 
@@ -53,10 +55,35 @@ const TX_STATUS_BADGE: Record<string, string> = {
   REVERSED:   'bg-xxm-gray-100 text-xxm-gray-600',
 }
 
+/**
+ * What a successful recording puts back in the URL.
+ *
+ * `outstanding` and `over` are carried because the amount is no longer capped
+ * at what was owed. The old form refused anything larger, which is the wrong
+ * answer for a member with no debit order — nobody knows what they owe, and
+ * turning away a deposit already sitting in the bank account does not
+ * un-receive the money, it just leaves it unrecorded. So it is accepted, and
+ * the banner says plainly that more went on than was owed while the admin is
+ * still looking at the screen and can reverse it.
+ *
+ * Module scope rather than inside the component: both server actions call it,
+ * and a server action closing over a function would ask Next to serialise
+ * something it cannot.
+ */
+function recordedParams(res: {
+  amount: number; period: string; outstanding: number; overpaid: boolean; memberName: string
+}) {
+  return (
+    `&recorded=1&amount=${res.amount}&period=${encodeURIComponent(res.period)}` +
+    `&outstanding=${res.outstanding}${res.overpaid ? '&over=1' : ''}` +
+    `&who=${encodeURIComponent(res.memberName)}`
+  )
+}
+
 export default async function ContributionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string; created?: string; skipped?: string; total?: string; reversed?: string; reverseError?: string; waived?: string; recorded?: string; amount?: string; period?: string; actionError?: string }>
+  searchParams: Promise<{ month?: string; year?: string; status?: string; page?: string; generated?: string; created?: string; skipped?: string; total?: string; reversed?: string; reverseError?: string; waived?: string; recorded?: string; amount?: string; period?: string; actionError?: string; outstanding?: string; over?: string; who?: string }>
 }) {
   const session = await auth()
   const roles   = (session?.user?.roles as string[] | undefined) ?? []
@@ -171,17 +198,94 @@ export default async function ContributionsPage({
     const id     = String(fd.get('contributionId') ?? '')
     const amount = Number(fd.get('amount') ?? 0)
     const ref    = String(fd.get('reference') ?? '')
+    const dateIn = String(fd.get('receivedAt') ?? '')
     const m = String(fd.get('month') ?? ''), y = String(fd.get('year') ?? '')
     const pg = String(fd.get('page') ?? '1'), st = String(fd.get('status') ?? '')
     const back = (extra: string) =>
       `/contributions?month=${m}&year=${y}${st ? `&status=${st}` : ''}&page=${pg}${extra}`
 
+    // A blank date means "today" rather than an error. The field is optional on
+    // this form because the common case here is a payment being recorded as it
+    // arrives; the catch-up form below, where the date is months in the past,
+    // requires it.
+    const receivedAt = dateIn ? new Date(`${dateIn}T12:00:00`) : new Date()
+    if (Number.isNaN(receivedAt.getTime())) {
+      redirect(back('&actionError=That+is+not+a+date'))
+    }
+
     try {
-      const res = await recordPayment(userId, r, id, amount, ref, ip)
-      redirect(back(`&recorded=1&amount=${res.amount}&period=${encodeURIComponent(res.period)}`))
+      const res = await recordPayment(userId, r, id, amount, ref, ip, receivedAt)
+      redirect(back(recordedParams(res)))
     } catch (err) {
       if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
       redirect(back(`&actionError=${encodeURIComponent(err instanceof Error ? err.message : 'That did not go through')}`))
+    }
+  }
+
+  /**
+   * Record a payment for a member and a month that has no contribution row.
+   *
+   * The backlog case, and the reason this page needed a second form. The row
+   * form above can only act on a month that already exists, and
+   * `generateMonthlyContributions` only raises a period for members with an
+   * active debit order — so June, July and August for the four members who have
+   * been paying by EFT are not on this page to be clicked. This form makes the
+   * period and the payment in one go.
+   *
+   * It redirects to the period that was paid rather than back to the one being
+   * viewed: the whole point of entering August from the June screen is to then
+   * see it, and landing back on a screen that does not show what you just did
+   * reads as a failure.
+   */
+  async function recordOffline(fd: FormData) {
+    'use server'
+    const { userId, roles: r, ip } = await requireAdmin('contribution.record-payment')
+
+    const memberId = String(fd.get('userId') ?? '')
+    const amount   = Number(fd.get('amount') ?? 0)
+    const dueRaw   = String(fd.get('amountDue') ?? '').trim()
+    const pm       = parseInt(String(fd.get('periodMonth') ?? ''), 10)
+    const py       = parseInt(String(fd.get('periodYear') ?? ''), 10)
+    const ref      = String(fd.get('reference') ?? '')
+    const note     = String(fd.get('note') ?? '').trim()
+    const dateIn   = String(fd.get('receivedAt') ?? '')
+
+    // Land on the month that was paid, not the one being viewed.
+    const back = (extra: string) => `/contributions?month=${pm}&year=${py}${extra}`
+    const stay = (extra: string) =>
+      `/contributions?month=${String(fd.get('month') ?? '')}&year=${String(fd.get('year') ?? '')}${extra}`
+
+    if (!memberId) redirect(stay('&actionError=Choose+a+member'))
+    if (!Number.isFinite(pm) || !Number.isFinite(py)) {
+      redirect(stay('&actionError=Choose+the+month+the+payment+was+for'))
+    }
+
+    // Midday rather than midnight. A date-only input has no timezone, and
+    // parsing it as UTC midnight lands on the previous day for anybody east of
+    // Greenwich — which is everybody using this.
+    const receivedAt = dateIn ? new Date(`${dateIn}T12:00:00`) : new Date()
+    if (Number.isNaN(receivedAt.getTime())) redirect(stay('&actionError=That+is+not+a+date'))
+
+    try {
+      const res = await recordOfflinePaymentForMember({
+        adminId: userId, adminRoles: r,
+        userId: memberId,
+        amount,
+        periodMonth: pm,
+        periodYear: py,
+        reference: ref,
+        receivedAt,
+        // Omitted rather than zero when left blank: the service treats an
+        // absent figure as "nothing to go on" and falls back, and a zero would
+        // be a stated obligation of nothing.
+        ...(dueRaw ? { amountDue: Number(dueRaw) } : {}),
+        ...(note ? { note } : {}),
+        ip,
+      })
+      redirect(back(recordedParams(res)))
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+      redirect(stay(`&actionError=${encodeURIComponent(err instanceof Error ? err.message : 'That did not go through')}`))
     }
   }
 
@@ -195,7 +299,10 @@ export default async function ContributionsPage({
     redirect(`/contributions?month=${m}&year=${y}&generated=1&created=${result.created}&skipped=${result.skipped}&total=${result.total}`)
   }
 
-  const preview = await previewGeneration(roles, month, year)
+  const [preview, payableMembers] = await Promise.all([
+    previewGeneration(roles, month, year),
+    listPayableMembers(roles),
+  ])
 
   // Said before the press, not discovered after it. A period already behind us
   // is allowed — catching up on a missed month is a real thing leadership does
@@ -215,6 +322,15 @@ export default async function ContributionsPage({
   ].filter(Boolean).join(' ')
 
   const yearOpts = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
+
+  // For the date fields' ceiling. Local parts, not toISOString(): that converts
+  // to UTC first, which in SAST hands back yesterday's date before 02:00.
+  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+
+  const inputCls =
+    'w-full rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25'
+  const labelCls =
+    'block text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest mb-1'
 
   return (
     <div className="space-y-6">
@@ -285,10 +401,27 @@ export default async function ContributionsPage({
       )}
 
       {params.recorded === '1' && (
-        <Alert variant="success" title="Payment recorded">
-          R{Number(params.amount ?? 0).toFixed(2)} recorded against {params.period ?? 'that month'}.
-          The member has been told, and the payment is on their statement.
-        </Alert>
+        params.over === '1' ? (
+          // Recorded, but worth stopping on. More money went onto the month
+          // than was owed, which is either a member paying ahead or somebody
+          // typing the wrong figure — and only a person can tell which.
+          <Alert variant="warning" title="Payment recorded — more than was owed">
+            R{Number(params.amount ?? 0).toFixed(2)} recorded against {params.period ?? 'that month'}
+            {params.who ? ` for ${params.who}` : ''}. That is
+            R{Math.abs(Number(params.outstanding ?? 0)).toFixed(2)} more than was outstanding, so the
+            month now shows a credit. If that was not intended, reverse the payment on the row below —
+            nothing is deleted, the correction shows alongside it.
+          </Alert>
+        ) : (
+          <Alert variant="success" title="Payment recorded">
+            R{Number(params.amount ?? 0).toFixed(2)} recorded against {params.period ?? 'that month'}
+            {params.who ? ` for ${params.who}` : ''}.{' '}
+            {Number(params.outstanding ?? 0) > 0
+              ? `R${Number(params.outstanding).toFixed(2)} is still outstanding on that month.`
+              : 'That month is now settled in full.'}
+            {' '}The member has been told, and the payment is on their statement.
+          </Alert>
+        )
       )}
 
       {/* ── Filters ─────────────────────────────────────────── */}
@@ -334,6 +467,170 @@ export default async function ContributionsPage({
             Filter
           </button>
         </form>
+      </Reveal>
+
+
+      {/* ── Money that arrived outside the debit order ───────── */}
+      {/*
+          Why this is a second form rather than a wider version of the one on
+          each row: the row form can only act on a month that is already on this
+          page, and the months that most need recording are not. Contributions
+          are only generated for members with an active debit order, and Netcash
+          declined the DebiCheck application — so for the members who have been
+          paying by EFT since June, no row exists to click. This one makes the
+          month and the payment together.
+      */}
+      <Reveal variant="up" delay={150}>
+        <details className="group bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
+          <summary className="flex items-center gap-3 px-5 py-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-xxm-green-50/40 transition-colors">
+            <span className="w-9 h-9 rounded-2xl bg-xxm-gold/15 flex items-center justify-center shrink-0">
+              <Banknote size={16} className="text-xxm-gold-dark" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold text-xxm-green-900">Record a cash or EFT payment</span>
+              <span className="block text-xs text-xxm-gray-500 mt-0.5">
+                For money already in the bank account — including months that were never generated.
+              </span>
+            </span>
+            <ChevronDown
+              size={16}
+              className="ml-auto text-xxm-gray-400 shrink-0 transition-transform group-open:rotate-180"
+              aria-hidden
+            />
+          </summary>
+
+          <form action={recordOffline} className="px-5 pb-5 pt-1 border-t border-xxm-gray-100 space-y-4">
+            {/* Where to go back to if this is refused, so a rejected form does
+                not also silently change which month is on screen. */}
+            <input type="hidden" name="month" value={month} />
+            <input type="hidden" name="year"  value={year} />
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 pt-4">
+              <label className="sm:col-span-2">
+                <span className={labelCls}>Member</span>
+                <div className="relative">
+                  <select name="userId" required defaultValue="" className={`${inputCls} appearance-none pr-8 cursor-pointer`}>
+                    <option value="" disabled>Choose a member…</option>
+                    {payableMembers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                        {m.monthlyAmount !== null ? ` — ${formatZAR(m.monthlyAmount)}/month` : ' — no debit order'}
+                        {m.status !== 'ACTIVE' ? ` (${m.status.toLowerCase()})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-xxm-gray-400 pointer-events-none" aria-hidden />
+                </div>
+                <span className="block text-[11px] text-xxm-gray-400 mt-1">
+                  Invited members who have not signed up yet are listed too — their payments still count.
+                </span>
+              </label>
+
+              <label>
+                <span className={labelCls}>Month paid for</span>
+                <div className="relative">
+                  <select name="periodMonth" defaultValue={month} className={`${inputCls} appearance-none pr-8 cursor-pointer`}>
+                    {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-xxm-gray-400 pointer-events-none" aria-hidden />
+                </div>
+              </label>
+
+              <label>
+                <span className={labelCls}>Year</span>
+                <div className="relative">
+                  <select name="periodYear" defaultValue={year} className={`${inputCls} appearance-none pr-8 cursor-pointer`}>
+                    {yearOpts.map((y) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-xxm-gray-400 pointer-events-none" aria-hidden />
+                </div>
+              </label>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <label>
+                <span className={labelCls}>Amount received</span>
+                <input
+                  name="amount" type="number" step="0.01" min="0.01" required
+                  placeholder="0.00"
+                  className={`${inputCls} stat-number`}
+                />
+              </label>
+
+              {/*
+                  The field that stops a part payment reading as settled.
+
+                  A member with an active debit order already has an agreed
+                  amount and this is ignored for them. A member without one has
+                  no recorded obligation anywhere, so left blank the month is
+                  created owing exactly what arrived — and R200 against a R500
+                  month marks them up to date. That is the whole reason this
+                  asks.
+              */}
+              <label>
+                <span className={labelCls}>Owed for that month <span className="font-semibold text-xxm-gray-300">(optional)</span></span>
+                <input
+                  name="amountDue" type="number" step="0.01" min="0.01"
+                  placeholder="If they owed more"
+                  className={`${inputCls} stat-number`}
+                />
+              </label>
+
+              <label>
+                <span className={labelCls}>Date the money arrived</span>
+                <input
+                  name="receivedAt" type="date" required max={todayISO}
+                  defaultValue={todayISO}
+                  className={inputCls}
+                />
+              </label>
+
+              <label>
+                <span className={labelCls}>Bank reference</span>
+                <input
+                  name="reference" required minLength={3} maxLength={120}
+                  placeholder="e.g. EFT 8231, or cash at the June meeting"
+                  className={inputCls}
+                />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className={labelCls}>Note <span className="font-semibold text-xxm-gray-300">(optional)</span></span>
+              <input
+                name="note" maxLength={500}
+                placeholder="Anything else worth remembering about this payment"
+                className={inputCls}
+              />
+            </label>
+
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
+              <ConfirmSubmitButton
+                title="Record this payment?"
+                message="This writes money onto the member's record and tells them it arrived. Only do this once you have seen it on the bank statement or taken the cash. It can be reversed afterwards, but not deleted."
+                confirmLabel="Record it"
+                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-xxm-green text-white text-sm font-bold hover:bg-xxm-canopy transition-colors shrink-0"
+              >
+                <HandCoins size={14} aria-hidden />
+                Record payment
+              </ConfirmSubmitButton>
+              {/*
+                  Said before the press. More than is owed is accepted rather
+                  than refused — nobody knows what a member with no debit order
+                  owes, and turning away a deposit that is already in the account
+                  does not un-receive it — so the guard is that the admin is told
+                  it happened, here and again in the banner afterwards.
+              */}
+              <p className="flex items-start gap-2 text-[11px] text-xxm-gray-500 leading-relaxed">
+                <TriangleAlert size={13} className="text-amber-500 shrink-0 mt-px" aria-hidden />
+                <span>
+                  Recording more than is owed is allowed — you will be told when it happens.
+                  The same reference cannot be recorded twice for the same member and month.
+                </span>
+              </p>
+            </div>
+          </form>
+        </details>
       </Reveal>
 
       {/* ── Contributions list ──────────────────────────────── */}
@@ -404,9 +701,13 @@ export default async function ContributionsPage({
                 <div className="px-4 pb-4 pt-1 bg-xxm-gray-50/60 border-t border-xxm-gray-100">
                   {c.status !== 'PAID' && c.status !== 'WAIVED' && (
                     <div className="grid gap-2 sm:grid-cols-2 pt-3">
-                      {/* Money that arrived as cash or a transfer. The service
-                          refuses more than is outstanding, so the hint is the
-                          same number it checks against. */}
+                      {/* Money that arrived as cash or a transfer. The amount
+                          is no longer capped at what is outstanding: the cap
+                          used to be enforced by the service, and refusing a
+                          deposit larger than the figure on file did not
+                          un-receive the money — it left it unrecorded. So the
+                          outstanding balance is a hint, and going over is
+                          reported in the banner instead of blocked here. */}
                       <form action={record} className="bg-white rounded-2xl border border-xxm-gray-100 p-3 space-y-2">
                         <input type="hidden" name="contributionId" value={c.id} />
                         <input type="hidden" name="month" value={month} />
@@ -419,22 +720,31 @@ export default async function ContributionsPage({
                         <div className="flex flex-wrap gap-2">
                           <input
                             name="amount" type="number" step="0.01" min="0.01"
-                            max={Number(c.amountDue) - Number(c.amountPaid)}
                             required
-                            placeholder={`Up to ${formatZAR(Number(c.amountDue) - Number(c.amountPaid))}`}
+                            placeholder={`${formatZAR(Number(c.amountDue) - Number(c.amountPaid))} outstanding`}
                             aria-label={`Amount received from ${fullName}`}
-                            className="w-32 rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                            className="w-36 rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
                           />
                           <input
-                            name="reference" required minLength={3}
+                            name="reference" required minLength={3} maxLength={120}
                             placeholder="How it arrived"
                             aria-label={`How the payment from ${fullName} arrived`}
                             className="flex-1 min-w-[8rem] rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
                           />
                         </div>
+                        {/* Defaults to today, which is right for a payment being
+                            recorded as it arrives. Editable because the same
+                            form is the quickest way to date a late one
+                            correctly, and a statement that puts three months of
+                            payments on one afternoon is wrong. */}
+                        <input
+                          name="receivedAt" type="date" max={todayISO} defaultValue={todayISO}
+                          aria-label={`Date the payment from ${fullName} arrived`}
+                          className="w-full rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm text-xxm-gray-600 focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                        />
                         <ConfirmSubmitButton
                           title="Record this payment?"
-                          message={`This adds money to ${fullName}'s ${MONTHS[c.periodMonth - 1]} ${c.periodYear} contribution and tells them it arrived. Only do this once the money is actually in the account.`}
+                          message={`This adds money to ${fullName}'s ${MONTHS[c.periodMonth - 1]} ${c.periodYear} contribution and tells them it arrived. ${formatZAR(Number(c.amountDue) - Number(c.amountPaid))} is outstanding; anything more than that is still recorded and you will be told. Only do this once the money is actually in the account.`}
                           confirmLabel="Record it"
                           className="px-3 py-1.5 rounded-lg bg-xxm-green text-white text-xs font-semibold hover:bg-xxm-canopy transition-colors"
                         >
@@ -490,9 +800,21 @@ export default async function ContributionsPage({
                               </span>
                               <span className="text-[11px] font-semibold text-xxm-gray-500">{t.type}</span>
                               <span className="stat-number text-sm font-bold text-xxm-green-900">{formatZAR(t.amount as number)}</span>
-                              <span className="font-mono text-[10px] text-xxm-gray-400 truncate">{t.gatewayRef ?? '—'}</span>
+                              {/* The bank reference for an offline row, the
+                                  gateway's for everything else. Both answer the
+                                  same question — what do I match this against —
+                                  and an offline row has no gatewayRef at all,
+                                  so it would otherwise show a dash on the one
+                                  payment kind that cannot be traced any other
+                                  way. */}
+                              <span className="font-mono text-[10px] text-xxm-gray-400 truncate">
+                                {t.offlineReference ?? t.gatewayRef ?? '—'}
+                              </span>
+                              {/* When the money arrived, falling back to when
+                                  the row was written. For a backlog these are
+                                  months apart and only the first is true. */}
                               <span className="text-[11px] text-xxm-gray-400 ml-auto">
-                                {new Date(t.createdAt).toLocaleDateString('en-ZA')}
+                                {new Date(t.processedAt ?? t.createdAt).toLocaleDateString('en-ZA')}
                               </span>
                             </div>
 

@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   runTransaction: vi.fn(),
   recalculate: vi.fn(),
   writeAuditLog: vi.fn(),
+  findById: vi.fn(),
+  inbox: vi.fn(),
 }))
 
 vi.mock('@/lib/env', () => ({ env: { ENABLE_MANUAL_PAYMENTS: true } }))
@@ -36,6 +38,7 @@ vi.mock('@/services/ledger.service', () => ({
   postPoolDebit: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/services/notification.service', () => ({ queueNotification: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/services/inbox.service', () => ({ createInboxMessages: mocks.inbox }))
 vi.mock('@/lib/cache', () => ({
   cache: { del: vi.fn().mockResolvedValue(undefined), get: vi.fn().mockResolvedValue(null), set: vi.fn().mockResolvedValue(undefined) },
   CACHE_KEYS: { DASHBOARD_STATS: 'k', memberInsights: (id: string) => 'insights:' + id, contributionSummary: (id: string) => 'summary:' + id },
@@ -59,7 +62,7 @@ vi.mock('@/repositories/contribution.repository', () => ({
   contributionRepo: {
     findByPeriod: mocks.findByPeriod,
     create: mocks.contribCreate,
-    findById: vi.fn(),
+    findById: mocks.findById,
     update: vi.fn(),
     updateByVersion: vi.fn().mockResolvedValue({ count: 1 }),
     findUniqueWithVersion: vi.fn().mockResolvedValue({
@@ -95,6 +98,11 @@ beforeEach(() => {
     fn({ contribution: { update: vi.fn() } }),
   )
   mocks.txCreate.mockImplementation(async (data: object) => ({ id: 'tx-1', ...data }))
+  // How the period reads once the payment is on it. Read back from the
+  // repository rather than computed, so the tests exercise the same source the
+  // service reports from.
+  mocks.findById.mockResolvedValue({ id: 'contrib-1', amountDue: 500, amountPaid: 200, status: 'PARTIAL' })
+  mocks.inbox.mockResolvedValue(undefined)
 })
 
 describe('what a period is created owing', () => {
@@ -241,5 +249,91 @@ describe('refusals', () => {
     await expect(
       recordOfflineContribution(payment() as never, ADMIN, ROLES),
     ).resolves.toMatchObject({ transactionId: 'tx-1' })
+  })
+})
+
+describe('what it reports back', () => {
+  it('says what is still outstanding, so a part payment cannot read as settled', async () => {
+    // The console redirects with this and the banner prints it. Without it an
+    // admin recording R200 of a R500 month sees "payment recorded" and no
+    // indication that R300 is still owed.
+    const res = await recordOfflineContribution(
+      payment({ amount: 200, amountDue: 500 }) as never,
+      ADMIN,
+      ROLES,
+    )
+
+    expect(res).toMatchObject({
+      period: 'June 2026',
+      amount: 200,
+      amountDue: 500,
+      amountPaid: 200,
+      outstanding: 300,
+      status: 'PARTIAL',
+      overpaid: false,
+    })
+  })
+
+  it('flags an overpayment rather than refusing it', async () => {
+    // Deliberately recorded, not blocked. Nobody knows what a member with no
+    // mandate owes, and turning away a deposit that is already in the bank
+    // account does not un-receive the money — it leaves it unrecorded. So it is
+    // written and reported, and a person decides whether to reverse it.
+    mocks.findById.mockResolvedValue({ id: 'contrib-1', amountDue: 500, amountPaid: 700, status: 'PAID' })
+
+    const res = await recordOfflineContribution(
+      payment({ amount: 700, amountDue: 500 }) as never,
+      ADMIN,
+      ROLES,
+    )
+
+    expect(res.overpaid).toBe(true)
+    expect(res.outstanding).toBe(-200)
+  })
+
+  it('tells the member money was recorded against their name', async () => {
+    // Leadership changing somebody\'s financial record without them being part
+    // of it is exactly the thing that must not happen quietly.
+    await recordOfflineContribution(
+      payment({ amount: 200, amountDue: 500 }) as never,
+      ADMIN,
+      ROLES,
+    )
+
+    expect(mocks.inbox).toHaveBeenCalledWith(
+      ['member-1'],
+      expect.objectContaining({
+        title: expect.stringContaining('June 2026'),
+        body: expect.stringContaining('R300.00 is still outstanding'),
+      }),
+    )
+  })
+
+  it('records the payment even when telling the member fails', async () => {
+    // The money is already committed by this point. A failed inbox write must
+    // not surface as an error the admin retries, or the same payment gets
+    // recorded twice.
+    mocks.inbox.mockRejectedValue(new Error('inbox down'))
+
+    await expect(recordOfflineContribution(payment() as never, ADMIN, ROLES))
+      .resolves.toMatchObject({ transactionId: 'tx-1' })
+  })
+})
+
+describe('a month that was waived', () => {
+  it('refuses the payment and says why', async () => {
+    // A waiver is a decision leadership made — that this member owes nothing
+    // for this month. Recording a payment against it would quietly undo that
+    // decision instead of asking anybody to revisit it.
+    //
+    // Enforced here rather than in the admin console, which is where it used to
+    // live: this service is now the only way an offline payment is written, and
+    // a rule enforced by one of two callers is a rule that is not enforced.
+    mocks.findByPeriod.mockResolvedValue({ id: 'contrib-1', status: 'WAIVED', amountDue: 500, amountPaid: 0 })
+
+    await expect(recordOfflineContribution(payment() as never, ADMIN, ROLES))
+      .rejects.toThrow(/waived/i)
+
+    expect(mocks.txCreate).not.toHaveBeenCalled()
   })
 })

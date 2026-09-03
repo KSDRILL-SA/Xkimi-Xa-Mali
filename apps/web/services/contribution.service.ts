@@ -14,6 +14,7 @@ import { cache, CACHE_KEYS } from '@/lib/cache'
 import { tallyBy } from '@/lib/aggregate'
 import { postPoolCredit, postPoolDebit } from './ledger.service'
 import { queueNotification } from './notification.service'
+import { createInboxMessages } from './inbox.service'
 import { env } from '@/lib/env'
 import { inngest, InngestEvents } from '@/lib/inngest'
 import {
@@ -30,7 +31,7 @@ import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
 import { subtractZAR } from '@/lib/money'
 import type { ManualContributionInput, GenerateContributionsInput, OfflineContributionInput } from '@/lib/validation/contribution'
-import { MIN_CONTRIBUTION_ZAR } from '@xxm/utils'
+import { MIN_CONTRIBUTION_ZAR, MONTHS } from '@xxm/utils'
 
 const MAX_OPTIMISTIC_RETRIES = 3
 
@@ -923,7 +924,7 @@ export async function recordOfflineContribution(
   if (duplicate) {
     throw new ContributionConflictError(
       `A payment with reference "${data.reference}" is already recorded for this member and period`,
-      'CTB_004',
+      'CTR_007',
     )
   }
 
@@ -945,6 +946,16 @@ export async function recordOfflineContribution(
   // Somebody who owed R500 and paid R200 would read as settled. That is what
   // (2) exists to prevent, and why the form asks.
   let contribution = await contributionRepo.findByPeriod(data.userId, data.periodMonth, data.periodYear)
+
+  // A waiver is a decision leadership made — that this member owes nothing for
+  // this month. Recording a payment against it would quietly undo that decision
+  // instead of asking anybody to revisit it, so it is refused and said plainly.
+  if (contribution?.status === 'WAIVED') {
+    throw new ContributionConflictError(
+      'That month was waived, so nothing is owed against it. If money did arrive for it, reverse the waiver first.',
+      'CTR_008',
+    )
+  }
 
   if (!contribution) {
     const mandate = await mandateRepo.findFirst({ userId: data.userId, status: 'ACTIVE' })
@@ -1037,18 +1048,73 @@ export async function recordOfflineContribution(
     ipAddress: ip,
   })
 
+  // What the period looks like now the payment is on it. Read back rather than
+  // computed here: `recalculateContributionStatus` derives amountPaid from the
+  // transaction rows, so anything worked out separately would be a second
+  // opinion about the same thing and free to disagree with it.
+  const settledState = await contributionRepo.findById(periodContribution.id)
+  const amountDue = Number(settledState?.amountDue ?? periodContribution.amountDue)
+  const amountPaid = Number(settledState?.amountPaid ?? data.amount)
+  const outstanding = subtractZAR(amountDue, amountPaid)
+  const status = settledState?.status ?? 'PARTIAL'
+
+  const period = `${MONTHS[data.periodMonth - 1] ?? data.periodMonth} ${data.periodYear}`
+
+  // Tell the member. Leadership recording money against somebody's name is a
+  // change to their financial record that they had no part in making, and the
+  // one thing worse than money going unrecorded is it being recorded silently.
+  // Best-effort: the payment is already committed, and a failed inbox write
+  // must not turn a recorded payment into an error the admin retries.
+  await createInboxMessages([data.userId], {
+    title: `R${data.amount.toFixed(2)} recorded against ${period}`,
+    body:
+      `Leadership has recorded a payment of R${data.amount.toFixed(2)} towards your ${period} contribution. ` +
+      (outstanding <= 0
+        ? 'That month is now settled in full.'
+        : `R${outstanding.toFixed(2)} is still outstanding.`) +
+      ` Reference: ${data.reference}.` +
+      ' If you do not recognise this, contact leadership.',
+    category: 'PAYMENT',
+    createdById: adminId,
+  }).catch((err) =>
+    logger.error('Inbox notify failed after an offline payment', {
+      error: err instanceof Error ? err.message : String(err),
+      userId: data.userId,
+    }),
+  )
+
   logger.info('Offline payment recorded', {
     adminId,
     memberId: data.userId,
     contributionId: periodContribution.id,
     amount: data.amount,
     period: `${data.periodYear}-${data.periodMonth}`,
+    status,
+    outstanding,
   })
 
   return {
     transactionId: transaction.id,
     contributionId: periodContribution.id,
     receiptRef: `XXM-OFF-${transaction.id.slice(-8).toUpperCase()}`,
+    period,
+    amount: data.amount,
+    amountDue,
+    amountPaid,
+    outstanding,
+    status,
+    /**
+     * True when more has now been paid against this period than was owed.
+     *
+     * Deliberately reported rather than refused. The admin path this replaces
+     * rejected anything above the outstanding balance, which is the wrong
+     * answer for the members this exists for: nobody with no mandate has a
+     * reliable `amountDue`, and turning away a deposit that is already sitting
+     * in the bank account does not un-receive the money — it just leaves it
+     * unrecorded. So it is written, and the caller is told plainly so a person
+     * can decide whether it was a mistake worth reversing.
+     */
+    overpaid: outstanding < 0,
   }
 }
 
