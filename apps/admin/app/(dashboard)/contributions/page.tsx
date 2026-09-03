@@ -1093,6 +1093,30 @@ export default async function ContributionsPage({
                               </p>
                             )}
 
+                            {/* Money that never moved.
+                                A MOCKTX- reference comes from the stand-in
+                                gateway, which answers SUCCESS to everything and
+                                contacts no bank. Production ran it for a period
+                                — `isLiveDeployment` was reading a hand-set
+                                DEPLOY_ENV that outranked the platform, so the
+                                guard meant to refuse the stand-in never fired.
+                                Any row carrying this ref is a settled payment
+                                for money that was never collected, and it has
+                                been counted in the pool and against a member's
+                                contribution. Reverse it: that leaves both the
+                                original and the correction on the record, which
+                                is what the audit trail is for. */}
+                            {typeof t.gatewayRef === 'string' && t.gatewayRef.startsWith('MOCKTX') && (
+                              <p className="mt-2 inline-flex items-start gap-1.5 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
+                                <TriangleAlert size={12} className="shrink-0 mt-px" aria-hidden />
+                                <span>
+                                  No money moved. This came from the stand-in gateway during a
+                                  misconfiguration — no bank was contacted. Reverse it so the
+                                  member&apos;s balance and the pool are correct.
+                                </span>
+                              </p>
+                            )}
+
                             {/* Neither. Every offline row written from now on
                                 carries one or the other, so this is a payment
                                 recorded before proof was required — said

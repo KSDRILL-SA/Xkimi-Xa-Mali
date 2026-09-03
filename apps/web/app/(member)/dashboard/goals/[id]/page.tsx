@@ -17,6 +17,7 @@ import { GoalPayCard } from '@/components/goal/GoalPayCard'
 import { GoalPlanCard } from '@/components/goal/GoalPlanCard'
 import { GoalHistory, type ProgressEntry } from '@/components/goal/GoalHistory'
 import { statusTheme, typeTheme, Trophy } from '@/components/goal/goal-theme'
+import { MEMBER_PAYMENTS_ENABLED } from '@/lib/payments-enabled'
 
 export const metadata: Metadata = { title: 'Goal Detail' }
 
@@ -43,7 +44,7 @@ export default async function GoalDetailPage({
   // Only offer the payment path when it can actually succeed: the kill switch
   // is on and the member has a debit order to charge. Otherwise the card would
   // invite a member into a form that fails at submit.
-  const canPay = env.ENABLE_MANUAL_PAYMENTS && goal.status === 'ACTIVE'
+  const canPay = MEMBER_PAYMENTS_ENABLED && goal.status === 'ACTIVE'
 
   const [engagement, memberHasMandate] = await Promise.all([
     getGoalEngagement(id, session.user.id, roles),

@@ -103,52 +103,110 @@ describe('choosing a payment gateway', () => {
   })
 })
 
-describe('the mock can never run in production', () => {
-  // A mock gateway in production would report every debit as collected while no
-  // money moved: contributions marked paid, a pool balance that does not exist,
-  // and the members finding out at the worst possible moment. Failing to boot is
-  // the only safe answer, and it fails on deploy rather than on debit night.
-  it('refuses to start rather than falling back quietly', async () => {
-    await expect(loadGateway({ PAYMENT_GATEWAY: 'mock', NODE_ENV: 'production' }))
-      .rejects.toThrow(/Refusing to start/)
+describe('the mock can never run on a live deployment', () => {
+  // A mock gateway serving real members reports every debit as collected while
+  // no money moves: contributions marked paid, a pool balance that does not
+  // exist, and the members finding out at the worst possible moment.
+  //
+  // This used to be a throw at module load. It is now the disabled gateway
+  // instead, and the change is not a softening — see below.
+  it('selects the disabled gateway rather than the stand-in', async () => {
+    const mod = await loadGateway({ PAYMENT_GATEWAY: 'mock', NODE_ENV: 'production' })
+
+    expect(mod.IS_MOCK_GATEWAY).toBe(false)
+    expect(mod.GATEWAY_CAN_MOVE_MONEY).toBe(false)
   })
 
-  it('says why, so whoever set it understands the risk', async () => {
-    await expect(loadGateway({ PAYMENT_GATEWAY: 'mock', NODE_ENV: 'production' }))
-      .rejects.toThrow(/moves no money|reported? uncollected debits as settled/i)
+  it('refuses every money operation, rather than answering SUCCESS', async () => {
+    // The single behaviour that matters. The stand-in returns
+    // { status: 'SUCCESS' } for any debit, which is how a R100 payment came to
+    // be written as settled with no bank contacted.
+    const mod = await loadGateway({ PAYMENT_GATEWAY: 'mock', NODE_ENV: 'production' })
+
+    await expect(
+      mod.paymentGateway.submitOnceOffDebit({} as never),
+    ).rejects.toThrow(/not available|no active payment provider/i)
   })
 
-  it('still starts normally in production without the flag', async () => {
+  it('stays up, because everything else still has members to serve', async () => {
+    // Why this is no longer a throw. Refusing to boot would take down
+    // statements, invitations, the community board and the admin console along
+    // with the payment path — for a feature deliberately not in use, since the
+    // DebiCheck application was declined and there are no credentials to be
+    // had. A gateway that is present and refuses is the honest state.
+    await expect(
+      loadGateway({ PAYMENT_GATEWAY: 'mock', NODE_ENV: 'production' }),
+    ).resolves.toBeDefined()
+  })
+
+  it('still starts normally in production with real credentials', async () => {
     const mod = await loadGateway({
       PAYMENT_GATEWAY: undefined, NODE_ENV: 'production', NETCASH_SERVICE_KEY: 'stub-key',
     })
     expect(mod.IS_MOCK_GATEWAY).toBe(false)
+    expect(mod.GATEWAY_CAN_MOVE_MONEY).toBe(true)
+  })
+})
+
+describe('a declared environment cannot outrank the platform', () => {
+  /**
+   * The defect that let it happen, and the reason it is tested here rather than
+   * only in the deployment helper.
+   *
+   * `isLiveDeployment()` read DEPLOY_ENV first and short-circuited on it, so any
+   * value other than "production" answered the question outright and VERCEL_ENV
+   * — which Vercel sets itself, and only for the deployment serving the
+   * production domain — was never read.
+   *
+   * Production ran with DEPLOY_ENV set to a non-live value. So the app believed
+   * it was not live, the guard above never fired, the stand-in was selected on
+   * the real site, and a member's R100 was recorded as a settled payment
+   * against a bank that had never been contacted.
+   *
+   * A declaration may make a deployment stricter. It must never make it looser.
+   */
+  it('treats VERCEL_ENV=production as live even when DEPLOY_ENV disagrees', async () => {
+    const mod = await loadGateway({
+      PAYMENT_GATEWAY: 'mock',
+      DEPLOY_ENV: 'staging',
+      VERCEL_ENV: 'production',
+    })
+
+    // The exact configuration that was live. Before the fix this returned the
+    // stand-in and answered SUCCESS to everything.
+    expect(mod.IS_MOCK_GATEWAY).toBe(false)
+    expect(mod.GATEWAY_CAN_MOVE_MONEY).toBe(false)
+  })
+
+  it('still lets a declaration make a preview stricter', async () => {
+    // The direction that remains allowed: claiming live on a preview, to
+    // rehearse production rules. Only loosening is refused.
+    const mod = await loadGateway({
+      PAYMENT_GATEWAY: 'mock',
+      DEPLOY_ENV: 'production',
+      VERCEL_ENV: 'preview',
+    })
+
+    expect(mod.IS_MOCK_GATEWAY).toBe(false)
+  })
+
+  it('leaves genuine preview and development deployments alone', async () => {
+    for (const vercelEnv of ['preview', 'development']) {
+      const mod = await loadGateway({ PAYMENT_GATEWAY: 'mock', VERCEL_ENV: vercelEnv })
+      expect(mod.IS_MOCK_GATEWAY, `VERCEL_ENV=${vercelEnv}`).toBe(true)
+    }
   })
 })
 
 describe('the real gateway can never be selected with no service key', () => {
-  // Real gap found while auditing this for go-live readiness (production-
-  // readiness tracker, document 1 §18/§20): `lib/env.ts` only requires
-  // NETCASH_SERVICE_KEY when `isLiveDeployment()` is true — but this project's
-  // own production deployment runs with DEPLOY_ENV=staging (deliberately, for
-  // other reasons), which makes `isLiveDeployment()` false even though it is
-  // genuinely serving real traffic. Before this fix, that combination meant
-  // the real gateway could be selected with nothing configured at all, and
-  // the first failure would be a throw deep inside `lib/netcash.ts` on an
-  // actual debit submission attempt — not caught at boot, on debit night.
+  // Found while auditing for go-live readiness: `lib/env.ts` only requires
+  // NETCASH_SERVICE_KEY when `isLiveDeployment()` is true, so a deployment that
+  // did not believe it was live could select the real gateway with nothing
+  // configured — and the first failure would be a throw deep inside
+  // `lib/netcash.ts` on an actual debit submission, on debit night.
   it('refuses to start rather than selecting a gateway it cannot use', async () => {
     await expect(
       loadGateway({ PAYMENT_GATEWAY: undefined, NODE_ENV: 'development', NETCASH_SERVICE_KEY: undefined }),
-    ).rejects.toThrow(/NETCASH_SERVICE_KEY/)
-  })
-
-  it('refuses even when the deployment is not flagged live', async () => {
-    // The exact gap: DEPLOY_ENV=staging, PAYMENT_GATEWAY left at its default
-    // (real gateway), no credentials — the state that must never boot clean.
-    await expect(
-      loadGateway({
-        PAYMENT_GATEWAY: undefined, DEPLOY_ENV: 'staging', NETCASH_SERVICE_KEY: undefined,
-      }),
     ).rejects.toThrow(/NETCASH_SERVICE_KEY/)
   })
 
@@ -156,6 +214,19 @@ describe('the real gateway can never be selected with no service key', () => {
     await expect(
       loadGateway({ PAYMENT_GATEWAY: undefined, NODE_ENV: 'development', NETCASH_SERVICE_KEY: undefined }),
     ).rejects.toThrow(/every debit submission would throw|PAYMENT_GATEWAY=mock/)
+  })
+
+  it('disables payments rather than throwing when the deployment is live', async () => {
+    // Same misconfiguration, different answer, and deliberately so. On a
+    // developer's machine a throw is the fastest way to hear about it; on the
+    // live site it would take down every other feature for a payment path that
+    // was never going to work anyway.
+    const mod = await loadGateway({
+      PAYMENT_GATEWAY: undefined, VERCEL_ENV: 'production', NETCASH_SERVICE_KEY: undefined,
+    })
+
+    expect(mod.GATEWAY_CAN_MOVE_MONEY).toBe(false)
+    await expect(mod.paymentGateway.submitOnceOffDebit({} as never)).rejects.toThrow()
   })
 
   it('does not affect the mock gateway, which needs no credentials', async () => {
