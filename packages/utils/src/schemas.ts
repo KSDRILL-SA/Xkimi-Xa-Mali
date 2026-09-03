@@ -1,6 +1,9 @@
 import { z } from 'zod'
 import { isValidSAId } from './sa-id'
-import { MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR } from './constants'
+import {
+  MIN_CONTRIBUTION_ZAR, MAX_CONTRIBUTION_ZAR,
+  TRANSACTION_TYPES, TRANSACTION_STATUSES,
+} from './constants'
 import { refusePeriod, PERIOD_REFUSAL_MESSAGE } from './contribution-period'
 import { isValidBankName, isValidAccountNumberFormat, isValidBranchCode } from './banks'
 
@@ -256,9 +259,49 @@ export const OfflineContributionSchema = z.object({
     .max(120, 'Reference cannot exceed 120 characters'),
   /** Optional context — "paid in cash at the August meeting", etc. */
   note: z.string().trim().max(500, 'Note cannot exceed 500 characters').optional(),
+  /**
+   * The stored proof of payment — a blob pathname, or a `data:` URL in local
+   * development. Never the bytes: the file is read and stored by the console,
+   * which owns the upload adapter, and only the reference crosses to this app.
+   *
+   * Members already send proof of payment to the WhatsApp group. Attaching it
+   * here is what turns an offline row from one admin's assertion into something
+   * a third person can check against the bank a year later.
+   */
+  proofUrl: z.string().trim().min(1).max(1024).optional(),
+  /**
+   * Who counted the money, when there is no document to attach.
+   *
+   * Cash handed over at a meeting has no proof of payment. A hard file
+   * requirement would mean either the money goes unrecorded — the exact failure
+   * the offline path exists to prevent — or somebody attaches something
+   * irrelevant to get past the gate. So the absence is recorded instead, and
+   * named: a row evidenced by attestation is visibly different from one
+   * evidenced by a document, and from one evidenced by nothing.
+   *
+   * Long enough to want two names in it. That is the point — one person's
+   * unwitnessed word about cash is what this is trying not to be.
+   */
+  proofWitness: z
+    .string()
+    .trim()
+    .min(10, 'Say who counted the money and where — one name is not a witness')
+    .max(300, 'Witness note cannot exceed 300 characters')
+    .optional(),
 }).refine(
   (v) => refusePeriod({ month: v.periodMonth, year: v.periodYear }) === null,
   { message: PERIOD_REFUSAL_MESSAGE.OUTSIDE_WINDOW, path: ['periodYear'] },
+).refine(
+  // Exactly one. Neither means an unevidenced claim about money, which is the
+  // thing this whole field exists to stop. Both means the witness note is
+  // decoration on a row that already has a document, and a later reader cannot
+  // tell which one the payment actually rests on.
+  (v) => (v.proofUrl ? 1 : 0) + (v.proofWitness ? 1 : 0) === 1,
+  {
+    message:
+      'Attach the proof of payment, or say who counted the cash — one or the other, not both and not neither',
+    path: ['proofUrl'],
+  },
 )
 
 export const GenerateContributionsSchema = z.object({
@@ -464,8 +507,12 @@ export const AdminReportRequestSchema = z.object({
 })
 
 export const TransactionFilterSchema = z.object({
-  status: z.enum(['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED']).optional(),
-  type:   z.enum(['DEBIT_ORDER', 'MANUAL', 'REVERSAL', 'SCHEDULED']).optional(),
+  // From the shared lists, not written out again here. This schema is where the
+  // omission bit hardest: `?type=OFFLINE` was refused as invalid rather than
+  // ignored, so the API could not return the one payment kind these members
+  // have. See TRANSACTION_TYPES in ./constants.
+  status: z.enum(TRANSACTION_STATUSES).optional(),
+  type:   z.enum(TRANSACTION_TYPES).optional(),
   from:   z.string().date().optional(),
   to:     z.string().date().optional(),
   page:   z.number().int().min(1).default(1),

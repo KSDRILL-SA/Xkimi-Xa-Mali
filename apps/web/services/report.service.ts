@@ -39,6 +39,9 @@ type TxRow = {
   gatewayRef: string | null
   idempotencyKey: string
   reversalReason: string | null
+  offlineReference: string | null
+  proofUrl: string | null
+  proofWitness: string | null
   processedAt: Date | null
   createdAt: Date
   contribution: {
@@ -49,9 +52,16 @@ type TxRow = {
   }
 }
 
-/** The only statuses and types a filter may name. Anything else is dropped. */
-const TRANSACTION_STATUSES = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED'] as const
-const TRANSACTION_TYPES = ['DEBIT_ORDER', 'MANUAL', 'OFFLINE', 'REVERSAL', 'SCHEDULED'] as const
+/**
+ * The only statuses and types a filter may name. Anything else is dropped.
+ *
+ * Imported rather than restated. This list was a hand-kept copy, and when
+ * OFFLINE was added to the Prisma enum this copy went stale — with the quietest
+ * possible failure, because an unrecognised filter here is silently ignored and
+ * the query returns every type instead of refusing. See ./constants in
+ * @xxm/utils for the rest of that story.
+ */
+import { TRANSACTION_TYPES, TRANSACTION_STATUSES } from '@xxm/utils'
 type TxStatusName = (typeof TRANSACTION_STATUSES)[number]
 type TxTypeName = (typeof TRANSACTION_TYPES)[number]
 
@@ -145,6 +155,18 @@ export async function getTransactionHistory(
       // Null on everything that is not a reversing entry, and on reversals
       // written before a reason was required.
       reversalReason: t.reversalReason ?? null,
+      // How an OFFLINE payment is evidenced, so the member can check what
+      // leadership recorded against their name. Exactly one is set on a new
+      // offline row; both are null on gateway transactions, which evidence
+      // themselves through gatewayRef, and on rows written before proof was
+      // required.
+      //
+      // `proofUrl` is a blob pathname, not a link — it is only openable through
+      // /api/media/proof, which re-checks that the transaction behind it sits
+      // on this member's own contribution.
+      offlineReference: t.offlineReference ?? null,
+      proofUrl: t.proofUrl ?? null,
+      proofWitness: t.proofWitness ?? null,
       period: periodLabel(t.contribution.periodMonth, t.contribution.periodYear),
       processedAt: t.processedAt?.toISOString() ?? null,
       createdAt: t.createdAt.toISOString(),

@@ -39,6 +39,29 @@ function sourceFiles(dir: string): string[] {
 
 const CALL = /internalAdmin(?:Post|Request)\s*(?:<[^>]*>)?\s*\(/g
 
+/**
+ * The whole argument list of a call, found by matching its parentheses.
+ *
+ * This used to take a fixed 700 characters from the call and search that. It
+ * was a silent trap: `adminUserId` is the LAST argument, so a call whose body
+ * grew past the window failed while being perfectly correct — the test
+ * reporting a defect in code that has none, which costs more trust than no
+ * test at all. `admin-action-ip.test.ts` already scans by parenthesis for
+ * exactly this reason; this is that.
+ */
+function callArgs(src: string, openParen: number): string {
+  let depth = 0
+  for (let i = openParen; i < src.length; i++) {
+    if (src[i] === '(') depth++
+    else if (src[i] === ')') {
+      depth--
+      if (depth === 0) return src.slice(openParen, i + 1)
+    }
+  }
+  // Unbalanced means the file does not parse; let the real compiler say so.
+  return src.slice(openParen)
+}
+
 type Site = { rel: string; line: number; window: string }
 
 const SITES: Site[] = ROOTS.flatMap(sourceFiles)
@@ -51,9 +74,8 @@ const SITES: Site[] = ROOTS.flatMap(sourceFiles)
       found.push({
         rel: path.relative(path.resolve(__dirname, '..'), file).replace(/\\/g, '/'),
         line: src.slice(0, m.index).split('\n').length,
-        // Generous window: these calls span several lines and the options object
-        // is the last argument.
-        window: src.slice(m.index, m.index + 700),
+        // The exact call, however long it is.
+        window: callArgs(src, (m.index ?? 0) + m[0].length - 1),
       })
     }
     return found

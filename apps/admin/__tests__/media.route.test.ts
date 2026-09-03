@@ -29,6 +29,7 @@ const auth = vi.fn()
 const blobGet = vi.fn()
 const findSignature = vi.fn()
 const findGoal = vi.fn()
+const findProof = vi.fn()
 
 async function loadRoute() {
   vi.resetModules()
@@ -38,6 +39,9 @@ async function loadRoute() {
     db: {
       adminSignature: { findFirst: findSignature },
       goal: { findFirst: findGoal },
+      // The third kind of private object this route serves: the proof of
+      // payment on an offline contribution.
+      transaction: { findFirst: findProof },
     },
   }))
   const { GET } = await import('@/app/api/media/route')
@@ -62,6 +66,7 @@ beforeEach(() => {
   auth.mockResolvedValue(ADMIN)
   findSignature.mockResolvedValue(null)
   findGoal.mockResolvedValue(null)
+  findProof.mockResolvedValue(null)
   blobGet.mockResolvedValue(ok200())
 })
 
@@ -200,5 +205,39 @@ describe('how the bytes come back', () => {
 
     expect(res.status).toBe(502)
     expect(await res.text()).not.toContain('TOKEN')
+  })
+})
+
+describe('a proof of payment', () => {
+  it('is served when a transaction row claims it', async () => {
+    // The third kind of object here, and the one that carries somebody's bank
+    // account number. Admins may open every member's, because reconciling them
+    // against the bank statement is the job — the member's own narrower view of
+    // the same file is a separate route in the member app.
+    findProof.mockResolvedValue({ id: 'tx-1' })
+    blobGet.mockResolvedValue(ok200())
+
+    const GET = await loadRoute()
+    auth.mockResolvedValue(ADMIN)
+
+    const res = await GET(req('payment-proofs/proof-abc.pdf'))
+
+    expect(res.status).toBe(200)
+    expect(findProof).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { proofUrl: 'payment-proofs/proof-abc.pdf' } }),
+    )
+  })
+
+  it('is refused when no row claims it, like every other reference', async () => {
+    // The rule that keeps an admin session from being a way to read the whole
+    // blob store, including objects belonging to features that have nothing to
+    // do with this console.
+    const GET = await loadRoute()
+    auth.mockResolvedValue(ADMIN)
+
+    const res = await GET(req('payment-proofs/never-recorded.pdf'))
+
+    expect(res.status).toBe(404)
+    expect(blobGet).not.toHaveBeenCalled()
   })
 })
