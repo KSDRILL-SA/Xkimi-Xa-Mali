@@ -100,3 +100,30 @@ export const STATUS_STYLES = {
     FAILED:   { label: 'Failed',   className: 'xxm-status-danger'  },
   },
 } as const
+
+/**
+ * Every transaction type, and every status, in one place.
+ *
+ * These used to be written out by hand in four: this file's filter schema, the
+ * report service's filter allowlist, the member transactions page's pill list,
+ * and the admin console. Adding `OFFLINE` to the Prisma enum meant finding all
+ * four, and three of them were missed — each failing quietly in its own way.
+ * The report service silently dropped an unrecognised filter and returned every
+ * type instead of one; the filter schema rejected `?type=OFFLINE` outright with
+ * a validation error; the page's pill list simply never offered it. So the one
+ * payment kind these members actually have was the one kind nobody could filter
+ * for, on the screen built to show it to them.
+ *
+ * Not derived from the Prisma enum, deliberately: this barrel is reachable from
+ * client components and `@prisma/client` is not. It is a hand-kept mirror of one
+ * enum — but one mirror instead of four, and the type below makes a consumer
+ * that disagrees a compile error rather than a silent wrong answer.
+ *
+ * Keep in step with `TransactionType` and `TransactionStatus` in
+ * packages/database/prisma/schema.prisma.
+ */
+export const TRANSACTION_TYPES = ['DEBIT_ORDER', 'MANUAL', 'OFFLINE', 'REVERSAL', 'SCHEDULED'] as const
+export type TransactionTypeName = (typeof TRANSACTION_TYPES)[number]
+
+export const TRANSACTION_STATUSES = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED'] as const
+export type TransactionStatusName = (typeof TRANSACTION_STATUSES)[number]

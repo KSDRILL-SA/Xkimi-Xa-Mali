@@ -9,10 +9,11 @@ import {
 } from '@/lib/services'
 import { formatZAR, MONTHS } from '@xxm/utils'
 import { Alert, Reveal, RouterPagination } from '@xxm/ui'
-import { Wallet, ChevronDown, Zap, Undo2, HandCoins, CircleSlash, Banknote, TriangleAlert } from 'lucide-react'
+import { Wallet, ChevronDown, Zap, Undo2, HandCoins, CircleSlash, Banknote, TriangleAlert, FileText } from 'lucide-react'
 import { requireAdmin } from '@/lib/admin-action'
 import { internalAdminPost } from '@/lib/api'
 import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
+import { storePaymentProof, PaymentProofError, PROOF_ACCEPT, PROOF_FORMATS } from '@/lib/payment-proof-storage'
 
 export const metadata: Metadata = { title: 'Contributions' }
 
@@ -44,6 +45,7 @@ type TxRow = {
   type: string; status: string; gatewayRef: string | null
   reversalReason: string | null; createdAt: Date
   offlineReference: string | null; processedAt: Date | null
+  proofUrl: string | null; proofWitness: string | null
   reversal: { id: string } | null
 }
 
@@ -70,6 +72,59 @@ const TX_STATUS_BADGE: Record<string, string> = {
  * and a server action closing over a function would ask Next to serialise
  * something it cannot.
  */
+/**
+ * Turn what the form submitted into the one piece of evidence the payment rests
+ * on: a stored document, or a note naming who counted the cash.
+ *
+ * Both forms on this page go through here, because "what counts as evidence" is
+ * exactly the rule that must not be stated twice. The file is read and stored
+ * on this side rather than forwarded — the console owns the upload adapter, and
+ * streaming a member's bank document through a second app to be stored there
+ * would put it in one more place for no gain.
+ *
+ * Returns a message instead of throwing: every refusal here is a person filling
+ * in a form incorrectly, and the caller puts it back on their screen.
+ */
+async function resolveEvidence(
+  fd: FormData,
+): Promise<{ evidence: { proofUrl?: string; proofWitness?: string } } | { error: string }> {
+  const isCash = fd.get('noProof') === 'on'
+  const witness = String(fd.get('proofWitness') ?? '').trim()
+  const file = fd.get('proof')
+  const hasFile = file instanceof File && file.size > 0
+
+  if (isCash) {
+    // Refused rather than quietly preferring one. An admin who ticked the box
+    // and also attached something has contradicted themselves, and guessing
+    // which they meant would record a claim neither of them made.
+    if (hasFile) {
+      return { error: 'You attached a file and also said there is no proof of payment. Do one or the other.' }
+    }
+    if (witness.length < 10) {
+      return { error: 'Say who counted the cash and where — one name is not a witness.' }
+    }
+    return { evidence: { proofWitness: witness } }
+  }
+
+  if (!hasFile) {
+    return { error: `Attach the proof of payment (${PROOF_FORMATS}), or tick "cash — no proof of payment".` }
+  }
+
+  try {
+    const stored = await storePaymentProof({
+      buffer: Buffer.from(await file.arrayBuffer()),
+      contentType: file.type,
+      filename: file.name,
+    })
+    return { evidence: { proofUrl: stored.pathname } }
+  } catch (err) {
+    // The storage layer's message names the actual problem — wrong format, too
+    // large, empty file — and is written for this reader.
+    if (err instanceof PaymentProofError) return { error: err.message }
+    throw err
+  }
+}
+
 function recordedParams(res: {
   amount: number; period: string; outstanding: number; overpaid: boolean; memberName: string
 }) {
@@ -213,8 +268,11 @@ export default async function ContributionsPage({
       redirect(back('&actionError=That+is+not+a+date'))
     }
 
+    const resolved = await resolveEvidence(fd)
+    if ('error' in resolved) redirect(back(`&actionError=${encodeURIComponent(resolved.error)}`))
+
     try {
-      const res = await recordPayment(userId, r, id, amount, ref, ip, receivedAt)
+      const res = await recordPayment(userId, r, id, amount, ref, ip, receivedAt, resolved.evidence)
       redirect(back(recordedParams(res)))
     } catch (err) {
       if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
@@ -266,6 +324,12 @@ export default async function ContributionsPage({
     const receivedAt = dateIn ? new Date(`${dateIn}T12:00:00`) : new Date()
     if (Number.isNaN(receivedAt.getTime())) redirect(stay('&actionError=That+is+not+a+date'))
 
+    // Before the money is written, not after. A payment recorded and then found
+    // to have an unreadable attachment would need reversing, and the file is
+    // the cheap thing to check first.
+    const resolved = await resolveEvidence(fd)
+    if ('error' in resolved) redirect(stay(`&actionError=${encodeURIComponent(resolved.error)}`))
+
     try {
       const res = await recordOfflinePaymentForMember({
         adminId: userId, adminRoles: r,
@@ -280,6 +344,7 @@ export default async function ContributionsPage({
         // be a stated obligation of nothing.
         ...(dueRaw ? { amountDue: Number(dueRaw) } : {}),
         ...(note ? { note } : {}),
+        ...resolved.evidence,
         ip,
       })
       redirect(back(recordedParams(res)))
@@ -331,6 +396,14 @@ export default async function ContributionsPage({
     'w-full rounded-xl border border-xxm-gray-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-xxm-green/25'
   const labelCls =
     'block text-[10px] font-bold text-xxm-gray-400 uppercase tracking-widest mb-1'
+  // The native control, restyled. A file input cannot be replaced without
+  // JavaScript, and this page is deliberately server-rendered forms — so the
+  // button half is styled through ::file-selector-button and left working.
+  const fileCls =
+    'w-full rounded-xl border border-dashed border-xxm-gray-300 px-3 py-2 text-sm bg-white ' +
+    'file:mr-3 file:rounded-lg file:border-0 file:bg-xxm-green-50 file:px-3 file:py-1.5 ' +
+    'file:text-xs file:font-semibold file:text-xxm-green-800 hover:file:bg-xxm-green-100 ' +
+    'file:cursor-pointer focus:outline-none focus:ring-2 focus:ring-xxm-green/25'
 
   return (
     <div className="space-y-6">
@@ -481,7 +554,14 @@ export default async function ContributionsPage({
           month and the payment together.
       */}
       <Reveal variant="up" delay={150}>
-        <details className="group bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden">
+        {/* Stays open when the last attempt was refused. Otherwise the panel
+            collapses on the redirect and the error banner above it is left
+            explaining a form nobody can see — which reads as the page having
+            simply lost the payment. */}
+        <details
+          open={Boolean(params.actionError)}
+          className="group bg-white rounded-3xl border border-xxm-green/8 shadow-xxm overflow-hidden"
+        >
           <summary className="flex items-center gap-3 px-5 py-4 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-xxm-green-50/40 transition-colors">
             <span className="w-9 h-9 rounded-2xl bg-xxm-gold/15 flex items-center justify-center shrink-0">
               <Banknote size={16} className="text-xxm-gold-dark" aria-hidden />
@@ -604,10 +684,56 @@ export default async function ContributionsPage({
               />
             </label>
 
+            {/* ── What the payment rests on ─────────────────────────────
+                Required, because an offline row is otherwise one person's
+                claim that money arrived and nothing lets anybody else check
+                it. Members already send these to the WhatsApp group; this is
+                where the file goes.
+
+                The cash escape is not a loophole, it is the honest case:
+                money handed over at a meeting has no proof of payment, and a
+                hard requirement would mean either the cash goes unrecorded —
+                the exact failure this page exists to prevent — or somebody
+                attaches something irrelevant to get past the gate. Naming who
+                counted it makes the absence itself a record.
+            */}
+            <fieldset className="rounded-2xl border border-xxm-gray-200 bg-xxm-gray-50/60 p-4 space-y-3">
+              <legend className="px-1.5 text-[10px] font-bold text-xxm-gray-500 uppercase tracking-widest">
+                Proof of payment
+              </legend>
+
+              <label className="block">
+                <span className="sr-only">Proof of payment file</span>
+                <input type="file" name="proof" accept={PROOF_ACCEPT} className={fileCls} />
+                <span className="block text-[11px] text-xxm-gray-400 mt-1.5">
+                  {PROOF_FORMATS}, up to 4&nbsp;MB — the bank&apos;s proof of payment, a screenshot, or a photo of the deposit slip.
+                </span>
+              </label>
+
+              <div className="border-t border-xxm-gray-200 pt-3 space-y-2">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox" name="noProof"
+                    className="mt-0.5 w-4 h-4 rounded border-xxm-gray-300 text-xxm-green focus:ring-2 focus:ring-xxm-green/25 cursor-pointer shrink-0"
+                  />
+                  <span className="text-xs text-xxm-gray-600 leading-relaxed">
+                    <span className="font-semibold text-xxm-gray-700">Cash — there is no proof of payment.</span>{' '}
+                    Tick this only for money handed over in person, then say who counted it.
+                  </span>
+                </label>
+                <input
+                  name="proofWitness" maxLength={300}
+                  placeholder="e.g. Counted by Kurhula and Thandi at the August meeting"
+                  aria-label="Who counted the cash"
+                  className={inputCls}
+                />
+              </div>
+            </fieldset>
+
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
               <ConfirmSubmitButton
                 title="Record this payment?"
-                message="This writes money onto the member's record and tells them it arrived. Only do this once you have seen it on the bank statement or taken the cash. It can be reversed afterwards, but not deleted."
+                message="This writes money onto the member's record, stores the proof of payment against it, and tells them it arrived. Only do this once you have seen it on the bank statement or taken the cash. It can be reversed afterwards, but not deleted."
                 confirmLabel="Record it"
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-xxm-green text-white text-sm font-bold hover:bg-xxm-canopy transition-colors shrink-0"
               >
@@ -742,9 +868,33 @@ export default async function ContributionsPage({
                           aria-label={`Date the payment from ${fullName} arrived`}
                           className="w-full rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm text-xxm-gray-600 focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
                         />
+                        {/* The same requirement as the fuller form above, and
+                            deliberately not a lighter one: a payment recorded
+                            from this row is the same claim about the same
+                            money. */}
+                        <input
+                          type="file" name="proof" accept={PROOF_ACCEPT}
+                          aria-label={`Proof of the payment from ${fullName}`}
+                          className="w-full rounded-lg border border-dashed border-xxm-gray-300 px-2.5 py-1.5 text-xs bg-white file:mr-2 file:rounded file:border-0 file:bg-xxm-green-50 file:px-2 file:py-1 file:text-[11px] file:font-semibold file:text-xxm-green-800 file:cursor-pointer hover:file:bg-xxm-green-100 focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                        />
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox" name="noProof"
+                            className="mt-0.5 w-3.5 h-3.5 rounded border-xxm-gray-300 text-xxm-green focus:ring-2 focus:ring-xxm-green/25 cursor-pointer shrink-0"
+                          />
+                          <span className="text-[11px] text-xxm-gray-500 leading-snug">
+                            Cash — no proof of payment. Say who counted it:
+                          </span>
+                        </label>
+                        <input
+                          name="proofWitness" maxLength={300}
+                          placeholder="Counted by … at the … meeting"
+                          aria-label={`Who counted the cash from ${fullName}`}
+                          className="w-full rounded-lg border border-xxm-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-xxm-green/25"
+                        />
                         <ConfirmSubmitButton
                           title="Record this payment?"
-                          message={`This adds money to ${fullName}'s ${MONTHS[c.periodMonth - 1]} ${c.periodYear} contribution and tells them it arrived. ${formatZAR(Number(c.amountDue) - Number(c.amountPaid))} is outstanding; anything more than that is still recorded and you will be told. Only do this once the money is actually in the account.`}
+                          message={`This adds money to ${fullName}'s ${MONTHS[c.periodMonth - 1]} ${c.periodYear} contribution, stores the proof against it, and tells them it arrived. ${formatZAR(Number(c.amountDue) - Number(c.amountPaid))} is outstanding; anything more than that is still recorded and you will be told. Only do this once the money is actually in the account.`}
                           confirmLabel="Record it"
                           className="px-3 py-1.5 rounded-lg bg-xxm-green text-white text-xs font-semibold hover:bg-xxm-canopy transition-colors"
                         >
@@ -817,6 +967,45 @@ export default async function ContributionsPage({
                                 {new Date(t.processedAt ?? t.createdAt).toLocaleDateString('en-ZA')}
                               </span>
                             </div>
+
+                            {/* What this payment rests on. An admin opening it
+                                is the reconciliation step — matching the
+                                document against the bank statement — so it is
+                                one click from the row rather than somewhere
+                                else. Served through /api/media, which refuses
+                                any reference no row claims. */}
+                            {t.proofUrl && (
+                              <p className="mt-2">
+                                <a
+                                  href={`/api/media?ref=${encodeURIComponent(t.proofUrl)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-xxm-green hover:text-xxm-canopy underline underline-offset-2"
+                                >
+                                  <FileText size={11} aria-hidden />
+                                  View proof of payment
+                                </a>
+                              </p>
+                            )}
+
+                            {t.proofWitness && (
+                              <p className="mt-2 text-[11px] text-xxm-gray-500">
+                                <span className="font-semibold text-xxm-gray-600">Cash, counted by: </span>
+                                {t.proofWitness}
+                              </p>
+                            )}
+
+                            {/* Neither. Every offline row written from now on
+                                carries one or the other, so this is a payment
+                                recorded before proof was required — said
+                                plainly rather than left as a blank somebody
+                                could read as "document not loaded". */}
+                            {t.type === 'OFFLINE' && !t.proofUrl && !t.proofWitness && (
+                              <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-amber-700">
+                                <TriangleAlert size={11} aria-hidden />
+                                Recorded before proof of payment was required — no evidence attached.
+                              </p>
+                            )}
 
                             {t.reversalReason && (
                               <p className="mt-2 text-[11px] text-xxm-gray-500">

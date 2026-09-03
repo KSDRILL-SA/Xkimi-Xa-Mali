@@ -1003,6 +1003,13 @@ export async function recordOfflineContribution(
         idempotencyKey,
         offlineReference: data.reference,
         recordedById: adminId,
+        // Exactly one of these, guaranteed by the schema. A document where
+        // there is one; otherwise a note naming who counted the cash. Stored
+        // side by side rather than collapsed into one column, so a later reader
+        // can tell at a glance whether the money is evidenced by the bank or by
+        // two people's word — those are not the same claim.
+        proofUrl: data.proofUrl ?? null,
+        proofWitness: data.proofWitness ?? null,
         processedAt: data.receivedAt,
       },
       tx,
@@ -1044,6 +1051,11 @@ export async function recordOfflineContribution(
       reference: data.reference,
       receivedAt: data.receivedAt.toISOString(),
       note: data.note ?? null,
+      // Which kind of evidence, never the reference itself. The audit log is
+      // read by people who are not entitled to open the document, and a
+      // pathname in it would be a way to ask for one.
+      evidence: data.proofUrl ? 'DOCUMENT' : 'WITNESSED',
+      witness: data.proofWitness ?? null,
     } as Prisma.InputJsonValue,
     ipAddress: ip,
   })

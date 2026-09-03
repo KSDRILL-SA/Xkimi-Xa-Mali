@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/session'
 import { formatZAR, formatDate } from '@/lib/formatters'
+import { TRANSACTION_TYPES, TRANSACTION_STATUSES } from '@xxm/utils'
 import { RouterPagination } from '@/components/ui/RouterPagination'
 import { Reveal } from '@xxm/ui'
 import { FileText, ArrowUpCircle } from 'lucide-react'
@@ -13,8 +14,11 @@ export const metadata: Metadata = { title: 'Transactions' }
 
 const PAGE_SIZE = 25
 
-type TxStatus = 'PENDING' | 'PROCESSING' | 'SUCCESS' | 'FAILED' | 'REVERSED'
-type TxType   = 'DEBIT_ORDER' | 'MANUAL' | 'REVERSAL' | 'SCHEDULED'
+// From the shared lists. Written out by hand, this page silently stopped
+// offering a filter for OFFLINE the moment that type existed — and the record
+// of these members' only payment kind was the thing it failed to show.
+type TxStatus = (typeof TRANSACTION_STATUSES)[number]
+type TxType   = (typeof TRANSACTION_TYPES)[number]
 
 const STATUS_CONFIG: Record<TxStatus, { label: string; dot: string; badge: string }> = {
   PENDING:    { label: 'Pending',    dot: 'bg-amber-500',     badge: 'bg-amber-100 text-amber-700'           },
@@ -27,6 +31,11 @@ const STATUS_CONFIG: Record<TxStatus, { label: string; dot: string; badge: strin
 const TYPE_LABELS: Record<TxType, string> = {
   DEBIT_ORDER: 'Debit Order',
   MANUAL:      'Manual',
+  // In the member's words, not the schema's. OFFLINE is what the ledger calls
+  // a payment that never touched the gateway; what happened from where they
+  // are standing is that they paid by EFT or in cash and leadership wrote it
+  // down.
+  OFFLINE:     'Cash / EFT',
   REVERSAL:    'Reversal',
   SCHEDULED:   'Scheduled',
 }
@@ -48,8 +57,8 @@ export default async function TransactionsPage({
   const page = Number.isFinite(requestedPage) ? Math.max(1, Math.floor(requestedPage)) : 1
   const skip = (page - 1) * PAGE_SIZE
 
-  const validStatuses: TxStatus[] = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'REVERSED']
-  const validTypes: TxType[]       = ['DEBIT_ORDER', 'MANUAL', 'REVERSAL', 'SCHEDULED']
+  const validStatuses: readonly TxStatus[] = TRANSACTION_STATUSES
+  const validTypes: readonly TxType[]       = TRANSACTION_TYPES
 
   const statusFilter = params.status && validStatuses.includes(params.status as TxStatus) ? (params.status as TxStatus) : undefined
   const typeFilter   = params.type   && validTypes.includes(params.type as TxType)         ? (params.type   as TxType)   : undefined
@@ -158,16 +167,50 @@ export default async function TransactionsPage({
                     {sc.label}
                   </span>
                   <span className="font-mono text-[11px] text-xxm-gray-400 hidden sm:block truncate">
-                    {tx.gatewayRef ?? '—'}
+                    {tx.offlineReference ?? tx.gatewayRef ?? '—'}
                   </span>
                   <span className="text-xs text-xxm-gray-400 hidden sm:block text-right">
-                    {formatDate(tx.createdAt)}
+                    {formatDate(tx.processedAt ?? tx.createdAt)}
                   </span>
                   {/* The stated reason for a reversing entry. Shown to the
                       member because a correction they cannot read the cause of
                       is not the honest history the Foundation promises — and
                       this is the screen they actually look at. Spans the full
                       row so a long reason wraps rather than truncating. */}
+                  {/* What a payment leadership recorded actually rests on.
+                      This is the member's own document — they sent it — and
+                      being able to open it is how they check the right amount
+                      landed on the right month. The commonest real error here
+                      is a payment recorded against the wrong period, and they
+                      are the person best placed to notice.
+
+                      A plain link, not an embed: the file may be a multi-page
+                      PDF, and /api/media/proof re-checks ownership on the way
+                      through rather than trusting this href. */}
+                  {tx.proofUrl && (
+                    <p className="w-full sm:col-span-6 text-xs sm:pl-[38px] sm:-mt-1">
+                      <a
+                        href={`/api/media/proof?ref=${encodeURIComponent(tx.proofUrl)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 font-semibold text-xxm-green hover:text-xxm-canopy underline underline-offset-2"
+                      >
+                        <FileText size={12} aria-hidden />
+                        View proof of payment
+                      </a>
+                    </p>
+                  )}
+
+                  {/* Cash, where there is no document. Naming who counted it is
+                      what the member is owed instead — and if those names are
+                      wrong, this is where they find out. */}
+                  {tx.proofWitness && (
+                    <p className="w-full sm:col-span-6 text-xs text-xxm-gray-500 sm:pl-[38px] sm:-mt-1">
+                      <span className="font-semibold text-xxm-gray-600">Cash, counted by: </span>
+                      {tx.proofWitness}
+                    </p>
+                  )}
+
                   {tx.reversalReason && (
                     <p className="w-full sm:col-span-6 text-xs text-xxm-gray-500 sm:pl-[38px] sm:-mt-1">
                       <span className="font-semibold text-xxm-gray-600">Reason for reversal: </span>

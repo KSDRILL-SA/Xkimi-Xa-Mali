@@ -126,6 +126,10 @@ export async function listTransactionsForContributions(
       // months of payments on the afternoon they were captured, which is the
       // precise misreading this whole path exists to avoid.
       offlineReference: true, processedAt: true,
+      // The evidence, so the row can offer it. proofUrl is a blob pathname,
+      // never a link — /api/media is what turns it into bytes, and only after
+      // checking a row claims it.
+      proofUrl: true, proofWitness: true,
       reversal: { select: { id: true } },
     },
   })
@@ -368,6 +372,11 @@ export async function recordPayment(
    * fuller form on the contributions page asks, this shorthand does not.
    */
   receivedAt?: Date,
+  /**
+   * How the payment is evidenced: a stored proof of payment, or a note naming
+   * who counted the cash. Exactly one, refused by the web schema otherwise.
+   */
+  evidence?: { proofUrl?: string; proofWitness?: string },
 ) {
   assertAdmin(adminRoles)
 
@@ -386,6 +395,8 @@ export async function recordPayment(
     periodYear: c.periodYear,
     reference: reference ?? '',
     receivedAt: receivedAt ?? new Date(),
+    ...(evidence?.proofUrl ? { proofUrl: evidence.proofUrl } : {}),
+    ...(evidence?.proofWitness ? { proofWitness: evidence.proofWitness } : {}),
     ip,
   })
 }
@@ -418,6 +429,15 @@ export async function recordOfflinePaymentForMember(input: {
   /** What the member owed, when no mandate establishes it. */
   amountDue?: number
   note?: string
+  /**
+   * The stored proof of payment, as a blob pathname. Exactly one of this and
+   * `proofWitness` is required — the web schema refuses the request otherwise.
+   * The file itself never travels: it is read and stored on this side, which
+   * owns the upload adapter, and only the reference crosses.
+   */
+  proofUrl?: string
+  /** Who counted the money, when cash means there is no document. */
+  proofWitness?: string
   ip?: string
 }) {
   assertAdmin(input.adminRoles)
@@ -453,6 +473,8 @@ export async function recordOfflinePaymentForMember(input: {
     reference: input.reference,
     ...(input.amountDue !== undefined ? { amountDue: input.amountDue } : {}),
     ...(input.note ? { note: input.note } : {}),
+    ...(input.proofUrl ? { proofUrl: input.proofUrl } : {}),
+    ...(input.proofWitness ? { proofWitness: input.proofWitness } : {}),
   }, { adminUserId: input.adminId, adminIp: input.ip })
 
   if (!res.ok || !res.data) {

@@ -84,6 +84,10 @@ const payment = (over: Record<string, unknown> = {}) => ({
   periodYear: 2026,
   receivedAt: new Date('2026-06-15'),
   reference: 'EFT 8231',
+  // The proof of payment the member sent to the WhatsApp group. Exactly one of
+  // this and proofWitness reaches the service; which one it is, and that it is
+  // only ever one, is enforced by the schema and tested there.
+  proofUrl: 'payment-proofs/proof-abc.pdf',
   ...over,
 })
 
@@ -335,5 +339,43 @@ describe('a month that was waived', () => {
       .rejects.toThrow(/waived/i)
 
     expect(mocks.txCreate).not.toHaveBeenCalled()
+  })
+})
+
+describe('the evidence it stores', () => {
+  it('keeps the document against the payment it belongs to', async () => {
+    await recordOfflineContribution(payment() as never, ADMIN, ROLES)
+
+    const [written] = mocks.txCreate.mock.calls[0]
+    expect(written.proofUrl).toBe('payment-proofs/proof-abc.pdf')
+    expect(written.proofWitness).toBeNull()
+  })
+
+  it('keeps the witness note instead, when the money was cash', async () => {
+    // Stored side by side rather than collapsed into one column: a payment
+    // evidenced by the bank and one evidenced by two people's word are not the
+    // same claim, and a later reader has to be able to tell them apart.
+    await recordOfflineContribution(
+      payment({
+        proofUrl: undefined,
+        proofWitness: 'Counted by Kurhula and Thandi at the August meeting',
+      }) as never,
+      ADMIN,
+      ROLES,
+    )
+
+    const [written] = mocks.txCreate.mock.calls[0]
+    expect(written.proofUrl).toBeNull()
+    expect(written.proofWitness).toContain('Kurhula and Thandi')
+  })
+
+  it('records which kind of evidence in the audit log, never the reference', async () => {
+    // The audit log is read by people who are not entitled to open the
+    // document. A pathname in it would be a way to ask for one.
+    await recordOfflineContribution(payment() as never, ADMIN, ROLES)
+
+    const [entry] = mocks.writeAuditLog.mock.calls[0]
+    expect(entry.payload.evidence).toBe('DOCUMENT')
+    expect(JSON.stringify(entry.payload)).not.toContain('payment-proofs/')
   })
 })

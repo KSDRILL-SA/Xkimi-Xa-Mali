@@ -421,29 +421,29 @@ model Contribution {
 }
 
 model Transaction {
-  id              String            @id @default(cuid())
-  contributionId  String
+  id               String            @id @default(cuid())
+  contributionId   String
   /// Null only for OFFLINE transactions. Every gateway-borne payment is
   /// authorised by a mandate and must carry one; money handed over as cash or
   /// pushed by EFT genuinely has none, and inventing a placeholder mandate
   /// (which would need a placeholder bank account under it) would mean
   /// fabricating banking details for someone who never gave any.
-  mandateId       String?
-  amount          Decimal           @db.Decimal(12, 2)
-  currency        String            @default("ZAR")
-  type            TransactionType
-  status          TransactionStatus @default(PENDING)
-  gatewayRef      String?
-  gatewayResponse Json?
-  idempotencyKey  String            @unique
-  retryCount      Int               @default(0)
-  failureReason   String?
+  mandateId        String?
+  amount           Decimal           @db.Decimal(12, 2)
+  currency         String            @default("ZAR")
+  type             TransactionType
+  status           TransactionStatus @default(PENDING)
+  gatewayRef       String?
+  gatewayResponse  Json?
+  idempotencyKey   String            @unique
+  retryCount       Int               @default(0)
+  failureReason    String?
   /// Why leadership reversed this transaction. Set on the REVERSAL row, never on
   /// the original — the original is evidence and is not edited. Null on rows
   /// written before the reason was required, and on everything that is not a
   /// reversal. Distinct from failureReason, which is the gateway refusing.
-  reversalReason  String?
-  reversalOfId    String?           @unique
+  reversalReason   String?
+  reversalOfId     String?           @unique
   /// What the admin matched this OFFLINE payment against on the bank statement
   /// — an EFT reference, a deposit slip number. Required by the service layer
   /// for OFFLINE rows and null for everything else: a gateway payment already
@@ -453,17 +453,38 @@ model Transaction {
   /// which no person asserts, an offline row is somebody's claim that money
   /// arrived — so the claim is attributable. Plain id, no relation, matching
   /// PaymentMandate.approvedById.
-  recordedById    String?
+  recordedById     String?
+  /// The proof of payment: a bank PDF, a screenshot, a photo of a deposit slip.
+  /// Stored as a blob **pathname**, never a URL — see Goal.outcomeProofUrl for
+  /// the same rule and blob-storage-privacy for why. The object is private and
+  /// reachable only through a media route that checks this column claims it.
+  ///
+  /// Members already send these to the WhatsApp group; before this they were
+  /// attached to nothing. It is what turns an offline row from one admin's
+  /// assertion into something a third person can check against the bank.
+  proofUrl         String?
+  /// Who counted the money, when there is no document to attach.
+  ///
+  /// Cash handed over at a meeting has no proof of payment, and a hard file
+  /// requirement would mean either the money goes unrecorded — the exact
+  /// failure the offline path exists to prevent — or somebody attaches
+  /// something irrelevant to satisfy the gate. So the absence is recorded
+  /// instead: exactly one of proofUrl and proofWitness is required on an
+  /// OFFLINE row, enforced by the service layer.
+  ///
+  /// Both are null on rows written before proof was required, and on every
+  /// gateway transaction, which evidences itself through gatewayRef.
+  proofWitness     String?
   /// When the money actually reached the account. For gateway rows this is set
   /// when the gateway settles; for OFFLINE rows the admin states it, and it is
   /// the date that matters — not when somebody got round to capturing it.
-  processedAt     DateTime?
-  createdAt       DateTime          @default(now())
+  processedAt      DateTime?
+  createdAt        DateTime          @default(now())
 
   contribution Contribution    @relation(fields: [contributionId], references: [id], onDelete: Restrict)
   mandate      PaymentMandate? @relation(fields: [mandateId], references: [id], onDelete: Restrict)
-  reversalOf   Transaction?   @relation("TransactionReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
-  reversal     Transaction?   @relation("TransactionReversal")
+  reversalOf   Transaction?    @relation("TransactionReversal", fields: [reversalOfId], references: [id], onDelete: SetNull)
+  reversal     Transaction?    @relation("TransactionReversal")
 
   // reversalOfId uniqueness (double-reversal guard) is enforced by a partial
   // unique index (WHERE reversalOfId IS NOT NULL) in raw SQL; @unique above keeps
@@ -474,6 +495,11 @@ model Transaction {
   @@index([gatewayRef])
   @@index([type])
   @@index([status, retryCount])
+  /// The media routes look a proof up by pathname on every request, to check
+  /// this column claims it before serving any bytes. Transactions are the
+  /// fastest-growing table here, so that lookup gets an index rather than a
+  /// scan.
+  @@index([proofUrl])
   @@map("transactions")
 }
 

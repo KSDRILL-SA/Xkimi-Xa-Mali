@@ -4,8 +4,9 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 
 /**
- * Serves the two kinds of private object this console renders: an admin's
- * signature, and a Goal outcome's proof.
+ * Serves the private objects this console renders: an admin's signature, a Goal
+ * outcome's proof, and the proof of payment attached to an offline
+ * contribution.
  *
  * Both used to be stored with `access: 'public'`, so the browser could load them
  * straight from a blob URL and no route like this was needed. That was the
@@ -46,12 +47,17 @@ export async function GET(req: NextRequest) {
 
   // The authorisation check. Not "is this a plausible path" — "is this an object
   // the console is entitled to show at all".
-  const [signature, goal] = await Promise.all([
+  const [signature, goal, proof] = await Promise.all([
     db.adminSignature.findFirst({ where: { signatureUrl: ref }, select: { id: true } }),
     db.goal.findFirst({ where: { outcomeProofUrl: ref }, select: { id: true } }),
+    // A proof of payment. Admins see every member's, which is the job — they
+    // are the ones reconciling against the bank statement. The member's own
+    // view of the same file is a separate route in the member app, scoped to
+    // the transactions on their own contributions.
+    db.transaction.findFirst({ where: { proofUrl: ref }, select: { id: true } }),
   ])
 
-  if (!signature && !goal) {
+  if (!signature && !goal && !proof) {
     return new NextResponse('Not found', { status: 404 })
   }
 

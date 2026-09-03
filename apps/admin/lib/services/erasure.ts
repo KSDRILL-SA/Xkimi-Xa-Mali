@@ -134,6 +134,7 @@ export async function assessErasure(
     staleNotifications,
     contributions,
     transactions,
+    paymentProofs,
     mandates,
     bankAccounts,
     auditEntries,
@@ -147,6 +148,15 @@ export async function assessErasure(
     // which belongs to the member. Counting them any other way would silently
     // report zero.
     db.transaction.count({ where: { contribution: { userId: subjectId } } }),
+    // Counted separately from the transactions themselves, because it is a
+    // different kind of thing to hold. A ledger row is a number; a proof of
+    // payment is the member's own bank document, showing an account number and
+    // often a balance. Somebody asking what the Foundation holds about them is
+    // entitled to be told that specifically, not to have it folded silently
+    // into "payments".
+    db.transaction.count({
+      where: { contribution: { userId: subjectId }, proofUrl: { not: null } },
+    }),
     db.paymentMandate.count({ where: { userId: subjectId } }),
     db.bankAccount.count({ where: { userId: subjectId } }),
     db.auditLog.count({ where: { userId: subjectId } }),
@@ -180,6 +190,15 @@ export async function assessErasure(
       // year is not modelled anywhere yet. Saying "retained" without a date is
       // honest; inventing a date would not be.
       basis: `Tax and accounting law requires these to be kept for ${RETENTION_YEARS.financial} years after the financial year they fall in. They cannot be deleted on request.`,
+      erasableFrom: null,
+    },
+    {
+      key: 'paymentProofs',
+      label: 'Proof-of-payment documents they sent — bank confirmations, deposit slips, screenshots',
+      count: paymentProofs,
+      disposition: 'RETAINED',
+      basis:
+        'The evidence that a payment recorded by leadership actually happened. Kept with the payment it belongs to, for as long as the payment is kept, because a financial record with the proof removed is no longer a record anybody can check.',
       erasableFrom: null,
     },
     {
