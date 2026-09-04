@@ -70,17 +70,48 @@ describe('watching a backup that may have stopped being scheduled', () => {
     expect(status).toMatchObject({ state: 'stale', lastSuccessAt: null })
   })
 
-  it('reports "cannot see" rather than "fine" when the token is missing', async () => {
-    // The distinction the whole service turns on. An unwatched backup must never
-    // be reported as a healthy one.
+  it('still asks GitHub when no token is set, because the repository is public', async () => {
+    // This used to return `unknown` without asking, and that was the defect.
+    // The Backup workflow had failed every run in its history for a week while
+    // the one alarm built to notice reported "cannot confirm" at warning
+    // instead of "the backup has stopped" at critical — because a variable
+    // nobody knew was needed had never been set.
+    //
+    // GitHub serves a public repository's workflow runs unauthenticated, so the
+    // token buys a higher rate limit and nothing else.
     envValues.BACKUP_WATCH_TOKEN = undefined
     const fetchSpy = githubReturns([])
     vi.stubGlobal('fetch', fetchSpy)
 
     const status = await checkBackupFreshness(NOW)
 
-    expect(status.state).toBe('unknown')
-    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(fetchSpy).toHaveBeenCalled()
+    // An empty run list is real news — no backup has ever succeeded — not an
+    // inability to see.
+    expect(status).toMatchObject({ state: 'stale', lastSuccessAt: null })
+  })
+
+  it('sends no Authorization header at all when there is no token', async () => {
+    // Omitted rather than sent empty: GitHub rejects a malformed Authorization
+    // header outright, where no header is a valid anonymous request.
+    envValues.BACKUP_WATCH_TOKEN = undefined
+    const fetchSpy = githubReturns([])
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await checkBackupFreshness(NOW)
+
+    const init = fetchSpy.mock.calls[0]![1] as { headers: Record<string, string> }
+    expect(init.headers).not.toHaveProperty('Authorization')
+  })
+
+  it('sends the token when one is configured', async () => {
+    const fetchSpy = githubReturns([])
+    vi.stubGlobal('fetch', fetchSpy)
+
+    await checkBackupFreshness(NOW)
+
+    const init = fetchSpy.mock.calls[0]![1] as { headers: Record<string, string> }
+    expect(init.headers.Authorization).toContain('Bearer')
   })
 
   it('reports "cannot see" when the repository is not configured', async () => {
