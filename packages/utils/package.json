@@ -22,7 +22,7 @@
     "./membership-standing": "./src/membership-standing.ts",
     "./contribution-period": "./src/contribution-period.ts",
     "./role-policy": "./src/role-policy.ts",
-    "./admin-invariant": "./src/admin-invariant.ts",
+    "./invariant-locks": "./src/invariant-locks.ts",
     "./keyring": "./src/keyring.ts"
   },
   "main": "./src/index.ts",

@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { MAX_MEMBERS } from '@xxm/utils'
 import { refuseRoleChange, ROLE_CHANGE_REFUSAL_MESSAGE } from '@xxm/utils/role-policy'
-import { lockAdminInvariant } from '@xxm/utils/admin-invariant'
+import { lockAdminInvariant } from '@xxm/utils/invariant-locks'
 import { publishRoleVersion } from '@/lib/role-version'
 import { assertAdmin, writeAuditLog, AdminNotFoundError, AdminConflictError, AdminForbiddenError } from './shared'
 

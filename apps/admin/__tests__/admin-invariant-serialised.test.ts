@@ -81,7 +81,7 @@ describe('every path that can remove the last admin takes the lock', () => {
   it.each(CALL_SITES)('$name imports the shared lock', ({ file }) => {
     // Not its own copy. A second implementation of a lock is a second lock,
     // and two locks serialise nothing against each other.
-    expect(read(file)).toContain("from '@xxm/utils/admin-invariant'")
+    expect(read(file)).toContain("from '@xxm/utils/invariant-locks'")
   })
 
   it.each(CALL_SITES)('$name takes the lock before it counts', ({ file, fn, countPattern }) => {

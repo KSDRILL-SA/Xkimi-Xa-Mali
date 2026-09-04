@@ -5,7 +5,7 @@ import {
   STATUS_CHANGE_REFUSAL_MESSAGE,
   type AdminSettableStatus,
 } from '@xxm/utils/status-policy'
-import { lockAdminInvariant } from '@xxm/utils/admin-invariant'
+import { lockAdminInvariant } from '@xxm/utils/invariant-locks'
 import { db, Prisma } from '@/lib/db'
 import { publishRoleVersion } from '@/lib/role-version'
 import { assertAdmin, notifyInbox, writeAuditLog, AdminNotFoundError, AdminConflictError } from './shared'
@@ -138,7 +138,7 @@ export async function setMemberStatus(
   // `users`, the other reads `user_roles`. So one admin suspending A while
   // another revokes B's role passed both checks and left nobody able to sign
   // in. `lockAdminInvariant` is the one lock both take, named for the invariant
-  // rather than for either operation — see admin-invariant.
+  // rather than for either operation — see invariant-locks.
   //
   // The roleVersion bump moves inside with the status. It is what ends a
   // suspended member's live session, and a suspension that commits without it
