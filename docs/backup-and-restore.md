@@ -462,6 +462,73 @@ the machine it ran from. Everything either side of that step was.
    (branch or new database); locally it needs the `postgres` role. Worth knowing
    before the clock is running.
 
+### 8-prod. The real drill — 2026-09-04, production data, the real key
+
+The first drill against **production data**, with the **real private key**,
+and the first successful backup this repository has ever produced. Everything
+§8 owed.
+
+| Step | Result |
+|---|---|
+| Nightly backup run | 182,716 byte dump of `staging`, encrypted, retained 90 days |
+| Download artifact | 182,948 bytes |
+| `age -d -i <private key>` | **Decrypts.** 182,716 bytes, header `PGDMP` |
+| Restore into a scratch Neon branch (CI) | Exit 0 |
+| Tables, source vs restored | **40 = 40** |
+| Rows, source vs restored | **623 = 623** |
+
+The restore-and-compare half now runs monthly and on demand as
+`.github/workflows/restore-drill.yml`, against a scratch branch it creates from
+the empty default branch and deletes afterwards. A drill that depends on
+somebody's laptop is not a drill; it is a thing that happened once.
+
+The decrypt half cannot be automated and should not be: the private key is held
+offline by two office bearers and never reaches GitHub, which is the property
+that makes storing backups on a public repository defensible at all. Opening a
+real artifact with the real key stays a human step, and is the step to repeat
+whenever custody of the key changes.
+
+### 8-prod-a. ⚠️ The machine doing the restore needs a client new enough to read it
+
+Found during that drill, and it is the kind of problem that only appears when
+the clock is running.
+
+`backup.yml` dumps with PostgreSQL **18**, so the archive is format version
+**1.16**. The office machine had PostgreSQL **16.14**, and:
+
+```
+pg_restore: error: unsupported version (1.16) in file header
+```
+
+The backup was perfect. The tooling on the machine holding the key could not
+open it. Nothing about that is visible until the day it matters, and on that day
+the answer is "install a database server first", under pressure, probably at
+night.
+
+**Before an emergency, make sure one of these is true on the machine that holds
+the private key:**
+
+| Option | Command |
+|---|---|
+| Docker (lightest — no server installed) | `docker run --rm -v "$PWD:/b" -w /b postgres:18 pg_restore --list restored.dump` |
+| PostgreSQL 18 client | `winget install PostgreSQL.PostgreSQL.18` |
+
+Docker is the better answer for a machine that is not a database host: it needs
+no service running, the image version can match whatever `backup.yml` used on
+the night, and a future move to PostgreSQL 19 is a tag change rather than
+another install. It is the only reason this project needs Docker at all — CI
+provides its own client and Vercel builds without one — but "the only reason" is
+still a sufficient one when the reason is reading your own backup.
+
+**Check the archive version against your client before you need to:**
+
+```bash
+# what wrote it
+pg_restore --list restored.dump | head -1
+# what you have
+pg_restore --version
+```
+
 ### 8a. The `age` round trip — proved in CI
 
 `.github/workflows/backup-selftest.yml` runs the whole crypto path on a
