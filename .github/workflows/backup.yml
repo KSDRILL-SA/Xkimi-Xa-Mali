@@ -145,14 +145,52 @@ jobs:
             curl -sS --fail-with-body -H "$AUTH" -H "Accept: application/json" "$@"
           }
 
-          # The default branch, by its own flag — not the first in the list and
-          # not a name. A restore has to come from what production actually
-          # runs on, and a preview branch answers every other question
-          # identically.
-          BRANCH=$(api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r '.branches[] | select(.default == true) | .id' | head -1)
-          if [ -z "$BRANCH" ] || [ "$BRANCH" = "null" ]; then
-            echo "::error::Could not find the default Neon branch for project $NEON_PROJECT_ID."
+          # The branch that holds the data — not the one called production.
+          #
+          # This project's default branch IS named `production`, and it is
+          # empty. The live application runs on a child branch named `staging`,
+          # which carries 97% of the project's compute. Backing up the default
+          # branch produced a 900-byte dump of nothing, and only the size guard
+          # stopped it being filed as a successful backup.
+          #
+          # So the branch is chosen by what it contains. Every branch is asked
+          # how many tables it has and the fullest wins, which is correct
+          # whichever branch that turns out to be and stays correct if the
+          # naming is ever untangled. A backup must follow the data, not a
+          # label somebody chose months ago.
+          DEFAULT_BRANCH=$(api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r '.branches[] | select(.default == true) | .id' | head -1)
+
+          BRANCH=""
+          BEST=0
+          echo "Table counts per branch (public schema):"
+          for B in $(api "$API/projects/$NEON_PROJECT_ID/branches" | jq -r '.branches[].id'); do
+            BNAME=$(api "$API/projects/$NEON_PROJECT_ID/branches"               | jq -r --arg b "$B" '.branches[] | select(.id==$b) | .name')
+            BDB=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases" | jq -r '.databases[0].name // empty')
+            BROLE=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases" | jq -r '.databases[0].owner_name // empty')
+            if [ -z "$BDB" ]; then echo "  $BNAME: no database"; continue; fi
+            BURI=$(api "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$B&database_name=$BDB&role_name=$BROLE&pooled=false" | jq -r '.uri')
+            echo "::add-mask::$BURI"
+            # Table count only. No column values are read, and none are printed.
+            N=$(psql "$BURI" -tAc "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null || echo 0)
+            echo "  $BNAME ($BDB): $N tables"
+            if [ "$N" -gt "$BEST" ] 2>/dev/null; then BEST="$N"; BRANCH="$B"; fi
+          done
+
+          if [ -z "$BRANCH" ] || [ "$BEST" -eq 0 ]; then
+            echo "::error::No Neon branch in this project has any tables. Nothing to back up."
             exit 1
+          fi
+
+          CHOSEN=$(api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r --arg b "$BRANCH" '.branches[] | select(.id==$b) | .name')
+          echo "Backing up branch '$CHOSEN' ($BEST tables)."
+
+          # Said loudly, every night, until somebody fixes the naming. A project
+          # whose default branch is empty while the application runs on a child
+          # is one accidental promotion away from serving an empty database.
+          if [ "$BRANCH" != "$DEFAULT_BRANCH" ]; then
+            echo "::warning::The fullest branch ('$CHOSEN') is NOT this project's default branch."
+            echo "::warning::Vercel maps production deployments to the DEFAULT branch, which is empty."
+            echo "::warning::See docs/backup-and-restore.md — this needs resolving, not working around."
           fi
 
           # Every branch and every database, by name, before anything is chosen.
@@ -160,28 +198,6 @@ jobs:
           # which is empty — 900 bytes, caught by the size guard. What the log
           # did not say was what else existed, so the next guess would have been
           # as blind as the first.
-          echo "Branches on this project:"
-          api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r '.branches[] | "  \(.id)  default=\(.default)  \(.name)"'
-
-          # Which branch actually holds the schema.
-          #
-          # The `production` branch dumped 900 bytes — an empty database — and
-          # the size guard rightly refused it. A branch called production that
-          # is empty is a fact worth establishing before choosing what to back
-          # up, so every branch is asked how many tables it has. Counting is
-          # cheap, reads nothing, and settles it in one run.
-          echo "Table counts per branch (public schema):"
-          for B in $(api "$API/projects/$NEON_PROJECT_ID/branches" | jq -r '.branches[].id'); do
-            BNAME=$(api "$API/projects/$NEON_PROJECT_ID/branches" | jq -r --arg b "$B" '.branches[] | select(.id==$b) | .name')
-            BDB=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases" | jq -r '.databases[0].name // empty')
-            BROLE=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases" | jq -r '.databases[0].owner_name // empty')
-            if [ -z "$BDB" ]; then echo "  $BNAME: no database"; continue; fi
-            BURI=$(api "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$B&database_name=$BDB&role_name=$BROLE&pooled=false" | jq -r '.uri')
-            echo "::add-mask::$BURI"
-            N=$(psql "$BURI" -tAc "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null || echo "?")
-            echo "  $BNAME ($BDB): $N tables"
-          done
-
           DBJSON=$(api "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/databases")
           echo "Databases on branch $BRANCH:"
           echo "$DBJSON" | jq -r '.databases[] | "  \(.name)  owner=\(.owner_name)"'
