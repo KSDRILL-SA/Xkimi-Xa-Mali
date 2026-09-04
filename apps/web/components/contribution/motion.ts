@@ -36,13 +36,14 @@
  *     That is the shape of the original bug.
  *   - `transition-all` anywhere. It arms `transform` whether or not anything
  *     ever moves, which is enough to promote the element.
- *   - An **infinite** transform animation — the drifting orbs on the dashboard
- *     hero — around anything that counts. On the dashboard those orbs sit in
- *     the hero and the count-ups sit in a *sibling* section, which is why that
- *     page was only ever a victim of the shell and not of its own decoration.
- *     The hero here holds the counting total itself, so it is decorated with
- *     static washes instead. It costs nothing visually and removes the only
- *     structure on the page that could bring the bug back.
+ *   - An **infinite** transform animation on anything that *wraps* content —
+ *     the shape the shell had. The dashboard's drifting orbs are not that
+ *     shape: they are absolutely positioned siblings that move their own layer
+ *     and nothing else's, which is why the hero here carries them beside the
+ *     counting total rather than around it. Each is `absolute`, `aria-hidden`
+ *     and `will-change: transform`, so the promotion is explicit rather than
+ *     left to Blink's heuristics — an orb can never be rasterised into the
+ *     same layer as the text it drifts behind.
  *   - An ungated hover transform. A phone cannot hover, so it is pure cost;
  *     every one here is `sm:`-gated, transition included.
  *
