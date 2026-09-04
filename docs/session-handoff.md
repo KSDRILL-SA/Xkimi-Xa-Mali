@@ -1,5 +1,11 @@
 # Session Handoff
 
+> **Later sessions have their own files.** The most recent is
+> `docs/session-2026-09-04.md` — twelve PRs (#472–#483): the contributions
+> tearing solved after eight attempts, the Fund page and a mislabelled member
+> total, and an integration sweep that found the Foundation had never once had a
+> working backup. Read that first for current state.
+>
 > **This file stopped being updated after 2026-08-17.** Everything from
 > 2026-08-18 onward — the domain/deployment work, the founder-guide
 > gaps, auth/roles hardening, the mobile relaunch, and the overnight
