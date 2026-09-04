@@ -44,6 +44,16 @@ settles it.
 | 1 | [Master audit — first pass](audit-01-master-audit-first-pass.md) | 2026-09-04 | 13 | Documented, verified, not scheduled |
 | 2 | [State machines, concurrency, security boundary](audit-02-state-machine-concurrency-security.md) | 2026-09-04 | 20 (14–33) | Documented, verified, not scheduled |
 | 3 | [Deeper money flow and API integrity](audit-03-money-flow-api-integrity.md) | 2026-09-04 | 12 (33–44) | Documented, verified, not scheduled |
+| 4 | [API, authorisation, state machine](audit-04-api-authorization-state-machine.md) | 2026-09-04 | 13 (45–57) | Documented, answered, not scheduled |
+
+## Some rounds ask questions rather than report defects
+
+Audit 4 is an attack-hypothesis pass: the auditor states what they would try and
+explicitly declines to call most of it confirmed. Those entries are answered from
+the code rather than verified as defects, and they carry their own verdicts —
+**holds**, **defect**, or **open**, with the paths actually examined named. A
+"holds" is scoped to what was read; where a full sweep is still owed, the entry
+says so and the sweep becomes the work item.
 
 ## Findings repeat across audits
 
