@@ -78,8 +78,9 @@ export const userRepo = {
     })
   },
 
-  count(where?: Prisma.UserWhereInput) {
-    return db.user.count({ ...(where && { where }) })
+  count(where?: Prisma.UserWhereInput, tx?: TxClient) {
+    const client = tx ?? db
+    return client.user.count({ ...(where && { where }) })
   },
 
   groupBy<T extends Prisma.UserGroupByArgs>(args: T) {

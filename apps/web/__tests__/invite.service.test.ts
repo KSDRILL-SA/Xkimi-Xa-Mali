@@ -120,6 +120,24 @@ const VALID_INVITE = {
   invitedById: 'a1',
 }
 
+/** What happened inside the last transaction, in order. */
+const txOrder: string[] = []
+
+/**
+ * A hand-built transaction client, plus the advisory lock.
+ *
+ * `acceptInviteRegistration` holds the member-cap lock as the first statement
+ * of its transaction, so every stub standing in for that transaction has to
+ * offer `$executeRaw`. Wrapping rather than adding it in five places, so a
+ * sixth stub cannot be written without it.
+ */
+function asTx(txMock: object) {
+  return {
+    ...txMock,
+    $executeRaw: (..._a: unknown[]) => { txOrder.push('lock'); return Promise.resolve(0) },
+  } as unknown as typeof db
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 
@@ -133,8 +151,22 @@ beforeEach(() => {
   // lock. Without a default here, whichever test last called
   // `mockDb.$transaction.mockImplementation` would decide the behaviour of
   // every test after it: `clearAllMocks` clears calls, not implementations.
+  txOrder.length = 0
   mockDb.$transaction.mockImplementation((async (fn: (tx: unknown) => Promise<unknown>) =>
-    fn({ ...mockDb, $executeRaw: vi.fn().mockResolvedValue(0) })) as never)
+    fn({
+      ...mockDb,
+      $executeRaw: (..._a: unknown[]) => { txOrder.push('lock'); return Promise.resolve(0) },
+      user: {
+        ...mockDb.user,
+        count: (...a: unknown[]) => { txOrder.push('count:user'); return mockDb.user.count(...a) },
+        create: (...a: unknown[]) => { txOrder.push('write:user'); return mockDb.user.create(...a) },
+      },
+      invitation: {
+        ...mockDb.invitation,
+        count: (...a: unknown[]) => { txOrder.push('count:invite'); return mockDb.invitation.count(...a) },
+        create: (...a: unknown[]) => { txOrder.push('write:invite'); return mockDb.invitation.create(...a) },
+      },
+    })) as never)
   // A circle with room in it, unless a test says otherwise. Without a default
   // every existing invite test would trip the fifty-member cap on an undefined
   // count.
@@ -166,6 +198,66 @@ describe('generateInvite', () => {
     mockDb.invitation.findFirst.mockResolvedValue(null as never)
     mockDb.user.findFirst.mockResolvedValue({ id: 'u2' } as never)
     await expect(generateInvite('a1', ADMIN, params, BASE)).rejects.toBeInstanceOf(InviteDuplicateError)
+  })
+
+  // ── The fifty places are reserved, not merely counted ────────────────────
+  //
+  // The cap check was taken outside any transaction and the invitation was
+  // created afterwards. Two admins both reading "49 members, 0 pending" were
+  // both told there was one place left, and both were right — and both wrote:
+  //
+  //     49 + 0 -> one place left -> invitation      (admin A)
+  //     49 + 0 -> one place left -> invitation      (admin B)
+  //                    -> 51 places occupied or held
+  //
+  // The fifty-first person is then refused at the moment they try to accept,
+  // after being told they were welcome, which is exactly what checking at issue
+  // was supposed to prevent.
+
+  it('takes the cap lock before counting, and writes after', async () => {
+    // A lock taken after the count locks nothing — the stale read has already
+    // happened. This ordering is the whole fix.
+    mockDb.invitation.findFirst.mockResolvedValue(null as never)
+    mockDb.user.findFirst.mockResolvedValue(null as never)
+    mockDb.invitation.create.mockResolvedValue({ id: 'inv1' } as never)
+    mockSendSMS.mockResolvedValue([] as never)
+    mockSendInviteEmail.mockResolvedValue(undefined as never)
+
+    await generateInvite('a1', ADMIN, params, BASE)
+
+    expect(txOrder[0]).toBe('lock')
+    expect(txOrder).toContain('count:user')
+    expect(txOrder).toContain('count:invite')
+    expect(txOrder[txOrder.length - 1]).toBe('write:invite')
+  })
+
+  it('refuses when the circle filled up between the count and the write', async () => {
+    // What the lock makes possible: the second admin's count runs after the
+    // first has committed, so it sees fifty and refuses instead of writing the
+    // fifty-first.
+    mockDb.invitation.findFirst.mockResolvedValue(null as never)
+    mockDb.user.findFirst.mockResolvedValue(null as never)
+    mockDb.user.count.mockResolvedValue(50 as never)
+    mockDb.invitation.count.mockResolvedValue(0 as never)
+
+    await expect(generateInvite('a1', ADMIN, params, BASE)).rejects.toBeInstanceOf(MemberCapReachedError)
+
+    // Nothing written, and no invitation sent to somebody who has no seat.
+    expect(mockDb.invitation.create).not.toHaveBeenCalled()
+    expect(mockSendSMS).not.toHaveBeenCalled()
+    expect(mockSendInviteEmail).not.toHaveBeenCalled()
+  })
+
+  it('counts pending invitations as places held, inside the lock', async () => {
+    // 49 members plus one unexpired invitation is fifty places taken, even
+    // though only forty-nine people exist. Without this a fifty-first link
+    // could be issued to somebody who would be refused on arrival.
+    mockDb.invitation.findFirst.mockResolvedValue(null as never)
+    mockDb.user.findFirst.mockResolvedValue(null as never)
+    mockDb.user.count.mockResolvedValue(49 as never)
+    mockDb.invitation.count.mockResolvedValue(1 as never)
+
+    await expect(generateInvite('a1', ADMIN, params, BASE)).rejects.toBeInstanceOf(MemberCapReachedError)
   })
 
   it('creates invite, sends SMS+email, writes audit log', async () => {
@@ -365,7 +457,7 @@ describe('the fifty-member cap', () => {
           emailVerificationToken: { create: vi.fn() },
           invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
         }
-        return fn(txMock as unknown as typeof db)
+        return fn(asTx(txMock))
       })
       mockSendVerificationEmail.mockResolvedValue(undefined as never)
       mockWriteAuditLog.mockResolvedValue(undefined)
@@ -504,6 +596,36 @@ describe('revokeInvitation', () => {
 
 // ─── acceptInviteRegistration ─────────────────────────────────────────────────
 
+describe('the cap lock covers acceptance too', () => {
+  // Issuing an invitation and accepting one consume the same fifty places, and
+  // they count different things — issue counts members plus pending
+  // invitations, acceptance counts members only, because the invitee's own
+  // invitation must not be counted against them. Different queries, one
+  // resource, so one lock: a lock per operation would serialise each against
+  // itself and neither against its sibling.
+  it('holds the same lock the issue path holds', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const src = readFileSync(resolve(__dirname, '../services/invite.service.ts'), 'utf8')
+
+    // Both call sites, and neither reaching for a lock of its own.
+    expect(src.match(/lockMemberCap\(tx\)/g) ?? []).toHaveLength(2)
+    expect(src).toContain("from '@xxm/utils/invariant-locks'")
+
+    // In the acceptance transaction, the lock precedes the member count. The
+    // count was already inside a transaction, which looked like enough and was
+    // not: under READ COMMITTED each of two concurrent acceptances sees its own
+    // insert and not the other's, so both read forty-nine and both create the
+    // fiftieth.
+    const accept = src.slice(src.indexOf('export async function acceptInviteRegistration'))
+    const lockAt = accept.indexOf('lockMemberCap(tx)')
+    const countAt = accept.indexOf('tx.user.count(')
+    expect(lockAt).toBeGreaterThan(-1)
+    expect(countAt).toBeGreaterThan(-1)
+    expect(lockAt).toBeLessThan(countAt)
+  })
+})
+
 describe('acceptInviteRegistration', () => {
   const input = {
     inviteCode: 'XKM-ABCD-1234',
@@ -544,7 +666,7 @@ describe('acceptInviteRegistration', () => {
         emailVerificationToken: { create: vi.fn() },
         invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       }
-      return fn(txMock as unknown as typeof db)
+      return fn(asTx(txMock))
     })
     mockSendVerificationEmail.mockResolvedValue(undefined as never)
     mockWriteAuditLog.mockResolvedValue(undefined)
@@ -576,7 +698,7 @@ describe('acceptInviteRegistration', () => {
         // The row was claimed by the other request between the read and here.
         invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
       }
-      return fn(txMock as unknown as typeof db)
+      return fn(asTx(txMock))
     })
 
     await expect(acceptInviteRegistration(input, 'http://localhost')).rejects.toThrow(InviteUsedError)
@@ -603,7 +725,7 @@ describe('acceptInviteRegistration', () => {
         emailVerificationToken: { create: vi.fn() },
         invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       }
-      return fn(txMock as unknown as typeof db)
+      return fn(asTx(txMock))
     })
     mockSendVerificationEmail.mockRejectedValue(new Error('Resend: domain not verified') as never)
     mockWriteAuditLog.mockResolvedValue(undefined)
@@ -635,7 +757,7 @@ describe('acceptInviteRegistration', () => {
         emailVerificationToken: { create: vi.fn() },
         invitation: { update: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
       }
-      return fn(txMock as unknown as typeof db)
+      return fn(asTx(txMock))
     })
     mockSendVerificationEmail.mockRejectedValue(new Error('Resend: domain not verified') as never)
     mockWriteAuditLog.mockResolvedValue(undefined)

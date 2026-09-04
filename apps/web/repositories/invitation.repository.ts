@@ -38,8 +38,9 @@ export const invitationRepo = {
     })
   },
 
-  create(data: Prisma.InvitationUncheckedCreateInput) {
-    return db.invitation.create({ data })
+  create(data: Prisma.InvitationUncheckedCreateInput, tx?: TxClient) {
+    const client = tx ?? db
+    return client.invitation.create({ data })
   },
 
   update(
@@ -51,7 +52,8 @@ export const invitationRepo = {
     return client.invitation.update({ where: { id }, data })
   },
 
-  count(where?: Prisma.InvitationWhereInput) {
-    return db.invitation.count({ ...(where && { where }) })
+  count(where?: Prisma.InvitationWhereInput, tx?: TxClient) {
+    const client = tx ?? db
+    return client.invitation.count({ ...(where && { where }) })
   },
 }

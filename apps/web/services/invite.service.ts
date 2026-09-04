@@ -22,7 +22,7 @@ import {
 import { MAX_MEMBERS } from '@xxm/utils'
 import { assertAdmin, ROLES } from '@/lib/authorization'
 import { refuseRoleChange, ROLE_CHANGE_REFUSAL_MESSAGE } from '@xxm/utils/role-policy'
-import { lockAdminInvariant } from '@xxm/utils/admin-invariant'
+import { lockAdminInvariant, lockMemberCap } from '@xxm/utils/invariant-locks'
 import { bumpRoleVersion } from '@/lib/role-version'
 import { userRepo, runTransaction } from '@/repositories/user.repository'
 import { invitationRepo } from '@/repositories/invitation.repository'
@@ -146,10 +146,10 @@ export async function getMyInvitation(userId: string) {
  * they tried to accept — after being told they were welcome. Refusing at the
  * point of invitation puts the "no" in front of the person who can act on it.
  */
-export async function countMemberPlaces() {
+export async function countMemberPlaces(tx?: Parameters<typeof userRepo.count>[1]) {
   const [members, pendingInvites] = await Promise.all([
-    userRepo.count({ deletedAt: null }),
-    invitationRepo.count({ status: 'PENDING', expiresAt: { gt: new Date() } }),
+    userRepo.count({ deletedAt: null }, tx),
+    invitationRepo.count({ status: 'PENDING', expiresAt: { gt: new Date() } }, tx),
   ])
 
   const taken = members + pendingInvites
@@ -186,12 +186,6 @@ export async function generateInvite(
 ) {
   assertAdmin(adminRoles)
 
-  // Before anything else: is there a place to invite someone into? Checked
-  // here rather than at registration so leadership learns the circle is full
-  // while deciding to invite, not after the invitee has been told they are in.
-  const places = await countMemberPlaces()
-  if (places.isFull) throw new MemberCapReachedError(MAX_MEMBERS)
-
   const { firstName, lastName, email, phone, idNumber, vouchedFor, minimumAmount } = params
   const normPhone = smsProvider.normalisePhone(phone)
 
@@ -210,11 +204,43 @@ export async function generateInvite(
   const expiresAt       = new Date(Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
   const registrationUrl = `${baseUrl}/register?code=${encodeURIComponent(code)}`
 
-  const invite = await invitationRepo.create({
-    codeHash, codePrefix, firstName, lastName,
-    email, phone: normPhone, idNumber: encrypt(idNumber), vouchedFor: vouchedFor ?? null,
-    minimumAmount, expiresAt,
-    invitedById: adminId,
+  // Is there a place to invite someone into — and is it still there when the
+  // invitation is written?
+  //
+  // The check happens at issue rather than at registration so leadership learns
+  // the circle is full while deciding to invite, not after the invitee has been
+  // told they are in. That reasoning is unchanged; what was wrong is that the
+  // count was taken outside any transaction and the invitation was created
+  // afterwards. Counting is not reserving:
+  //
+  //     49 members, 0 pending      49 members, 0 pending
+  //       one place left             one place left
+  //       creates an invitation      creates an invitation
+  //                -> 51 places occupied or held
+  //
+  // Both admins were told the truth and both acted on it. The fifty-first
+  // person is then refused at the moment they try to accept, after being told
+  // they were welcome — which is precisely what checking at issue was supposed
+  // to prevent.
+  //
+  // `lockMemberCap` is the first statement, because a lock taken after the
+  // count locks nothing: the stale read has already happened. Accepting an
+  // invitation takes the same lock, on a different count — see
+  // `acceptInviteRegistration`, and INVARIANT_LOCK for why one lock covers two
+  // queries with nothing in common.
+  const invite = await runTransaction(async (tx) => {
+    await lockMemberCap(tx)
+
+    const places = await countMemberPlaces(tx)
+    // Thrown inside, so the lock is released and no invitation is written.
+    if (places.isFull) throw new MemberCapReachedError(MAX_MEMBERS)
+
+    return invitationRepo.create({
+      codeHash, codePrefix, firstName, lastName,
+      email, phone: normPhone, idNumber: encrypt(idNumber), vouchedFor: vouchedFor ?? null,
+      minimumAmount, expiresAt,
+      invitedById: adminId,
+    }, tx)
   })
 
   smsProvider.send({
@@ -393,6 +419,19 @@ export async function acceptInviteRegistration(
     // Backstop. The real gate is at invitation issue; this catches two invitees
     // accepting at once, where both were inside the cap when they were invited.
     //
+    // It was inside a transaction already, which looked like enough and was
+    // not: under READ COMMITTED each of two concurrent acceptances sees its own
+    // insert and not the other's, so both read forty-nine members and both
+    // create the fiftieth. A count is only a reservation if something stops the
+    // other writer between the count and the write.
+    //
+    // The same lock as `generateInvite`, deliberately, even though the two
+    // count different things — see INVARIANT_LOCK. Issuing holds a place;
+    // accepting converts a held place into an occupied one. Both draw from the
+    // same fifty, so a lock per operation would serialise each against itself
+    // and neither against the other.
+    await lockMemberCap(tx)
+
     // Counts *members* only, not invitations. This person is holding a pending
     // invitation right now — counting it would refuse the fiftieth member on
     // the strength of their own invite. Accepting converts a held place into an

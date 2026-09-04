@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
   lockAdminInvariant,
-  ADMIN_INVARIANT_LOCK,
+  lockMemberCap,
+  INVARIANT_LOCK,
   XXM_LOCK_NAMESPACE,
-} from '../admin-invariant'
+} from '../invariant-locks'
 
 // ---------------------------------------------------------------------------
 // The lock that makes "at least one admin" an invariant.
@@ -46,7 +47,7 @@ describe('lockAdminInvariant', () => {
 
     await lockAdminInvariant(tx)
 
-    expect(tx.calls[0]!.values).toEqual([XXM_LOCK_NAMESPACE, ADMIN_INVARIANT_LOCK])
+    expect(tx.calls[0]!.values).toEqual([XXM_LOCK_NAMESPACE, INVARIANT_LOCK.ADMIN_AVAILABILITY])
   })
 
   it('waits for the lock', async () => {
@@ -67,17 +68,37 @@ describe('lockAdminInvariant', () => {
     expect(settled).toBe(true)
   })
 
-  it('keeps the two keys distinct so unrelated locks cannot collide', () => {
-    // A namespace shared with an objid of the same value would make two
-    // unrelated invariants serialise against each other, silently.
-    expect(XXM_LOCK_NAMESPACE).not.toBe(ADMIN_INVARIANT_LOCK)
-    expect(Number.isInteger(XXM_LOCK_NAMESPACE)).toBe(true)
-    expect(Number.isInteger(ADMIN_INVARIANT_LOCK)).toBe(true)
-    // int4 range — the two-argument form takes integers, and a value outside
-    // it would be a runtime error on the first revocation anybody attempted.
-    for (const key of [XXM_LOCK_NAMESPACE, ADMIN_INVARIANT_LOCK]) {
+  it('every key is a valid int4', () => {
+    // The two-argument form takes integers. A value outside the range would be
+    // a runtime error on the first operation anybody attempted.
+    for (const key of [XXM_LOCK_NAMESPACE, ...Object.values(INVARIANT_LOCK)]) {
+      expect(Number.isInteger(key)).toBe(true)
       expect(key).toBeGreaterThan(-2_147_483_648)
       expect(key).toBeLessThan(2_147_483_647)
     }
+  })
+})
+
+describe('the registry', () => {
+  it('gives every invariant its own id', () => {
+    // Two invariants sharing an id would serialise against each other with
+    // nothing to show for it — no error, no deadlock, just two unrelated
+    // operations mysteriously queueing. Which is why they live in one object
+    // rather than being chosen at call sites.
+    const ids = Object.values(INVARIANT_LOCK)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it('separates the member cap from admin availability', async () => {
+    // The reason this file exists rather than a second lock module: adding a
+    // lock must be visibly a different lock.
+    const a = fakeTx()
+    const b = fakeTx()
+
+    await lockAdminInvariant(a)
+    await lockMemberCap(b)
+
+    expect(a.calls[0]!.values).not.toEqual(b.calls[0]!.values)
+    expect(b.calls[0]!.values).toEqual([XXM_LOCK_NAMESPACE, INVARIANT_LOCK.MEMBER_CAP])
   })
 })
