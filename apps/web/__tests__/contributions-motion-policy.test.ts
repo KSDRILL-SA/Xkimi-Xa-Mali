@@ -27,13 +27,22 @@ import { resolve } from 'node:path'
  */
 
 const DIR = resolve(__dirname, '../components/contribution')
+// The fund page carries the same counting figures inside the same hero
+// construction, so it is held to the same rule rather than trusted to copy it.
+const FUND_DIR = resolve(__dirname, '../components/fund')
 const PAGE = resolve(__dirname, '../app/(member)/dashboard/contributions/page.tsx')
+const FUND_PAGE = resolve(__dirname, '../app/(member)/dashboard/fund/page.tsx')
+
+const inDir = (dir: string, prefix: string) =>
+  readdirSync(dir)
+    .filter((f) => f.endsWith('.tsx'))
+    .map((f) => ({ name: `${prefix}${f}`, source: readFileSync(resolve(dir, f), 'utf8') }))
 
 const files: { name: string; source: string }[] = [
-  ...readdirSync(DIR)
-    .filter((f) => f.endsWith('.tsx'))
-    .map((f) => ({ name: f, source: readFileSync(resolve(DIR, f), 'utf8') })),
-  { name: 'page.tsx', source: readFileSync(PAGE, 'utf8') },
+  ...inDir(DIR, 'contribution/'),
+  ...inDir(FUND_DIR, 'fund/'),
+  { name: 'contributions/page.tsx', source: readFileSync(PAGE, 'utf8') },
+  { name: 'fund/page.tsx', source: readFileSync(FUND_PAGE, 'utf8') },
 ]
 
 /** Strip block and line comments — the notes here discuss the banned classes. */
@@ -74,8 +83,11 @@ describe('every contribution component', () => {
   })
 })
 
-describe('the hero, which holds the counting total', () => {
-  const hero = code(readFileSync(resolve(DIR, 'ContributionHero.tsx'), 'utf8'))
+describe.each([
+  ['ContributionHero', resolve(DIR, 'ContributionHero.tsx')],
+  ['FundHero', resolve(FUND_DIR, 'FundHero.tsx')],
+])('%s, which holds a counting total', (_name, path) => {
+  const hero = code(readFileSync(path, 'utf8'))
 
   /**
    * Infinite animations are allowed, but only in one shape.
@@ -136,8 +148,11 @@ describe('the hero, which holds the counting total', () => {
   })
 })
 
-describe('the page wrapper', () => {
-  const page = code(readFileSync(PAGE, 'utf8'))
+describe.each([
+  ['contributions', PAGE],
+  ['fund', FUND_PAGE],
+])('the %s page wrapper', (_name, path) => {
+  const page = code(readFileSync(path, 'utf8'))
 
   it('staggers with animationDelay rather than delay-*', () => {
     // Tailwind's `delay-*` sets `transition-delay`, which does nothing to a CSS
