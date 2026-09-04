@@ -44,6 +44,9 @@ const TAKES_IP = [
   'correctMemberIdNumber',
   'generateContributions',
   'recalculateBadges',
+  // Writes to the immutable pool ledger, so the audit row has to name the
+  // admin's own address rather than the admin app's.
+  'reconcileLedgerNow',
   'recordGoalOutcome',
   // Declares its `ip` inside an options object rather than positionally. The
   // obligation is the same — it forwards the caller's origin to the web app,
