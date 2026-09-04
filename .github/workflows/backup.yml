@@ -155,7 +155,17 @@ jobs:
             exit 1
           fi
 
+          # Every branch and every database, by name, before anything is chosen.
+          # The first run against this project dumped Neon's default `neondb`,
+          # which is empty — 900 bytes, caught by the size guard. What the log
+          # did not say was what else existed, so the next guess would have been
+          # as blind as the first.
+          echo "Branches on this project:"
+          api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r '.branches[] | "  \(.id)  default=\(.default)  \(.name)"'
+
           DBJSON=$(api "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/databases")
+          echo "Databases on branch $BRANCH:"
+          echo "$DBJSON" | jq -r '.databases[] | "  \(.name)  owner=\(.owner_name)"'
           DBNAME=$(echo "$DBJSON" | jq -r '.databases[0].name')
           DBROLE=$(echo "$DBJSON" | jq -r '.databases[0].owner_name')
           if [ -z "$DBNAME" ] || [ "$DBNAME" = "null" ]; then
