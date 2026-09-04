@@ -151,7 +151,14 @@ function StatCell({
         className={[
           'mb-3 flex h-9 w-9 items-center justify-center rounded-xl sm:mb-4 sm:h-10 sm:w-10',
           iconBg,
-          'transition-transform duration-slow sm:group-hover:scale-110',
+          // `sm:` on the TRANSITION, not just the hover that triggers it.
+          // An armed transform transition makes an element a compositing
+          // candidate in Blink even at rest and even if nothing ever hovers
+          // it. Four of these ride the summary and twelve more ride the
+          // history rows — and the one card on this page with no such icon,
+          // Group Collection Account, is the one card that never ghosted.
+          // Earlier rounds gated this on the card and missed the children.
+          'sm:transition-transform sm:duration-slow sm:group-hover:scale-110',
         ].join(' ')}
         aria-hidden
       >
