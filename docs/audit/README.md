@@ -72,6 +72,16 @@ suspension sibling of A1-F05) and **corrected one of our own narrowings**
 (A2-F25 on cancellation). Both are recorded where they happened, not silently
 folded in.
 
+## The plan
+
+All four audits have been received. The surviving work is consolidated and
+ordered in **[implementation-plan.md](implementation-plan.md)**: 58 findings to
+28 work items plus 3 decisions, in the order they will be done.
+
+The ordering is deliberately **not** by severity. The audits rank Netcash first;
+that work is dormant, because there is no gateway. What can produce a wrong
+outcome today comes first.
+
 ## Process
 
 1. Each audit is written up as `audit-NN-<slug>.md` as it arrives, with the
