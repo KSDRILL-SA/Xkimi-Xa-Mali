@@ -25,7 +25,30 @@ const page = readFileSync(
   'utf8',
 )
 
-const serialisation = page.slice(page.indexOf('const serialized'), page.indexOf('const hasOpen'))
+/**
+ * Bounded explicitly, and asserted.
+ *
+ * This used to end at `const hasOpen`, a name the page redesign removed.
+ * `indexOf` then returned -1, `slice(start, -1)` ran to the end of the file,
+ * and the "narrow" assertions below started reading the whole page — where
+ * `userId` appears half a dozen times. The failure was loud in that direction,
+ * but the opposite rename would have widened the slice silently and left these
+ * tests passing over text they were never meant to see.
+ */
+const START = 'const serialized'
+const END = 'const openPeriods'
+
+const startAt = page.indexOf(START)
+const endAt = page.indexOf(END)
+
+describe('the slice this file reasons about', () => {
+  it('still finds both boundaries in the page', () => {
+    expect(startAt, START).toBeGreaterThan(-1)
+    expect(endAt, END).toBeGreaterThan(startAt)
+  })
+})
+
+const serialisation = page.slice(startAt, endAt)
 
 describe('the transaction fields that cross into the browser', () => {
   it('does not spread the row', () => {

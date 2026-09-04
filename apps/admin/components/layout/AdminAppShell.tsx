@@ -57,7 +57,8 @@ export function AdminAppShell({ children, userName, userInitials, signOutSlot }:
           fixedHeight={false}
         />
         <ScrollNav items={adminNav} variant="admin" />
-        <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
+        {/* Opacity, never transform — the same reason as the member shell. */}
+        <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in">
           {children}
         </main>
         <AppFooter />

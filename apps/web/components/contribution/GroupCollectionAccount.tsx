@@ -9,10 +9,12 @@ import { formatZAR } from '@/lib/formatters'
  * tinted header strip and the gradient icon tile with its ring — as one card
  * rather than nested tinted blocks.
  *
- * The cell backgrounds stay opaque. A translucent box has to be blended
- * against whatever is behind it on every paint, and this page tore on phones
- * for six rounds because of how much of that work it was asking a GPU to do.
- * See `ContributionSummary` for the full account of what fixed it.
+ * It sits at the foot of the contributions page: reference material, below a
+ * member's own record rather than interrupting it.
+ *
+ * (An earlier note here blamed translucent backgrounds for the tearing on that
+ * page. That was wrong, along with six other guesses — the cause was a
+ * transform animation on the app shell's `<main>`. See `ContributionHero`.)
  */
 export function GroupCollectionAccount({ compact = false }: { compact?: boolean } = {}) {
   const fields = [

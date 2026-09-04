@@ -75,7 +75,12 @@ export function MemberAppShell({
           showSkipLink
         />
         <ScrollNav items={nav} variant="member" />
-        <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in-up">
+        {/* `animate-fade-in`, not `animate-fade-in-up` — opacity, never
+            transform. See the note in ContributionHero: a translate on this
+            wrapper puts the entire page in a moving compositing layer for
+            400ms, and any subtree repainting at 60fps during that window
+            (the count-up hooks) left its old frames stranded on screen. */}
+        <main id="main-content" className="flex-1 p-4 md:p-6 max-w-screen-xl w-full mx-auto animate-fade-in">
           {children}
         </main>
         {footerSlot}
