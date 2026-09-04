@@ -5,12 +5,24 @@ import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vites
 const apiMocks = vi.hoisted(() => ({ internalAdminPost: vi.fn().mockResolvedValue({ ok: true, status: 200, data: null }) }))
 vi.mock('@/lib/api', () => ({ internalAdminPost: apiMocks.internalAdminPost }))
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    user:            { findUnique: vi.fn(), update: vi.fn(), count: vi.fn()},
+/**
+ * The database, plus a transaction that actually runs.
+ *
+ * `setMemberRole` and `setMemberStatus` now count admins and write inside one
+ * transaction, so the count they act on cannot go stale between the two. The
+ * fake hands the callback the same mock instances the direct client uses — a
+ * test that arranges `db.userRole.count` is arranging the count that really
+ * happens — plus a `$executeRaw` that records the advisory lock, because the
+ * order of lock-then-count is the whole of the fix.
+ *
+ * Hoisted because a `vi.mock` factory is lifted above every other statement in
+ * the file, so an ordinary `const` would not exist yet when it runs.
+ */
+const dbm = vi.hoisted(() => {
+  const order: string[] = []
+  const tables = {
+    user:            { findUnique: vi.fn(), update: vi.fn(), count: vi.fn() },
     role:            { findUnique: vi.fn() },
-    // `count` is how a revocation establishes there is another admin to fall
-    // back on. Left off, the policy refuses rather than guessing.
     goal:            { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), create: vi.fn(), delete: vi.fn() },
     goalProgress:    { create: vi.fn() },
     userRole:        { upsert: vi.fn(), deleteMany: vi.fn(), count: vi.fn() },
@@ -21,10 +33,30 @@ vi.mock('@/lib/db', () => ({
     adminSignatureHistory: { create: vi.fn() },
     inboxMessage:    { create: vi.fn().mockResolvedValue({}) },
     auditLog:        { create: vi.fn().mockResolvedValue({}) },
-    $transaction:    vi.fn(),
-  },
-  Prisma: {},
-}))
+  }
+  const tx = {
+    ...tables,
+    $executeRaw: (..._args: unknown[]) => { order.push('lock'); return Promise.resolve(0) },
+    user: {
+      ...tables.user,
+      count: (...args: unknown[]) => { order.push('count'); return tables.user.count(...args) },
+      update: (...args: unknown[]) => { order.push('write'); return tables.user.update(...args) },
+    },
+    userRole: {
+      ...tables.userRole,
+      count: (...args: unknown[]) => { order.push('count'); return tables.userRole.count(...args) },
+      upsert: (...args: unknown[]) => { order.push('write'); return tables.userRole.upsert(...args) },
+      deleteMany: (...args: unknown[]) => { order.push('write'); return tables.userRole.deleteMany(...args) },
+    },
+  }
+  return {
+    order,
+    db: { ...tables, $transaction: vi.fn(async (fn: (c: unknown) => Promise<unknown>) => fn(tx)) },
+  }
+})
+
+vi.mock('@/lib/db', () => ({ db: dbm.db, Prisma: {} }))
+
 vi.mock('@/lib/signature-storage', () => ({
   storeSignaturePng: vi.fn().mockResolvedValue('https://blob/sig.png'),
 }))
