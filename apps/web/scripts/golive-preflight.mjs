@@ -82,6 +82,26 @@ export const NETCASH_CREDENTIALS = ['NETCASH_SERVICE_KEY', 'NETCASH_WEBHOOK_SECR
 export const NETCASH_CONFIG = ['NETCASH_API_URL', 'NETCASH_DEBICHECK_TEMPLATE_ID']
 
 /**
+ * Not required to boot, and reported anyway.
+ *
+ * These two are what let `backup-watch` read the Backup workflow's history. Without
+ * them `checkBackupFreshness` returns `unknown`, and the daily job raises
+ * `BACKUP_WATCH_BLIND` at **warning** — "cannot confirm the backup is running" —
+ * instead of `BACKUP_NOT_RUNNING` at **critical**.
+ *
+ * That difference is the whole point of listing them here. The dead-man's switch
+ * exists because a backup that stops produces no run, no failure and no alert;
+ * blind, it degrades into a mild warning about itself, and the one condition it
+ * was built to catch is the one it cannot report. Nothing else would ever say so:
+ * they are `.optional()` in `lib/env.ts`, so env validation is happy, the
+ * deployment is happy, and the report was silent.
+ *
+ * Advisory, not blocking. Their absence is not a reason to refuse a go-live —
+ * it is a reason to know.
+ */
+export const WATCHDOG_VARS = ['BACKUP_REPO', 'BACKUP_WATCH_TOKEN']
+
+/**
  * @param {Record<string, string | undefined>} env
  * @returns {{ live: boolean, mockGateway: boolean, missing: string[], checked: string[] }}
  */
@@ -116,7 +136,12 @@ export function preflight(env) {
     return value === undefined || value === ''
   })
 
-  return { live, mockGateway, missing, checked }
+  const watchdogMissing = WATCHDOG_VARS.filter((name) => {
+    const value = env[name]
+    return value === undefined || value === ''
+  })
+
+  return { live, mockGateway, missing, checked, watchdogMissing }
 }
 
 const log = (msg) => console.log(`[go-live] ${msg}`)
@@ -126,9 +151,18 @@ function main() {
   // build has none of them and would report everything missing, which is noise.
   if (!process.env.VERCEL || process.env.VERCEL_ENV !== 'production') return 0
 
-  const { live, mockGateway, missing, checked } = preflight(process.env)
+  const { live, mockGateway, missing, checked, watchdogMissing } = preflight(process.env)
 
   log(`deployment is ${live ? 'LIVE' : 'NOT live'}; payment gateway is ${mockGateway ? 'mock' : 'real'}`)
+
+  // Said before the pass/fail line below, so it is not swallowed by an
+  // "everything is set" that is about a different question.
+  if (watchdogMissing.length > 0) {
+    log('WARNING: the off-platform backup cannot be watched.')
+    for (const name of watchdogMissing) log(`  not set: ${name}`)
+    log('  backup-watch will report "cannot confirm" rather than "backup has stopped".')
+    log('  See docs/backup-and-restore.md section 3b-ii.')
+  }
 
   if (missing.length === 0) {
     log(`all ${checked.length} go-live variables are set.`)

@@ -8,6 +8,7 @@ import {
   CONFIGURED_WHEN_LIVE,
   NETCASH_CREDENTIALS,
   NETCASH_CONFIG,
+  WATCHDOG_VARS,
 } from '../scripts/golive-preflight.mjs'
 
 /**
@@ -134,5 +135,61 @@ describe('go-live preflight — reporting', () => {
     // looser.
     expect(preflight({ DEPLOY_ENV: 'production', VERCEL_ENV: 'preview' }).live).toBe(true)
     expect(preflight({ DEPLOY_ENV: 'staging', VERCEL_ENV: 'production' }).live).toBe(true)
+  })
+})
+
+
+/**
+ * The variables that decide whether the backup can be *watched*.
+ *
+ * Found by a sweep: the Backup workflow had failed every day for a week —
+ * correctly, refusing to write an unencrypted dump of fifty people's ID numbers
+ * because `BACKUP_AGE_PUBLIC_KEY` was never set — and nothing told anyone. The
+ * workflow's own alert only reaches the GitHub Actions UI, and the app-side
+ * dead-man's switch was blind, because `BACKUP_REPO` and `BACKUP_WATCH_TOKEN`
+ * are `.optional()` and had never been set either.
+ *
+ * Blind, that switch raises `BACKUP_WATCH_BLIND` at warning — "cannot confirm
+ * the backup is running" — rather than `BACKUP_NOT_RUNNING` at critical. The one
+ * condition it exists to catch is the one it degrades into a shrug about.
+ *
+ * So the preflight reports them. Keyed on what the service actually reads, for
+ * the same reason the lists above are keyed on `lib/env.ts`: a list maintained
+ * by hand drifts, and a preflight that has drifted is worse than none.
+ */
+describe('go-live preflight — the backup watchdog', () => {
+  const WATCH_SERVICE = readFileSync(join(__dirname, '../services/backup-watch.service.ts'), 'utf8')
+
+  it('lists exactly the variables the watch service reads', () => {
+    const read = [...WATCH_SERVICE.matchAll(/env\.(BACKUP_[A-Z_]+)/g)]
+      .map((m) => m[1])
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .sort()
+
+    expect([...WATCHDOG_VARS].sort()).toEqual(read)
+  })
+
+  it('reports them missing when they are not set', () => {
+    const { watchdogMissing } = preflight({ VERCEL_ENV: 'production' })
+
+    expect(watchdogMissing).toEqual(expect.arrayContaining(['BACKUP_REPO', 'BACKUP_WATCH_TOKEN']))
+  })
+
+  it('reports nothing when both are set', () => {
+    const { watchdogMissing } = preflight({
+      VERCEL_ENV: 'production',
+      BACKUP_REPO: 'KSDRILL-SA/Xkimi-Xa-Mali',
+      BACKUP_WATCH_TOKEN: 'ghp_x',
+    })
+
+    expect(watchdogMissing).toEqual([])
+  })
+
+  it('does not make them block a go-live', () => {
+    // Advisory. Their absence is a reason to know, not a reason to refuse.
+    const { missing } = preflight({ VERCEL_ENV: 'production' })
+
+    expect(missing).not.toContain('BACKUP_REPO')
+    expect(missing).not.toContain('BACKUP_WATCH_TOKEN')
   })
 })
