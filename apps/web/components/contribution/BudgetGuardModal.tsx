@@ -102,7 +102,10 @@ function BudgetGuardModalContent({ details, loading, onChangeAmount, onProceed, 
               maxLength={200}
               rows={2}
               placeholder="e.g. Catching up on a missed month"
-              className="w-full rounded-xl border border-xxm-gray-200 text-sm p-3 outline-none transition-all duration-150 focus:border-xxm-green focus:ring-2 focus:ring-xxm-green/15"
+              // Named, not `all`. Focus changes the border colour and the
+              // ring; `all` additionally arms `transform`, which promotes the
+              // field to its own compositing layer for nothing.
+              className="w-full rounded-xl border border-xxm-gray-200 text-sm p-3 outline-none transition-[border-color,box-shadow] duration-150 focus:border-xxm-green focus:ring-2 focus:ring-xxm-green/15"
             />
           </div>
 

@@ -2,6 +2,7 @@
 
 import { useCountUp } from '@/lib/hooks/useCountUp'
 import { formatZAR } from '@/lib/formatters'
+import { TrendingUp } from 'lucide-react'
 
 type Summary = {
   totalPaid: number
@@ -14,47 +15,26 @@ type Summary = {
 }
 
 /**
- * ── What tore this page, after seven attempts ───────────────────────────────
+ * The headline panel, in the dashboard hero's language.
  *
- * Not a card, not a shadow, not a gradient, and not `transition-transform`.
+ * Same construction as the greeting card on `/dashboard`: a `to-br` green
+ * gradient at `rounded-3xl` under `shadow-xxm-lg`, a noise overlay, a
+ * `glass-gold` eyebrow pill and display type. It should read as the same
+ * product, because it is.
  *
- * `<main>` in the app shell carried `animate-fade-in-up` — a 400ms
- * **translateY** — on every page load. That puts the entire page content into
- * a compositing layer that is moving for the first 400ms after navigation.
+ * ── One difference from the dashboard hero, and it is deliberate ────────────
  *
- * `useCountUp` runs a `requestAnimationFrame` loop calling `setState` roughly
- * sixty times a second for 900ms. On the contributions page four of those ran
- * at once, inside that moving layer. Blink rasterises the layer, the subtree
- * rewrites itself mid-transform, and the old tiles are never invalidated — so
- * the phone kept the intermediate frames on screen. That is exactly what the
- * screenshots show: "Make a payment" painted three times at three scroll
- * offsets, each copy a real frame of the entry animation.
+ * The dashboard's hero carries three orbs on infinite `animate-orb-drift-*`
+ * transforms. They are safe there because the count-ups live in a *sibling*
+ * section — nothing that repaints sits inside a perpetually moving box.
  *
- * The correlation is complete and it is the only one that ever was:
+ * Here the counting total is the hero, so drifting orbs would put a 60fps
+ * repaint inside a permanently animating layer: the exact arrangement that
+ * tore this page for seven rounds. The washes below are static radial
+ * gradients instead. They give the same depth and light, cost one paint, and
+ * remove the only structure on this page capable of bringing the bug back.
  *
- *   contributions  uses useCountUp  tears
- *   dashboard      uses useCountUp  tears
- *   transactions   does not         never tore — with the same gradients,
- *                                   the same rounded-3xl, the same shadow-xxm
- *                                   and the same Reveal
- *
- * Which is why every previous fix failed. They removed cards, shadows, hover
- * lifts and transitions from a page whose visual twin had all of them and was
- * fine. Round six disabled the count-up and the tearing stopped — but the
- * conclusion drawn was "phones cannot afford the animation", so when the owner
- * asked for it back in round seven it returned and took the bug with it.
- *
- * The animation was never the problem. The **ancestor transform** was. The
- * shell now fades with opacity alone, so a repainting subtree has no moving
- * layer to be stranded in, and the count-up is free to run everywhere.
- *
- * ── The design ─────────────────────────────────────────────────────────────
- *
- * One number is why a member opens this page: what they have put in. It gets
- * the panel, the scale and the contrast; everything else is context sized
- * against it. The previous layout gave "Total contributed" exactly as much
- * room as "Overdue: 0", which is four figures of equal weight and therefore no
- * hierarchy at all.
+ * See `motion.ts` for the full policy.
  */
 export function ContributionHero({ summary }: { summary: Summary }) {
   // Counted in cents so the decimals animate rather than snapping on at the end.
@@ -62,7 +42,6 @@ export function ContributionHero({ summary }: { summary: Summary }) {
   const year = useCountUp(Math.round(summary.yearlyPaid * 100), 900)
   const currentYear = new Date().getFullYear()
 
-  const settled = summary.paid + summary.partial
   const progress =
     summary.totalContributions > 0
       ? Math.min(100, Math.round((summary.paid / summary.totalContributions) * 100))
@@ -71,85 +50,64 @@ export function ContributionHero({ summary }: { summary: Summary }) {
   return (
     <section
       aria-label="Contribution totals"
-      className="overflow-hidden rounded-3xl bg-gradient-to-br from-xxm-canopy to-xxm-green-900 shadow-xxm"
+      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-xxm-green via-xxm-canopy to-xxm-green-900 text-white shadow-xxm-lg"
     >
-      <div className="px-5 py-6 sm:px-7 sm:py-7">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-white/50">
-          Total contributed
-        </p>
+      <div className="noise-overlay" aria-hidden />
+
+      {/* Static light. Radial washes, not drifting orbs — see the note above. */}
+      <div
+        className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.10),transparent_70%)]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(212,175,55,0.14),transparent_70%)]"
+        aria-hidden
+      />
+
+      <div className="relative z-10 px-5 py-6 sm:px-8 sm:py-8">
+        <span className="glass-gold inline-flex items-center gap-2 rounded-full px-3 py-1.5">
+          <TrendingUp size={12} className="text-xxm-gold" aria-hidden />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-xxm-gold sm:text-[11px]">
+            Total contributed
+          </span>
+        </span>
+
         {/* `break-words`, not `truncate`: this is the member's own money and
             clipping it silently is worse than letting it wrap. */}
-        <p className="stat-number mt-1.5 break-words font-display text-4xl font-black leading-none tracking-tight text-white sm:text-5xl">
+        <p className="stat-number mt-3.5 break-words font-display text-4xl font-black leading-none tracking-tight sm:text-5xl">
           {formatZAR(total / 100)}
         </p>
 
-        {/* The year's progress, as a single line rather than a card. */}
-        <div className="mt-5 sm:mt-6">
+        <div className="mt-6 max-w-md sm:mt-7">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-[11px] font-semibold uppercase tracking-widest text-white/50">
-              {currentYear}
+            <span className="text-[11px] font-bold uppercase tracking-widest text-white/50">
+              {currentYear} so far
             </span>
-            <span className="stat-number text-sm font-bold text-xxm-gold">
+            <span className="stat-number text-sm font-extrabold text-xxm-gold">
               {formatZAR(year / 100)}
             </span>
           </div>
           <span
-            className="mt-2 block h-1.5 w-full overflow-hidden rounded-full bg-white/12"
+            className="mt-2.5 block h-1.5 w-full overflow-hidden rounded-full bg-white/12"
             role="progressbar"
             aria-valuenow={progress}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-label="Periods settled"
+            aria-label="Periods fully paid"
           >
+            {/* `transition-[width]` on a leaf that contains nothing. */}
             <span
-              className="block h-full rounded-full bg-xxm-gold transition-[width] duration-700 ease-smooth"
+              className="block h-full rounded-full bg-gradient-to-r from-xxm-gold-dark via-xxm-gold to-xxm-gold-light transition-[width] duration-700 ease-smooth"
               style={{ width: `${progress}%` }}
             />
           </span>
-          <p className="mt-2 text-[11px] text-white/45">
+          <p className="mt-2.5 text-[11px] leading-relaxed text-white/50">
             {summary.paid} of {summary.totalContributions}{' '}
             {summary.totalContributions === 1 ? 'period' : 'periods'} fully paid
             {summary.partial > 0 && ` · ${summary.partial} part-paid`}
           </p>
         </div>
       </div>
-
-      {/* A hairline strip of counts, inside the same box. Three figures that
-          are context for the headline, not competitors to it. */}
-      <dl className="grid grid-cols-3 divide-x divide-white/10 border-t border-white/10">
-        <HeroStat label="Settled" value={`${settled}`} />
-        <HeroStat label="Awaiting" value={`${summary.pending}`} />
-        <HeroStat
-          label="Overdue"
-          value={`${summary.overdue}`}
-          tone={summary.overdue > 0 ? 'alert' : undefined}
-        />
-      </dl>
     </section>
-  )
-}
-
-function HeroStat({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: string
-  tone?: 'alert'
-}) {
-  return (
-    <div className="px-3 py-3.5 text-center sm:py-4">
-      <dd
-        className={`stat-number text-xl font-extrabold leading-none sm:text-2xl ${
-          tone === 'alert' ? 'text-red-300' : 'text-white'
-        }`}
-      >
-        {value}
-      </dd>
-      <dt className="mt-1.5 text-[10px] font-semibold uppercase tracking-widest text-white/45">
-        {label}
-      </dt>
-    </div>
   )
 }

@@ -5,20 +5,23 @@ import Link from 'next/link'
 import { formatZAR, formatMonth } from '@/lib/formatters'
 import { PaymentModal } from './PaymentModal'
 import { Button } from '@/components/ui/Button'
-import { CalendarClock, AlertTriangle } from 'lucide-react'
+import { CalendarClock, AlertTriangle, ArrowRight } from 'lucide-react'
 import type { ContributionData, MandateInfo } from './ContributionLedger'
 
 /**
  * The one period a member is here to act on, lifted out of the ledger.
  *
  * Previously the only way to pay was to find the right row among twelve and
- * press a "Pay" button sitting inside it — the primary action on the page,
- * indistinguishable from eleven rows that needed nothing. The oldest open
- * period now gets its own band, above the history, stating what is owed and
- * when it was due.
+ * press a small button inside it — the primary action on the page, styled
+ * exactly like eleven rows that needed nothing.
  *
- * Oldest, not newest: arrears are what a stokvel chases, and paying the oldest
- * outstanding month first is what keeps a member's standing intact.
+ * Oldest open period, not newest: arrears are what a stokvel chases, and
+ * clearing the oldest outstanding month first is what protects a member's
+ * standing.
+ *
+ * Styled to the dashboard's card language, with the accent carried by the
+ * header strip rather than by elevation — an overdue month should be
+ * unmistakable without shouting in shadow.
  */
 export function NextPaymentCard({
   contribution,
@@ -31,7 +34,7 @@ export function NextPaymentCard({
    * Whether in-app payment exists at all right now. It does not: since the
    * DebiCheck rejection there is no gateway, so `mandate` is null for every
    * member. Without this the card would tell all of them to "set up a mandate"
-   * — advice that cannot be followed and that hides the way that does work.
+   * — advice that cannot be followed, and that hides the way that does work.
    */
   paymentsEnabled: boolean
 }) {
@@ -40,6 +43,7 @@ export function NextPaymentCard({
   const due = Number(contribution.amountDue)
   const paid = Number(contribution.amountPaid)
   const outstanding = Math.max(0, due - paid)
+  const progress = due > 0 ? Math.min(100, Math.round((paid / due) * 100)) : 0
   const isOverdue = contribution.status === 'OVERDUE'
   const dueDate = new Date(contribution.dueDate)
 
@@ -49,20 +53,18 @@ export function NextPaymentCard({
     <>
       <section
         aria-label="Next payment"
-        className={`overflow-hidden rounded-3xl border bg-white shadow-xxm-sm ${
-          isOverdue ? 'border-red-200' : 'border-xxm-green/10'
+        className={`overflow-hidden rounded-2xl border bg-white shadow-xxm-sm ${
+          isOverdue ? 'border-red-200' : 'border-xxm-green/12'
         }`}
       >
         <div
           className={`flex items-center gap-2 px-4 py-2.5 sm:px-5 ${
-            isOverdue ? 'bg-red-50' : 'bg-xxm-green-50'
+            isOverdue
+              ? 'bg-gradient-to-r from-red-50 to-white'
+              : 'bg-gradient-to-r from-xxm-green-50 to-white'
           }`}
         >
-          <Icon
-            size={13}
-            className={isOverdue ? 'text-red-500' : 'text-xxm-green'}
-            aria-hidden
-          />
+          <Icon size={13} className={isOverdue ? 'text-red-500' : 'text-xxm-green'} aria-hidden />
           <h2
             className={`text-[11px] font-bold uppercase tracking-widest ${
               isOverdue ? 'text-red-700' : 'text-xxm-green-700'
@@ -76,10 +78,10 @@ export function NextPaymentCard({
             on a narrow phone without the button crushing the text. */}
         <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-5">
           <div className="min-w-0">
-            <p className="stat-number break-words text-2xl font-extrabold leading-none text-xxm-green-900">
+            <p className="stat-number break-words font-display text-3xl font-black leading-none tracking-tight text-xxm-green-900">
               {formatZAR(outstanding)}
             </p>
-            <p className="mt-1.5 text-[13px] text-xxm-gray-500">
+            <p className="mt-2 text-[13px] text-xxm-gray-500">
               <span className="font-semibold text-xxm-gray-700">
                 {formatMonth(contribution.periodMonth, contribution.periodYear)}
               </span>
@@ -91,9 +93,17 @@ export function NextPaymentCard({
               })}
             </p>
             {paid > 0 && (
-              <p className="mt-1 text-[11px] text-xxm-gray-400">
-                {formatZAR(paid)} of {formatZAR(due)} already paid
-              </p>
+              <div className="mt-2.5 max-w-[16rem]">
+                <span className="block h-1 w-full overflow-hidden rounded-full bg-xxm-gray-100">
+                  <span
+                    className="block h-full rounded-full bg-xxm-green transition-[width] duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </span>
+                <p className="mt-1.5 text-[11px] text-xxm-gray-400">
+                  {formatZAR(paid)} of {formatZAR(due)} already paid
+                </p>
+              </div>
             )}
           </div>
 
@@ -115,9 +125,14 @@ export function NextPaymentCard({
             // repeating it in a card this size.
             <Link
               href="/dashboard/contribute"
-              className="shrink-0 text-xs font-semibold text-xxm-green underline decoration-xxm-green/30 underline-offset-2 transition-colors hover:text-xxm-canopy sm:max-w-[13rem] sm:text-right"
+              className="group inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-xxm-green/20 bg-white px-4 py-2.5 text-xs font-bold text-xxm-green transition-colors hover:bg-xxm-green-50"
             >
-              Pay by EFT or cash — see how
+              Pay by EFT or cash
+              <ArrowRight
+                size={13}
+                className="sm:transition-transform sm:group-hover:translate-x-0.5"
+                aria-hidden
+              />
             </Link>
           )}
         </div>
