@@ -160,6 +160,13 @@ jobs:
           # which is empty — 900 bytes, caught by the size guard. What the log
           # did not say was what else existed, so the next guess would have been
           # as blind as the first.
+          # Every project this key can see. The production branch of
+          # NEON_PROJECT_ID dumped 900 bytes — an empty database — while the
+          # live app plainly has data, so the first thing to establish is
+          # whether this key is even looking at the project the app uses.
+          echo "Projects visible to this API key:"
+          api "$API/projects"             | jq -r '.projects[] | "  \(.id)  \(.name)  created=\(.created_at[0:10])"'
+
           echo "Branches on this project:"
           api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r '.branches[] | "  \(.id)  default=\(.default)  \(.name)"'
 
