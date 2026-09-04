@@ -162,6 +162,7 @@ jobs:
 
           BRANCH=""
           BEST=0
+          BEST_TABLES=0
           echo "Table counts per branch (public schema):"
           for B in $(api "$API/projects/$NEON_PROJECT_ID/branches" | jq -r '.branches[].id'); do
             BNAME=$(api "$API/projects/$NEON_PROJECT_ID/branches"               | jq -r --arg b "$B" '.branches[] | select(.id==$b) | .name')
@@ -170,19 +171,39 @@ jobs:
             if [ -z "$BDB" ]; then echo "  $BNAME: no database"; continue; fi
             BURI=$(api "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$B&database_name=$BDB&role_name=$BROLE&pooled=false" | jq -r '.uri')
             echo "::add-mask::$BURI"
-            # Table count only. No column values are read, and none are printed.
+            # Tables, then bytes. Both are metadata: `information_schema` and
+            # `pg_database_size` describe the database, and neither reads a
+            # column value.
+            #
+            # Table count alone chose wrong on the first successful run. This
+            # project has a branch called `preview` marked *schema-only* — 40
+            # tables, no rows — beside `staging`, which has the same 40 tables
+            # and all the members. Counting tables made them indistinguishable,
+            # the tie went to whichever was iterated first, and the run produced
+            # a 126KB dump of an empty schema. It passed the 50KB size guard and
+            # was recorded as the project's first successful backup.
+            #
+            # A backup of a schema with no rows is the exact thing this workflow
+            # exists to prevent, arriving with a green tick. Size tells them
+            # apart in one query and cannot be fooled by a branch that was
+            # copied without its data.
             N=$(psql "$BURI" -tAc "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null || echo 0)
-            echo "  $BNAME ($BDB): $N tables"
-            if [ "$N" -gt "$BEST" ] 2>/dev/null; then BEST="$N"; BRANCH="$B"; fi
+            SZ=$(psql "$BURI" -tAc "select pg_database_size(current_database())" 2>/dev/null || echo 0)
+            echo "  $BNAME ($BDB): $N tables, $(( SZ / 1024 )) KB"
+            # Tables are the gate; bytes decide. A branch with no tables is not
+            # a candidate however much history it carries.
+            if [ "$N" -gt 0 ] 2>/dev/null && [ "$SZ" -gt "$BEST" ] 2>/dev/null; then
+              BEST="$SZ"; BRANCH="$B"; BEST_TABLES="$N"
+            fi
           done
 
-          if [ -z "$BRANCH" ] || [ "$BEST" -eq 0 ]; then
+          if [ -z "$BRANCH" ] || [ "$BEST_TABLES" -eq 0 ]; then
             echo "::error::No Neon branch in this project has any tables. Nothing to back up."
             exit 1
           fi
 
           CHOSEN=$(api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r --arg b "$BRANCH" '.branches[] | select(.id==$b) | .name')
-          echo "Backing up branch '$CHOSEN' ($BEST tables)."
+          echo "Backing up branch '$CHOSEN' — $BEST_TABLES tables, $(( BEST / 1024 )) KB."
 
           # Said loudly, every night, until somebody fixes the naming. A project
           # whose default branch is empty while the application runs on a child
