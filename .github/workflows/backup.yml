@@ -82,7 +82,22 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client
-          pg_dump --version
+
+          # Use the newest client explicitly, by path.
+          #
+          # Installing pgdg is not enough. `/usr/bin/pg_dump` is Debian's
+          # `pg_wrapper`, and the runner image ships PostgreSQL 16 already — so
+          # after installing client 18 the wrapper still resolved to 16.15 and
+          # pg_dump aborted with "server version mismatch" against a newer Neon.
+          # The install step looked completely successful; only the version line
+          # gave it away.
+          #
+          # Sorted with `sort -V` so this keeps working when pgdg moves to 19,
+          # rather than pinning a major that Neon will eventually pass.
+          PGBIN="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          echo "PATH=$PGBIN:$PATH" >> "$GITHUB_ENV"
+          echo "Using client at: $PGBIN"
+          "$PGBIN/pg_dump" --version
 
       # ── Where the connection string comes from ──────────────────────────
       #
