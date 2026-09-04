@@ -25,7 +25,7 @@ import {
   TransactionNotFoundError,
   BudgetExceededError,
 } from '@/lib/errors'
-import { assertCanAccess, assertAdmin } from '@/lib/authorization'
+import { assertCanAccess, canAccess, assertAdmin } from '@/lib/authorization'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
@@ -113,8 +113,13 @@ export async function getContribution(id: string, requesterId: string, roles: st
   const contribution = await contributionRepo.findById(id, {
     transactions: { orderBy: { createdAt: 'desc' } },
   })
-  if (!contribution) throw new ContributionNotFoundError()
-  assertCanAccess(contribution.userId, requesterId, roles)
+  // One answer for "there is no such contribution" and "that one is not
+  // yours" — see canAccess. `getContributions` above keeps `assertCanAccess`
+  // and is already safe: it authorises a userId parameter before any lookup, so
+  // a stranger's id and a nonexistent one are refused identically.
+  if (!contribution || !canAccess(contribution.userId, requesterId, roles)) {
+    throw new ContributionNotFoundError()
+  }
   return contribution
 }
 
