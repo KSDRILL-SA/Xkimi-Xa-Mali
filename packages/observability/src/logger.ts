@@ -1,4 +1,5 @@
 import * as Sentry from '@sentry/nextjs'
+import { redact } from './redact'
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
@@ -25,10 +26,19 @@ function serialize(value: unknown): unknown {
   return value
 }
 
+/**
+ * Serialise, then redact — in that order, and the order matters.
+ *
+ * `serialize` spreads an Error's own enumerable properties into the entry,
+ * which is how a provider error carrying a recipient address gets in without
+ * any call site naming it. Redacting afterwards sees those fields; redacting
+ * first would not. See redact.ts.
+ */
 function formatMeta(meta: LogMeta): LogMeta {
-  return Object.fromEntries(
+  const serialised = Object.fromEntries(
     Object.entries(meta).map(([k, v]) => [k, serialize(v)]),
   )
+  return redact(serialised) as LogMeta
 }
 
 /** Everything except the error itself — Sentry shows the exception separately. */
