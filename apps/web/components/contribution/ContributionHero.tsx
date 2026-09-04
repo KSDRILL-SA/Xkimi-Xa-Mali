@@ -22,19 +22,31 @@ type Summary = {
  * `glass-gold` eyebrow pill and display type. It should read as the same
  * product, because it is.
  *
- * ── One difference from the dashboard hero, and it is deliberate ────────────
+ * ── The drifting orbs, and why they are safe here ──────────────────────────
  *
- * The dashboard's hero carries three orbs on infinite `animate-orb-drift-*`
- * transforms. They are safe there because the count-ups live in a *sibling*
- * section — nothing that repaints sits inside a perpetually moving box.
+ * These are the dashboard hero's three `animate-orb-drift-*` lights: slow
+ * 14–22s translate-and-scale loops that give the panel depth without ever
+ * asking for attention.
  *
- * Here the counting total is the hero, so drifting orbs would put a 60fps
- * repaint inside a permanently animating layer: the exact arrangement that
- * tore this page for seven rounds. The washes below are static radial
- * gradients instead. They give the same depth and light, cost one paint, and
- * remove the only structure on this page capable of bringing the bug back.
+ * An infinite transform animation was the one thing this page could not
+ * afford to get wrong, so it is worth being precise about why this shape is
+ * fine when the shell's was not.
  *
- * See `motion.ts` for the full policy.
+ * The bug was an **ancestor** transform: `<main>` moved, and the count-up
+ * repainted *inside* the layer that was moving, so Blink kept rasterising
+ * tiles it never invalidated. Every orb here is an absolutely positioned
+ * **sibling** of the content — it sits beside the number, not around it.
+ * Its transform moves its own layer and nothing else's, and the counting
+ * total is never a descendant of anything that animates.
+ *
+ * `will-change: transform` makes that promotion explicit rather than leaving
+ * it to Blink's heuristics, so an orb can never be rasterised into the same
+ * layer as the text it drifts behind.
+ *
+ * `motion.ts` states the rule this follows, and
+ * `contributions-motion-policy.test.ts` enforces the shape: an infinite
+ * animation on this page must be `absolute`, `aria-hidden` and
+ * `will-change`-promoted — decorative, out of flow, and never a wrapper.
  */
 export function ContributionHero({ summary }: { summary: Summary }) {
   // Counted in cents so the decimals animate rather than snapping on at the end.
@@ -54,13 +66,21 @@ export function ContributionHero({ summary }: { summary: Summary }) {
     >
       <div className="noise-overlay" aria-hidden />
 
-      {/* Static light. Radial washes, not drifting orbs — see the note above. */}
+      {/* Drifting light, as on the dashboard. Absolute siblings of the
+          content, promoted to their own layers — see the note above. */}
       <div
-        className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.10),transparent_70%)]"
+        className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full bg-white/[0.07] animate-orb-drift-1"
+        style={{ willChange: 'transform' }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(212,175,55,0.14),transparent_70%)]"
+        className="pointer-events-none absolute -bottom-24 -left-12 h-56 w-56 rounded-full bg-xxm-gold/10 animate-orb-drift-2"
+        style={{ willChange: 'transform' }}
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute -bottom-16 right-1/4 h-40 w-40 rounded-full bg-white/[0.04] animate-orb-drift-3"
+        style={{ willChange: 'transform' }}
         aria-hidden
       />
 

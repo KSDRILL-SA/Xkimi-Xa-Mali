@@ -77,21 +77,57 @@ describe('every contribution component', () => {
 describe('the hero, which holds the counting total', () => {
   const hero = code(readFileSync(resolve(DIR, 'ContributionHero.tsx'), 'utf8'))
 
-  it('runs no infinite animation around the count', () => {
-    // The dashboard hero's drifting orbs are safe there because its count-ups
-    // live in a sibling section. Here the count is inside the hero, so a
-    // perpetually moving layer would wrap a 60fps repaint — the original bug,
-    // rebuilt as decoration.
-    for (const animation of [
-      'animate-orb-drift-1',
-      'animate-orb-drift-2',
-      'animate-orb-drift-3',
-      'animate-float',
-      'animate-gold-glow',
-      'animate-pulse-ring',
-      'animate-rotate-slow',
-    ]) {
-      expect(hero, animation).not.toContain(animation)
+  /**
+   * Infinite animations are allowed, but only in one shape.
+   *
+   * The bug was an **ancestor** transform: the shell moved and the count
+   * repainted inside the layer that was moving. A drifting orb is the opposite
+   * arrangement — an absolutely positioned sibling that moves its own layer and
+   * wraps nothing. So the test is not "is this class present" but "is every
+   * element carrying it decorative and out of flow".
+   */
+  const INFINITE = [
+    'animate-orb-drift-1',
+    'animate-orb-drift-2',
+    'animate-orb-drift-3',
+    'animate-float',
+    'animate-float-delayed',
+    'animate-gold-glow',
+    'animate-border-glow',
+    'animate-pulse-gold',
+    'animate-pulse-ring',
+    'animate-rotate-slow',
+  ]
+
+  /** The `<div …/>` (or `<span …/>`) that carries a given class. */
+  function elementWith(cls: string): string | null {
+    const at = hero.indexOf(cls)
+    if (at === -1) return null
+    const open = hero.lastIndexOf('<', at)
+    const close = hero.indexOf('/>', at)
+    return hero.slice(open, close + 2)
+  }
+
+  it.each(INFINITE)('%s, if used, is a decorative absolute sibling', (cls) => {
+    const el = elementWith(cls)
+    if (el === null) return // not used — nothing to prove
+
+    expect(el, `${cls} must be positioned out of flow`).toMatch(/\babsolute\b/)
+    expect(el, `${cls} must be hidden from assistive tech`).toContain('aria-hidden')
+    expect(el, `${cls} must not swallow taps`).toMatch(/\bpointer-events-none\b/)
+    // Explicit promotion, so the orb never shares a layer with the text it
+    // drifts behind.
+    expect(el, `${cls} must declare willChange`).toContain('willChange')
+    // Self-closing: an element that wraps children is the banned shape.
+    expect(el.endsWith('/>'), `${cls} must not wrap content`).toBe(true)
+  })
+
+  it('keeps the counting total outside every animated element', () => {
+    // The amount is rendered in the `relative z-10` block, which carries no
+    // animation of its own.
+    const content = hero.slice(hero.indexOf('relative z-10'))
+    for (const cls of INFINITE) {
+      expect(content, `${cls} must not appear around the total`).not.toContain(cls)
     }
   })
 
