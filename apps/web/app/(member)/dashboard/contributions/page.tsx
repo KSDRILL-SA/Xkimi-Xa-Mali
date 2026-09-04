@@ -5,11 +5,14 @@ import { getSession } from '@/lib/session'
 import { getContributions, getContributionSummary } from '@/services/contribution.service'
 import { getMandates } from '@/services/mandate.service'
 import { ContributionHero } from '@/components/contribution/ContributionHero'
+import { ContributionStats } from '@/components/contribution/ContributionStats'
 import { NextPaymentCard } from '@/components/contribution/NextPaymentCard'
+import { SectionHeading } from '@/components/contribution/SectionHeading'
 import { GroupCollectionAccount } from '@/components/contribution/GroupCollectionAccount'
 import { ContributionLedger } from '@/components/contribution/ContributionLedger'
 import { RouterPagination } from '@/components/ui/RouterPagination'
-import { Wallet, AlertTriangle } from 'lucide-react'
+import { ENTER, enterDelay } from '@/components/contribution/motion'
+import { Wallet, AlertTriangle, Receipt, Landmark } from 'lucide-react'
 import { MEMBER_PAYMENTS_ENABLED } from '@/lib/payments-enabled'
 
 export const metadata: Metadata = { title: 'Contributions' }
@@ -17,32 +20,33 @@ export const metadata: Metadata = { title: 'Contributions' }
 const PAGE_SIZE = 12
 
 /**
- * ── Rebuilt from scratch, 2026-09-04 ───────────────────────────────────────
+ * ── Rebuilt 2026-09-04, then styled to the dashboard ───────────────────────
  *
  * Seven rounds of patching failed to stop this page tearing on Android. The
- * cause is written up in full in `ContributionHero`: it was never anything on
- * this page. `<main>` in the app shell animated a **translateY** for 400ms on
- * every navigation, and the count-up hooks repainted at 60fps inside that
- * moving layer. Contributions and the dashboard were the only two pages that
- * ran count-ups, and they were the only two pages that ever tore. The shell now
- * fades with opacity alone.
- *
- * With the cause removed, the layout is free to be designed for reading rather
- * than for placating a compositor.
+ * cause is written up in `motion.ts`: `<main>` in the app shell animated a
+ * 400ms **translateY**, and the count-up hooks repainted at 60fps inside that
+ * moving layer. Contributions and the dashboard were the only two pages
+ * running count-ups and the only two that ever tore. The shell now fades with
+ * opacity, the owner has confirmed the page is clean on a real phone, and
+ * every animation added since follows the policy in `motion.ts`.
  *
  * ── The order is the argument ──────────────────────────────────────────────
  *
- *   1. What you have saved      — the hero. One number, at the top, unmissable.
- *   2. What you owe next        — the one period that needs action, with the
- *                                 amount on the button.
- *   3. Your record              — the ledger, grouped by year.
- *   4. Where the money goes     — the group account, as reference.
+ *   1. What you have saved   the hero. One number, unmissable.
+ *   2. How your periods sit  three counts, equal weight because they are a set
+ *   3. What you owe next     the one period needing action, amount on the button
+ *   4. Your record           the ledger, grouped by year
+ *   5. Where the money goes  the group account, as reference
  *
- * The previous order put four equally weighted stat cards first (so no figure
- * led), then bank details, then a mandate warning, then history — with the pay
- * action buried inside whichever of twelve rows happened to be outstanding.
- * Reference material sat above the member's own record, and the primary action
- * was the hardest thing on the page to find.
+ * The previous order opened with four equally weighted stat cards, so no
+ * figure led; put bank details above the member's own record; and buried the
+ * pay action inside whichever of twelve rows happened to be outstanding.
+ *
+ * ── Entrances ──────────────────────────────────────────────────────────────
+ *
+ * Opacity only, staggered by 60ms. No section fades *up*: a translate on a
+ * wrapper is the exact shape of the bug this page spent seven rounds on, and
+ * a fade reads as calm rather than busy on a page about money.
  *
  * Mobile-first: base styles target a 360px viewport and widen at `sm:`.
  */
@@ -123,8 +127,8 @@ export default async function ContributionsPage({
   const nextDue = openPeriods.length > 0 ? openPeriods[openPeriods.length - 1]! : null
 
   return (
-    <div className="space-y-5 sm:space-y-6">
-      <header className="flex items-start gap-3 sm:gap-4">
+    <div className="space-y-5 sm:space-y-7">
+      <header className={`flex items-start gap-3 sm:gap-4 ${ENTER}`}>
         <span
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-xxm-green/15 to-xxm-green/5 ring-1 ring-xxm-green/10 sm:h-12 sm:w-12"
           aria-hidden
@@ -143,21 +147,34 @@ export default async function ContributionsPage({
         </div>
       </header>
 
-      <ContributionHero summary={summary} />
+      <div className={ENTER} style={enterDelay(60)}>
+        <ContributionHero summary={summary} />
+      </div>
+
+      {total > 0 && (
+        <div className={ENTER} style={enterDelay(120)}>
+          <ContributionStats summary={summary} />
+        </div>
+      )}
 
       {nextDue && (
-        <NextPaymentCard
-          contribution={nextDue}
-          mandate={mandateInfo}
-          paymentsEnabled={MEMBER_PAYMENTS_ENABLED}
-        />
+        <div className={ENTER} style={enterDelay(180)}>
+          <NextPaymentCard
+            contribution={nextDue}
+            mandate={mandateInfo}
+            paymentsEnabled={MEMBER_PAYMENTS_ENABLED}
+          />
+        </div>
       )}
 
       {/* Only when a mandate is a thing a member can act on. With no gateway
           there is nothing to set up, and telling everyone to "enable monthly
           debits" would be an instruction that cannot be followed. */}
       {MEMBER_PAYMENTS_ENABLED && !mandateInfo && (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3.5 sm:px-5 sm:py-4">
+        <div
+          className={`flex items-start gap-3 rounded-2xl border border-amber-200 bg-gradient-to-b from-amber-50 to-white px-4 py-3.5 shadow-xxm-sm sm:px-5 sm:py-4 ${ENTER}`}
+          style={enterDelay(200)}
+        >
           <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-500" aria-hidden />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-amber-800">No active mandate</p>
@@ -177,9 +194,12 @@ export default async function ContributionsPage({
       {contributions.length === 0 ? (
         // p-14 was 56px of padding on every side — on a 360px screen that
         // leaves under 250px for the content it is meant to frame.
-        <div className="rounded-3xl border border-xxm-green/8 bg-white p-8 text-center shadow-xxm-sm sm:p-14 sm:shadow-xxm">
+        <div
+          className={`rounded-2xl border border-xxm-green/12 bg-white p-8 text-center shadow-xxm-sm sm:p-14 sm:shadow-xxm ${ENTER}`}
+          style={enterDelay(240)}
+        >
           <span
-            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-xxm-green/15 to-xxm-green/5 ring-1 ring-xxm-green/10"
+            className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-xxm-green/15 to-xxm-green/5 ring-1 ring-xxm-green/10"
             aria-hidden
           >
             <Wallet size={26} className="text-xxm-green/50" />
@@ -190,29 +210,35 @@ export default async function ContributionsPage({
           </p>
         </div>
       ) : (
-        <section className="space-y-3">
-          <h2 className="px-1 text-xs font-bold uppercase tracking-widest text-xxm-gray-400">
-            Payment record
-          </h2>
+        <section className={ENTER} style={enterDelay(240)}>
+          <SectionHeading
+            icon={Receipt}
+            title="Payment record"
+            subtitle="Every period, newest first"
+          />
           <ContributionLedger contributions={serialized} mandate={mandateInfo} />
           {totalPages > 1 && (
-            <RouterPagination
-              totalItems={total}
-              itemsPerPage={PAGE_SIZE}
-              currentPage={page}
-              baseUrl="/dashboard/contributions"
-            />
+            <div className="mt-3">
+              <RouterPagination
+                totalItems={total}
+                itemsPerPage={PAGE_SIZE}
+                currentPage={page}
+                baseUrl="/dashboard/contributions"
+              />
+            </div>
           )}
         </section>
       )}
 
       {/* Reference, so it sits below the member's own record rather than
           interrupting it. */}
-      <section className="space-y-3">
-        <h2 className="px-1 text-xs font-bold uppercase tracking-widest text-xxm-gray-400">
-          Where your money goes
-        </h2>
-        <GroupCollectionAccount />
+      <section className={ENTER} style={enterDelay(300)}>
+        <SectionHeading
+          icon={Landmark}
+          title="Where your money goes"
+          subtitle="The group's collection account"
+        />
+        <GroupCollectionAccount showHeader={false} />
       </section>
     </div>
   )

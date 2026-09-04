@@ -14,9 +14,12 @@ import { formatZAR } from '@/lib/formatters'
  *
  * (An earlier note here blamed translucent backgrounds for the tearing on that
  * page. That was wrong, along with six other guesses — the cause was a
- * transform animation on the app shell's `<main>`. See `ContributionHero`.)
+ * transform animation on the app shell's `<main>`. See `motion.ts`.)
  */
-export function GroupCollectionAccount({ compact = false }: { compact?: boolean } = {}) {
+export function GroupCollectionAccount({
+  compact = false,
+  showHeader = true,
+}: { compact?: boolean; showHeader?: boolean } = {}) {
   const fields = [
     { label: 'Account name', value: GROUP_ACCOUNT.accountName, mono: false },
     { label: 'Bank', value: GROUP_ACCOUNT.bankName, mono: false },
@@ -27,11 +30,16 @@ export function GroupCollectionAccount({ compact = false }: { compact?: boolean 
   return (
     <section
       aria-label="Group collection account"
-      className={`overflow-hidden rounded-3xl border border-xxm-green/8 bg-white ${
+      className={`overflow-hidden rounded-2xl border border-xxm-green/12 bg-white ${
         compact ? '' : 'shadow-xxm-sm sm:shadow-xxm'
       }`}
     >
-      <div className="flex items-center gap-2.5 border-b border-xxm-gray-100 bg-xxm-gray-50 px-4 py-3 sm:px-5">
+      {/* Suppressed on the contributions page, where a `SectionHeading`
+          directly above already says this in the page's own type scale —
+          two headings, one on top of the other, saying the same thing. The
+          payment modal has no such heading and keeps it. */}
+      {showHeader && (
+      <div className="flex items-center gap-2.5 border-b border-xxm-gray-100 bg-gradient-to-r from-xxm-green-50 to-white px-4 py-3 sm:px-5">
         <span
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-xxm-green/15 to-xxm-green/5 ring-1 ring-xxm-green/10"
           aria-hidden
@@ -45,6 +53,7 @@ export function GroupCollectionAccount({ compact = false }: { compact?: boolean 
           <p className="text-[10px] text-xxm-gray-500">Where your contributions are settled</p>
         </div>
       </div>
+      )}
 
       {/* `min-w-0` on each cell: a 2-up grid on a narrow phone gives each about
           150px, and both the account name and a letter-spaced account number

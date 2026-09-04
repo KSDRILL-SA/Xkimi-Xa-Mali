@@ -90,15 +90,15 @@ export function ContributionLedger({
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-xxm-green/8 bg-white shadow-xxm-sm sm:shadow-xxm">
+    <div className="overflow-hidden rounded-2xl border border-xxm-green/12 bg-white shadow-xxm-sm sm:shadow-xxm">
       {groups.map((group, gi) => (
         <section key={group.year} aria-label={`${group.year} contributions`}>
           <h3
-            className={`flex items-baseline justify-between gap-3 bg-xxm-gray-50 px-4 py-2.5 sm:px-5 ${
+            className={`flex items-baseline justify-between gap-3 bg-gradient-to-r from-xxm-green-50 to-white px-4 py-2.5 sm:px-5 ${
               gi === 0 ? '' : 'border-t border-xxm-gray-100'
             } border-b border-xxm-gray-100`}
           >
-            <span className="stat-number text-[13px] font-extrabold tracking-tight text-xxm-green-900">
+            <span className="stat-number font-display text-sm font-black tracking-tight text-xxm-green-900">
               {group.year}
             </span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-xxm-gray-400">
