@@ -22,10 +22,12 @@ const mocks = vi.hoisted(() => ({
   userUpdate: vi.fn(),
   publishRoleVersion: vi.fn(),
   writeAuditLog: vi.fn(),
+  /** What happened inside the transaction, in order. */
+  order: [] as string[],
 }))
 
-vi.mock('@/lib/db', () => ({
-  db: {
+vi.mock('@/lib/db', () => {
+  const tables = {
     role: { findUnique: mocks.roleFindUnique },
     user: { findUnique: mocks.userFindUnique, update: mocks.userUpdate },
     userRole: {
@@ -33,8 +35,24 @@ vi.mock('@/lib/db', () => ({
       upsert: mocks.userRoleUpsert,
       deleteMany: mocks.userRoleDeleteMany,
     },
-  },
-}))
+  }
+  // The count and the write happen in one transaction now, so the number the
+  // policy is given cannot go stale before it is acted on. Same mock instances
+  // as the direct client, so every arrangement below still arranges the call
+  // that really happens.
+  const tx = {
+    ...tables,
+    $executeRaw: (..._a: unknown[]) => { mocks.order.push('lock'); return Promise.resolve(0) },
+    userRole: {
+      count: (...a: unknown[]) => { mocks.order.push('count'); return mocks.userRoleCount(...a) },
+      upsert: (...a: unknown[]) => { mocks.order.push('write'); return mocks.userRoleUpsert(...a) },
+      deleteMany: (...a: unknown[]) => { mocks.order.push('write'); return mocks.userRoleDeleteMany(...a) },
+    },
+  }
+  return {
+    db: { ...tables, $transaction: vi.fn(async (fn: (c: unknown) => Promise<unknown>) => fn(tx)) },
+  }
+})
 vi.mock('@/lib/env', () => ({ env: { UPSTASH_REDIS_REST_URL: undefined, UPSTASH_REDIS_REST_TOKEN: undefined } }))
 vi.mock('@/lib/role-version', () => ({ publishRoleVersion: mocks.publishRoleVersion }))
 
@@ -54,6 +72,57 @@ beforeEach(() => {
   mocks.userFindUnique.mockResolvedValue({ id: 'member-2' })
   mocks.userRoleCount.mockResolvedValue(3)
   mocks.userUpdate.mockResolvedValue({ id: 'member-2', roleVersion: 4 })
+})
+
+describe('the count and the write are one operation', () => {
+  // The guards above are correct and were evaluated against a read taken
+  // outside any transaction, with the delete happening after it. Two admins
+  // removing each other at the same moment both read three admins, were both
+  // told three is enough, and both wrote — each operation individually
+  // legitimate, the pair of them leaving nobody able to sign in.
+  //
+  // There is no stricter check that fixes this: under READ COMMITTED each
+  // transaction sees its own delete and not the other's, so re-counting after
+  // writing still concludes that an admin remains. The lock is what makes the
+  // second caller wait and then see the truth.
+
+  beforeEach(() => { mocks.order.length = 0 })
+
+  it('takes the lock before counting, and writes after', async () => {
+    // A lock taken after the count locks nothing — the stale read has already
+    // happened. This ordering is the entire fix.
+    await setMemberRole('admin-1', ADMIN_ROLES, 'member-2', 'ADMIN', false)
+
+    expect(mocks.order).toEqual(['lock', 'count', 'write'])
+  })
+
+  it('does not lock when granting admin', async () => {
+    // Adding an admin cannot strand anybody, and the ordinary case should not
+    // pay for a lock on a rule it cannot trip.
+    await setMemberRole('admin-1', ADMIN_ROLES, 'member-2', 'ADMIN', true)
+
+    expect(mocks.order).toEqual(['write'])
+  })
+
+  it('does not lock when the role is not ADMIN', async () => {
+    mocks.roleFindUnique.mockResolvedValue({ id: 'role-member', name: 'MEMBER' })
+
+    await setMemberRole('admin-1', ADMIN_ROLES, 'member-2', 'MEMBER', true)
+
+    expect(mocks.order).toEqual(['write'])
+  })
+
+  it('releases the lock without writing when the policy refuses', async () => {
+    // Thrown inside the transaction, so it rolls back and the lock goes with
+    // it. A refusal that left the lock held would shut the console for good.
+    mocks.userRoleCount.mockResolvedValue(1)
+
+    await expect(
+      setMemberRole('admin-1', ADMIN_ROLES, 'member-2', 'ADMIN', false),
+    ).rejects.toThrow(/at least one admin must remain/i)
+
+    expect(mocks.order).toEqual(['lock', 'count'])
+  })
 })
 
 describe('the click that could have ended the system', () => {

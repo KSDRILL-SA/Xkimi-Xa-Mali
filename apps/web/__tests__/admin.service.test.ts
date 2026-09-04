@@ -1,12 +1,28 @@
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest'
 
+/**
+ * What happened inside the last transaction, in order.
+ *
+ * Hoisted so the `@/lib/db` factory below can close over it — a mock factory is
+ * lifted above every other statement in the file, so an ordinary `const` would
+ * not exist yet when it runs.
+ */
+const tx = vi.hoisted(() => ({
+  order: [] as string[],
+  count: vi.fn(),
+  update: vi.fn(),
+}))
+
 vi.mock('@/lib/db', () => ({
   db: {
     user: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
-      count: vi.fn(),
-      update: vi.fn(),
+      // The same instances the transaction client below uses, so a test that
+      // arranges `mockDb.user.update` still arranges the write that actually
+      // happens now it runs inside a transaction.
+      count: tx.count,
+      update: tx.update,
     },
     paymentMandate: {
       findMany: vi.fn(),
@@ -27,6 +43,19 @@ vi.mock('@/lib/db', () => ({
       findMany: vi.fn(),
       count: vi.fn(),
     },
+    // `setMemberStatus` counts admins and writes inside one transaction now, so
+    // the count it acts on cannot go stale between the two. The fake runs the
+    // callback against a client that records the advisory lock, because the
+    // order of lock-then-count is the whole of that fix.
+    $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({
+        $executeRaw: (..._args: unknown[]) => { tx.order.push('lock'); return Promise.resolve(0) },
+        user: {
+          count: (...args: unknown[]) => { tx.order.push('count'); return tx.count(...args) },
+          update: (...args: unknown[]) => { tx.order.push('write'); return tx.update(...args) },
+        },
+      }),
+    ),
   },
 }))
 
@@ -209,7 +238,7 @@ describe('listMembers', () => {
 
 describe('setMemberStatus', () => {
   it('updates status and writes audit log', async () => {
-    mockDb.user.findMany.mockResolvedValue([{ id: 'u1', status: 'PENDING' }] as never)
+    mockDb.user.findMany.mockResolvedValue([{ id: 'u1', status: 'PENDING', roles: [] }] as never)
     mockDb.user.update.mockResolvedValue({ id: 'u1', status: 'ACTIVE', firstName: 'X', lastName: 'Y' } as never)
     mockWriteAuditLog.mockResolvedValue(undefined)
 
@@ -226,8 +255,84 @@ describe('setMemberStatus', () => {
   })
 
   it('throws AdminConflictError when status is unchanged', async () => {
-    mockDb.user.findMany.mockResolvedValue([{ id: 'u1', status: 'ACTIVE' }] as never)
+    mockDb.user.findMany.mockResolvedValue([{ id: 'u1', status: 'ACTIVE', roles: [] }] as never)
     await expect(setMemberStatus('a', ADMIN_ROLES, 'u1', 'ACTIVE')).rejects.toBeInstanceOf(AdminConflictError)
+  })
+})
+
+// ─── setMemberStatus: the last admin ─────────────────────────────────────────
+//
+// This function had no last-admin guard at all — not a race, a single request.
+// `status-policy` was written because suspension can strand the circle exactly
+// as revoking a role can, and the console's copy of setMemberStatus was given
+// the rule. This one, reached at POST /api/v1/admin/members/:id/status, was
+// never given it: suspend the one remaining admin and the roleVersion bump ends
+// their session, sign-in refuses them for want of an active account, and nothing
+// can lift the suspension because lifting it needs an admin.
+//
+// Which is the defect role-policy exists to prevent, one file over. Sharing a
+// rule only helps the callers that ask it.
+
+describe('setMemberStatus and the last admin', () => {
+  const asAdmin = (status = 'ACTIVE') =>
+    [{ id: 'u1', status, roles: [{ role: { name: 'ADMIN' } }] }] as never
+
+  beforeEach(() => {
+    tx.order.length = 0
+    mockDb.user.update.mockResolvedValue({ id: 'u1', status: 'SUSPENDED', firstName: 'X', lastName: 'Y' } as never)
+  })
+
+  it('refuses to suspend the only admin who can still sign in', async () => {
+    // Counted including the target, so one means suspending them leaves zero.
+    mockDb.user.findMany.mockResolvedValue(asAdmin())
+    tx.count.mockResolvedValue(1 as never)
+
+    await expect(
+      setMemberStatus('admin1', ADMIN_ROLES, 'u1', 'SUSPENDED'),
+    ).rejects.toBeInstanceOf(AdminConflictError)
+
+    expect(tx.update).not.toHaveBeenCalled()
+  })
+
+  it('allows it while another admin remains', async () => {
+    mockDb.user.findMany.mockResolvedValue(asAdmin())
+    tx.count.mockResolvedValue(2 as never)
+
+    const result = await setMemberStatus('admin1', ADMIN_ROLES, 'u1', 'SUSPENDED')
+
+    expect(result.status).toBe('SUSPENDED')
+    expect(tx.update).toHaveBeenCalledOnce()
+  })
+
+  it('takes the lock before counting, and writes after', async () => {
+    // A lock taken after the count locks nothing — the stale read has already
+    // happened. This ordering is the entire fix.
+    mockDb.user.findMany.mockResolvedValue(asAdmin())
+    tx.count.mockResolvedValue(2 as never)
+
+    await setMemberStatus('admin1', ADMIN_ROLES, 'u1', 'SUSPENDED')
+
+    expect(tx.order).toEqual(['lock', 'count', 'write'])
+  })
+
+  it('does not lock or count when the target is not an admin', async () => {
+    // The ordinary case must not pay for a query about a rule it cannot trip.
+    mockDb.user.findMany.mockResolvedValue([{ id: 'u1', status: 'ACTIVE', roles: [] }] as never)
+    tx.count.mockResolvedValue(2 as never)
+
+    await setMemberStatus('admin1', ADMIN_ROLES, 'u1', 'SUSPENDED')
+
+    expect(tx.order).toEqual(['write'])
+  })
+
+  it('does not lock or count when reactivating an admin', async () => {
+    // Restoring access cannot strand anybody.
+    mockDb.user.findMany.mockResolvedValue(asAdmin('SUSPENDED'))
+    mockDb.user.update.mockResolvedValue({ id: 'u1', status: 'ACTIVE', firstName: 'X', lastName: 'Y' } as never)
+
+    await setMemberStatus('admin1', ADMIN_ROLES, 'u1', 'ACTIVE')
+
+    expect(tx.order).toEqual(['write'])
   })
 })
 

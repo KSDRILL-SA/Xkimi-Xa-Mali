@@ -22,6 +22,7 @@ import {
 import { MAX_MEMBERS } from '@xxm/utils'
 import { assertAdmin, ROLES } from '@/lib/authorization'
 import { refuseRoleChange, ROLE_CHANGE_REFUSAL_MESSAGE } from '@xxm/utils/role-policy'
+import { lockAdminInvariant } from '@xxm/utils/admin-invariant'
 import { bumpRoleVersion } from '@/lib/role-version'
 import { userRepo, runTransaction } from '@/repositories/user.repository'
 import { invitationRepo } from '@/repositories/invitation.repository'
@@ -518,29 +519,6 @@ export async function setMemberRole(
 ) {
   assertAdmin(adminRoles)
 
-  // The same rule the admin console applies, from the same module.
-  //
-  // These guards used to live here and only here, expressed as two separate
-  // conditionals — while the console called its own copy of this function,
-  // which had neither. The rules were right and were not on the path anyone
-  // took. Sharing the decision is the fix; keeping two that happen to agree
-  // today is how this happened.
-  const adminCount =
-    roleName === ROLES.ADMIN && !assign
-      ? await userRepo
-          .findRole(ROLES.ADMIN)
-          .then((r) => (r ? userRepo.countUserRoles({ roleId: r.id }) : 0))
-      : 0
-
-  const refusal = refuseRoleChange({
-    actorId: adminId,
-    targetId: memberId,
-    role: roleName,
-    assign,
-    adminCount,
-  })
-  if (refusal) throw new ForbiddenError(ROLE_CHANGE_REFUSAL_MESSAGE[refusal])
-
   const [member, role] = await Promise.all([
     userRepo.findById(memberId),
     userRepo.findRoleOrThrow(roleName),
@@ -548,15 +526,52 @@ export async function setMemberRole(
 
   if (!member) throw new AdminNotFoundError('Member not found')
 
-  if (assign) {
-    await userRepo.upsertUserRole(
-      { userId_roleId: { userId: memberId, roleId: role.id } },
-      { userId: memberId, roleId: role.id },
-      {},
-    )
-  } else {
-    await userRepo.deleteUserRoles({ userId: memberId, roleId: role.id })
-  }
+  // Count, decide and write as one operation, under the lock.
+  //
+  // The rule itself comes from the shared module, as it did before: these
+  // guards used to live here and only here while the console called its own
+  // copy that had neither, so the protection existed in the codebase and not on
+  // the path anyone took. What the shared rule could not fix is *when* it is
+  // consulted. The count was taken outside any transaction and the delete
+  // happened after it, so two admins removing each other at the same moment
+  // both read two admins, were both told two is enough, and both wrote.
+  //
+  // `lockAdminInvariant` is first, because a lock taken after the count locks
+  // nothing that matters — the stale read has already happened.
+  await runTransaction(async (tx) => {
+    if (roleName === ROLES.ADMIN && !assign) {
+      await lockAdminInvariant(tx)
+    }
+
+    const adminCount =
+      roleName === ROLES.ADMIN && !assign
+        ? await userRepo
+            .findRole(ROLES.ADMIN, tx)
+            .then((r) => (r ? userRepo.countUserRoles({ roleId: r.id }, tx) : 0))
+        : 0
+
+    const refusal = refuseRoleChange({
+      actorId: adminId,
+      targetId: memberId,
+      role: roleName,
+      assign,
+      adminCount,
+    })
+    // Thrown inside the transaction so the lock is released and nothing is
+    // written; the caller sees the same error it always did.
+    if (refusal) throw new ForbiddenError(ROLE_CHANGE_REFUSAL_MESSAGE[refusal])
+
+    if (assign) {
+      await userRepo.upsertUserRole(
+        { userId_roleId: { userId: memberId, roleId: role.id } },
+        { userId: memberId, roleId: role.id },
+        {},
+        tx,
+      )
+    } else {
+      await userRepo.deleteUserRoles({ userId: memberId, roleId: role.id }, tx)
+    }
+  })
 
   await bumpRoleVersion(memberId)
 

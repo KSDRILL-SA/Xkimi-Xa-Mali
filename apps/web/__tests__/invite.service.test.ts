@@ -122,6 +122,19 @@ const VALID_INVITE = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+
+  // A transaction that runs, unless a test replaces it.
+  //
+  // `setMemberRole` now counts admins and writes inside one transaction, so the
+  // number the policy is given cannot go stale before it is acted on. The
+  // client handed to the callback delegates to the same table mocks as the
+  // direct one — a test arranging `mockDb.userRole.count` is arranging the
+  // count that really happens — and carries `$executeRaw` for the advisory
+  // lock. Without a default here, whichever test last called
+  // `mockDb.$transaction.mockImplementation` would decide the behaviour of
+  // every test after it: `clearAllMocks` clears calls, not implementations.
+  mockDb.$transaction.mockImplementation((async (fn: (tx: unknown) => Promise<unknown>) =>
+    fn({ ...mockDb, $executeRaw: vi.fn().mockResolvedValue(0) })) as never)
   // A circle with room in it, unless a test says otherwise. Without a default
   // every existing invite test would trip the fifty-member cap on an undefined
   // count.

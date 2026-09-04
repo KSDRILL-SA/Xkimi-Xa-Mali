@@ -5,6 +5,7 @@ import {
   STATUS_CHANGE_REFUSAL_MESSAGE,
   type AdminSettableStatus,
 } from '@xxm/utils/status-policy'
+import { lockAdminInvariant } from '@xxm/utils/admin-invariant'
 import { db, Prisma } from '@/lib/db'
 import { publishRoleVersion } from '@/lib/role-version'
 import { assertAdmin, notifyInbox, writeAuditLog, AdminNotFoundError, AdminConflictError } from './shared'
@@ -123,27 +124,6 @@ export async function setMemberStatus(
 
   const targetIsAdmin = member.roles.some((r) => r.role.name === 'ADMIN')
 
-  // Admins who could still undo this. Counted only when it could matter, so the
-  // ordinary case does not pay for a query about a rule it cannot trip.
-  const activeAdminCount = targetIsAdmin && newStatus === 'SUSPENDED'
-    ? await db.user.count({
-        where: { status: 'ACTIVE', deletedAt: null, roles: { some: { role: { name: 'ADMIN' } } } },
-      })
-    : 0
-
-  // The status arrives from a form field. The dropdown offers three values, but
-  // the server is not entitled to assume the client sent one of them — and one
-  // of the values it does not offer, RESIGNED, would record that a member chose
-  // to leave when leadership removed them.
-  const refusal = refuseStatusChange({
-    actorId: adminId,
-    targetId: memberId,
-    requestedStatus: newStatus,
-    targetIsAdmin,
-    activeAdminCount,
-  })
-  if (refusal) throw new AdminConflictError(STATUS_CHANGE_REFUSAL_MESSAGE[refusal])
-
   const trimmedReason = reason?.trim() ?? ''
   if (newStatus === 'SUSPENDED' && trimmedReason.length < 10) {
     throw new AdminConflictError(
@@ -151,10 +131,50 @@ export async function setMemberStatus(
     )
   }
 
-  const updated = await db.user.update({
-    where: { id: memberId },
-    data: { status: newStatus as AdminSettableStatus, roleVersion: { increment: 1 } },
-    select: { id: true, status: true, firstName: true, lastName: true, roleVersion: true },
+  // Count, decide and write as one operation, under the lock.
+  //
+  // Suspending an admin and revoking an admin's role are different operations
+  // against the same invariant, and they could not see each other: one reads
+  // `users`, the other reads `user_roles`. So one admin suspending A while
+  // another revokes B's role passed both checks and left nobody able to sign
+  // in. `lockAdminInvariant` is the one lock both take, named for the invariant
+  // rather than for either operation — see admin-invariant.
+  //
+  // The roleVersion bump moves inside with the status. It is what ends a
+  // suspended member's live session, and a suspension that commits without it
+  // is somebody locked out on paper and still signed in.
+  const updated = await db.$transaction(async (tx) => {
+    if (targetIsAdmin && newStatus === 'SUSPENDED') {
+      await lockAdminInvariant(tx)
+    }
+
+    // Admins who could still undo this. Counted only when it could matter, so
+    // the ordinary case does not pay for a query about a rule it cannot trip.
+    const activeAdminCount = targetIsAdmin && newStatus === 'SUSPENDED'
+      ? await tx.user.count({
+          where: { status: 'ACTIVE', deletedAt: null, roles: { some: { role: { name: 'ADMIN' } } } },
+        })
+      : 0
+
+    // The status arrives from a form field. The dropdown offers three values,
+    // but the server is not entitled to assume the client sent one of them —
+    // and one of the values it does not offer, RESIGNED, would record that a
+    // member chose to leave when leadership removed them.
+    const refusal = refuseStatusChange({
+      actorId: adminId,
+      targetId: memberId,
+      requestedStatus: newStatus,
+      targetIsAdmin,
+      activeAdminCount,
+    })
+    // Thrown inside, so the lock is released and nothing is written.
+    if (refusal) throw new AdminConflictError(STATUS_CHANGE_REFUSAL_MESSAGE[refusal])
+
+    return tx.user.update({
+      where: { id: memberId },
+      data: { status: newStatus as AdminSettableStatus, roleVersion: { increment: 1 } },
+      select: { id: true, status: true, firstName: true, lastName: true, roleVersion: true },
+    })
   })
 
   // The member portal's Edge middleware reads this value from Redis. Publishing

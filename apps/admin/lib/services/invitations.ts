@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { MAX_MEMBERS } from '@xxm/utils'
 import { refuseRoleChange, ROLE_CHANGE_REFUSAL_MESSAGE } from '@xxm/utils/role-policy'
+import { lockAdminInvariant } from '@xxm/utils/admin-invariant'
 import { publishRoleVersion } from '@/lib/role-version'
 import { assertAdmin, writeAuditLog, AdminNotFoundError, AdminConflictError, AdminForbiddenError } from './shared'
 
@@ -101,30 +102,47 @@ export async function setMemberRole(
   // of the role, and no way to grant it back because granting needs an admin.
   // The protection existed; it was on the path nobody took.
   //
-  // Counted only when it matters. Revoking ADMIN is rare; every other change
-  // skips the query.
-  const adminCount =
-    role === 'ADMIN' && !assign
-      ? await db.userRole.count({ where: { roleId: roleRecord.id } })
-      : 0
+  // Counted only when it matters, and inside the transaction that writes.
+  //
+  // Sharing the rule fixed *what* is allowed. It could not fix *when* the
+  // question is asked: the count used to be taken outside any transaction and
+  // the delete happened afterwards, so two admins removing each other at the
+  // same moment both read two admins, were both told two is enough, and both
+  // wrote. `lockAdminInvariant` is the first statement, because a lock taken
+  // after the count locks nothing that matters.
+  //
+  // The roleVersion bump belongs in here too. It is what ends the target's
+  // session, and a role removed without it is a member who keeps admin access
+  // until their token expires.
+  const updated = await db.$transaction(async (tx) => {
+    if (role === 'ADMIN' && !assign) {
+      await lockAdminInvariant(tx)
+    }
 
-  const refusal = refuseRoleChange({ actorId: adminId, targetId: memberId, role, assign, adminCount })
-  if (refusal) throw new AdminForbiddenError(ROLE_CHANGE_REFUSAL_MESSAGE[refusal])
+    const adminCount =
+      role === 'ADMIN' && !assign
+        ? await tx.userRole.count({ where: { roleId: roleRecord.id } })
+        : 0
 
-  if (assign) {
-    await db.userRole.upsert({
-      where: { userId_roleId: { userId: memberId, roleId: roleRecord.id } },
-      create: { userId: memberId, roleId: roleRecord.id },
-      update: {},
+    const refusal = refuseRoleChange({ actorId: adminId, targetId: memberId, role, assign, adminCount })
+    // Thrown inside, so the lock is released and nothing is written.
+    if (refusal) throw new AdminForbiddenError(ROLE_CHANGE_REFUSAL_MESSAGE[refusal])
+
+    if (assign) {
+      await tx.userRole.upsert({
+        where: { userId_roleId: { userId: memberId, roleId: roleRecord.id } },
+        create: { userId: memberId, roleId: roleRecord.id },
+        update: {},
+      })
+    } else {
+      await tx.userRole.deleteMany({ where: { userId: memberId, roleId: roleRecord.id } })
+    }
+
+    return tx.user.update({
+      where: { id: memberId },
+      data: { roleVersion: { increment: 1 } },
+      select: { id: true, roleVersion: true },
     })
-  } else {
-    await db.userRole.deleteMany({ where: { userId: memberId, roleId: roleRecord.id } })
-  }
-
-  const updated = await db.user.update({
-    where: { id: memberId },
-    data: { roleVersion: { increment: 1 } },
-    select: { id: true, roleVersion: true },
   })
 
   // The member portal's Edge middleware reads Redis, not Postgres. Publish the

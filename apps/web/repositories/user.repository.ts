@@ -43,11 +43,28 @@ export const userRepo = {
     return client.user.create({ data })
   },
 
-  update(id: string, data: Prisma.UserUpdateInput, select?: Prisma.UserSelect) {
-    return db.user.update({
+  update(id: string, data: Prisma.UserUpdateInput, select?: Prisma.UserSelect, tx?: TxClient) {
+    const client = tx ?? db
+    return client.user.update({
       where: { id },
       data,
       ...(select && { select }),
+    })
+  },
+
+  /**
+   * Admins who can still sign in — ACTIVE, undeleted, holding ADMIN.
+   *
+   * Its own method rather than a `findMany` at the call site, because the shape
+   * of this count *is* the rule: counted including the target, so suspending
+   * the last one leaves zero and the policy refuses. Takes a `tx` because it is
+   * only meaningful inside the transaction holding the admin-availability lock
+   * — read outside one, the answer is already stale when it is used.
+   */
+  countActiveAdmins(tx?: TxClient) {
+    const client = tx ?? db
+    return client.user.count({
+      where: { status: 'ACTIVE', deletedAt: null, roles: { some: { role: { name: 'ADMIN' } } } },
     })
   },
 
@@ -69,8 +86,9 @@ export const userRepo = {
     return (db.user.groupBy as unknown as (a: T) => ReturnType<typeof db.user.groupBy>)(args)
   },
 
-  findRole(name: RoleName | string) {
-    return db.role.findUnique({ where: { name: name as RoleName } })
+  findRole(name: RoleName | string, tx?: TxClient) {
+    const client = tx ?? db
+    return client.role.findUnique({ where: { name: name as RoleName } })
   },
 
   findRoleOrThrow(name: RoleName | string) {
@@ -82,16 +100,22 @@ export const userRepo = {
     return client.userRole.create({ data })
   },
 
-  upsertUserRole(where: Prisma.UserRoleWhereUniqueInput, create: Prisma.UserRoleUncheckedCreateInput, update: Prisma.UserRoleUpdateInput) {
-    return db.userRole.upsert({ where, create, update })
+  upsertUserRole(where: Prisma.UserRoleWhereUniqueInput, create: Prisma.UserRoleUncheckedCreateInput, update: Prisma.UserRoleUpdateInput, tx?: TxClient) {
+    const client = tx ?? db
+    return client.userRole.upsert({ where, create, update })
   },
 
-  deleteUserRoles(where: Prisma.UserRoleWhereInput) {
-    return db.userRole.deleteMany({ where })
+  deleteUserRoles(where: Prisma.UserRoleWhereInput, tx?: TxClient) {
+    const client = tx ?? db
+    return client.userRole.deleteMany({ where })
   },
 
-  countUserRoles(where: Prisma.UserRoleWhereInput) {
-    return db.userRole.count({ where })
+  // `tx` is not optional in spirit on the revoke path: the count and the write
+  // that follows it only mean anything inside the transaction holding the
+  // admin-availability lock. See lockAdminInvariant.
+  countUserRoles(where: Prisma.UserRoleWhereInput, tx?: TxClient) {
+    const client = tx ?? db
+    return client.userRole.count({ where })
   },
 
   findLoginHistory(where: Prisma.LoginHistoryWhereInput, opts?: { skip?: number; take?: number; orderBy?: Prisma.LoginHistoryOrderByWithRelationInput; select?: Prisma.LoginHistorySelect }) {

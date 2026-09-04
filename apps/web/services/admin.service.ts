@@ -3,7 +3,7 @@ import { writeAuditLog } from './audit.service'
 import { queueNotification } from './notification.service'
 import { createInboxMessages } from './inbox.service'
 import { AdminNotFoundError, AdminConflictError } from '@/lib/errors'
-import { assertAdmin, assertNotSelf } from '@/lib/authorization'
+import { assertAdmin, assertNotSelf, ROLES } from '@/lib/authorization'
 import { isValidSAId } from '@xxm/utils/sa-id'
 import { encrypt } from '@/lib/encryption'
 import { paymentGateway } from '@/integrations/payment'
@@ -16,7 +16,9 @@ import { cache, CACHE_KEYS } from '@/lib/cache'
 import { tallyBy } from '@/lib/aggregate'
 import { subtractZAR } from '@/lib/money'
 import { bumpRoleVersion } from '@/lib/role-version'
-import { userRepo } from '@/repositories/user.repository'
+import { refuseStatusChange, STATUS_CHANGE_REFUSAL_MESSAGE } from '@xxm/utils/status-policy'
+import { lockAdminInvariant } from '@xxm/utils/admin-invariant'
+import { userRepo, runTransaction } from '@/repositories/user.repository'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
 import { auditRepo } from '@/repositories/audit.repository'
@@ -175,14 +177,52 @@ export async function setMemberStatus(
 
   const memberResults = await userRepo.findMany({ id: memberId }, {
     take: 1,
-    select: { id: true, status: true },
+    select: { id: true, status: true, roles: { select: { role: { select: { name: true } } } } },
   })
   const member = memberResults[0] ?? null
   if (!member) throw new AdminNotFoundError('Member not found')
   if (member.status === newStatus) throw new AdminConflictError(`Member is already ${newStatus}`)
 
-  const updated = await userRepo.update(memberId, { status: newStatus }, {
-    id: true, status: true, firstName: true, lastName: true,
+  const targetIsAdmin = ((member as unknown as { roles?: Array<{ role: { name: string } }> })
+    .roles ?? []).some((r) => r.role.name === ROLES.ADMIN)
+
+  // The last-admin guard this function did not have at all.
+  //
+  // `status-policy` exists because roles were given a last-admin guard and
+  // suspension — the route that role-policy's own refusal message recommends —
+  // had neither. That was fixed in the console's `setMemberStatus`. This is the
+  // member app's copy, reached by POST /api/v1/admin/members/:id/status, and it
+  // was never given the rule: an admin could suspend the last remaining admin
+  // in a single request, no race required, and lock the circle out of its own
+  // console with nobody left to undo it.
+  //
+  // Which is the same defect role-policy was written to end, one file over.
+  // Sharing a rule only helps the callers that ask it.
+  //
+  // Self-suspension is still refused above by `assertNotSelf`, which runs first
+  // and reaches the same answer as the policy's SELF_SUSPEND with this app's own
+  // error type. The policy is consulted for what that check cannot see.
+  const updated = await runTransaction(async (tx) => {
+    if (targetIsAdmin && newStatus === 'SUSPENDED') {
+      await lockAdminInvariant(tx)
+    }
+
+    const activeAdminCount = targetIsAdmin && newStatus === 'SUSPENDED'
+      ? await userRepo.countActiveAdmins(tx)
+      : 0
+
+    const refusal = refuseStatusChange({
+      actorId: adminId,
+      targetId: memberId,
+      requestedStatus: newStatus,
+      targetIsAdmin,
+      activeAdminCount,
+    })
+    if (refusal) throw new AdminConflictError(STATUS_CHANGE_REFUSAL_MESSAGE[refusal])
+
+    return userRepo.update(memberId, { status: newStatus }, {
+      id: true, status: true, firstName: true, lastName: true,
+    }, tx)
   })
 
   await Promise.all([
