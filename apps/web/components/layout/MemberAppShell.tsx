@@ -6,6 +6,7 @@ import { ToastProvider } from '@/components/ui/Toast'
 import {
   LayoutDashboard,
   Wallet,
+  Landmark,
   CalendarCheck,
   Target,
   ArrowLeftRight,
@@ -22,6 +23,10 @@ import {
 const memberNav: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/contributions', label: 'Contributions', icon: Wallet },
+  // Directly after Contributions: it is the same money, seen whole. A member
+  // who has just read their own months is the member most likely to ask what
+  // the group holds.
+  { href: '/dashboard/fund', label: 'The Fund', icon: Landmark },
   { href: '/dashboard/mandates', label: 'Mandates', icon: CalendarCheck },
   { href: '/dashboard/goals', label: 'Goals', icon: Target },
   { href: '/dashboard/transactions', label: 'Transactions', icon: ArrowLeftRight },

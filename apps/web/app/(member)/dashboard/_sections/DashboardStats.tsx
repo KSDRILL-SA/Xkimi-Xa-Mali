@@ -20,7 +20,7 @@ export async function DashboardStats() {
     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <AnimatedStatCard
         icon={<TrendingUp size={18} className="text-xxm-green" aria-hidden />}
-        label="Total contributed"
+        label="Monthly contributions"
         value={summary.totalContributed}
         prefix="R "
         decimals={2}
@@ -30,7 +30,7 @@ export async function DashboardStats() {
       />
       <AnimatedStatCard
         icon={<Calendar size={18} className="text-xxm-gold-dark" aria-hidden />}
-        label={`${currentYear} total`}
+        label={`${currentYear} monthly`}
         value={summary.yearlyContributed}
         prefix="R "
         decimals={2}

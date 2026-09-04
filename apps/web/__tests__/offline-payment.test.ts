@@ -73,6 +73,7 @@ vi.mock('@/repositories/contribution.repository', () => ({
 }))
 
 import { recordOfflineContribution } from '@/services/contribution.service'
+import { postPoolCredit } from '@/services/ledger.service'
 
 const ADMIN = 'admin-1'
 const ROLES = ['ADMIN']
@@ -164,6 +165,54 @@ describe('what a period is created owing', () => {
     )
 
     expect(mocks.contribCreate).not.toHaveBeenCalled()
+  })
+})
+
+/**
+ * The pool ledger has to hear about this immediately.
+ *
+ * Every other money path credits the ledger the moment money is real — the
+ * gateway webhook on SUCCESS, the goal-payment handler on settlement. The
+ * offline path did not, and it is the one that matters: with no gateway since
+ * the DebiCheck rejection, cash and EFT recorded here is *all* the money the
+ * Foundation takes in.
+ *
+ * `reconcileLedger` would have found it, but it runs at 05:00 SAST. Until then
+ * a member could be told their payment was recorded, open the fund page, and
+ * see their share unchanged and the pool short by what they had just handed
+ * over. Correct by tomorrow is not correct.
+ */
+describe('the pool ledger credit', () => {
+  it('is posted as soon as the payment is recorded', async () => {
+    await recordOfflineContribution(payment({ amount: 250 }) as never, ADMIN, ROLES)
+
+    expect(postPoolCredit).toHaveBeenCalledWith(
+      expect.objectContaining({ refType: 'TRANSACTION', amount: 250, memberId: 'member-1' }),
+    )
+  })
+
+  it('uses the reference the reconciler uses, so the nightly pass cannot double-credit', async () => {
+    // The unique (refType, refId, direction) constraint makes reconcileLedger's
+    // later attempt a silent no-op — but only if both name the row the same way.
+    mocks.txCreate.mockResolvedValueOnce({ id: 'tx-42', amount: 250 } as never)
+
+    await recordOfflineContribution(payment({ amount: 250 }) as never, ADMIN, ROLES)
+
+    expect(postPoolCredit).toHaveBeenCalledWith(
+      expect.objectContaining({ refType: 'TRANSACTION', refId: 'tx-42' }),
+    )
+  })
+
+  it('does not unwind the payment when the ledger post fails', async () => {
+    // Best-effort, like the gateway path: a ledger hiccup must never undo money
+    // that has already been recorded. The nightly reconciler is the backstop.
+    vi.mocked(postPoolCredit).mockRejectedValueOnce(new Error('ledger down'))
+
+    await expect(
+      recordOfflineContribution(payment() as never, ADMIN, ROLES),
+    ).resolves.toBeDefined()
+
+    expect(mocks.writeAuditLog).toHaveBeenCalled()
   })
 })
 

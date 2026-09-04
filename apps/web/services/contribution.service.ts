@@ -1036,6 +1036,38 @@ export async function recordOfflineContribution(
     }),
   )
 
+  // Credit the pool, now, exactly as the gateway path does on settlement.
+  //
+  // This was missing. Every other money path posts to the immutable ledger the
+  // moment money is real — the webhook handler on SUCCESS, the goal-payment
+  // handler on settlement, the reversal path on a pull-back — and the offline
+  // path did not. It was the one path that mattered: since the DebiCheck
+  // rejection there is no gateway, so cash and EFT recorded here is *all* the
+  // money the Foundation takes in.
+  //
+  // `reconcileLedger` would have caught it, but it runs at 05:00 SAST. Until
+  // then a member could be told their payment was recorded, open the fund page,
+  // and find their share unchanged and the pool short by the amount they had
+  // just handed over. Correct by tomorrow is not correct.
+  //
+  // Same `refType`/`refId` the reconciler uses, so its later pass is a silent
+  // no-op on the unique (refType, refId, direction) constraint rather than a
+  // double credit. Best-effort for the same reason as the gateway path: a
+  // ledger hiccup must never undo a payment that has already been recorded,
+  // and the nightly pass remains the backstop.
+  await postPoolCredit({
+    refType: 'TRANSACTION',
+    refId: transaction.id,
+    amount: Number(transaction.amount),
+    memberId: data.userId,
+    description: 'Contribution received',
+  }).catch((err) =>
+    logger.error('Ledger credit post failed on an offline payment', {
+      transactionId: transaction.id,
+      error: err instanceof Error ? err.message : String(err),
+    }),
+  )
+
   await writeAuditLog({
     userId: adminId,
     action: 'OFFLINE_PAYMENT_RECORDED',

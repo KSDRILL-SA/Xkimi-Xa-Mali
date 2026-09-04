@@ -219,6 +219,19 @@ export async function getMemberSummary(
   const statusMap = tallyBy(statusCounts, (r) => r.status, 'status')
 
   return {
+    /**
+     * Monthly contributions only — `Contribution.amountPaid`.
+     *
+     * The name is kept because `/api/v1/members/[id]/summary` returns this
+     * shape, but it is **not** everything a member has given: `GoalPayment` is
+     * a separate table and money directed at a goal never touches this figure.
+     *
+     * It was labelled "Total contributed" in the interface, so a member who
+     * paid R6 000 in months and R2 000 into goals was shown R6 000 under a
+     * word that means all of it. The labels now say "Monthly contributions",
+     * and `/dashboard/fund` shows the true total from the pool ledger — see
+     * `getMemberFundShare` in `ledger.service.ts`.
+     */
     totalContributed: Number(allTimeTotals._sum?.amountPaid ?? 0),
     yearlyContributed: Number(yearlyTotals._sum?.amountPaid ?? 0),
     paidCount: statusMap['PAID'] ?? 0,

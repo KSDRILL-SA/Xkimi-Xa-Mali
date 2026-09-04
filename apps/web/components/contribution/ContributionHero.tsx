@@ -88,7 +88,7 @@ export function ContributionHero({ summary }: { summary: Summary }) {
         <span className="glass-gold inline-flex items-center gap-2 rounded-full px-3 py-1.5">
           <TrendingUp size={12} className="text-xxm-gold" aria-hidden />
           <span className="text-[10px] font-bold uppercase tracking-widest text-xxm-gold sm:text-[11px]">
-            Total contributed
+            Monthly contributions
           </span>
         </span>
 
