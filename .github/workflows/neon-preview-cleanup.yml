@@ -1,0 +1,132 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Neon preview branch cleanup
+#
+# The Vercel–Neon integration creates a Neon branch per pull request and does
+# not reliably remove it afterwards. `preview/docs/restore-drill-and-tooling`
+# outlived its merged PR and its deleted git branch, and would have sat there
+# indefinitely.
+#
+# That was harmless while preview branches forked from an empty `production`.
+# It stopped being harmless the moment `staging` — which holds every member's
+# ID number, bank detail and contribution history — became the default branch,
+# because Neon branches from the default. Every orphan is now a full copy of
+# the membership database that nobody is watching.
+#
+# The exposure is contained: preview deployments sit behind Vercel
+# Authentication (they redirect to vercel.com/login), and the credentials live
+# in access-controlled environment variables. This is not a breach waiting to
+# happen. It is data minimisation — POPIA asks that personal information not be
+# kept beyond its purpose, and a copy made for a pull request that merged three
+# weeks ago has no purpose left. It also protects the branch quota: the free
+# plan allows ten, and five were already in use.
+#
+# ── What it will not touch ───────────────────────────────────────────────────
+#
+# Only branches whose name begins with `preview/`, which is the prefix the
+# integration uses. Never the default branch, never `production`, never
+# `staging`, never the schema-only `preview` root, never anything protected.
+# The safety is in the prefix match and in an explicit refusal list, because a
+# cleanup job that guesses is worse than no cleanup job.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Neon preview cleanup
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    # 03:30 UTC (05:30 SAST) daily — a sweep for anything the PR-close run
+    # missed, which is how the orphan that prompted this survived.
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-preview-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Remove Neon branches whose git branch is gone
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Delete orphaned preview branches
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [ -n "$NEON_API_KEY" ] && [ -n "$NEON_PROJECT_ID" ] || {
+            echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required."; exit 1; }
+
+          API="https://console.neon.tech/api/v2"
+          api() { curl -sS --fail-with-body -H "Authorization: Bearer $NEON_API_KEY" \
+                    -H "Accept: application/json" "$@"; }
+
+          # Names that are never candidates, whatever else is true of them.
+          # Listed rather than inferred: the cost of a wrong deletion here is
+          # the live database.
+          NEVER="production staging preview vercel-dev"
+
+          BRANCHES=$(api "$API/projects/$NEON_PROJECT_ID/branches")
+          DEFAULT_ID=$(echo "$BRANCHES" | jq -r '.branches[] | select(.default == true) | .id')
+
+          # Every git branch that still exists on the remote.
+          LIVE=$(git ls-remote --heads origin | awk '{print $2}' | sed 's|refs/heads/||')
+
+          echo "Live git branches:"; echo "$LIVE" | sed 's/^/  /'
+          echo
+
+          DELETED=0
+          KEPT=0
+          while read -r ID NAME PROTECTED; do
+            [ -n "$ID" ] || continue
+
+            # Only the integration's own prefix.
+            case "$NAME" in
+              preview/*) ;;
+              *) continue ;;
+            esac
+
+            # Belt and braces, in that order.
+            if [ "$ID" = "$DEFAULT_ID" ]; then
+              echo "  SKIP $NAME — it is the default branch"; KEPT=$((KEPT+1)); continue
+            fi
+            if [ "$PROTECTED" = "true" ]; then
+              echo "  SKIP $NAME — protected"; KEPT=$((KEPT+1)); continue
+            fi
+            for N in $NEVER; do
+              if [ "$NAME" = "$N" ]; then
+                echo "  SKIP $NAME — on the refusal list"; KEPT=$((KEPT+1)); continue 2
+              fi
+            done
+
+            # `preview/docs/restore-drill` came from git branch
+            # `docs/restore-drill`. If that branch is still open, so is its
+            # database.
+            GITREF="${NAME#preview/}"
+            if echo "$LIVE" | grep -qxF "$GITREF"; then
+              echo "  KEEP $NAME — git branch '$GITREF' still exists"; KEPT=$((KEPT+1)); continue
+            fi
+
+            echo "  DELETE $NAME — git branch '$GITREF' no longer exists"
+            curl -sS --fail-with-body -X DELETE \
+              -H "Authorization: Bearer $NEON_API_KEY" \
+              "$API/projects/$NEON_PROJECT_ID/branches/$ID" > /dev/null
+            DELETED=$((DELETED+1))
+          done <<< "$(echo "$BRANCHES" | jq -r '.branches[] | "\(.id) \(.name) \(.protected // false)"')"
+
+          echo
+          echo "Deleted $DELETED, kept $KEPT."
+          {
+            echo "### Neon preview cleanup"
+            echo ""
+            echo "Deleted **$DELETED**, kept **$KEPT**."
+          } >> "$GITHUB_STEP_SUMMARY"
