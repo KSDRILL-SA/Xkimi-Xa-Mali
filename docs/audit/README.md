@@ -42,6 +42,20 @@ settles it.
 | # | Audit | Received | Findings | Status |
 |---|---|---|---|---|
 | 1 | [Master audit — first pass](audit-01-master-audit-first-pass.md) | 2026-09-04 | 13 | Documented, verified, not scheduled |
+| 2 | [State machines, concurrency, security boundary](audit-02-state-machine-concurrency-security.md) | 2026-09-04 | 20 (14–33) | Documented, verified, not scheduled |
+
+## Findings repeat across audits
+
+Later rounds rediscover earlier findings, sometimes with better evidence. A
+rediscovery raises confidence; it does not add work. Where a finding duplicates
+one already recorded, its entry says so and points at the original, and the new
+evidence or proposed remedy is carried into that item rather than scheduled
+twice.
+
+Audit 2 also **answered** an audit 1 open question (A2-F26 verified the
+suspension sibling of A1-F05) and **corrected one of our own narrowings**
+(A2-F25 on cancellation). Both are recorded where they happened, not silently
+folded in.
 
 ## Process
 
