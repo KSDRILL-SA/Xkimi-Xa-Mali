@@ -298,3 +298,41 @@ export async function getBroadcastAudience(adminRoles: string[]) {
 
   return { ALL: all, ACTIVE: active, PENDING: pending, SUSPENDED: suspended }
 }
+
+/**
+ * Rebuild any missing pool-ledger entries, now.
+ *
+ * `reconcileLedger` runs nightly at 05:00 SAST and there was no other way to
+ * reach it. Every ledger post in the system is best-effort — deliberately, so
+ * that a ledger hiccup can never unwind a payment already recorded — which
+ * means a failed post leaves the fund figures members see short until the small
+ * hours, with no way for leadership to close the gap or confirm it closed.
+ *
+ * Safe to press repeatedly: every entry is keyed on
+ * `(refType, refId, direction)` behind a unique constraint and written with
+ * `skipDuplicates`, so a second press writes nothing and reports zero. It
+ * derives entirely from settled transactions and settled goal payments, so it
+ * cannot invent money — only find money the records already prove.
+ *
+ * Server-to-server, like every other admin action that touches money.
+ */
+export async function reconcileLedgerNow(
+  adminId: string,
+  adminRoles: string[],
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const res = await internalAdminPost<{
+    creditsPosted: number
+    debitsPosted: number
+    balance: number
+    entries: number
+  }>('/api/v1/admin/ledger/reconcile', {}, { adminUserId: adminId, adminIp: ip })
+
+  if (!res.ok || !res.data) {
+    throw new AdminConflictError(res.error?.message ?? 'The reconciliation could not be run.')
+  }
+
+  return res.data
+}

@@ -91,6 +91,9 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   // Derives rather than decides, but it still reaches every member's score —
   // and it refuses before the fetch, not after.
   ['recalculateBadges',        (r) => services.recalculateBadges('a1', r)],
+  // Rebuilds ledger entries from settled payments. It cannot invent money,
+  // but it writes to the record members are shown — so it refuses first.
+  ['reconcileLedgerNow',       (r) => services.reconcileLedgerNow('a1', r)],
   ['getSignatureMetadata',     (r) => services.getSignatureMetadata('a1', r)],
   ['getLockStatus',            (r) => services.getLockStatus('a1', r)],
   ['getSignatureHistory',      (r) => services.getSignatureHistory('a1', r)],

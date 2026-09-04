@@ -1,11 +1,14 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getMonthlyReportSummary, getNudgeOutcomes } from '@/lib/services'
+import { getMonthlyReportSummary, getNudgeOutcomes, reconcileLedgerNow } from '@/lib/services'
+import { requireAdmin } from '@/lib/admin-action'
+import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
+import { Alert } from '@xxm/ui'
 import { NudgeOutcomes } from './NudgeOutcomes'
 import { formatZAR, formatMonth, MONTHS } from '@xxm/utils'
 import { ProgressBar, Reveal } from '@xxm/ui'
-import { Download, FileText, TrendingUp, Users, Wallet, BarChart3, ChevronDown, CheckCircle2 } from 'lucide-react'
+import { Download, FileText, TrendingUp, Users, Wallet, BarChart3, ChevronDown, CheckCircle2, RefreshCw } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Reports' }
 
@@ -20,7 +23,12 @@ const STATUS_STYLES: Record<string, { badge: string; dot: string }> = {
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; year?: string }>
+  searchParams: Promise<{
+    month?: string
+    year?: string
+    reconciled?: string
+    reconcileError?: string
+  }>
 }) {
   const session = await auth()
   const roles   = (session?.user?.roles as string[] | undefined) ?? []
@@ -36,6 +44,38 @@ export default async function ReportsPage({
     getMonthlyReportSummary(roles, month, year),
     getNudgeOutcomes(roles, month, year),
   ])
+
+  /**
+   * Fill any gaps in the pool ledger, now rather than at 05:00.
+   *
+   * Every ledger post in the system is best-effort on purpose — a ledger
+   * hiccup must never unwind a payment that has already been recorded — so a
+   * failed post leaves the fund figures members see short until the nightly
+   * pass. This is that pass, on demand.
+   *
+   * It writes only what is missing and cannot invent money: every entry is
+   * derived from a settled transaction or a settled goal payment, and keyed
+   * behind a unique constraint, so pressing it twice writes nothing.
+   */
+  async function reconcile() {
+    'use server'
+    const { userId, roles: r, ip } = await requireAdmin('ledger.reconcile', { bulk: true })
+    const back = (extra: string) => `/reports?month=${month}&year=${year}&${extra}`
+
+    try {
+      const res = await reconcileLedgerNow(userId, r, ip)
+      redirect(back(`reconciled=${res.creditsPosted + res.debitsPosted}`))
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('NEXT_REDIRECT')) throw err
+      redirect(
+        back(
+          `reconcileError=${encodeURIComponent(
+            err instanceof Error ? err.message : 'That did not go through',
+          )}`,
+        ),
+      )
+    }
+  }
 
   const yearOpts = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
 
@@ -79,8 +119,36 @@ export default async function ReportsPage({
             <Download size={14} aria-hidden />
             Export CSV
           </a>
+          {/* The ledger reconciles itself nightly. This is for the hours in
+              between, when a best-effort post has failed and the fund page is
+              showing less than the Foundation actually holds. */}
+          <form action={reconcile}>
+            <ConfirmSubmitButton
+              title="Reconcile the ledger now?"
+              message="This rebuilds any pool-ledger entries that are missing, from settled payments. It runs every night at 05:00 anyway — press this when the fund totals look short and you would rather not wait. It only ever writes what is missing, so pressing it twice does nothing."
+              confirmLabel="Reconcile"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-xxm-gray-200 text-sm font-semibold text-xxm-gray-700 hover:bg-xxm-gray-50 transition-colors"
+            >
+              <RefreshCw size={14} aria-hidden />
+              Reconcile ledger
+            </ConfirmSubmitButton>
+          </form>
         </div>
       </Reveal>
+
+      {params.reconciled !== undefined && (
+        <Alert variant="success" title="Ledger reconciled">
+          {params.reconciled === '0'
+            ? 'Nothing was missing — every settled payment was already on the ledger.'
+            : `${params.reconciled} missing ${params.reconciled === '1' ? 'entry was' : 'entries were'} written from settled payments.`}
+        </Alert>
+      )}
+
+      {params.reconcileError && (
+        <Alert variant="error" title="Reconciliation failed">
+          {params.reconcileError}
+        </Alert>
+      )}
 
       {/* ── Period selector ──────────────────────────────────────── */}
       <Reveal variant="up" delay={100} className="bg-white rounded-3xl border border-xxm-green/8 shadow-xxm p-4">
