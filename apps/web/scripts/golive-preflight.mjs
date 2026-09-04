@@ -157,11 +157,19 @@ function main() {
 
   // Said before the pass/fail line below, so it is not swallowed by an
   // "everything is set" that is about a different question.
-  if (watchdogMissing.length > 0) {
-    log('WARNING: the off-platform backup cannot be watched.')
-    for (const name of watchdogMissing) log(`  not set: ${name}`)
+  // Two different severities, because they are two different problems. Without
+  // BACKUP_REPO the watch cannot run at all and degrades to "cannot confirm" —
+  // the failure that let a week of failed backups go unreported. Without the
+  // token it still works against a public repository; it is only rate-limited.
+  if (watchdogMissing.includes('BACKUP_REPO')) {
+    log('WARNING: the off-platform backup cannot be watched — BACKUP_REPO is not set.')
     log('  backup-watch will report "cannot confirm" rather than "backup has stopped".')
     log('  See docs/backup-and-restore.md section 3b-ii.')
+  }
+  if (watchdogMissing.includes('BACKUP_WATCH_TOKEN')) {
+    log('note: BACKUP_WATCH_TOKEN is not set. The watch still works on a public')
+    log('  repository; unauthenticated GitHub calls are rate-limited per IP, so a')
+    log('  busy hour can turn a real answer into "cannot confirm".')
   }
 
   if (missing.length === 0) {

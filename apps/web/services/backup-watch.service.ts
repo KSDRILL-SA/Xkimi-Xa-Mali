@@ -63,12 +63,30 @@ export async function checkBackupFreshness(now: Date = new Date()): Promise<Back
   const repo = env.BACKUP_REPO
   const token = env.BACKUP_WATCH_TOKEN
 
-  if (!repo || !token) {
+  // The repo is what the watch cannot do without. Without it there is nothing
+  // to ask about, and no default worth guessing at.
+  if (!repo) {
     return {
       state: 'unknown',
-      reason: 'BACKUP_REPO or BACKUP_WATCH_TOKEN is not set, so the backup cannot be watched.',
+      reason: 'BACKUP_REPO is not set, so the backup cannot be watched.',
     }
   }
+
+  // The token is optional, because this repository is public and GitHub serves
+  // a public repository's workflow runs unauthenticated.
+  //
+  // It used to be required, and the cost of that was the whole point of the
+  // watch. `checkBackupFreshness` returned `unknown` whenever either variable
+  // was absent, so the daily job raised BACKUP_WATCH_BLIND at *warning* —
+  // "cannot confirm the backup is running" — instead of BACKUP_NOT_RUNNING at
+  // *critical*. The Backup workflow had by then failed every run in its
+  // history, for a week, and the one alarm built to notice was reporting a
+  // shrug about itself.
+  //
+  // Supplying a token is still better where one exists: unauthenticated calls
+  // are rate-limited per IP (60/hour, shared with every other tenant on the
+  // same egress), so a busy hour can turn a real answer into `unknown`. It is
+  // sent when present and simply not required.
 
   // `backup.yml` by file name rather than by display name: the workflow's `name:`
   // is prose and may be reworded, while the path is what the repository is
@@ -82,7 +100,10 @@ export async function checkBackupFreshness(now: Date = new Date()): Promise<Back
     const res = await fetch(url, {
       headers: {
         Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
+        // Omitted entirely rather than sent empty: GitHub rejects a malformed
+        // Authorization header outright, where no header at all is a valid
+        // anonymous request against a public repository.
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         'X-GitHub-Api-Version': '2022-11-28',
       },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -102,7 +123,7 @@ export async function checkBackupFreshness(now: Date = new Date()): Promise<Back
     // quote the request it was given — which carries the token in a header.
     // Unlikely, and cheap to make impossible.
     const raw = err instanceof Error ? err.message : String(err)
-    return { state: 'unknown', reason: `Could not reach GitHub: ${scrub(raw, token)}` }
+    return { state: 'unknown', reason: `Could not reach GitHub: ${scrub(raw, token ?? '')}` }
   }
 
   const runs = payload.workflow_runs ?? []
