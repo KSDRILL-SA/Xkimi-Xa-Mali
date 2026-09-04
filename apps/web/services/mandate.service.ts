@@ -8,7 +8,7 @@ import {
   BankAccountNotFoundError,
   isUniqueViolation,
 } from '@/lib/errors'
-import { assertCanAccess } from '@/lib/authorization'
+import { assertCanAccess, canAccess } from '@/lib/authorization'
 import {
   paymentGateway,
   type WebhookEvent,
@@ -79,8 +79,13 @@ export async function getMandates(userId: string, requesterId: string, requester
 export async function getMandate(mandateId: string, requesterId: string, requesterRoles: string[]) {
   const mandate = (await mandateRepo.findById(mandateId, mandateBankInclude)) as MandateWithBank | null
 
-  if (!mandate) throw new MandateNotFoundError()
-  assertCanAccess(mandate.userId, requesterId, requesterRoles)
+  // One answer for "there is no such mandate" and "that one is not yours".
+  // Answering them differently tells a stranger which ids are real — see
+  // canAccess. The bank-account queries in member.service already work this way
+  // (`findByIdAndUser`); this brings mandates into line with them.
+  if (!mandate || !canAccess(mandate.userId, requesterId, requesterRoles)) {
+    throw new MandateNotFoundError()
+  }
 
   return {
     ...mandate,
@@ -195,8 +200,13 @@ export async function updateMandate(
   ipAddress?: string,
 ) {
   const mandate = await mandateRepo.findById(mandateId)
-  if (!mandate) throw new MandateNotFoundError()
-  assertCanAccess(mandate.userId, requesterId, requesterRoles)
+  // One answer for "there is no such mandate" and "that one is not yours".
+  // Answering them differently tells a stranger which ids are real — see
+  // canAccess. The bank-account queries in member.service already work this way
+  // (`findByIdAndUser`); this brings mandates into line with them.
+  if (!mandate || !canAccess(mandate.userId, requesterId, requesterRoles)) {
+    throw new MandateNotFoundError()
+  }
 
   if (mandate.status !== 'ACTIVE' && mandate.status !== 'PENDING') {
     throw new MandateConflictError('Only active or pending mandates can be updated', 'MND_003')
@@ -267,8 +277,13 @@ export async function cancelMandate(
   ipAddress?: string,
 ) {
   const mandate = await mandateRepo.findById(mandateId)
-  if (!mandate) throw new MandateNotFoundError()
-  assertCanAccess(mandate.userId, requesterId, requesterRoles)
+  // One answer for "there is no such mandate" and "that one is not yours".
+  // Answering them differently tells a stranger which ids are real — see
+  // canAccess. The bank-account queries in member.service already work this way
+  // (`findByIdAndUser`); this brings mandates into line with them.
+  if (!mandate || !canAccess(mandate.userId, requesterId, requesterRoles)) {
+    throw new MandateNotFoundError()
+  }
 
   if (mandate.status === 'CANCELLED') {
     throw new MandateConflictError('Mandate is already cancelled', 'MND_004')
@@ -328,8 +343,13 @@ export async function requestDelay(
   ipAddress?: string,
 ) {
   const mandate = await mandateRepo.findById(mandateId)
-  if (!mandate) throw new MandateNotFoundError()
-  assertCanAccess(mandate.userId, requesterId, requesterRoles)
+  // One answer for "there is no such mandate" and "that one is not yours".
+  // Answering them differently tells a stranger which ids are real — see
+  // canAccess. The bank-account queries in member.service already work this way
+  // (`findByIdAndUser`); this brings mandates into line with them.
+  if (!mandate || !canAccess(mandate.userId, requesterId, requesterRoles)) {
+    throw new MandateNotFoundError()
+  }
 
   if (mandate.status !== 'ACTIVE') {
     throw new MandateConflictError('Only active mandates can be delayed', 'MND_005')

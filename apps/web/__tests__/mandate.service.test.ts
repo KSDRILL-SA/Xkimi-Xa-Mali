@@ -54,6 +54,8 @@ import { bumpRoleVersion } from '@/lib/role-version'
 import { notifyAdmins } from '@/services/inbox.service'
 import {
   createMandate,
+  getMandate,
+  updateMandate,
   cancelMandate,
   leaveFoundation,
   processMandateWebhook,
@@ -61,7 +63,7 @@ import {
   hasActiveMandate,
   requestDelay,
 } from '@/services/mandate.service'
-import { MandateConflictError } from '@/lib/errors'
+import { MandateConflictError, MandateNotFoundError } from '@/lib/errors'
 
 const mock = <T extends (...a: never[]) => unknown>(fn: unknown) => fn as MockedFunction<T>
 
@@ -180,6 +182,79 @@ describe('cancelMandate', () => {
 
     expect(mandateRepo.update).toHaveBeenCalledWith('m1', { status: 'CANCELLED' })
     expect(paymentGateway.cancelMandate).toHaveBeenCalledWith('nc-1')
+  })
+})
+
+describe('a mandate that is not yours', () => {
+  // Every entry point used to load the row, throw "not found" if it was
+  // missing, and only then ask whether the caller was allowed to see it. That
+  // answered two different questions:
+  //
+  //     404  ->  no such mandate
+  //     403  ->  that mandate exists, and it is somebody else's
+  //
+  // The second is a fact about another member. Ids are cuids and this is fifty
+  // people who know each other, so nobody is enumerating anything at scale —
+  // but an id travels, and confirming one should not be free.
+  //
+  // The pattern was already in this file for bank accounts, which query by id
+  // AND user together and cannot answer differently. Mandates now match.
+
+  const STRANGER = 'user-2'
+  const someoneElses = {
+    id: 'm1', userId: OWNER, status: 'ACTIVE', netcashMandateId: 'nc-1',
+    bankAccountId: 'ba-1',
+    // `getMandate` masks the account number on the way out, so the read paths
+    // need one to mask.
+    bankAccount: { id: 'ba-1', bankName: 'Test Bank', accountNumber: 'enc:1234567890' },
+  }
+
+  beforeEach(() => {
+    mock(mandateRepo.findById).mockResolvedValue(someoneElses as never)
+  })
+
+  it('reads as not found, not as forbidden', async () => {
+    await expect(getMandate('m1', STRANGER, ['MEMBER'])).rejects.toBeInstanceOf(MandateNotFoundError)
+  })
+
+  it('gives the same answer for a mandate that genuinely does not exist', async () => {
+    // The point of the change: a stranger cannot tell these two apart.
+    mock(mandateRepo.findById).mockResolvedValue(null as never)
+
+    await expect(getMandate('m1', STRANGER, ['MEMBER'])).rejects.toBeInstanceOf(MandateNotFoundError)
+  })
+
+  it('refuses an update without revealing the mandate is real', async () => {
+    await expect(
+      updateMandate('m1', { amount: 900 }, STRANGER, ['MEMBER']),
+    ).rejects.toBeInstanceOf(MandateNotFoundError)
+
+    expect(mandateRepo.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses a cancellation the same way', async () => {
+    await expect(cancelMandate('m1', STRANGER, ['MEMBER'])).rejects.toBeInstanceOf(MandateNotFoundError)
+
+    expect(mandateRepo.update).not.toHaveBeenCalled()
+    expect(paymentGateway.cancelMandate).not.toHaveBeenCalled()
+  })
+
+  it('refuses a delay request the same way', async () => {
+    await expect(
+      requestDelay('m1', { newDate: '2099-01-01' }, STRANGER, ['MEMBER']),
+    ).rejects.toBeInstanceOf(MandateNotFoundError)
+
+    expect(mandateRepo.update).not.toHaveBeenCalled()
+  })
+
+  it('still lets an admin open it', async () => {
+    // Leadership has to be able to look at a member's mandate to help them, so
+    // the refusal is about ownership, not about hiding rows from everyone.
+    await expect(getMandate('m1', 'an-admin', ['ADMIN'])).resolves.toMatchObject({ id: 'm1' })
+  })
+
+  it('still lets the owner open it', async () => {
+    await expect(getMandate('m1', OWNER, ['MEMBER'])).resolves.toMatchObject({ id: 'm1' })
   })
 })
 
