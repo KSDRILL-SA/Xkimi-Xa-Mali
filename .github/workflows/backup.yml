@@ -84,15 +84,88 @@ jobs:
           sudo apt-get install -y -qq postgresql-client
           pg_dump --version
 
-      - name: Dump
+      # ── Where the connection string comes from ──────────────────────────
+      #
+      # Asking Neon, rather than keeping a second copy of the same credential
+      # in GitHub. The API key and project id were already here and unused by
+      # any workflow.
+      #
+      # A pasted PRODUCTION_DIRECT_DATABASE_URL was the last thing standing
+      # between this repository and having any backup at all, and it is the
+      # kind of secret that goes stale quietly: Neon rotates a role's password
+      # and the backup starts failing on a night nobody is watching. Derived
+      # each run, it cannot drift.
+      #
+      # `PRODUCTION_DIRECT_DATABASE_URL` still wins when it is set, so pointing
+      # the backup at a database Neon does not host stays a matter of adding a
+      # secret.
+      - name: Resolve the production connection string
         env:
-          # The UNPOOLED connection string. The pooled endpoint is not suitable
-          # for pg_dump — see docs/environment-setup-plan.md.
-          PGCONN: ${{ secrets.PRODUCTION_DIRECT_DATABASE_URL }}
+          OVERRIDE: ${{ secrets.PRODUCTION_DIRECT_DATABASE_URL }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
         run: |
           set -euo pipefail
-          if [ -z "$PGCONN" ]; then
-            echo "::error::PRODUCTION_DIRECT_DATABASE_URL secret is not set."
+
+          if [ -n "$OVERRIDE" ]; then
+            echo "Using PRODUCTION_DIRECT_DATABASE_URL."
+            echo "::add-mask::$OVERRIDE"
+            echo "PGCONN=$OVERRIDE" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "::error::No connection string available."
+            echo "Set PRODUCTION_DIRECT_DATABASE_URL, or NEON_API_KEY (secret)"
+            echo "and NEON_PROJECT_ID (variable). See docs/backup-and-restore.md."
+            exit 1
+          fi
+
+          API="https://console.neon.tech/api/v2"
+          AUTH="Authorization: Bearer $NEON_API_KEY"
+
+          # `--fail-with-body` so an HTTP error is a failure here rather than
+          # valid-looking JSON that produces an empty URI three steps later.
+          api() {
+            curl -sS --fail-with-body -H "$AUTH" -H "Accept: application/json" "$@"
+          }
+
+          # The default branch, by its own flag — not the first in the list and
+          # not a name. A restore has to come from what production actually
+          # runs on, and a preview branch answers every other question
+          # identically.
+          BRANCH=$(api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r '.branches[] | select(.default == true) | .id' | head -1)
+          if [ -z "$BRANCH" ] || [ "$BRANCH" = "null" ]; then
+            echo "::error::Could not find the default Neon branch for project $NEON_PROJECT_ID."
+            exit 1
+          fi
+
+          DBJSON=$(api "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/databases")
+          DBNAME=$(echo "$DBJSON" | jq -r '.databases[0].name')
+          DBROLE=$(echo "$DBJSON" | jq -r '.databases[0].owner_name')
+          if [ -z "$DBNAME" ] || [ "$DBNAME" = "null" ]; then
+            echo "::error::No database found on Neon branch $BRANCH."
+            exit 1
+          fi
+          echo "Dumping database '$DBNAME' as role '$DBROLE' from the default branch."
+
+          # pooled=false — the pooled endpoint cannot serve pg_dump.
+          URI=$(api "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$BRANCH&database_name=$DBNAME&role_name=$DBROLE&pooled=false"             | jq -r '.uri')
+          if [ -z "$URI" ] || [ "$URI" = "null" ]; then
+            echo "::error::Neon returned no connection URI."
+            exit 1
+          fi
+
+          # Masked before it is written anywhere. The password is inside it, and
+          # a later step that echoes an error must not be able to leak it.
+          echo "::add-mask::$URI"
+          echo "PGCONN=$URI" >> "$GITHUB_ENV"
+
+      - name: Dump
+        run: |
+          set -euo pipefail
+          if [ -z "${PGCONN:-}" ]; then
+            echo "::error::No connection string resolved."
             exit 1
           fi
           STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
