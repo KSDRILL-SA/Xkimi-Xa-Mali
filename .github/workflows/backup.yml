@@ -160,15 +160,27 @@ jobs:
           # which is empty — 900 bytes, caught by the size guard. What the log
           # did not say was what else existed, so the next guess would have been
           # as blind as the first.
-          # Every project this key can see. The production branch of
-          # NEON_PROJECT_ID dumped 900 bytes — an empty database — while the
-          # live app plainly has data, so the first thing to establish is
-          # whether this key is even looking at the project the app uses.
-          echo "Projects visible to this API key:"
-          api "$API/projects"             | jq -r '.projects[] | "  \(.id)  \(.name)  created=\(.created_at[0:10])"'
-
           echo "Branches on this project:"
           api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r '.branches[] | "  \(.id)  default=\(.default)  \(.name)"'
+
+          # Which branch actually holds the schema.
+          #
+          # The `production` branch dumped 900 bytes — an empty database — and
+          # the size guard rightly refused it. A branch called production that
+          # is empty is a fact worth establishing before choosing what to back
+          # up, so every branch is asked how many tables it has. Counting is
+          # cheap, reads nothing, and settles it in one run.
+          echo "Table counts per branch (public schema):"
+          for B in $(api "$API/projects/$NEON_PROJECT_ID/branches" | jq -r '.branches[].id'); do
+            BNAME=$(api "$API/projects/$NEON_PROJECT_ID/branches" | jq -r --arg b "$B" '.branches[] | select(.id==$b) | .name')
+            BDB=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases" | jq -r '.databases[0].name // empty')
+            BROLE=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases" | jq -r '.databases[0].owner_name // empty')
+            if [ -z "$BDB" ]; then echo "  $BNAME: no database"; continue; fi
+            BURI=$(api "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$B&database_name=$BDB&role_name=$BROLE&pooled=false" | jq -r '.uri')
+            echo "::add-mask::$BURI"
+            N=$(psql "$BURI" -tAc "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null || echo "?")
+            echo "  $BNAME ($BDB): $N tables"
+          done
 
           DBJSON=$(api "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/databases")
           echo "Databases on branch $BRANCH:"
