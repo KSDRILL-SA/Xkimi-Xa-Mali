@@ -1,0 +1,240 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Restore drill
+#
+# A backup nobody has restored is a hypothesis.
+#
+# `backup.yml` proves a great deal already: the archive parses, its table of
+# contents is complete, and a full read-back streams every byte. What it cannot
+# prove is that those bytes become a working database — the check that only
+# fails when it matters, at the moment somebody needs the data back.
+#
+# `docs/backup-and-restore.md` §8 has owed this since the drill was first
+# written. It was run by hand once, against development, on a throwaway key,
+# and never against production. A drill that depends on somebody's laptop is
+# not a drill; it is a thing that happened once.
+#
+# So: dump the live branch, restore it into a scratch Neon branch, compare what
+# came back against what went in, and delete the scratch branch whatever
+# happens.
+#
+# ── What this deliberately does not do ───────────────────────────────────────
+#
+# It does not decrypt the retained artifact. It cannot: the private key is held
+# offline by two office bearers and never reaches GitHub, which is the property
+# that makes storing backups on a public repository defensible in the first
+# place. The encryption round trip is proved separately in
+# `backup-selftest.yml`, and opening a real artifact with the real key is a
+# human step in §8.
+#
+# What is proved here is the half that machine can prove: that the dump this
+# pipeline produces restores into a database with the same contents.
+#
+# ── Privacy ──────────────────────────────────────────────────────────────────
+#
+# Counts only. Table names come from `information_schema`; the row comparison
+# is a single summed total. No column value is ever selected, printed or kept,
+# and the scratch branch is deleted at the end of the job.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Restore drill
+
+on:
+  schedule:
+    # 02:30 UTC (04:30 SAST) on the 1st — an hour after the nightly backup, so
+    # a drill failure and a backup failure are never the same morning's noise.
+    - cron: '30 2 1 * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/restore-drill.yml'
+      - '.github/workflows/backup.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never two drills at once: each creates a Neon branch, and the free plan
+  # allows ten.
+  group: restore-drill
+  cancel-in-progress: false
+
+jobs:
+  drill:
+    name: Dump, restore, compare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install a matching Postgres client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq curl ca-certificates gnupg jq
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+            https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          # By path. /usr/bin/pg_dump is Debian's pg_wrapper and the runner
+          # image ships PostgreSQL 16, which otherwise wins and cannot read an
+          # archive this pipeline writes. See backup.yml.
+          PGBIN="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          echo "PATH=$PGBIN:$PATH" >> "$GITHUB_ENV"
+          "$PGBIN/pg_restore" --version
+
+      - name: Dump the branch that holds the data
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          [ -n "$NEON_API_KEY" ] && [ -n "$NEON_PROJECT_ID" ] || {
+            echo "::error::NEON_API_KEY and NEON_PROJECT_ID are required."; exit 1; }
+
+          API="https://console.neon.tech/api/v2"
+          api() { curl -sS --fail-with-body -H "Authorization: Bearer $NEON_API_KEY" \
+                    -H "Accept: application/json" "$@"; }
+
+          BRANCHES=$(api "$API/projects/$NEON_PROJECT_ID/branches")
+          echo "PARENT_ID=$(echo "$BRANCHES" | jq -r '.branches[] | select(.default == true) | .id')" >> "$GITHUB_ENV"
+
+          # The fullest branch, as backup.yml chooses it — by bytes, because
+          # this project has a schema-only branch carrying the same table count
+          # as the live one.
+          BEST=0; SRC=""
+          for B in $(echo "$BRANCHES" | jq -r '.branches[].id'); do
+            DBJ=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases")
+            DB=$(echo "$DBJ" | jq -r '.databases[0].name // empty'); [ -n "$DB" ] || continue
+            RL=$(echo "$DBJ" | jq -r '.databases[0].owner_name')
+            U=$(api "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$B&database_name=$DB&role_name=$RL&pooled=false" | jq -r '.uri')
+            echo "::add-mask::$U"
+            N=$(psql "$U" -tAc "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null || echo 0)
+            S=$(psql "$U" -tAc "select pg_database_size(current_database())" 2>/dev/null || echo 0)
+            if [ "$N" -gt 0 ] 2>/dev/null && [ "$S" -gt "$BEST" ] 2>/dev/null; then
+              BEST="$S"; SRC="$U"; echo "SRC_NAME=$(echo "$BRANCHES" | jq -r --arg b "$B" '.branches[]|select(.id==$b)|.name')" >> "$GITHUB_ENV"
+            fi
+          done
+          [ -n "$SRC" ] || { echo "::error::No branch has any tables."; exit 1; }
+          echo "::add-mask::$SRC"
+          echo "SRC_URI=$SRC" >> "$GITHUB_ENV"
+
+          pg_dump "$SRC" --format=custom --no-owner --no-privileges --file=drill.dump
+          ls -l drill.dump
+
+      - name: Measure the source
+        run: |
+          set -euo pipefail
+          # One number out of each side. `query_to_xml` runs count(*) per table
+          # and the result is summed, so no table's contents are ever printed.
+          COUNT_SQL="select coalesce(sum(n),0) from (
+            select (xpath('/row/c/text()', query_to_xml(
+              format('select count(*) as c from %I.%I', table_schema, table_name),
+              false, true, '')))[1]::text::bigint as n
+            from information_schema.tables
+            where table_schema='public' and table_type='BASE TABLE') t"
+          echo "COUNT_SQL<<SQLEOF" >> "$GITHUB_ENV"
+          echo "$COUNT_SQL" >> "$GITHUB_ENV"
+          echo "SQLEOF" >> "$GITHUB_ENV"
+
+          echo "SRC_TABLES=$(psql "$SRC_URI" -tAc "select count(*) from information_schema.tables where table_schema='public'")" >> "$GITHUB_ENV"
+          echo "SRC_ROWS=$(psql "$SRC_URI" -tAc "$COUNT_SQL")" >> "$GITHUB_ENV"
+
+      - name: Create a scratch branch
+        id: scratch
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          API="https://console.neon.tech/api/v2"
+          NAME="restore-drill-$(date -u +%Y%m%dT%H%M%SZ)"
+
+          # Branched from the default branch, which on this project is empty —
+          # so the restore lands on bare ground and a passing comparison cannot
+          # be an artefact of data that was already there.
+          RESP=$(curl -sS --fail-with-body -X POST \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            -H "Content-Type: application/json" \
+            "$API/projects/$NEON_PROJECT_ID/branches" \
+            -d "{\"branch\":{\"parent_id\":\"$PARENT_ID\",\"name\":\"$NAME\"},\"endpoints\":[{\"type\":\"read_write\"}]}")
+
+          BID=$(echo "$RESP" | jq -r '.branch.id')
+          [ -n "$BID" ] && [ "$BID" != "null" ] || { echo "::error::Could not create a scratch branch."; exit 1; }
+          # Recorded before anything can fail, so cleanup always has it.
+          echo "SCRATCH_ID=$BID" >> "$GITHUB_ENV"
+          echo "Created scratch branch $NAME ($BID)"
+
+          DBJ=$(curl -sS --fail-with-body -H "Authorization: Bearer $NEON_API_KEY" \
+            "$API/projects/$NEON_PROJECT_ID/branches/$BID/databases")
+          DB=$(echo "$DBJ" | jq -r '.databases[0].name')
+          RL=$(echo "$DBJ" | jq -r '.databases[0].owner_name')
+          U=$(curl -sS --fail-with-body -H "Authorization: Bearer $NEON_API_KEY" \
+            "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$BID&database_name=$DB&role_name=$RL&pooled=false" | jq -r '.uri')
+          echo "::add-mask::$U"
+          echo "DST_URI=$U" >> "$GITHUB_ENV"
+
+      - name: Restore into it
+        run: |
+          set -euo pipefail
+          # --clean --if-exists so the drill is repeatable against a branch that
+          # is not quite empty; --no-owner because a restore must land under
+          # whatever role is doing the restoring.
+          pg_restore --no-owner --no-privileges --clean --if-exists \
+            --dbname="$DST_URI" drill.dump 2> restore.err || {
+              echo "::error::pg_restore failed"
+              sed -E 's#postgres(ql)?://[^ ]*#postgres://REDACTED#g' restore.err | tail -40
+              exit 1
+            }
+          if [ -s restore.err ]; then
+            echo "::warning::pg_restore wrote to stderr despite succeeding:"
+            sed -E 's#postgres(ql)?://[^ ]*#postgres://REDACTED#g' restore.err | tail -40
+          fi
+
+      - name: Compare
+        run: |
+          set -euo pipefail
+          DST_TABLES=$(psql "$DST_URI" -tAc "select count(*) from information_schema.tables where table_schema='public'")
+          DST_ROWS=$(psql "$DST_URI" -tAc "$COUNT_SQL")
+
+          echo "| | source ($SRC_NAME) | restored |"       >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|"                             >> "$GITHUB_STEP_SUMMARY"
+          echo "| tables | $SRC_TABLES | $DST_TABLES |"     >> "$GITHUB_STEP_SUMMARY"
+          echo "| rows | $SRC_ROWS | $DST_ROWS |"           >> "$GITHUB_STEP_SUMMARY"
+
+          echo "tables: source=$SRC_TABLES restored=$DST_TABLES"
+          echo "rows:   source=$SRC_ROWS restored=$DST_ROWS"
+
+          FAIL=0
+          [ "$DST_TABLES" = "$SRC_TABLES" ] || { echo "::error::Table count differs."; FAIL=1; }
+          [ "$DST_ROWS" = "$SRC_ROWS" ]     || { echo "::error::Row count differs."; FAIL=1; }
+          # A restore that produces an empty database passes both equality
+          # checks if the source was empty too. It never should be here, and
+          # saying so is cheaper than discovering it during an outage.
+          [ "$SRC_ROWS" -gt 0 ] 2>/dev/null || { echo "::error::Source had no rows. Nothing was proved."; FAIL=1; }
+          [ "$FAIL" = "0" ] || exit 1
+
+          echo "Restore drill passed: $DST_TABLES tables, $DST_ROWS rows recovered."
+
+      - name: Delete the scratch branch
+        # Always. A drill that leaves branches behind fills the plan's quota and
+        # the next drill cannot run.
+        if: always()
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SCRATCH_ID:-}" ]; then
+            echo "No scratch branch was created; nothing to remove."
+            exit 0
+          fi
+          curl -sS --fail-with-body -X DELETE \
+            -H "Authorization: Bearer $NEON_API_KEY" \
+            "https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches/$SCRATCH_ID" \
+            > /dev/null
+          echo "Deleted scratch branch $SCRATCH_ID"
