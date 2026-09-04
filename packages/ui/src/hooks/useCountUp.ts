@@ -19,27 +19,27 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  * an enhancement that runs backwards from it — the desktop path drops to zero
  * in a layout effect, before the browser paints, so nothing flashes.
  *
- * ── Why touch devices get no animation ──────────────────────────────────────
+ * ── The count itself runs everywhere ────────────────────────────────────────
  *
- * Each call runs a `requestAnimationFrame` loop that calls `setState` on every
- * frame. The contributions page mounts four of them at once, and each re-render
- * repaints a card carrying a gradient fill, a coloured border and a shadow —
- * four continuously recomposited boxes for the better part of a second.
+ * It was briefly switched off on touch devices, on the theory that four
+ * `requestAnimationFrame` loops repainting four gradient cards were what tore
+ * the contributions page on Android. Screenshots taken afterwards showed the
+ * tearing unchanged, and the owner wanted the animation back — so the theory
+ * was wrong and the animation stays.
  *
- * Those are the two pages that tore on Android: contributions and the
- * dashboard. The transactions page, which has never torn, does not use this
- * hook at all. That correlation is the reason for the guard.
+ * What actually correlated with the ghosting was an armed
+ * `transition-transform` on the icon inside each card: present on every card
+ * that ghosted, absent from the one card on the page that never did. A
+ * transition on `transform` makes an element a compositing candidate even at
+ * rest, and the hover that would have triggered it was already `sm:`-gated
+ * while the transition itself was not.
  *
- * The decision is read from the `no-reveal` class that `RevealGuard` sets in
- * the document head before first paint, so the whole app answers "does this
- * device animate" the same way, once, rather than each component asking again
- * with its own slightly different test.
+ * Reduced motion is still honoured, because that is a stated preference rather
+ * than a guess about hardware.
  */
 function shouldAnimate(): boolean {
   if (typeof window === 'undefined') return false
-  if (document.documentElement.classList.contains('no-reveal')) return false
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false
-  return (navigator.maxTouchPoints ?? 0) === 0
+  return !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 }
 
 export function useCountUp(target: number, duration = 800): number {

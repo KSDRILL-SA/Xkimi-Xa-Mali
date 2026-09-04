@@ -148,7 +148,7 @@ function ContributionItem({
 
             <ChevronDown
               size={15}
-              className={`shrink-0 text-xxm-gray-400 transition-transform duration-slow ${
+              className={`shrink-0 text-xxm-gray-400 sm:transition-transform sm:duration-slow ${
                 expanded ? 'rotate-180' : ''
               }`}
               aria-hidden
