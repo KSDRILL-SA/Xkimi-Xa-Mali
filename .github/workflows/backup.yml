@@ -82,17 +82,171 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client
-          pg_dump --version
 
-      - name: Dump
+          # Use the newest client explicitly, by path.
+          #
+          # Installing pgdg is not enough. `/usr/bin/pg_dump` is Debian's
+          # `pg_wrapper`, and the runner image ships PostgreSQL 16 already — so
+          # after installing client 18 the wrapper still resolved to 16.15 and
+          # pg_dump aborted with "server version mismatch" against a newer Neon.
+          # The install step looked completely successful; only the version line
+          # gave it away.
+          #
+          # Sorted with `sort -V` so this keeps working when pgdg moves to 19,
+          # rather than pinning a major that Neon will eventually pass.
+          PGBIN="$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1)"
+          echo "PATH=$PGBIN:$PATH" >> "$GITHUB_ENV"
+          echo "Using client at: $PGBIN"
+          "$PGBIN/pg_dump" --version
+
+      # ── Where the connection string comes from ──────────────────────────
+      #
+      # Asking Neon, rather than keeping a second copy of the same credential
+      # in GitHub. The API key and project id were already here and unused by
+      # any workflow.
+      #
+      # A pasted PRODUCTION_DIRECT_DATABASE_URL was the last thing standing
+      # between this repository and having any backup at all, and it is the
+      # kind of secret that goes stale quietly: Neon rotates a role's password
+      # and the backup starts failing on a night nobody is watching. Derived
+      # each run, it cannot drift.
+      #
+      # `PRODUCTION_DIRECT_DATABASE_URL` still wins when it is set, so pointing
+      # the backup at a database Neon does not host stays a matter of adding a
+      # secret.
+      - name: Resolve the production connection string
         env:
-          # The UNPOOLED connection string. The pooled endpoint is not suitable
-          # for pg_dump — see docs/environment-setup-plan.md.
-          PGCONN: ${{ secrets.PRODUCTION_DIRECT_DATABASE_URL }}
+          OVERRIDE: ${{ secrets.PRODUCTION_DIRECT_DATABASE_URL }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
         run: |
           set -euo pipefail
-          if [ -z "$PGCONN" ]; then
-            echo "::error::PRODUCTION_DIRECT_DATABASE_URL secret is not set."
+
+          if [ -n "$OVERRIDE" ]; then
+            echo "Using PRODUCTION_DIRECT_DATABASE_URL."
+            echo "::add-mask::$OVERRIDE"
+            echo "PGCONN=$OVERRIDE" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "::error::No connection string available."
+            echo "Set PRODUCTION_DIRECT_DATABASE_URL, or NEON_API_KEY (secret)"
+            echo "and NEON_PROJECT_ID (variable). See docs/backup-and-restore.md."
+            exit 1
+          fi
+
+          API="https://console.neon.tech/api/v2"
+          AUTH="Authorization: Bearer $NEON_API_KEY"
+
+          # `--fail-with-body` so an HTTP error is a failure here rather than
+          # valid-looking JSON that produces an empty URI three steps later.
+          api() {
+            curl -sS --fail-with-body -H "$AUTH" -H "Accept: application/json" "$@"
+          }
+
+          # The branch that holds the data — not the one called production.
+          #
+          # This project's default branch IS named `production`, and it is
+          # empty. The live application runs on a child branch named `staging`,
+          # which carries 97% of the project's compute. Backing up the default
+          # branch produced a 900-byte dump of nothing, and only the size guard
+          # stopped it being filed as a successful backup.
+          #
+          # So the branch is chosen by what it contains. Every branch is asked
+          # how many tables it has and the fullest wins, which is correct
+          # whichever branch that turns out to be and stays correct if the
+          # naming is ever untangled. A backup must follow the data, not a
+          # label somebody chose months ago.
+          DEFAULT_BRANCH=$(api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r '.branches[] | select(.default == true) | .id' | head -1)
+
+          BRANCH=""
+          BEST=0
+          BEST_TABLES=0
+          echo "Table counts per branch (public schema):"
+          for B in $(api "$API/projects/$NEON_PROJECT_ID/branches" | jq -r '.branches[].id'); do
+            BNAME=$(api "$API/projects/$NEON_PROJECT_ID/branches"               | jq -r --arg b "$B" '.branches[] | select(.id==$b) | .name')
+            BDB=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases" | jq -r '.databases[0].name // empty')
+            BROLE=$(api "$API/projects/$NEON_PROJECT_ID/branches/$B/databases" | jq -r '.databases[0].owner_name // empty')
+            if [ -z "$BDB" ]; then echo "  $BNAME: no database"; continue; fi
+            BURI=$(api "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$B&database_name=$BDB&role_name=$BROLE&pooled=false" | jq -r '.uri')
+            echo "::add-mask::$BURI"
+            # Tables, then bytes. Both are metadata: `information_schema` and
+            # `pg_database_size` describe the database, and neither reads a
+            # column value.
+            #
+            # Table count alone chose wrong on the first successful run. This
+            # project has a branch called `preview` marked *schema-only* — 40
+            # tables, no rows — beside `staging`, which has the same 40 tables
+            # and all the members. Counting tables made them indistinguishable,
+            # the tie went to whichever was iterated first, and the run produced
+            # a 126KB dump of an empty schema. It passed the 50KB size guard and
+            # was recorded as the project's first successful backup.
+            #
+            # A backup of a schema with no rows is the exact thing this workflow
+            # exists to prevent, arriving with a green tick. Size tells them
+            # apart in one query and cannot be fooled by a branch that was
+            # copied without its data.
+            N=$(psql "$BURI" -tAc "select count(*) from information_schema.tables where table_schema='public'" 2>/dev/null || echo 0)
+            SZ=$(psql "$BURI" -tAc "select pg_database_size(current_database())" 2>/dev/null || echo 0)
+            echo "  $BNAME ($BDB): $N tables, $(( SZ / 1024 )) KB"
+            # Tables are the gate; bytes decide. A branch with no tables is not
+            # a candidate however much history it carries.
+            if [ "$N" -gt 0 ] 2>/dev/null && [ "$SZ" -gt "$BEST" ] 2>/dev/null; then
+              BEST="$SZ"; BRANCH="$B"; BEST_TABLES="$N"
+            fi
+          done
+
+          if [ -z "$BRANCH" ] || [ "$BEST_TABLES" -eq 0 ]; then
+            echo "::error::No Neon branch in this project has any tables. Nothing to back up."
+            exit 1
+          fi
+
+          CHOSEN=$(api "$API/projects/$NEON_PROJECT_ID/branches"             | jq -r --arg b "$BRANCH" '.branches[] | select(.id==$b) | .name')
+          echo "Backing up branch '$CHOSEN' — $BEST_TABLES tables, $(( BEST / 1024 )) KB."
+
+          # Said loudly, every night, until somebody fixes the naming. A project
+          # whose default branch is empty while the application runs on a child
+          # is one accidental promotion away from serving an empty database.
+          if [ "$BRANCH" != "$DEFAULT_BRANCH" ]; then
+            echo "::warning::The fullest branch ('$CHOSEN') is NOT this project's default branch."
+            echo "::warning::Vercel maps production deployments to the DEFAULT branch, which is empty."
+            echo "::warning::See docs/backup-and-restore.md — this needs resolving, not working around."
+          fi
+
+          # Every branch and every database, by name, before anything is chosen.
+          # The first run against this project dumped Neon's default `neondb`,
+          # which is empty — 900 bytes, caught by the size guard. What the log
+          # did not say was what else existed, so the next guess would have been
+          # as blind as the first.
+          DBJSON=$(api "$API/projects/$NEON_PROJECT_ID/branches/$BRANCH/databases")
+          echo "Databases on branch $BRANCH:"
+          echo "$DBJSON" | jq -r '.databases[] | "  \(.name)  owner=\(.owner_name)"'
+          DBNAME=$(echo "$DBJSON" | jq -r '.databases[0].name')
+          DBROLE=$(echo "$DBJSON" | jq -r '.databases[0].owner_name')
+          if [ -z "$DBNAME" ] || [ "$DBNAME" = "null" ]; then
+            echo "::error::No database found on Neon branch $BRANCH."
+            exit 1
+          fi
+          echo "Dumping database '$DBNAME' as role '$DBROLE' from the default branch."
+
+          # pooled=false — the pooled endpoint cannot serve pg_dump.
+          URI=$(api "$API/projects/$NEON_PROJECT_ID/connection_uri?branch_id=$BRANCH&database_name=$DBNAME&role_name=$DBROLE&pooled=false"             | jq -r '.uri')
+          if [ -z "$URI" ] || [ "$URI" = "null" ]; then
+            echo "::error::Neon returned no connection URI."
+            exit 1
+          fi
+
+          # Masked before it is written anywhere. The password is inside it, and
+          # a later step that echoes an error must not be able to leak it.
+          echo "::add-mask::$URI"
+          echo "PGCONN=$URI" >> "$GITHUB_ENV"
+
+      - name: Dump
+        run: |
+          set -euo pipefail
+          if [ -z "${PGCONN:-}" ]; then
+            echo "::error::No connection string resolved."
             exit 1
           fi
           STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
