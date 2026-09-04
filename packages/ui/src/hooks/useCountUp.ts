@@ -21,18 +21,24 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
  *
  * ── The count itself runs everywhere ────────────────────────────────────────
  *
- * It was briefly switched off on touch devices, on the theory that four
- * `requestAnimationFrame` loops repainting four gradient cards were what tore
- * the contributions page on Android. Screenshots taken afterwards showed the
- * tearing unchanged, and the owner wanted the animation back — so the theory
- * was wrong and the animation stays.
+ * This hook was, for a while, the prime suspect in the tearing on Android: the
+ * only two pages that ever tore — contributions and the dashboard — are
+ * exactly the two that call it, and switching it off on touch devices did stop
+ * the tearing. The conclusion drawn was "a phone cannot afford four rAF loops",
+ * which was wrong, and it cost the owner an animation they wanted.
  *
- * What actually correlated with the ghosting was an armed
- * `transition-transform` on the icon inside each card: present on every card
- * that ghosted, absent from the one card on the page that never did. A
- * transition on `transform` makes an element a compositing candidate even at
- * rest, and the hover that would have triggered it was already `sm:`-gated
- * while the transition itself was not.
+ * The loops were never the problem by themselves. `<main>` in both app shells
+ * carried `animate-fade-in-up`, a 400ms **translateY**, so every page began
+ * life inside a moving compositing layer — and a subtree that rewrites itself
+ * sixty times a second inside a moving layer leaves its old frames stranded,
+ * because Blink never invalidates the tiles it already rasterised. Disabling
+ * the count-up removed one half of a collision and so looked like a fix.
+ *
+ * The shells now fade with opacity alone, which removes the other half — the
+ * actual cause. The animation runs everywhere again.
+ *
+ * If tearing ever returns: look for a transform animation or transition on an
+ * ancestor of whatever is repainting, not at the repaint itself.
  *
  * Reduced motion is still honoured, because that is a stated preference rather
  * than a guess about hardware.
