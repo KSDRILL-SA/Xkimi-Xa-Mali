@@ -5,7 +5,7 @@ import { adminOfflinePaymentRatelimit } from '@/lib/redis'
 import { recordOfflineContribution } from '@/services/contribution.service'
 import { OfflineContributionSchema } from '@/lib/validation/contribution'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 /**
@@ -32,7 +32,7 @@ import { getClientIP } from '@/lib/request'
  * bill everybody at once and would stop a catch-up halfway through.
  */
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const isTrustedInternal = isValidInternalRequest(req)
+  const isTrustedInternal = await verifyInternalRequest(req)
 
   const session = await auth()
   const sessionRoles = (session?.user?.roles as string[] | undefined) ?? []

@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
 import { createHmac } from 'node:crypto'
 
 // ---------------------------------------------------------------------------
@@ -94,5 +96,57 @@ describe('isAllowedNetcashIp — the second lock', () => {
 
   it('rejects an empty IP (e.g. a proxy header that failed to resolve)', () => {
     expect(isAllowedNetcashIp('')).toBe(false)
+  })
+})
+
+
+// ---------------------------------------------------------------------------
+// The allowlist is a security control that can become a reliability hazard.
+//
+// It is four addresses the provider chose, and providers move infrastructure.
+// If Netcash moves, every settlement notification arrives at a 403 — and the
+// only trace was a `logger.warn` in a log nobody is reading, while members'
+// payments quietly stopped being recorded as settled. Silence on the money path
+// is the failure this repository keeps rediscovering.
+//
+// Asserted against the route's source rather than by driving the handler: the
+// value here is that the alert cannot be dropped by a later edit, and pinning
+// that does not need the whole webhook mock surface stood up. What the alert
+// does once raised is `alert.service`'s own tested behaviour.
+// ---------------------------------------------------------------------------
+
+describe('a refused webhook is not silent', () => {
+  const route = () => {
+    const { readFileSync } = fs
+    return readFileSync(path.resolve(__dirname, '../app/api/v1/webhooks/netcash/route.ts'), 'utf8')
+  }
+
+  it('raises an operational alert when the IP is refused', () => {
+    const src = route()
+
+    expect(src).toContain('WEBHOOK_IP_REFUSED')
+    expect(src).toMatch(/raiseOperationalAlert\(/)
+  })
+
+  it('treats it as critical, because settlements stop while it lasts', () => {
+    const src = route()
+    const alert = src.slice(src.indexOf('WEBHOOK_IP_REFUSED'), src.indexOf('WEBHOOK_IP_REFUSED') + 200)
+
+    expect(alert).toContain("severity: 'critical'")
+  })
+
+  it('names the variable that fixes it', () => {
+    // An alert that says something is wrong and not what to do about it costs
+    // the reader the one thing they needed at 2am.
+    expect(route()).toContain('NETCASH_WEBHOOK_IPS')
+  })
+
+  it('does not let a failed alert swallow the refusal', () => {
+    // The 403 still has to happen if the alert cannot be sent.
+    const src = route()
+    const block = src.slice(src.indexOf('isAllowedWebhookIp'))
+
+    expect(block).toMatch(/\.catch\(/)
+    expect(block).toContain("status: 403")
   })
 })

@@ -38,7 +38,7 @@ function routeFiles(dir: string): string[] {
 /** Routes that accept the trusted server-to-server path at all. */
 const INTERNAL_ROUTES = routeFiles(API_ROOT)
   .map((file) => ({ file, src: readFileSync(file, 'utf8') }))
-  .filter((r) => r.src.includes('isValidInternalRequest'))
+  .filter((r) => r.src.includes('verifyInternalRequest'))
   .map((r) => ({ ...r, rel: path.relative(API_ROOT, r.file).replace(/\\/g, '/') }))
 
 describe('routes reachable by a trusted internal request', () => {

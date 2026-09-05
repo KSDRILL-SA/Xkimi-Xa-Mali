@@ -3,10 +3,10 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { getLedger, getPoolBalance } from '@/services/ledger.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest } from '@/lib/internal-request'
+import { verifyInternalRequest } from '@/lib/internal-request'
 
 export const GET = withApiHandler(async (req: NextRequest) => {
-  const isTrusted = isValidInternalRequest(req)
+  const isTrusted = await verifyInternalRequest(req)
   const session   = isTrusted ? null : await auth()
   if (!isTrusted && !session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 

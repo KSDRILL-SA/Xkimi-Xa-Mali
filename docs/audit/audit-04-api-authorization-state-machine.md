@@ -549,5 +549,5 @@ exists to make possible. The privacy and deletion work should be offered from
 | 1 | May the pool balance go negative? | leadership | A2-F16 |
 | 2 | What does a second payment against a settled period mean? | leadership | **A4-F56 (new)** |
 | 3 | Is "last day of month" a first-class debit day? | product | A3-F35 |
-| 4 | Is `TRUSTED_PROXY` set in production? | ops | A2-F30 |
+| ~~4~~ | ~~Is `TRUSTED_PROXY` set in production?~~ **Withdrawn** — unset already resolves to `vercel`, and it is tested | — | A2-F30 |
 | 5 | The auditor has still not run the suite (ours: 2,154 green) | — | A1 |

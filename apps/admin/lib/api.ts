@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto'
 import { WEB_BASE_URL } from './env'
 
 export class ApiClientError extends Error {
@@ -87,6 +88,11 @@ export async function internalAdminRequest<T = unknown>(
         'Content-Type':      'application/json',
         'x-admin-secret':    secret,
         'x-admin-timestamp': String(Date.now()),
+        // One per request, claimed once on the other side. The timestamp bounds
+        // how long a captured request stays plausible; this is what stops it
+        // being sent twice inside that window — and every route behind this
+        // channel does something that must not happen twice.
+        'x-admin-nonce':     randomUUID(),
         ...(opts.adminUserId && { 'x-admin-user-id': opts.adminUserId }),
         // Without this the web app records its caller's socket address, which
         // on a server-to-server hop is this app rather than the admin who

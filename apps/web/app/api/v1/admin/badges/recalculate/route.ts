@@ -4,7 +4,7 @@ import { apiSuccess, apiError } from '@/lib/api-response'
 import { adminBulkRatelimit } from '@/lib/redis'
 import { recalculateAll, recalculateOne } from '@/services/badge.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { writeAuditLog } from '@/services/audit.service'
 import { getClientIP } from '@/lib/request'
 
@@ -35,7 +35,7 @@ import { getClientIP } from '@/lib/request'
  * ask more than three times an hour, and one limit is one thing to reason about.
  */
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const isTrustedInternal = isValidInternalRequest(req)
+  const isTrustedInternal = await verifyInternalRequest(req)
 
   const session = await auth()
   const sessionRoles = (session?.user?.roles as string[] | undefined) ?? []

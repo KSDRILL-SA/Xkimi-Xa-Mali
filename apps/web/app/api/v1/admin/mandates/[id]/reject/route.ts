@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { rejectMandate } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 /**
@@ -27,7 +27,7 @@ export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { pa
   // with the shared secret, and it must name the admin who acted, because a
   // rejection stops somebody's contributions and the audit trail should say
   // whose decision that was.
-  const isTrustedInternal = isValidInternalRequest(req)
+  const isTrustedInternal = await verifyInternalRequest(req)
 
   const session = await auth()
   const sessionRoles = (session?.user?.roles as string[] | undefined) ?? []

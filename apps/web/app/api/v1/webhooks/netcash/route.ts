@@ -6,6 +6,7 @@ import { processTransactionWebhook } from '@/services/contribution.service'
 import { processGoalPaymentWebhook } from '@/services/goal-payment.service'
 import { claimWebhookEvent, releaseWebhookEvent, webhookEventKey } from '@/services/webhook-dedupe.service'
 import { logger } from '@xxm/observability'
+import { raiseOperationalAlert } from '@/services/alert.service'
 import { withApiHandler } from '@/lib/api-handler'
 import { getClientIP } from '@/lib/request'
 
@@ -46,6 +47,33 @@ export const POST = withApiHandler(async (req: NextRequest) => {
   // lock, and a second lock a caller can pick themselves is not one.
   const clientIp = getClientIP(req) ?? ''
   if (!paymentGateway.isAllowedWebhookIp(clientIp)) {
+    // Not only a log line.
+    //
+    // This is a security control that can become a reliability hazard: the
+    // allowlist is four addresses the provider chose, and providers move
+    // infrastructure. If they do, every settlement notification arrives at a
+    // 403 and the only trace is a warning in a log nobody is reading — while
+    // members' payments quietly stop being recorded as settled.
+    //
+    // The alert says which it is. A signature that verified means the caller
+    // holds the webhook secret, so this is far more likely to be the provider
+    // moving than an attacker; a signature that did not verify never reaches
+    // this line, having been refused above.
+    await raiseOperationalAlert({
+      code: 'WEBHOOK_IP_REFUSED',
+      severity: 'critical',
+      title: 'A signed payment webhook was refused by the IP allowlist',
+      body: [
+        'A webhook arrived with a valid signature from an address that is not on',
+        'the allowlist, and was refused. A correctly signed call is very unlikely',
+        'to be an attacker — it is far more likely Netcash has moved.',
+        '',
+        'While this continues, settlement notifications are not being processed.',
+        'Confirm the provider’s current addresses and set NETCASH_WEBHOOK_IPS.',
+      ].join('\n'),
+      payload: { clientIp },
+    }).catch((err) => logger.error('Could not raise the webhook IP alert', { err }))
+
     logger.warn('Webhook from disallowed IP', { clientIp })
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
