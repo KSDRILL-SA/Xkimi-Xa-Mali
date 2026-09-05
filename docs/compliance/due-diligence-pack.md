@@ -146,6 +146,7 @@ that only ever grows is not being maintained.*
 | 1 | **No collection has ever been processed.** The DebiCheck application was declined; contributions are paid by members and recorded by an administrator | **High** — the Foundation has no collections history, which is the substance of the decline |
 | 2 | **The emergency restore cannot be performed on the machine holding the key.** Backups are written by a PostgreSQL 18 client; the office machine has a 16 client and refuses the archive format. Needs a PG 18 client or Docker, and that install is not finished | **High** — the backup is sound and currently unopenable by its own custodian |
 | 3 | The private key exists in one place only | **High** — a second custody copy is an outstanding owner action |
+| 3a | **The backup dead-man's switch is blind.** `BACKUP_REPO` is unset in production, so the daily watch cannot read whether the backup ran and degrades to "cannot confirm" instead of "the backup has stopped" | **Medium–High** — the backups run; what is missing is the alarm that would say if they stopped, which is the failure they were built to survive |
 | 4 | `REQUIRE_PASSWORD_POLICY_RESET` remains **off** — existing passwords predating the 12-character policy have not been force-reset | Medium |
 | 5 | No penetration test by an external firm | Medium — internal adversarial audits were done, including one reading the provider's own service terms against the code. That is not the same thing |
 | 6 | Retention policy not enforced by any mechanism | Medium |

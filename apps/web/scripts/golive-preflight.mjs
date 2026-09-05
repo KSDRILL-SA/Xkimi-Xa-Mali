@@ -127,7 +127,7 @@ export const GROUP_ACCOUNT_VARS = [
 
 /**
  * @param {Record<string, string | undefined>} env
- * @returns {{ live: boolean, mockGateway: boolean, missing: string[], checked: string[] }}
+ * @returns {{ live: boolean, mockGateway: boolean, gateway: string, missing: string[], checked: string[] }}
  */
 export function preflight(env) {
   // The platform's answer first, and unconditionally. This duplicated
@@ -147,6 +147,22 @@ export function preflight(env) {
   const mockGateway = env.PAYMENT_GATEWAY === 'mock'
   // The same question lib/env.ts and integrations/payment both ask.
   const netcashInUse = !mockGateway && Boolean(env.NETCASH_SERVICE_KEY)
+
+  // Which adapter `selectGateway()` will actually return — not which one the
+  // environment asked for.
+  //
+  // Those are different, and reporting the wrong one printed the single most
+  // alarming sentence this build log could carry: "deployment is LIVE; payment
+  // gateway is mock". It was never true. `selectGateway` refuses the mock on a
+  // live deployment and returns the disabled adapter, which declines every
+  // money operation.
+  //
+  // But that is the exact sentence describing the incident this project has
+  // already had — the stand-in selected in production, answering SUCCESS to
+  // every debit while no bank was contacted — and a reader has no way to tell a
+  // false alarm from the real thing. A monitoring line that cries wolf about
+  // the one failure that actually happened is worse than no line.
+  const gateway = netcashInUse ? 'netcash' : live ? 'disabled' : mockGateway ? 'mock' : 'none'
 
   const checked = [
     ...REQUIRED_WHEN_LIVE,
@@ -170,7 +186,7 @@ export function preflight(env) {
     return value === undefined || value === ''
   })
 
-  return { live, mockGateway, missing, checked, watchdogMissing, groupAccountMissing }
+  return { live, mockGateway, gateway, missing, checked, watchdogMissing, groupAccountMissing }
 }
 
 const log = (msg) => console.log(`[go-live] ${msg}`)
@@ -180,10 +196,18 @@ function main() {
   // build has none of them and would report everything missing, which is noise.
   if (!process.env.VERCEL || process.env.VERCEL_ENV !== 'production') return 0
 
-  const { live, mockGateway, missing, checked, watchdogMissing, groupAccountMissing } =
+  const { live, gateway, missing, checked, watchdogMissing, groupAccountMissing } =
     preflight(process.env)
 
-  log(`deployment is ${live ? 'LIVE' : 'NOT live'}; payment gateway is ${mockGateway ? 'mock' : 'real'}`)
+  log(`deployment is ${live ? 'LIVE' : 'NOT live'}; payment gateway is ${gateway}`)
+
+  // Said plainly, because "disabled" is a state somebody will meet in a build
+  // log without context and read as a fault.
+  if (gateway === 'disabled') {
+    log('  no provider is configured, so every money operation refuses.')
+    log('  This is the expected state: the collections application was declined.')
+    log('  Payments are recorded by an administrator in the console instead.')
+  }
 
   // Said before the pass/fail line below, so it is not swallowed by an
   // "everything is set" that is about a different question.
