@@ -26,6 +26,7 @@ import {
   BudgetExceededError,
 } from '@/lib/errors'
 import { assertCanAccess, canAccess, assertAdmin } from '@/lib/authorization'
+import { raiseOperationalAlert } from './alert.service'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
@@ -434,6 +435,13 @@ export type ContributionStatusChange = {
   userId: string
   contributionId: string
   status: string
+  /**
+   * How far past the amount due this period has just gone, when it has.
+   *
+   * Present only on the crossing. See `emitContributionStatusChange` for what
+   * happens with it, and why it is not silently absorbed.
+   */
+  overpaidBy?: number
 }
 
 /**
@@ -444,6 +452,8 @@ export type ContributionStatusChange = {
  * {@link recalculateContributionStatus}.
  */
 export async function emitContributionStatusChange(change: ContributionStatusChange): Promise<void> {
+  if (change.overpaidBy) await reportOverpaidPeriod(change)
+
   await inngest
     .send({ name: InngestEvents.CONTRIBUTION_STATUS_CHANGED, data: change })
     .catch((err) => {
@@ -452,6 +462,64 @@ export async function emitContributionStatusChange(change: ContributionStatusCha
         error: err instanceof Error ? err.message : String(err),
       })
     })
+}
+
+/**
+ * A member has paid more into a period than that period asked for.
+ *
+ * ── What a second payment against a settled period means ───────────────────
+ *
+ * **It stands, it is recorded, and somebody is told.** That is a decision, and
+ * it is written here because until now it was only a side effect of how the
+ * numbers happened to add up: the sum went past the amount due, the status was
+ * already PAID and stayed PAID, and nothing anywhere said so.
+ *
+ * The alternatives were considered and rejected:
+ *
+ *   - **Reject the second payment.** The money has physically arrived — it is
+ *     cash or an EFT an admin is entering. Refusing to record it would make
+ *     this system disagree with the bank, which is the one thing a ledger may
+ *     never do.
+ *   - **Credit it forward to the next period, automatically.** That is moving
+ *     a member's money between months without anybody deciding to. It may well
+ *     be the right outcome; it is not the system's call to make quietly.
+ *   - **Refund it, automatically.** Same objection, plus it moves money.
+ *
+ * So it is recorded as what it is, and leadership decides what to do with it —
+ * carry it forward or return it — as an explicit act with a name on it. The
+ * Founder Guide's promise is that "the full history stays honest and any of us
+ * can retrace exactly what happened"; an overpayment silently absorbed into a
+ * PAID period is not that.
+ *
+ * `warning` rather than `critical`: no money has moved wrongly and nobody is
+ * out of pocket. It is a decision waiting for a person, not an incident.
+ */
+async function reportOverpaidPeriod(change: ContributionStatusChange): Promise<void> {
+  logger.info('Contribution period overpaid', {
+    contributionId: change.contributionId,
+    userId: change.userId,
+    overpaidBy: change.overpaidBy,
+  })
+
+  await raiseOperationalAlert({
+    code: 'CONTRIBUTION_OVERPAID',
+    severity: 'warning',
+    title: 'A member has paid more into a month than it asked for',
+    entityId: change.contributionId,
+    body: [
+      `A contribution period is now R${change.overpaidBy} over what was due.`,
+      '',
+      'The payment is recorded and the money is safely in the fund — nothing has',
+      'gone wrong. What is needed is a decision: carry the extra forward to the',
+      'next month, or return it to the member.',
+      '',
+      'It is raised because the period reads as PAID either way, so nothing else',
+      'would ever mention it.',
+    ].join(String.fromCharCode(10)),
+    payload: { contributionId: change.contributionId, overpaidBy: change.overpaidBy },
+  }).catch((err) => logger.error('Could not raise the overpayment alert', {
+    contributionId: change.contributionId, err,
+  }))
 }
 
 /**
@@ -487,11 +555,17 @@ export async function recalculateContributionStatus(
     if (!contribution) return null
 
     const newAmountPaid = Number(aggr._sum.amount ?? 0)
-    const status = deriveContributionStatus(
-      newAmountPaid,
-      Number(contribution.amountDue),
-      contribution.dueDate,
-    )
+    const amountDue = Number(contribution.amountDue)
+    const status = deriveContributionStatus(newAmountPaid, amountDue, contribution.dueDate)
+
+    // Did this settlement take the period past what was owed?
+    //
+    // Only on the crossing, not on every recalculation of an already-overpaid
+    // period — an alert that repeats every time a job touches the row is an
+    // alert everybody learns to close.
+    const overpaidBy = subtractZAR(newAmountPaid, amountDue)
+    const newlyOverpaid =
+      overpaidBy > 0 && subtractZAR(Number(contribution.amountPaid), amountDue) <= 0
 
     const updated = await contributionRepo.updateByVersion(
       contributionId,
@@ -503,7 +577,12 @@ export async function recalculateContributionStatus(
     if (updated.count > 0) {
       const change =
         status === 'PAID' || status === 'OVERDUE'
-          ? { userId: contribution.userId, contributionId, status }
+          ? {
+              userId: contribution.userId,
+              contributionId,
+              status,
+              ...(newlyOverpaid && { overpaidBy }),
+            }
           : null
 
       // Announced here only when this owns the connection. Inside a caller's

@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach, type MockedFunction } from 'vitest'
 
+// `reconcileLedger` now checks the pool against its own rules and alerts when it
+// is holding less than nothing, which pulls the alert service — and validated
+// env — into this module's import graph. Neither belongs in a unit test of the
+// ledger arithmetic.
+vi.mock('@/services/alert.service', () => ({ raiseOperationalAlert: vi.fn().mockResolvedValue({}) }))
+vi.mock('./alert.service', () => ({ raiseOperationalAlert: vi.fn().mockResolvedValue({}) }))
+vi.mock('@/lib/env', () => ({ env: { ENCRYPTION_KEY: '0'.repeat(64), NEXTAUTH_URL: 'https://app.test' } }))
+
 vi.mock('@/lib/db', () => ({
   db: {
     ledgerEntry: { groupBy: vi.fn(), count: vi.fn() },
