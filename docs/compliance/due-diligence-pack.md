@@ -31,7 +31,8 @@ ceiling of R10 000 per month each.
 | Membership cap | 50 (enforced in code) |
 | Contribution range | R100 – R10 000 per month, in R50 steps |
 | Theoretical maximum monthly collection | R500 000 |
-| Collection method | DebiCheck authenticated debit order via Netcash |
+| Collection method (today) | **None.** Members pay by transfer or in cash; an administrator records each payment against the member and the month, with proof of payment attached |
+| Collection method (intended) | DebiCheck authenticated debit order. Built and dormant — the application was declined; see `collections-application-brief.md` |
 
 ---
 
@@ -39,7 +40,8 @@ ceiling of R10 000 per month each.
 
 | Question | Answer |
 |---|---|
-| Where is the money held? | A bank account **in the Foundation's name** at `[BANK]` |
+| Where is the money held? | The Foundation's **ABSA** account, into which members pay directly. When a collections partner is appointed, collections settle into the Capitec Business account of KSDRILL SA (Pty) Ltd, held **in custody for the Foundation's members** under constitution clause 1.4A |
+| Does the constitution say so? | Clause 6.1 as signed on 2026-08-24 names only the Capitec account. The amendment reconciling it is drafted in `resolution-2026-09-banking.md` and **is not yet signed** |
 | Is it ever in a personal account? | **No.** Not a member's, not a leader's |
 | Who can move it? | Only against a **Goal** agreed by the members |
 | Can one leader move it alone? | **No** |
@@ -125,9 +127,9 @@ gates are run before any change is merged.
 | Runbook | ✅ `docs/runbook.md` |
 | Key rotation runbook | ✅ Documented, three steps |
 | Environment setup plan | ✅ `docs/environment-setup-plan.md` |
-| Database migrations under version control | ✅ 16 migrations |
-| Backup and restore procedure | **GAP — see clause 8** |
-| Disaster recovery test | **GAP — see clause 8** |
+| Database migrations under version control | ✅ Every schema change is a reviewed, versioned migration in `packages/database/prisma/migrations` |
+| Backup and restore procedure | ✅ `docs/backup-and-restore.md` — encrypted, off-site, scheduled |
+| Disaster recovery test | ✅ **Restore-proven.** Drill run and documented; 40 tables, 623 rows recovered |
 
 ---
 
@@ -135,22 +137,34 @@ gates are run before any change is merged.
 
 Stated deliberately.
 
+*Last reviewed 2026-09-05. Four items on the previous version of this list have
+since been closed and are recorded at the end, because a due-diligence document
+that only ever grows is not being maintained.*
+
 | # | Gap | Materiality |
 |---|---|---|
-| 1 | **No live transaction has ever been processed.** The platform is pre-production | **High** — the Foundation has no operating history |
-| 2 | **Netcash live dry run outstanding** | **High** — the integration is implemented and tested, never exercised live |
-| 3 | Not deployed to production | High |
-| 4 | **No documented backup and restore procedure** | **High** — this holds members' financial records |
-| 5 | No disaster recovery test | Medium |
-| 6 | `REQUIRE_PASSWORD_POLICY_RESET` remains **off** — existing passwords predating the 12-character policy have not been force-reset | Medium |
-| 7 | No penetration test by an external firm | Medium — an internal adversarial audit was done, which is not the same thing |
-| 8 | Retention policy not enforced by any mechanism | Medium |
-| 9 | Operator data processing agreements not confirmed | Medium |
-| 10 | Cross-border transfer disclosed only as of 2026-08-14 | Low — now remediated |
+| 1 | **No collection has ever been processed.** The DebiCheck application was declined; contributions are paid by members and recorded by an administrator | **High** — the Foundation has no collections history, which is the substance of the decline |
+| 2 | **The emergency restore cannot be performed on the machine holding the key.** Backups are written by a PostgreSQL 18 client; the office machine has a 16 client and refuses the archive format. Needs a PG 18 client or Docker, and that install is not finished | **High** — the backup is sound and currently unopenable by its own custodian |
+| 3 | The private key exists in one place only | **High** — a second custody copy is an outstanding owner action |
+| 4 | `REQUIRE_PASSWORD_POLICY_RESET` remains **off** — existing passwords predating the 12-character policy have not been force-reset | Medium |
+| 5 | No penetration test by an external firm | Medium — internal adversarial audits were done, including one reading the provider's own service terms against the code. That is not the same thing |
+| 6 | Retention policy not enforced by any mechanism | Medium |
+| 7 | Operator data processing agreements not confirmed | Medium |
+| 8 | Cross-border transfer disclosed only as of 2026-08-14 | Low — now remediated |
 
-Items 1–3 are sequencing, not defects: the Foundation is asking to begin, not
-claiming to have begun. **Item 4 is a genuine engineering gap and should be closed
-before production**, regardless of what any external party asks for.
+Item 1 is the Foundation's position, not a defect it can repair alone: it is
+asking to begin. Items 2 and 3 are genuine engineering gaps in the one control
+that matters most if everything else fails, and should be closed regardless of
+what any external party asks for.
+
+### Closed since the previous version
+
+| Was | Now |
+|---|---|
+| Not deployed to production | Deployed. Three applications live on `xkimixamali.co.za` |
+| No documented backup and restore procedure | `docs/backup-and-restore.md`; encrypted, off-site, scheduled, and running |
+| No disaster recovery test | Restore drill **passed** — 40 tables, 623 rows, verified identical; automated monthly |
+| Netcash live dry run outstanding | Moot. The application was declined; see `collections-application-brief.md` |
 
 ---
 

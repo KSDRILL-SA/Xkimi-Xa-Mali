@@ -10,8 +10,9 @@ Written 2026-07-26. **Superseded by events — this checklist is now
 substantially done, not outstanding.** All three apps are live on
 `xkimixamali.co.za` (member./admin./apex+www), the domain is registered and
 propagated, Neon/Redis/Inngest/Sentry/Resend/Vercel Blob are all connected,
-and the Netcash registration form itself is submitted (2026-08-29) with
-vetting now on Netcash's side — see `[[project-deployment-phase]]` and
+and the Netcash registration form itself was submitted (2026-08-29) and
+**declined** — see `docs/compliance/collections-application-brief.md`,
+`[[project-netcash-rejected-pivot]]`, `[[project-deployment-phase]]` and
 `[[project-netcash-critical-path]]` in memory for the real, current state.
 The sequencing and reasoning below is still accurate as a record of the
 plan that was followed; treat every checkbox as historical, not as a live

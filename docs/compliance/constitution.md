@@ -4,14 +4,22 @@
 
 | | |
 |---|---|
-| Document status | **DRAFT — ready for member review and signature.** Independent legal review is optional at this scale, not required to open an account or sign — see the note below. |
+| Document status | **ADOPTED AND SIGNED.** This file is the text of the signed document, kept so it can be searched and quoted. The operative document is the signed PDF. |
 | Version | 1.1 |
-| Adopted on | `[DATE OF ADOPTION]` |
+| Adopted on | **2026-08-24**, signed by all four founders |
+| Signed original | `Constitution of Xkimi Xa Mali Foundation - SIGNED.pdf` (held outside this repository) |
+| Amendment pending | **Clause 6.1 — banking.** See the note under that clause and `resolution-2026-09-banking.md`. Not in force until signed. |
 | Operated through | KSDRILL SA (Pty) Ltd, registration number 2026/614917/07 — see clause 1.4A |
 | Self-regulatory body | National Stokvel Association of South Africa (NASASA) — membership application in progress, number to follow |
 
 > **Read this first.** This document states what the system built for this
-> collective actually does, in the form a constitution takes. Independent legal
+> collective actually does, in the form a constitution takes. It was adopted and
+> signed by all four founders on **2026-08-24**. Editing this file changes
+> nothing on its own: the signed PDF is the operative document, and it changes
+> only by an amendment under clause 14 — a resolution, recorded in writing and
+> signed. Where the two disagree, the signed PDF governs and this file is wrong.
+>
+> Independent legal
 > review by a South African attorney is genuinely optional at this scale — the
 > Foundation is a voluntary association operated through an already-registered
 > company, not itself seeking CIPC registration — but is still worth doing if the
@@ -203,6 +211,36 @@ account holder KSDRILL SA (Pty) Ltd, account number 1055722831, branch code
 This account is used **only** for the Foundation's funds: never for KSDRILL SA's
 own income or expenses, and never for any other system KSDRILL SA operates. They
 are not held in the personal account of any member or leader.
+
+> ### ⚠ Clause 6.1 does not describe current practice — amendment pending
+>
+> **What was signed.** Clause 6.1 above names *one* account — Capitec Business,
+> in the name of KSDRILL SA (Pty) Ltd — as the account holding all
+> contributions. That was written when the collections application was expected
+> to succeed: the Capitec account was to be the settlement account, so it made
+> sense for it to be the only one named.
+>
+> **What actually happened.** The DebiCheck application was declined (see
+> `collections-application-brief.md`), so there are no collections to settle.
+> Contributions are paid by transfer or in cash and recorded by an
+> administrator, and the account they are paid into is the Foundation's **ABSA**
+> account, not the Capitec one. The intention remains that when a collections
+> partner is appointed, that partner settles into the KSDRILL SA Capitec
+> account, because the applicant will be KSDRILL SA.
+>
+> **So the signed clause is presently inaccurate**, and inaccurate in the one
+> place a bank, NASASA or a member is most likely to check. It is stated here
+> rather than quietly corrected, because this file cannot correct it.
+>
+> **What fixes it.** Only an amendment under clause 14: a resolution of
+> two-thirds of the members at a meeting called with notice, recorded in writing
+> and signed by the office bearers (14.1, 14.3). Clause 14.2 does not bar it —
+> it touches none of (a) to (d). The resolution is drafted and ready to sign in
+> **`resolution-2026-09-banking.md`**; the replacement text for 6.1 is in it.
+>
+> **Until it is signed**, treat clause 6.1 as it stands as the operative rule and
+> this note as the disclosure of the discrepancy. Do not hand this constitution
+> to a bank or to NASASA without it.
 
 6.2 Money leaves the pool **only** for a **Goal**.
 

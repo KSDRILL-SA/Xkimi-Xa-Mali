@@ -102,6 +102,30 @@ export const NETCASH_CONFIG = ['NETCASH_API_URL', 'NETCASH_DEBICHECK_TEMPLATE_ID
 export const WATCHDOG_VARS = ['BACKUP_REPO', 'BACKUP_WATCH_TOKEN']
 
 /**
+ * The account members are told to pay into.
+ *
+ * With no gateway, a contribution arrives because a member reads these four
+ * values off their screen and sends money to them. They have defaults in
+ * `lib/group-account.ts`, deliberately: a missing variable must never blank out
+ * the details somebody needs in order to pay.
+ *
+ * Which is exactly why they are reported here. The defaults mean nothing ever
+ * looks wrong, and none of the four is set in production today — so the account
+ * shown to members lives in the source, and changing banks is a release rather
+ * than a configuration change. Nobody would discover that until the day they
+ * needed it to be otherwise.
+ *
+ * Advisory, never blocking. Serving the default account is a working state, not
+ * a broken one.
+ */
+export const GROUP_ACCOUNT_VARS = [
+  'NEXT_PUBLIC_GROUP_ACCOUNT_NAME',
+  'NEXT_PUBLIC_GROUP_BANK_NAME',
+  'NEXT_PUBLIC_GROUP_BANK_ACCOUNT',
+  'NEXT_PUBLIC_GROUP_BANK_BRANCH',
+]
+
+/**
  * @param {Record<string, string | undefined>} env
  * @returns {{ live: boolean, mockGateway: boolean, missing: string[], checked: string[] }}
  */
@@ -141,7 +165,12 @@ export function preflight(env) {
     return value === undefined || value === ''
   })
 
-  return { live, mockGateway, missing, checked, watchdogMissing }
+  const groupAccountMissing = GROUP_ACCOUNT_VARS.filter((name) => {
+    const value = env[name]
+    return value === undefined || value === ''
+  })
+
+  return { live, mockGateway, missing, checked, watchdogMissing, groupAccountMissing }
 }
 
 const log = (msg) => console.log(`[go-live] ${msg}`)
@@ -151,7 +180,8 @@ function main() {
   // build has none of them and would report everything missing, which is noise.
   if (!process.env.VERCEL || process.env.VERCEL_ENV !== 'production') return 0
 
-  const { live, mockGateway, missing, checked, watchdogMissing } = preflight(process.env)
+  const { live, mockGateway, missing, checked, watchdogMissing, groupAccountMissing } =
+    preflight(process.env)
 
   log(`deployment is ${live ? 'LIVE' : 'NOT live'}; payment gateway is ${mockGateway ? 'mock' : 'real'}`)
 
@@ -170,6 +200,21 @@ function main() {
     log('note: BACKUP_WATCH_TOKEN is not set. The watch still works on a public')
     log('  repository; unauthenticated GitHub calls are rate-limited per IP, so a')
     log('  busy hour can turn a real answer into "cannot confirm".')
+  }
+
+  // Not a failure: the defaults are a real account and members can pay into it.
+  // Reported because the cost of not knowing is only paid on the day the account
+  // has to change, and on that day it is a code change and a deploy.
+  if (groupAccountMissing.length === GROUP_ACCOUNT_VARS.length) {
+    log('note: the group collection account is not configured; the built-in')
+    log('  details are being shown to members. Changing banks currently means')
+    log('  editing lib/group-account.ts and redeploying. See DEPLOYMENT.md,')
+    log('  "The group collection account".')
+  } else if (groupAccountMissing.length > 0) {
+    log('WARNING: the group collection account is only PARTLY configured:')
+    for (const name of groupAccountMissing) log(`  falling back to the built-in value: ${name}`)
+    log('  Members would be shown a mix of configured and built-in banking')
+    log('  details. Set all four together, or none.')
   }
 
   if (missing.length === 0) {
