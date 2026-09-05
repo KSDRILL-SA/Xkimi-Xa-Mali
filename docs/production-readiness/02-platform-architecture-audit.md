@@ -1,5 +1,17 @@
 # 2 — Platform & Architecture Audit Report
 
+> [!WARNING]
+> **Superseded on the `DEPLOY_ENV` question.** This document describes a
+> deployment whose live-ness was decided by a hand-set `DEPLOY_ENV`, with
+> `requiredWhenLive` checks inert while it read `staging`. That is no longer how
+> it works: `VERCEL_ENV === "production"` is now checked **first and
+> unconditionally**, a declaration can tighten but never loosen, and the
+> `requiredWhenLive` vars are enforced because the platform says this is
+> production. There is nothing to flip. See `DEPLOYMENT.md` §2.
+>
+> Kept as the dated record it is, rather than rewritten — the findings below
+> were true when they were made, and the reasoning is still worth reading.
+
 Source: *Platform & Architecture Audit Report*, dated 28 August 2026, domain
 `xkimixamali.co.za`. See [`README.md`](./README.md) for the status legend and
 how to use this file.

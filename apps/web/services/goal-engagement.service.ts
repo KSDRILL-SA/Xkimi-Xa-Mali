@@ -1,4 +1,5 @@
 import { db } from '@/lib/db'
+import { roundZAR } from '@/lib/money'
 import { goalRepo } from '@/repositories/goal.repository'
 import { isAdmin } from '@/lib/authorization'
 import { writeAuditLog } from './audit.service'
@@ -165,7 +166,12 @@ export async function setGoalPledge(goalId: string, userId: string, amount: numb
     throw new ValidationError(`Pledge must be between R${MIN_PLEDGE} and R${MAX_PLEDGE.toLocaleString('en-ZA')}`)
   }
 
-  const rounded = Math.round(amount * 100) / 100
+  // `roundZAR`, not a hand-rolled copy of it. This one is missing the
+  // Number.EPSILON nudge the helper applies, so a value sitting a hair below
+  // a .xx5 boundary rounds down here and up everywhere else — two answers to
+  // the same question, which is the whole reason the contract in lib/money
+  // says every money operation goes through one place.
+  const rounded = roundZAR(amount)
   await db.goalPledge.upsert({
     where: { goalId_userId: { goalId, userId } },
     create: { goalId, userId, amount: rounded },

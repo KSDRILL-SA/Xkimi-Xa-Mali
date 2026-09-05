@@ -10,7 +10,7 @@ Three fully isolated tiers — no tier shares data or credentials with another.
 |---|---|---|---|---|
 | **Local** | Dev machine | Neon dev branch *(Docker optional via `docker-compose.yml`)* | Upstash dev | Mock gateway |
 | **Preview** | PR to `main` | Neon PR branch (auto) | Upstash dev | Mock gateway |
-| **Production** | Merge to `main` | Neon `staging` branch (the real, live one — see the naming-trap note below) | Upstash production | **Mock gateway, deliberately** — Netcash's registration is submitted and under vetting as of 2026-08-29, not yet live; see `[[project-netcash-critical-path]]` in the project's memory system |
+| **Production** | Merge to `main` | Neon `staging` branch (the real, live one — see the naming-trap note below) | Upstash production | **No gateway.** The DebiCheck application was declined — the bank required a debit-order base a new stokvel cannot have. A live deployment therefore selects `disabledGateway`: every money operation refuses, and money is recorded as it is actually received, in cash and EFT through the console |
 
 ---
 
@@ -33,7 +33,7 @@ flowchart TD
 
     CI -->|green| REVIEW["review"] --> MERGE["squash merge"]
     MERGE -->|preview| PREV["Vercel preview<br/>Neon PR branch · mock gateway"]
-    MERGE -->|main| PROD["Vercel production, 3 projects<br/>migrate deploy → build → deploy<br/>Neon staging branch · mock gateway<br/>(DEPLOY_ENV=staging today — see note)"]
+    MERGE -->|main| PROD["Vercel production, 3 projects<br/>migrate deploy → build → deploy<br/>Neon staging branch · no gateway<br/>(disabledGateway — see note)"]
 ```
 
 **CI is green and running normally** — the account's billing lock (a failed
@@ -44,13 +44,17 @@ Test`, `Constitutional enforcement`, and (on `main`) `Backup Self-Test`, all
 required to pass before merge.
 
 > **A real naming trap, not a typo:** the Neon branch that actually serves
-> production traffic is named **`staging`**, and `DEPLOY_ENV=staging` is set
-> on the live `xkimi-xa-mali-web` deployment — both deliberate from early
-> infra bootstrapping, neither changed since. The Neon branch literally
-> named `production` is empty. Always verify which Neon branch shows
-> `Active` compute before trusting a label. `PAYMENT_GATEWAY=mock` is set
-> explicitly in production today regardless of this naming, so no real
-> debit can go out by accident — see [../../DEPLOYMENT.md](../../DEPLOYMENT.md).
+> production traffic is named **`staging`**, from early infra bootstrapping.
+> The branch literally named `production` is empty. It was also the *default*
+> branch until 2026-09-04, which meant the project sat one re-sync away from
+> serving an empty database — Vercel's Neon integration maps production
+> deployments to the default branch. `staging` is now the default. Always
+> verify which branch shows `Active` compute before trusting a label.
+>
+> On the gateway: a live deployment with no real credentials selects
+> `disabledGateway`, so every money operation refuses rather than being
+> simulated. That is a property of the code, not of an environment variable
+> somebody remembered to set — see [../../DEPLOYMENT.md](../../DEPLOYMENT.md).
 
 ---
 
@@ -83,7 +87,7 @@ flowchart TB
         CRON["cron schedules"]
         HIST["execution history"]
     end
-    NC["Netcash — mock gateway today<br/>(registration submitted, vetting)"]
+    NC["Netcash — not integrated<br/>(DebiCheck application declined)"]
     BULK["BulkSMS"]
     RESEND["Resend"]
     BLOB["Vercel Blob — private access"]
@@ -113,7 +117,7 @@ flowchart LR
     end
     subgraph PR["Production — main"]
         PRA["member. / admin. / apex+www<br/>.xkimixamali.co.za"] --- PRDB["Neon 'staging' branch — real member data<br/>despite the branch name"]
-        PRA --- PRNC["Netcash mock gateway —<br/>no live debits yet"]
+        PRA --- PRNC["No gateway — disabledGateway;<br/>cash and EFT recorded by an admin"]
     end
     L -.->|no shared data or creds| P -.->|no shared data or creds| PR
 ```
@@ -126,7 +130,7 @@ flowchart LR
 apps/web        Next.js 16 — pages · api/v1 · services · lib · inngest · middleware.ts
 apps/admin      Next.js 16 — admin dashboard, server actions
 apps/website    Next.js 16 — marketing site, no DB/auth/payment deps
-packages/database      schema.prisma (34 models · 17 enums) · 46 migrations · seed.ts
+packages/database      schema.prisma · migrations/ · seed.ts
 packages/observability  structured logger wrapping Sentry
 packages/ui|utils|types|config   shared libraries
 docs/           architecture · flows · database · security · adr · constitutions

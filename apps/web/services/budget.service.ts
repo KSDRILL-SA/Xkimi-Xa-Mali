@@ -133,7 +133,11 @@ export async function checkMandateAgainstBudget(
     warning: true,
     budget: budgetAmount,
     mandateAmount,
-    overage: mandateAmount - budgetAmount,
+    // subtractZAR, not `-`. Both sides arrive from DECIMAL columns via
+    // Number(), and the contract in lib/money is that every money operation in
+    // JS goes through the helpers — the figure is shown to a member as the
+    // amount they would go over by.
+    overage: subtractZAR(mandateAmount, budgetAmount),
   }
 }
 

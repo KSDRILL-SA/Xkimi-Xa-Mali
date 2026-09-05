@@ -436,9 +436,10 @@ carry around its deployment state.
 
 ### Verification
 
-Confirmed, and the drift is larger than reported: there are **50** migration
+Confirmed, and the drift is larger than reported: there are **49** migration
 directories in `packages/database/prisma/migrations`, against `DEPLOYMENT.md:128`
-claiming 37.
+claiming 37. (Recorded as 50 when this was written — that count included
+`migration_lock.toml`.)
 
 The auditor's read of the runner is right, and is better than the documentation
 describing it:

@@ -1,7 +1,7 @@
 import { db } from '@/lib/db'
 import { assessFromCounts, MEMBER_ATTRIBUTABLE_FAILURE } from '@/services/risk.service'
 import { assertCanAccess } from '@/lib/authorization'
-import { subtractZAR } from '@/lib/money'
+import { subtractZAR, sumZAR, multiplyZAR } from '@/lib/money'
 import { cache, CACHE_KEYS } from '@/lib/cache'
 
 // Streak lengths worth celebrating. When a member is exactly one month short of
@@ -203,7 +203,11 @@ export async function getMemberInsights(
 
   const yearToDatePaid = Number(ytdAgg._sum.amountPaid ?? 0)
   const monthlyAmount = activeMandate ? Number(activeMandate.amount) : 0
-  const projectedYearEnd = yearToDatePaid + monthlyAmount * remainingMonths
+  // Through the helpers, like every other money operation. The figure is
+  // shown to a member as what they are on course to have saved by December,
+  // and `a + b * n` on rand values is exactly the chained arithmetic the
+  // contract in lib/money exists to keep out of the financial path.
+  const projectedYearEnd = sumZAR(yearToDatePaid, multiplyZAR(monthlyAmount, remainingMonths))
 
   let paidCount = 0
   let overdueCount = 0
