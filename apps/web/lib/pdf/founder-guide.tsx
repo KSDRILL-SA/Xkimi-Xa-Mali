@@ -558,7 +558,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           needs and what it has, all the time.
         </P>
 
-        <H2>Two ways money reaches a Goal, and a third to come</H2>
+        <H2>Three ways money reaches a Goal</H2>
         <IconList items={[
           {
             glyph: 'cycle', title: 'Your monthly contribution',
@@ -570,7 +570,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           },
           {
             glyph: 'clock', title: 'A monthly plan toward one Goal',
-            text: <>Built, and waiting on collection: commit an amount on a day of your choosing and it repeats until you stop it or the Goal closes. It needs a standing collection to draw from, so it becomes available the day a collection partner does.</>,
+            text: <>Commit an amount and a day, and every month on that day you are told what your plan asks for. You pay it as you pay everything else, a leader records it against the Goal, and the plan is settled for that month. It runs until you stop it or the Goal closes.</>,
           },
         ]} />
 
@@ -960,7 +960,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
             ['How do I actually pay?', 'Transfer your amount to the Foundation’s account — the details are in the app — or hand cash to a leader. Then send your proof of payment, and it is recorded against your month. Section 04.'],
             ['Why is nothing taken automatically?', 'Because we were declined for debit orders: a new circle has no collection history, and that is what the bank wanted to see. Recording payments by hand is how we build it. Section 04.'],
             ['What if a leader records it wrong?', 'Tell any leader. A wrong entry is reversed, not erased — the mistake and its correction both stay visible, with names on each.'],
-            ['What if I pay too much?', 'The money stands — the record never disagrees with the bank about money that arrived. The month shows as paid with more against it than was due, and leadership is alerted so somebody speaks to you about what to do with the difference.'],
+            ['What if I pay too much?', 'It goes toward whatever else you owe, oldest month first. Pay R900 when the month asks R450 and you are behind on an earlier one, and both settle. If nothing else is owed the extra stands on that month and leadership is told, so somebody can speak to you about it.'],
             ['Can I change my monthly amount?', 'Yes, by speaking to a leader. It is a decision, not a slider — the circle plans around what everyone committed.'],
             ['Who can see what I contribute?', 'Leadership, and you. Other members see your name and that you are a member, not your amount.'],
             ['Can I be removed?', 'Leadership can suspend an account, which stops participation and keeps your record and your seat. It is for serious things, not for one missed month or for disagreeing with us.'],
@@ -983,7 +983,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
             ['Reversal', 'Undoing a payment recorded in error. The original stays visible with the reversal beside it — nothing is deleted.'],
             ['Debit order', 'A standing permission for your amount to be collected on a chosen day. Not in use yet — see Section 04.'],
             ['Goal', 'A named thing the circle is funding, with an amount and a date. The only way money leaves the pool.'],
-            ['Monthly plan', 'A standing commitment to one Goal, collected each month until you stop it.'],
+            ['Monthly plan', 'A standing commitment to one Goal. Each month on your chosen day it tells you what it asks for, and it runs until you stop it.'],
             ['Gift', 'A one-off amount you send to a Goal yourself, separate from your monthly contribution.'],
             ['Waiver', 'A month leadership released you from, with their name on the decision.'],
             ['Statement', 'A PDF of everything that happened on your account in a month, which you generate yourself.'],

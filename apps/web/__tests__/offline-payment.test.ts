@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
   writeAuditLog: vi.fn(),
   findById: vi.fn(),
   inbox: vi.fn(),
+  findUnsettled: vi.fn(),
+  findUniqueWithVersion: vi.fn(),
 }))
 
 vi.mock('@/lib/env', () => ({ env: { ENABLE_MANUAL_PAYMENTS: true } }))
@@ -65,9 +67,13 @@ vi.mock('@/repositories/contribution.repository', () => ({
     findById: mocks.findById,
     update: vi.fn(),
     updateByVersion: vi.fn().mockResolvedValue({ count: 1 }),
-    findUniqueWithVersion: vi.fn().mockResolvedValue({
-      id: 'contrib-1', amountDue: 500, amountPaid: 0, dueDate: new Date(), version: 1, status: 'PENDING',
-    }),
+    findUniqueWithVersion: mocks.findUniqueWithVersion,
+    // No other unsettled month, which is this file's world: one member, one
+    // period, one payment. Where the payment overshoots there is nowhere for
+    // the surplus to go, so it stays on the period and the over-payment is
+    // reported — the behaviour asserted below and deliberately unchanged.
+    // Spilling across months has its own file, `payment-allocation.test.ts`.
+    findUnsettledByUser: mocks.findUnsettled,
   },
   runTransaction: mocks.runTransaction,
 }))
@@ -108,6 +114,10 @@ beforeEach(() => {
   // service reports from.
   mocks.findById.mockResolvedValue({ id: 'contrib-1', amountDue: 500, amountPaid: 200, status: 'PARTIAL' })
   mocks.inbox.mockResolvedValue(undefined)
+  mocks.findUnsettled.mockResolvedValue([])
+  mocks.findUniqueWithVersion.mockResolvedValue({
+    id: 'contrib-1', amountDue: 500, amountPaid: 0, dueDate: new Date(), version: 1, status: 'PENDING',
+  })
 })
 
 describe('what a period is created owing', () => {
@@ -426,5 +436,112 @@ describe('the evidence it stores', () => {
     const [entry] = mocks.writeAuditLog.mock.calls[0]
     expect(entry.payload.evidence).toBe('DOCUMENT')
     expect(JSON.stringify(entry.payload)).not.toContain('payment-proofs/')
+  })
+})
+
+describe('a payment bigger than the month it was recorded against', () => {
+  // The pure split is covered exhaustively in `payment-allocation.test.ts`.
+  // What is checked HERE is the wiring, which is where the money could actually
+  // go missing: one real payment must become rows that sum to it, and the pool
+  // must be credited every one of them.
+
+  beforeEach(() => {
+    mocks.findByPeriod.mockResolvedValue({
+      id: 'contrib-sep', status: 'PENDING', amountDue: 450, amountPaid: 0,
+    })
+    mocks.findUniqueWithVersion.mockResolvedValue({
+      id: 'contrib-sep', amountDue: 450, amountPaid: 0, version: 1, status: 'PENDING',
+    })
+    mocks.findUnsettled.mockResolvedValue([
+      { id: 'contrib-jul', amountDue: 450, amountPaid: 0, status: 'OVERDUE' },
+    ])
+    mocks.txCreate.mockImplementation(async (data: { amount: number }) => ({
+      id: `tx-${data.amount}`, ...data,
+    }))
+  })
+
+  it('settles the named month, then the arrears', async () => {
+    await recordOfflineContribution(
+      payment({ amount: 900, periodMonth: 9 }) as never, ADMIN, ROLES,
+    )
+
+    const written = mocks.txCreate.mock.calls.map(([d]: [{ contributionId: string; amount: number }]) => ({
+      contributionId: d.contributionId, amount: d.amount,
+    }))
+    expect(written).toEqual([
+      { contributionId: 'contrib-sep', amount: 450 },
+      { contributionId: 'contrib-jul', amount: 450 },
+    ])
+  })
+
+  it('credits the pool the whole payment, not just the named part', async () => {
+    // The failure that would matter. Crediting only the first row would leave
+    // the ledger short by exactly the spilled amount — money the member handed
+    // over, sitting in the bank, missing from the pool.
+    await recordOfflineContribution(
+      payment({ amount: 900, periodMonth: 9 }) as never, ADMIN, ROLES,
+    )
+
+    const credited = vi.mocked(postPoolCredit).mock.calls
+      .reduce((sum, [c]) => sum + (c as { amount: number }).amount, 0)
+
+    expect(credited).toBe(900)
+  })
+
+  it('gives each part its own key, so nothing collides on the reference', async () => {
+    await recordOfflineContribution(
+      payment({ amount: 900, periodMonth: 9 }) as never, ADMIN, ROLES,
+    )
+
+    const keys = mocks.txCreate.mock.calls.map(([d]: [{ idempotencyKey: string }]) => d.idempotencyKey)
+    expect(new Set(keys).size).toBe(keys.length)
+    // The first row keeps the key the duplicate check was made against, so
+    // re-recording the same bank reference is still refused before any of this
+    // runs.
+    expect(keys[0]).not.toContain(':part:')
+    expect(keys[1]).toContain(':part:')
+  })
+
+  it('recalculates every month it touched', async () => {
+    // A spilled-into month whose status is never recalculated stays OVERDUE
+    // while holding the money that settles it — and the member goes on being
+    // chased for it.
+    await recordOfflineContribution(
+      payment({ amount: 900, periodMonth: 9 }) as never, ADMIN, ROLES,
+    )
+
+    // `recalculateContributionStatus` lives in the module under test, so it
+    // runs for real against these mocks rather than being stubbed. What proves
+    // it ran for a period is the read it opens with.
+    const read = mocks.findUniqueWithVersion.mock.calls.map(([id]: [string]) => id)
+    expect(read).toContain('contrib-sep')
+    expect(read).toContain('contrib-jul')
+  })
+
+  it('writes where the money went into the audit log', async () => {
+    await recordOfflineContribution(
+      payment({ amount: 900, periodMonth: 9 }) as never, ADMIN, ROLES,
+    )
+
+    const [entry] = mocks.writeAuditLog.mock.calls[0]
+    expect(entry.payload.allocations).toEqual([
+      { contributionId: 'contrib-sep', amount: 450 },
+      { contributionId: 'contrib-jul', amount: 450 },
+    ])
+  })
+
+  it('still leaves a genuine over-payment on the named month', async () => {
+    // Nothing to absorb it. The month reads over-paid and leadership is
+    // alerted, exactly as before — the record says money arrived that nothing
+    // was owed for, which is what happened.
+    mocks.findUnsettled.mockResolvedValue([])
+
+    await recordOfflineContribution(
+      payment({ amount: 900, periodMonth: 9 }) as never, ADMIN, ROLES,
+    )
+
+    expect(mocks.txCreate).toHaveBeenCalledTimes(1)
+    const [written] = mocks.txCreate.mock.calls[0]
+    expect(written.amount).toBe(900)
   })
 })

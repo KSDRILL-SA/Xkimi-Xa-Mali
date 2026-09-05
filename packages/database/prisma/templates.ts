@@ -75,6 +75,18 @@ export const NOTIFICATION_TEMPLATES: Array<{
     body: 'Xkimi Xa Mali Foundation: Your monthly plan for "{{goal}}" is paused - we could not find an active debit order to collect from. Set one up and you can resume it.',
   },
   {
+    // What the plan asks for this month, when nothing can collect it.
+    //
+    // With no collections provider a plan cannot charge anybody, so its monthly
+    // event is a request rather than a debit. Unlike a debit, the member is the
+    // one who has to act on it — so this carries the amount and the goal, and
+    // says what to do with both. Plain hyphens, as above.
+    slug: 'goal-plan-due',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimi Xa Mali Foundation: Your monthly plan for "{{goal}}" asks for R{{amount}} this month. Pay it into the group account and send your proof of payment, and we will record it against the goal.',
+  },
+  {
     // Sent to the members who pledged toward a Goal that lapsed without
     // reaching target. Plain hyphen, not an em dash: outside GSM-7 the whole
     // message is billed as UCS-2 and halves the character budget.

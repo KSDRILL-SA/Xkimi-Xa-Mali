@@ -421,10 +421,10 @@ model PaymentMandate {
   gatewaySyncReason String?
   /// When the two last disagreed — so a stale divergence is visible as stale.
   gatewaySyncAt     DateTime?
-  approvedAt       DateTime?
-  approvedById     String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  approvedAt        DateTime?
+  approvedById      String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Restrict)
   bankAccount  BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Restrict)
@@ -726,6 +726,19 @@ model GoalPlan {
   /// reads it to know whether this month is already done, and the same value
   /// forms the idempotency key — so a retried job cannot charge twice.
   lastCollectedPeriod String?
+  /// The last period this plan ASKED the member for, as YYYY-MM.
+  ///
+  /// Kept apart from `lastCollectedPeriod` because they mean different things
+  /// and only one of them is money. With no collections provider a plan cannot
+  /// charge anybody, so the monthly event is a request: the member is told what
+  /// their standing commitment asks for this month, pays it the way they pay
+  /// everything else, and an administrator records it — which is what finally
+  /// stamps `lastCollectedPeriod`.
+  ///
+  /// Both stamps stop a plan being handled twice in one month. Merging them
+  /// into one column would make a plan that was merely asked look collected,
+  /// which is the one thing a money record may never say.
+  lastRequestedPeriod String?
   /// Consecutive months whose collection never succeeded. Reset by a success.
   failedRuns          Int            @default(0)
   version             Int            @default(0)

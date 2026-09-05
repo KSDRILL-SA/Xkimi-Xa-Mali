@@ -28,18 +28,34 @@ export function collectionDayInMonth(debitDay: number, year: number, month1: num
 }
 
 /**
- * Whether a plan should be collected on this date.
+ * Whether a plan should be acted on this date.
  *
- * `lastCollectedPeriod` is the guard against charging twice. The job runs daily
- * and may be retried within the same day, so "is it the right day" cannot be
- * the only question — the answer stays true for the whole of that day.
+ * The stamps are the guard against acting twice. The job runs daily and may be
+ * retried within the same day, so "is it the right day" cannot be the only
+ * question — the answer stays true for the whole of that day.
+ *
+ * Two stamps, either of which means this month is done:
+ *
+ *   - `lastCollectedPeriod` — money moved for this period, whether a collection
+ *     took it or an administrator recorded a payment the member made.
+ *   - `lastRequestedPeriod` — the member was asked for it, because nothing can
+ *     collect. Asking twice in a month is not a money defect, but it is the
+ *     kind of nagging that teaches people to ignore the message that matters.
+ *
+ * Reading both also covers the day a provider is finally appointed: a plan
+ * already asked for this month is not then also charged for it.
  */
 export function isDueOn(
-  plan: { debitDay: number; lastCollectedPeriod: string | null },
+  plan: {
+    debitDay: number
+    lastCollectedPeriod: string | null
+    lastRequestedPeriod?: string | null
+  },
   when: Date,
 ): boolean {
   const period = periodKey(when)
   if (plan.lastCollectedPeriod === period) return false
+  if (plan.lastRequestedPeriod === period) return false
   return when.getDate() === collectionDayInMonth(plan.debitDay, when.getFullYear(), when.getMonth() + 1)
 }
 
