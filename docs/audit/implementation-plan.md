@@ -13,6 +13,10 @@ Four audits produced 58 numbered findings. They are not 58 pieces of work.
   item rather than scheduled twice.
 - **28 work items remain**, plus **3 decisions that are not ours to make**.
 
+*(Phase 3 later gained two more — **G9** and **G10** — when it was redesigned to be
+provider-agnostic rather than Netcash-specific. They are mechanism rather than
+findings, which is why the mapping below still accounts for 28.)*
+
 Every finding is accounted for in the mapping table below. Nothing was dropped
 silently.
 
@@ -487,29 +491,243 @@ audits keep recommending.
 
 ---
 
-## Phase 3 — The gateway lifecycle
+## Phase 3 — The collections lifecycle, and a port that survives a second provider
 
-Eight items. **None of this is scheduled yet**, because there is no gateway and
-enabling one is a future decision. It is planned now so that the decision, when it
-comes, is a start date rather than a design exercise.
+Ten items. **None of this is scheduled**, because there is no gateway and getting
+one is a business decision rather than a start date. It is designed now so that
+the decision, when it comes, is a start date rather than a design exercise.
+
+### The decision that reframed this phase
+
+Recorded 2026-09-05, and it is the owner's:
+
+> Do not build the gateway specifically for Netcash. Build it so that when a
+> provider declines us, we can map the scope to whichever one accepts us without
+> changing much — only aligning with the one that says yes. Start by reapplying to
+> Netcash, after the three members have accounts and their past payments are
+> recorded.
+
+The goal is right. The way to reach it is not the obvious one, and this section
+exists because the obvious one has already been tried in this codebase.
+
+### "Make it provider-agnostic" is not the fix it sounds like
+
+`IPaymentGateway` in `apps/web/integrations/payment/types.ts` contains the word
+Netcash exactly zero times. It is already provider-agnostic in shape. **And every
+Netcash finding across the four audits leaked straight through it.**
+
+| The port promises | What DebiCheck actually does |
+|---|---|
+| `submitScheduledDebit() -> { transactionRef, status }` | A **batch file** is uploaded, a **file token** comes back, the outcome arrives later in a **load report**. There is nowhere to put the token, so it went into `transactionRef` — **A1-F02** |
+| *(no method to fetch an outcome)* | `fetchBatchReport()` exists in `lib/netcash.ts` and is called by nothing. **The port has no seat for it** — **A1-F04** |
+| `delayMandate()` | No such operation exists. The real adapter throws unconditionally — **A3-F34** |
+| `updateMandate({ amount, debitDay })` | Only the amount is amendable; a day change is a new authentication — **A3-F33** |
+| `verifyWebhookSignature` + `isAllowedWebhookIp` | Assumes the provider posts with an HMAC header from a fixed IP range. Netcash does neither — **A1-F01** |
+| `getNextDebitDate(debitDay)` | Calendar arithmetic, on a *gateway* port, emitting `2026-02-31` — **A3-F35** |
+
+The port was generalised from an **imagined** provider rather than from the
+domain. It is portable in name and wrong in substance, and a second adapter behind
+it would not produce portability — it would produce two adapters lying in
+different ways.
+
+**So the work is not to make the port generic. It already is. The work is to make
+it model the lifecycle.**
+
+### What is genuinely stable, and why
+
+These hold for every South African collections provider, and they hold because
+**DebiCheck regulates them** rather than because a vendor chose them:
+
+```
+authorisation  ->  bank-side authentication  ->  collection submitted
+               ->  outcome arrives, later, by some route
+               ->  attributed to exactly one member
+```
+
+Every part of that is provider-independent. What varies between providers is
+*transport* and *timing*, not the shape of the lifecycle.
+
+P6 already built the first piece of this without needing a provider: `UNKNOWN`
+exists because the gap between "submitted" and "outcome" is real for any
+asynchronous collector, and a timeout inside that gap is an absence of information
+rather than a failure.
+
+### Capabilities are declared, not assumed
+
+The single highest-value change in this phase, and the one that makes a provider
+swap a **data** difference instead of a code one.
+
+`delayMandate()` exists on the port and throws, because DebiCheck has no such
+operation. `updateMandate` accepts a `debitDay` no provider can honour without
+re-authentication. Both are the port promising things on a provider's behalf.
+
+Instead, an adapter states what it can do:
+
+```ts
+supports: {
+  amendAmount: true,
+  amendDebitDay: false,     // a new authentication, not an amendment
+  delayCollection: false,   // expressed by when the batch is submitted
+  outcomes: 'poll',         // 'poll' | 'webhook' | 'both'
+  submission: 'batch',      // 'batch' | 'single'
+}
+```
+
+…and the **service layer** decides what to offer the member. A provider that can
+amend a debit day gets that button; one that cannot never shows it, rather than
+showing it and failing. This closes A3-F33 and A3-F34 at the root instead of
+patching each call site.
+
+### The adapter contract
+
+What a new provider must supply. Written down so that onboarding provider #2 is a
+checklist rather than a redesign — and so that the checklist exists *before*
+anybody is under time pressure to switch.
+
+| # | The provider must give us | Why the lifecycle needs it |
+|---|---|---|
+| 1 | A way to register an authorisation and learn when the debtor authenticated it | Nothing may be collected against an unauthenticated mandate |
+| 2 | A **per-collection reference we choose**, echoed back in outcomes | Without it an outcome cannot be attributed to a member — **A1-F03** |
+| 3 | A durable handle for a submission | So a submission can be re-asked about after a crash — **A2-F22** |
+| 4 | At least one way to learn outcomes: poll, callback, or both | The whole of **A1-F04** |
+| 5 | Per-row outcomes, not just a batch verdict | `SUCCESSFUL WITH ERRORS` is simultaneously a batch success and a member failure — **A3-F38** |
+| 6 | A stated position on reversals and how they are notified | The pool debit depends on it |
+| 7 | A capability declaration (the table above) | So the UI offers only what is real |
+| 8 | A sandbox | See below — this is not optional |
+
+### What will not be built, and why
+
+**No speculative second adapter.** The audits have just demonstrated, at length,
+what generalising from imagination costs. Writing two imagined adapters doubles
+it. A good port comes from one provider's **sandbox** plus a written contract for
+the next — never from two sets of documentation.
+
+**Item 8 above is the reason.** The current port was built from Netcash's
+documentation, which is public and complete, and it still got the timing model
+wrong. Documentation describes the happy path; a sandbox tells you what a timeout
+looks like.
+
+**But take the cheap insurance now**, because it is the part that is expensive to
+retrofit: carry the provider's name and its own identifiers in their own columns
+from the first migration. Adding a column later means migrating financial records
+— and G2 and G3 below are already that change, so the cost is zero if it is done
+in the same pass.
+
+### How much of this is Netcash-shaped
+
+Less than it looks. Most of Phase 3 is required for **any** asynchronous
+collector:
+
+| Item | Provider-independent? |
+|---|---|
+| G1 · unique per-member reference | **Yes** — contract item 2 |
+| G2 · separate the identities | **Yes** — contract item 3 |
+| G3 · model the submission | **Yes** — contract items 3 and 5 |
+| G4 · the outcome consumer | **Yes** — contract item 4, with a per-provider reader |
+| G5 · one submission per period | **Yes** where the provider batches; the capability says which |
+| G9 · capability declaration | **Yes** — this is the mechanism |
+| G10 · the adapter contract | **Yes** |
+| G6 · amendment honesty | Becomes a capability question |
+| G7 · a delay is local scheduling | Becomes a capability question |
+| G8 · calendar-correct dates | **Yes** — and it never belonged on the port at all |
+
+So the owner's requirement adds roughly a fifth to this phase, and **nothing at
+all if Netcash accepts** — because the lifecycle work is required either way.
 
 ### The split that de-risks this phase
 
 The audits treat "verify the postback contract" as a blocker for everything. It is
-not — and the distinction matters:
+not, and the distinction is what keeps certification off the critical path:
 
 - **The load-report path is documented.** `BatchFileUpload` returns a file token;
   `RequestFileUploadReport` returns the outcome; polling remains available even
-  when a postback URL is configured. This can be built from the vendor's own
-  documentation, which is public and complete.
+  when a postback URL is configured.
 - **The postback contract is not established.** Netcash's published docs do not
   establish `x-netcash-signature` as the DebiCheck contract, and our endpoint
   would reject a genuine postback at the signature check with 401.
 
-**Recommendation: make polling the primary settlement mechanism and the webhook an
-optional accelerant.** That inverts the current design, removes V1 from the
-critical path, and means the settlement pipeline rests on the half of the contract
-that is documented rather than the half that is guessed.
+**Recommendation: make polling the primary settlement mechanism and the callback an
+optional accelerant.** That inverts the current design, and it generalises: every
+provider can be asked "what happened?", while only some can reliably tell us
+unprompted. A pipeline that rests on asking is a pipeline that ports.
+
+### On reapplying to Netcash
+
+The sequencing is sound. Real member accounts and a recorded payment history make
+a materially better case than an empty system did.
+
+**One caution, recorded so the application is framed well.** Netcash declined
+because the processing bank required an existing **debit-order base**. Recorded
+offline payments prove *collection history* — genuinely useful evidence of real
+members paying real money on a real cadence — but they are not a debit-order book,
+which is what that objection was about. The same "no" can return for the same
+structural reason.
+
+So reapplication is one of three tracks, and the other two have long lead times:
+
+| Track | What it is | Why it might succeed where a direct application did not |
+|---|---|---|
+| **Reapply direct** | Netcash again, with members and history behind it | Answers the commercial doubt. May not answer the structural one |
+| **Collect under a sponsor** | XXM as a sub-merchant of an aggregator with its own DebiCheck registration | **Bypasses the objection entirely** rather than arguing with it |
+| **NASASA** | The stokvel self-regulatory body | Its entire purpose is stokvel access to formal financial services |
+
+The middle option is worth noticing for a second reason: *"we are a sub-merchant
+of an aggregator"* is a different integration shape again — a settlement account
+that is not ours, references namespaced by the sponsor. A lifecycle-shaped port
+absorbs that. The current one would not.
+
+### G9 · Capabilities are declared by the adapter
+**Findings:** A3-F33, A3-F34 (mechanism) · **Size:** M · **Do this first**
+
+The mechanism the rest of the phase leans on, and the reason a provider swap
+becomes a data difference rather than a code one.
+
+Today the port promises operations on a provider's behalf: `delayMandate()` exists
+and throws, `updateMandate` accepts a `debitDay` no provider can honour. Both are
+the same mistake — a capability invented at the interface and discovered at
+runtime, by a member.
+
+An adapter now states what it can do, and the **service layer** decides what to
+offer:
+
+```ts
+supports: {
+  amendAmount: true,
+  amendDebitDay: false,     // a new authentication, not an amendment
+  delayCollection: false,   // expressed by when the batch is submitted
+  outcomes: 'poll',         // 'poll' | 'webhook' | 'both'
+  submission: 'batch',      // 'batch' | 'single'
+}
+```
+
+**Acceptance.** A member is never shown an action the configured provider cannot
+perform. A capability that is false makes the corresponding service call a refusal
+with a clear message, not a thrown `ExternalServiceError` from deep in an adapter.
+The `disabled` adapter declares everything false, which is what it has always
+meant and never said.
+
+**Ordering.** Before G6 and G7, which stop being separate fixes once this exists —
+they become two entries in one table.
+
+### G10 · The adapter contract, written down
+**Size:** S · **Do this alongside G9**
+
+The eight things a provider must supply, from the section above, as a document a
+person can hold against a vendor's API while deciding whether to sign with them.
+
+This is not documentation for its own sake. The contract is the thing that turns
+"can we move to this provider?" from a research project into an afternoon, and it
+has to exist **before** anybody is under time pressure to switch — which is
+precisely when it will not get written.
+
+**Acceptance.** A reader who has never seen this codebase can take the contract to
+a provider's API docs and answer yes or no to each of the eight items. Where the
+answer is no, the contract says what the lifecycle loses.
+
+**Include the sandbox requirement.** It is item 8 and it is not negotiable: the
+current port was built from documentation that is public and complete, and it
+still got the timing model wrong. Documentation describes the happy path; a
+sandbox is the only thing that shows you a timeout.
 
 ### G1 · A unique provider-facing reference
 **Findings:** A1-F03, A2-F23, A3-F39 · **Size:** S · **Blocks G4**
@@ -582,6 +800,10 @@ exactly this claim and catches only the case where the day travels alone.
 
 A debit-day change is a **new authentication**, not an amendment. Say so.
 
+**With G9 this stops being its own fix.** `amendDebitDay: false` is the whole
+statement, and the service refuses the change with a message rather than sending
+a request that silently drops half of it.
+
 ### G7 · A delay is local scheduling, not a mandate operation
 **Findings:** A3-F34 · **Size:** S
 
@@ -593,6 +815,10 @@ they had said they could not afford. The architecture in its comments is right;
 the call order defeats it. Stop asking the gateway's permission for a local
 scheduling decision.
 
+**With G9 this is `delayCollection: false`** — and the local mechanism runs
+regardless, because it never needed the gateway's permission. A provider that
+*can* move a collection sets it true and the same code path uses it.
+
 ### G8 · Calendar-correct debit dates
 **Findings:** A3-F35 (needs **D3**) · **Size:** S
 
@@ -602,6 +828,11 @@ The goal-plan scheduler clamps correctly; this helper does not.
 
 *(`UpdateMandateSchema` caps `debitDay` at 28, which narrows the reach without
 closing it — creation and internal callers may not share that bound.)*
+
+**And it moves off the port.** `getNextDebitDate` is calendar arithmetic; it has
+nothing to do with any provider, and its presence on `IPaymentGateway` is how a
+domain rule ended up with three implementations, one of which emits impossible
+dates. It belongs beside the goal-plan scheduler that already clamps correctly.
 
 ---
 
@@ -642,14 +873,30 @@ Adopted.
 ```
 D1 -> L3          D2 -> L10          D3 -> G8
 
-P6 ─┐
-G1 ─┼─> G4        G2 -> G3 -> G4     G5 (decide) -> G3
-G3 ─┘
+Phase 3, in order:
+
+  G9  (capabilities)  ─┬─> G6, G7        the two stop being separate fixes
+  G10 (contract)      ─┘
+
+  G2 -> G3 -> G4        G5 (decide) -> G3
+  G1 ─────────> G4      P6 ──────────> G4   (done)
+
+  G8 is independent, and moves off the port entirely
 
 V1 -> V2 ;  Phase 3 -> V2
 ```
 
-Everything in Phase 1 except L3 and L10 is independent and can run in any order.
+Everything in Phase 1 except L3 and L10 was independent and could run in any
+order; it is done.
+
+**Phase 3 starts at G9 and G10**, not at G1. The capability declaration is the
+mechanism the rest leans on, and the adapter contract has to be written while
+nobody is under pressure to switch providers — which is the only time it will
+actually get written.
+
+**G5 is a decision before it is an item.** A per-member and a per-file submission
+model produce different tables, and G3 is where that table gets created. Deciding
+it afterwards means migrating financial records.
 
 ---
 
@@ -738,7 +985,7 @@ Established in this repository, and not up for renegotiation per item:
 | Decisions | 3 | **D1 and D2 answered** (by the implementer — see above, and review them). D3 open, blocks G8 only |
 | 1 — Live today | 10 | **Done** — L1–L10 |
 | 2 — Patterns | 8 | **Done** — P1–P8 |
-| 3 — Gateway | 8 | Planned, **not scheduled**: needs a gateway that does not exist |
+| 3 — Collections lifecycle | 10 | Planned, **not scheduled**: needs a gateway, and getting one is a business decision. Redesigned 2026-09-05 to be provider-agnostic — see the phase preamble |
 | 4 — Certification | 2 | Planned, **not scheduled**: needs credentials |
 
 ### What Phase 1 and 2 came to
@@ -766,15 +1013,28 @@ Established in this repository, and not up for renegotiation per item:
 
 ### Where to pick up
 
-**Phase 3 needs a decision before it needs engineering.** Enabling a gateway is
-not a scheduling question — the DebiCheck application was declined, and the
-alternative routes (a different provider, an aggregator, NASASA) are the
-owner's call. Nothing in Phase 3 should start until that is answered.
+**Phase 3 needs a decision before it needs engineering.** Getting a gateway is
+not a scheduling question — the DebiCheck application was declined, and which
+route to take is the owner's call. Three tracks are set out in the phase
+preamble; the middle one, collecting under a sponsor's registration, is the only
+one that *bypasses* the objection rather than arguing with it.
 
-One recommendation carried from the plan: **make load-report polling the primary
-settlement mechanism and the webhook an optional accelerant**. The polling
-contract is documented and buildable; the postback contract is not established,
-and our endpoint would reject a genuine Netcash post at the signature check.
+**The phase was redesigned on 2026-09-05** at the owner's direction: build for any
+provider, not for Netcash specifically. The preamble explains why "make the port
+generic" is not the fix it sounds like — it already is generic, and every Netcash
+finding leaked through it anyway — and what to build instead. Two items were added
+(**G9** capability declaration, **G10** the adapter contract) and they come first.
+
+Two recommendations carried forward:
+
+- **Make outcome polling the primary settlement mechanism and the callback an
+  optional accelerant.** Every provider can be asked *"what happened?"*; only some
+  can reliably tell us unprompted. A pipeline that rests on asking is one that
+  ports.
+- **Take the cheap insurance in the same pass.** Provider name and
+  provider-specific identifiers in their own columns from the first migration.
+  G2 and G3 are already that change, so doing it provider-aware costs nothing —
+  and retrofitting it later means migrating financial records.
 
 **D3** (is "last day of the month" a first-class debit day?) blocks G8 and only
 G8. It can wait for the gateway decision.
