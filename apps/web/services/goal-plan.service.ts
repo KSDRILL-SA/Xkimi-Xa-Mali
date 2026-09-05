@@ -53,6 +53,16 @@ export async function suggestPlan(goalId: string, userId: string, requesterId: s
   const goal = (await goalRepo.findById(goalId)) as GoalForPlan | null
   if (!goal) throw new GoalNotFoundError()
 
+  // `currentAmount` is the materialised figure, not the derived one.
+  //
+  // Deliberate, and bounded. Under the contract in `applySettledPayment`, a
+  // goal's total is DERIVED from its settled payments and `currentAmount` is a
+  // cache the next sync corrects — so between a payment and its sync this can
+  // be briefly high, and the suggestion briefly low.
+  //
+  // Acceptable *here specifically* because a suggestion is not a commitment:
+  // the member sees it, changes it if they like, and what they choose is what
+  // gets stored. Nothing collects on this number.
   const remaining = Math.max(0, subtractZAR(Number(goal.targetAmount), Number(goal.currentAmount)))
   const months = monthsUntil(goal.deadline)
   const suggested = Math.max(MIN_GOAL_PAYMENT, roundZAR(remaining / months))
@@ -232,6 +242,16 @@ export async function collectDuePlans(now = new Date()): Promise<{
     if (!isDueOn(plan, now)) continue
 
     const goal = plan.goal
+    // The same materialised figure, and here it does decide money — it caps the
+    // instalment so a plan cannot overshoot its goal.
+    //
+    // Acceptable because of when this runs, not because the figure is exact.
+    // The job is a daily cron; a settlement re-syncs the goal at the moment it
+    // settles, so by the time this reads it the cache has been correct for
+    // hours. The failure mode is also the safe direction: a stale-high total
+    // makes `remaining` too small and collects less, never more.
+    //
+    // If this ever moves to running immediately after settlement, derive here.
     const remaining = Math.max(0, subtractZAR(Number(goal.targetAmount), Number(goal.currentAmount)))
 
     // Reasons to stop rather than collect. Checked in this order because a met

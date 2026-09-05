@@ -50,9 +50,32 @@ async function resyncGoal(goal: GoalForPayment): Promise<void> {
 
 /**
  * Everything that must happen once a directed payment is settled money, whether
- * it settled inline at submission or later via the gateway webhook. The goal
- * total re-derives; the pool ledger credit and the thank-you are best-effort — a
- * hiccup in either must never unwind a payment we have already taken.
+ * it settled inline at submission or later via the gateway webhook.
+ *
+ * ── The contract, stated because it was only implied ───────────────────────
+ *
+ * `SUCCESS` means **the payment is recorded as settled**. Nothing after this
+ * point may unwind that: the money has already moved, and a hiccup in our
+ * bookkeeping is not a reason to tell a member their payment failed.
+ *
+ * Everything below is therefore an **asynchronous projection**, guaranteed by
+ * reconciliation rather than by this function:
+ *
+ *   - the goal total is DERIVED from the sum of SUCCESS payments, so a failed
+ *     re-sync leaves a stale figure the next sync corrects;
+ *   - the pool ledger is idempotent on `(refType, refId, direction)`, so a
+ *     failed credit is filled in by the nightly reconciler;
+ *   - the thank-you is a notification, and a missing one is not a money defect.
+ *
+ * Which is why all three are `.catch`ed. **All three** — `resyncGoal` was not,
+ * and that was the defect: a throw there propagated out of this function and
+ * skipped the ledger credit that would otherwise have been attempted, turning
+ * one stale figure into two. Same guarantee, so the same handling.
+ *
+ * "Correct by tomorrow is not correct" still applies to the primary write,
+ * which is why the credit is attempted here and now rather than left to the
+ * 05:00 reconciler. What the catch buys is that a failure degrades to
+ * "reconciliation will fix it" instead of to "the next step never ran".
  */
 async function applySettledPayment(
   payment: SettledPayment,
@@ -60,7 +83,10 @@ async function applySettledPayment(
 ): Promise<void> {
   const amount = roundZAR(Number(payment.amount))
 
-  await resyncGoal(goal)
+  await resyncGoal(goal).catch((err) => logger.error('Goal re-sync failed on a settled payment', {
+    paymentId: payment.id, goalId: goal.id,
+    error: err instanceof Error ? err.message : String(err),
+  }))
 
   await postPoolCredit({
     refType: 'GOAL_PAYMENT', refId: payment.id, amount, memberId: payment.userId,
@@ -90,7 +116,14 @@ async function applyReversedPayment(
 ): Promise<void> {
   const amount = roundZAR(Number(payment.amount))
 
-  await resyncGoal(goal)
+  // Same contract as the settlement path: the reversal is already recorded, and
+  // both of these are projections reconciliation guarantees. An unwrapped
+  // re-sync here would skip the pool debit — leaving the fund showing money it
+  // no longer holds, which is the direction that matters most.
+  await resyncGoal(goal).catch((err) => logger.error('Goal re-sync failed on a reversed payment', {
+    paymentId: payment.id, goalId: goal.id,
+    error: err instanceof Error ? err.message : String(err),
+  }))
 
   await postPoolDebit({
     refType: 'GOAL_PAYMENT', refId: payment.id, amount, memberId: payment.userId,
