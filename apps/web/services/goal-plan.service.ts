@@ -226,6 +226,54 @@ export async function cancelPlan(
  * the mandate they had may be gone. Each is a reason to stop rather than a
  * reason to charge.
  */
+/**
+ * The failure bookkeeping, with its result actually checked.
+ *
+ * ── Why these are functions rather than three inline calls ─────────────────
+ *
+ * `collectDuePlans` claims a plan with `updateByVersion(plan.id, plan.version,
+ * …)` and checks the count — correct, and that claim is what stops two runs
+ * collecting the same plan. Its three follow-up writes then used
+ * `plan.version + 1` and **discarded the result**.
+ *
+ * That assumed the claim was the only thing to touch the row in between. A
+ * member resuming or cancelling their plan mid-run moves the version again, the
+ * follow-up matches nothing, affects zero rows, and is silently dropped.
+ *
+ * What gets dropped is `failedRuns` — the counter that pauses a plan which
+ * keeps failing and tells the member why. So a plan could fail repeatedly, lose
+ * the increment each time to a race, and never pause: the one outcome the
+ * counter exists to produce.
+ *
+ * It is narrow and unlikely. It is also a silent write, and a silent write on
+ * the money path is the thing this repository keeps finding. Logging the loss
+ * costs nothing and turns "it never paused" into something with a trail.
+ */
+async function recordFailure(plan: { id: string; version: number; failedRuns: number }): Promise<void> {
+  const updated = await goalPlanRepo.updateByVersion(plan.id, plan.version + 1, {
+    failedRuns: plan.failedRuns + 1,
+  })
+
+  if (updated.count === 0) {
+    // The member changed the plan while this run was collecting on it. The
+    // charge stands; only the tally was lost.
+    logger.warn('Goal plan failure count not recorded — the plan changed mid-run', {
+      planId: plan.id, expectedVersion: plan.version + 1,
+    })
+  }
+}
+
+/** The mirror of {@link recordFailure}: a plan that recovered starts clean. */
+async function clearFailures(plan: { id: string; version: number }): Promise<void> {
+  const updated = await goalPlanRepo.updateByVersion(plan.id, plan.version + 1, { failedRuns: 0 })
+
+  if (updated.count === 0) {
+    logger.warn('Goal plan failure count not cleared — the plan changed mid-run', {
+      planId: plan.id, expectedVersion: plan.version + 1,
+    })
+  }
+}
+
 export async function collectDuePlans(now = new Date()): Promise<{
   collected: number
   failed: number
@@ -326,14 +374,10 @@ export async function collectDuePlans(now = new Date()): Promise<{
 
       if (res.status === 'FAILED') {
         failed += 1
-        await goalPlanRepo.updateByVersion(plan.id, plan.version + 1, {
-          failedRuns: plan.failedRuns + 1,
-        })
+        await recordFailure(plan)
       } else {
         collected += 1
-        if (plan.failedRuns > 0) {
-          await goalPlanRepo.updateByVersion(plan.id, plan.version + 1, { failedRuns: 0 })
-        }
+        if (plan.failedRuns > 0) await clearFailures(plan)
       }
     } catch (err) {
       failed += 1
@@ -341,9 +385,7 @@ export async function collectDuePlans(now = new Date()): Promise<{
         planId: plan.id, goalId: plan.goalId, userId: plan.userId,
         error: err instanceof Error ? err.message : String(err),
       })
-      await goalPlanRepo.updateByVersion(plan.id, plan.version + 1, {
-        failedRuns: plan.failedRuns + 1,
-      })
+      await recordFailure(plan)
     }
   }
 
@@ -374,6 +416,29 @@ export async function resumePlan(
   if (!plan || plan.userId !== userId) throw new GoalNotFoundError()
   if (plan.status !== 'PAUSED') {
     throw new GoalConflictError('Only a paused plan can be resumed', 'GPL_008')
+  }
+
+  // Is there already a live plan for this goal?
+  //
+  // The database knows: `goal_plans_user_goal_active_key` is unique on
+  // (userId, goalId) among ACTIVE rows, so two active plans for one goal cannot
+  // exist. That partial index has been quietly absorbing this — a paused plan
+  // resumed alongside a newer active one was refused by Postgres.
+  //
+  // Refused, and reported as a raw constraint violation: an opaque error, from
+  // a function that returns a clear message for every other refusal it makes.
+  // The invariant was safe and the member was not told why.
+  //
+  // Worth noting which way round this runs. Everywhere else in this audit the
+  // application held a rule the database did not; here the database held one
+  // the application had forgotten. The index did its job. This just says so in
+  // words a person can act on.
+  const live = await goalPlanRepo.findActive(userId, plan.goalId)
+  if (live && live.id !== plan.id) {
+    throw new GoalConflictError(
+      'You already have an active plan for this goal. Cancel that one first if you want to go back to this.',
+      'GPL_010',
+    )
   }
 
   // Whatever paused it must be fixed first, or the next collection pauses it
