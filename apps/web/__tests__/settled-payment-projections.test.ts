@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   postPoolDebit: vi.fn(),
   queueNotification: vi.fn(),
   updatePayment: vi.fn(),
+  updatePaymentIfStatus: vi.fn(),
   findPaymentByGatewayRef: vi.fn(),
   findGoalById: vi.fn(),
   mapTransactionStatus: vi.fn(),
@@ -45,6 +46,7 @@ vi.mock('@/services/notification.service', () => ({ queueNotification: mocks.que
 vi.mock('@/repositories/goal.repository', () => ({
   goalRepo: {
     updatePayment: mocks.updatePayment,
+    updatePaymentIfStatus: mocks.updatePaymentIfStatus,
     findPaymentByGatewayRef: mocks.findPaymentByGatewayRef,
     findById: mocks.findGoalById,
   },
@@ -67,13 +69,15 @@ beforeEach(() => {
   mocks.postPoolCredit.mockResolvedValue(undefined)
   mocks.queueNotification.mockResolvedValue(undefined)
   mocks.updatePayment.mockResolvedValue(undefined)
+  // The compare-and-swap: count 1 means this delivery claimed the transition.
+  mocks.updatePaymentIfStatus.mockResolvedValue({ count: 1 })
 })
 
 describe('a settled payment credits the pool', () => {
   it('records the settlement, re-derives the goal and credits the ledger', async () => {
     await processGoalPaymentWebhook({ transactionRef: 'ref-1', status: 'SUCCESS' })
 
-    expect(mocks.updatePayment).toHaveBeenCalledWith('gp-1', expect.objectContaining({ status: 'SUCCESS' }))
+    expect(mocks.updatePaymentIfStatus).toHaveBeenCalledWith('gp-1', 'PENDING', expect.objectContaining({ status: 'SUCCESS' }))
     expect(mocks.syncAdditional).toHaveBeenCalledWith('g-1')
     expect(mocks.postPoolCredit).toHaveBeenCalledWith(
       expect.objectContaining({ refType: 'GOAL_PAYMENT', refId: 'gp-1', amount: 250 }),
@@ -113,7 +117,7 @@ describe('a settled payment credits the pool', () => {
       processGoalPaymentWebhook({ transactionRef: 'ref-1', status: 'SUCCESS' }),
     ).resolves.toBeUndefined()
 
-    expect(mocks.updatePayment).toHaveBeenCalledWith('gp-1', expect.objectContaining({ status: 'SUCCESS' }))
+    expect(mocks.updatePaymentIfStatus).toHaveBeenCalledWith('gp-1', 'PENDING', expect.objectContaining({ status: 'SUCCESS' }))
   })
 })
 

@@ -297,6 +297,56 @@ type GoalPaymentEvent = {
  * have to follow it down. Every other transition out of a terminal state is
  * refused, so a late or replayed SUCCESS can never resurrect reversed money.
  */
+/**
+ * Which status a goal payment may move to, from where.
+ *
+ * ── The transition that should never have been reachable ───────────────────
+ *
+ * The old guard was "refuse anything leaving a terminal state, unless it is a
+ * reversal of a settled payment":
+ *
+ *     const terminal = ['SUCCESS', 'REVERSED']
+ *     if (terminal.includes(payment.status) && !isReversalOfSettled) return
+ *
+ * Correct about terminal states, and silent about PENDING — which is not one.
+ * So `PENDING -> REVERSED` was permitted, and a reordered delivery could do
+ * real damage with it:
+ *
+ *   1. a reversal arrives before the settlement it reverses;
+ *   2. the payment becomes REVERSED without ever having been SUCCESS;
+ *   3. the legitimate SUCCESS arrives and is refused, because REVERSED is
+ *      terminal.
+ *
+ * The payment now reads as money that came back, having never been recorded as
+ * money that arrived. And because it was never SUCCESS, `processedAt` was never
+ * stamped — so the ledger reconciler, which uses exactly that to tell a
+ * reversal needing an unwind from one with nothing to unwind, correctly leaves
+ * it alone. The member paid, and nothing anywhere says so.
+ *
+ * ── The machine ────────────────────────────────────────────────────────────
+ *
+ *     PENDING  -> SUCCESS | FAILED
+ *     SUCCESS  -> REVERSED
+ *     FAILED   -> SUCCESS      (a late settlement of a decline is possible)
+ *     REVERSED -> nothing
+ *
+ * A reversal arriving before settlement is refused and logged rather than
+ * applied. That is deliberately not "stored and replayed later": a deferred
+ * event queue is a real design with real failure modes, and the honest first
+ * step is to stop corrupting the record and say loudly that it happened. The
+ * gateway redelivers, and by then the settlement has usually landed.
+ */
+const ALLOWED_TRANSITIONS: Record<string, readonly string[]> = {
+  PENDING: ['SUCCESS', 'FAILED'],
+  FAILED: ['SUCCESS'],
+  SUCCESS: ['REVERSED'],
+  REVERSED: [],
+}
+
+function isAllowedTransition(from: string, to: string): boolean {
+  return (ALLOWED_TRANSITIONS[from] ?? []).includes(to)
+}
+
 export async function processGoalPaymentWebhook(event: GoalPaymentEvent): Promise<void> {
   const payment = await goalRepo.findPaymentByGatewayRef(event.transactionRef)
   if (!payment) return
@@ -306,18 +356,44 @@ export async function processGoalPaymentWebhook(event: GoalPaymentEvent): Promis
 
   if (payment.status === newStatus) return
 
-  const isReversalOfSettled = payment.status === 'SUCCESS' && newStatus === 'REVERSED'
-  const terminal = ['SUCCESS', 'REVERSED']
-  if (terminal.includes(payment.status) && !isReversalOfSettled) return
+  if (!isAllowedTransition(payment.status, newStatus)) {
+    logger.warn('Goal payment webhook refused an out-of-order transition', {
+      paymentId: payment.id, from: payment.status, to: newStatus,
+    })
+    return
+  }
 
-  // processedAt is only ever stamped by settlement, never cleared. On a reversal
-  // it is the record that this payment DID clear once — which is how the ledger
-  // reconciler tells a reversal that needs undoing from one that never settled
-  // and so has no credit to undo.
-  await goalRepo.updatePayment(payment.id, {
+  const isReversalOfSettled = payment.status === 'SUCCESS' && newStatus === 'REVERSED'
+
+  // Compare-and-swap, not a blind update.
+  //
+  // Webhook deduplication stops the SAME event being processed twice. It does
+  // nothing about two DIFFERENT events racing on one payment: both read
+  // PENDING, both map to SUCCESS, both write, and both go on to thank the
+  // member and re-derive the goal. Deduplication and a compare-and-swap solve
+  // different problems, and this path had only the first.
+  //
+  // The contribution handler four files away has done it this way for a while
+  // — `transactionRepo.updateIfStatus`, then check the count. Same shape here.
+  //
+  // processedAt is only ever stamped by settlement, never cleared. On a
+  // reversal it is the record that this payment DID clear once — which is how
+  // the ledger reconciler tells a reversal that needs undoing from one that
+  // never settled and so has no credit to undo.
+  const claimed = await goalRepo.updatePaymentIfStatus(payment.id, payment.status, {
     status: newStatus,
     ...(newStatus === 'SUCCESS' && { processedAt: new Date() }),
   })
+
+  if (claimed.count === 0) {
+    // A parallel delivery moved it first. Returning here is what stops the
+    // second one crediting the pool again, thanking the member again, and
+    // re-deriving a goal that is already correct.
+    logger.info('Goal payment webhook lost the concurrent update race', {
+      paymentId: payment.id, transactionRef: event.transactionRef,
+    })
+    return
+  }
 
   // A payment that never settled has nothing to unwind — no goal total moved and
   // no pool entry was written, so recording the status is the whole job.
