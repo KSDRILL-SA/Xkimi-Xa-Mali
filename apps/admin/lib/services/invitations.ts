@@ -79,7 +79,9 @@ export async function revokeInvitation(
   await writeAuditLog({
     userId: adminId, action: 'ADMIN_INVITATION_REVOKED',
     entity: 'Invitation', entityId: invitationId,
-    payload: { email: invite.email }, ipAddress: ip,
+    // The invitation is named by entityId and its email is on the row — see
+    // the member app's copy of this entry.
+    payload: { previousStatus: invite.status }, ipAddress: ip,
   })
 }
 

@@ -273,11 +273,16 @@ export async function generateInvite(
     action: 'ADMIN_INVITE_CREATED',
     entity: 'Invitation',
     entityId: invite.id,
-    payload: { email, phone: normPhone, expiresAt },
+    // No email or phone. `entityId` already names the invitation, and the
+    // Invitation row holds both — repeating them here makes a second permanent
+    // copy in an append-only table, which is a copy that cannot later be
+    // corrected or erased. A payload records what changed; who it was about is
+    // `entityId`, and who did it is `userId`.
+    payload: { expiresAt },
     ipAddress: ip,
   })
 
-  logger.info('Invite created', { inviteId: invite.id, email, adminId })
+  logger.info('Invite created', { inviteId: invite.id, adminId })
 
   return { id: invite.id, code, codePrefix, email, phone: normPhone, firstName, lastName, expiresAt }
 }
@@ -331,7 +336,8 @@ export async function revokeInvitation(
     action: 'ADMIN_INVITE_REVOKED',
     entity: 'Invitation',
     entityId: inviteId,
-    payload: { email: invite.email },
+    // The invitation is named above; its email is on the row.
+    payload: { previousStatus: invite.status },
     ipAddress: ip,
   })
 }
@@ -533,7 +539,9 @@ export async function acceptInviteRegistration(
     action: 'INVITE_ACCEPTED',
     entity: 'Invitation',
     entityId: invite.id,
-    payload: { email: invite.email, invitedById: invite.invitedById, verificationEmailSent },
+    // `userId` above is the member who registered, so the email added nothing
+    // an admin could not already reach.
+    payload: { invitedById: invite.invitedById, verificationEmailSent },
     ipAddress: ip,
   })
 
@@ -619,7 +627,8 @@ export async function setMemberRole(
     action: assign ? 'ADMIN_ROLE_ASSIGNED' : 'ADMIN_ROLE_REVOKED',
     entity: 'User',
     entityId: memberId,
-    payload: { role: roleName, email: member.email },
+    // The role is the change; the member is `entityId`.
+    payload: { role: roleName, assigned: assign },
     ipAddress: ip,
   })
 
