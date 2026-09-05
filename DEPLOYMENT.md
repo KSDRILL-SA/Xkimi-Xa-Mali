@@ -82,6 +82,7 @@ Source of truth: [`.env.example`](.env.example). Set these per Vercel project.
 | `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | error monitoring. |
 | `WHATSAPP_GROUP_LINK` / `NEXT_PUBLIC_WHATSAPP_GROUP_LINK` | the group invite link. |
 | `TRUSTED_PROXY` | `vercel` unless a CDN/WAF is genuinely in front. Decides which forwarded-IP header is believed — get it wrong and per-IP rate limiting can be bypassed by sending the header yourself. |
+| `NEXT_PUBLIC_GROUP_ACCOUNT_NAME` · `_BANK_NAME` · `_BANK_ACCOUNT` · `_BANK_BRANCH` | **The account members are told to pay into.** See below — these are banking details, not settings. |
 
 **The Foundation's operational mailbox is `xkimixamali@gmail.com`.** Use it for
 `SUPPORT_EMAIL`, `NEXT_PUBLIC_SUPPORT_EMAIL` and `ALERT_FALLBACK_EMAIL` — all
@@ -137,6 +138,46 @@ three are addresses that *receive*.
 >
 > Money is recorded the way it is actually received: cash and EFT, entered by an
 > admin in the console.
+
+### The group collection account
+
+Because there is no gateway, **members pay by transfer into an account whose
+details the app shows them**. Those details come from four variables:
+
+| Var | Default in code |
+|-----|-----------------|
+| `NEXT_PUBLIC_GROUP_ACCOUNT_NAME` | `Xkimi Xa Mali Foundation` |
+| `NEXT_PUBLIC_GROUP_BANK_NAME` | `ABSA Bank` |
+| `NEXT_PUBLIC_GROUP_BANK_ACCOUNT` | `9385143164` |
+| `NEXT_PUBLIC_GROUP_BANK_BRANCH` | `632005` |
+
+> [!IMPORTANT]
+> **None of the four is set in Vercel today.** The app therefore serves the code
+> defaults above, which is why nobody noticed they were undocumented — it works.
+> Two consequences follow, and both matter:
+>
+> 1. **Changing the account currently means changing code and deploying**, not
+>    editing configuration. Setting the variables is what buys the ability to
+>    change banking details without a release.
+> 2. **They are inlined at build time**, like every `NEXT_PUBLIC_*` value. Set
+>    them and then *redeploy* — setting them alone changes nothing that a member
+>    sees.
+>
+> Change all four together. A holder name from one bank next to an account
+> number from another is worse than either alone, and this is the one screen
+> where a member acts on what it says by sending money.
+>
+> **Constitution clause 6.1 names the account that holds contributions.** As
+> signed on 2026-08-24 it names the Capitec account of KSDRILL SA (Pty) Ltd, not
+> the ABSA account above. The amendment reconciling the two is drafted in
+> [`docs/compliance/resolution-2026-09-banking.md`](docs/compliance/resolution-2026-09-banking.md)
+> and needs signatures. Until it is signed, the app and the constitution
+> disagree — knowingly, and recorded in both places.
+
+`NEXT_PUBLIC_NETCASH_FEE_BUFFER` (default `10`) is the amount added on top of a
+contribution to cover a collections provider's fee. It is dormant with no
+gateway, but it is quoted in the Founder Guide and registered as part of the
+mandate instalment, so it is not a value to zero out casually.
 
 ## 3. Database (Neon, production)
 

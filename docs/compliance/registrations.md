@@ -225,9 +225,9 @@ items moot rather than completed via this checklist)*
 | 2 | Constitution adopted | ☑ **Signed 2026-08-24** by all four founders — `Constitution of Xkimi Xa Mali Foundation - SIGNED.pdf` | — |
 | 3 | Entity registered (if needed) | ☑ **Moot** — see item 1 | — |
 | 4 | NASASA membership | ☐ **Applied 2026-08-24**, still awaiting reply as of 2026-08-29 (3+ business days, no response yet) | 2 |
-| 5 | Bank account | ☑ **Done** — Capitec Business, KSDRILL SA's existing account, doubles as the Netcash settlement account and the dedicated member-funds account | 2, 3 |
+| 5 | Bank account | ☑ **Done, and now two.** Contributions are paid by members into the Foundation's **ABSA** account. The Capitec Business account (KSDRILL SA's existing one) remains the intended **settlement** account for a collections partner. Constitution clause 6.1 names only the Capitec one — amendment drafted in `resolution-2026-09-banking.md`, **not yet signed** | 2, 3 |
 | 6 | SARS position settled | ☐ Not started — still a real open question for the accountant, unchanged | 1 |
-| 7 | Netcash onboarding | ☑ **Registration form submitted 2026-08-29**, confirmed received by Netcash the same day; vetting now on their side | 5 |
+| 7 | Netcash onboarding | ☒ **DECLINED.** Submitted 2026-08-29; the processing bank required an existing debit-order book, which a new savings circle cannot have. Payments are recorded by an administrator instead. Reapplication argument and the alternatives: `collections-application-brief.md` | 5 |
 | 8 | Information Officer registered | ☐ Not started | 1 |
 | 9 | PAIA manual published | ☑ Live at `/paia` — fill in the details once item 1 and 8 land | 1, 8 |
 | 10 | Attorney engaged | ☐ Not started — decided not needed in practice once KSDRILL SA's existing registration made §1 moot | — |

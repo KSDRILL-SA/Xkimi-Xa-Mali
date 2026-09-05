@@ -2,7 +2,15 @@
 
 > *"It is more blessed to give than to receive."* — Acts 20:35
 
-A private, real-money contribution platform for a family savings group. It automates monthly DebiCheck debit orders, tracks every rand in an append-only ledger, and gives each member a live view of their standing — no spreadsheets, no manual collection. Built for four brothers, designed to scale to ~50 members.
+A private, real-money contribution platform for a family savings group. Members pay their
+monthly contribution by transfer or in cash and an administrator records it against the member
+and the month, with proof of payment; every rand lands in an append-only ledger and each member
+has a live view of their standing. Built for four brothers, designed to scale to ~50 members.
+
+> **On collections.** The DebiCheck application was declined — a new savings circle has no
+> collection history, which is what the sponsoring bank required. The debit-order machinery is
+> built and dormant; a live deployment with no provider refuses every money operation rather
+> than pretending. See [`docs/compliance/collections-application-brief.md`](docs/compliance/collections-application-brief.md).
 
 ```mermaid
 flowchart LR
@@ -16,12 +24,12 @@ flowchart LR
         JOBS["Inngest jobs<br/>debits · reminders · reconcile"]
     end
     subgraph data["State"]
-        DB[("Neon Postgres<br/>34 models · append-only ledger")]
+        DB[("Neon Postgres<br/>append-only ledger")]
         REDIS["Upstash Redis<br/>cache · rate-limit · idempotency"]
         BLOB["Vercel Blob<br/>statement PDFs"]
     end
     subgraph ext["External"]
-        NC["Netcash<br/>DebiCheck debit orders"]
+        NC["Netcash<br/>DebiCheck — built, dormant"]
         SMS["BulkSMS"]
         MAIL["Resend"]
     end
@@ -41,7 +49,7 @@ flowchart LR
 | Area | Capability |
 |---|---|
 | **Contributions** | Monthly records (R100 min/member), automatic status: `PENDING → PAID / OVERDUE` |
-| **Payments** | Netcash DebiCheck mandates + automated debit runs, idempotent webhook settlement |
+| **Payments** | Admin-recorded offline payments (transfer or cash) with proof of payment, reversible but never erasable. Netcash DebiCheck mandates, debit runs and idempotent webhook settlement are built and dormant |
 | **Ledger** | Append-only double-entry pool ledger; balance = Σcredits − Σdebits; nightly reconciliation |
 | **Notifications** | SMS + email + in-app inbox — warnings, receipts, overdue reminders |
 | **Goals** | Group savings goals with cheers, comments, and pledges |
@@ -79,7 +87,7 @@ apps/
   admin/      Admin dashboard (:3002) — calls web via internal API
   website/    Public marketing site (:3001)
 packages/
-  database/   Prisma schema, 16 migrations, seed
+  database/   Prisma schema, migrations, seed
   ui/ utils/ types/ config/   Shared libraries
 docs/         Architecture, flows, database, security, ADRs, constitutions
 ```

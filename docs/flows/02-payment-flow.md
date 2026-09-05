@@ -118,4 +118,23 @@ sequenceDiagram
 
 Pool balance = Σ CREDIT − Σ DEBIT, rebuilt nightly by `reconcileLedger`. A manual payment (`POST /contributions/pay`) follows the same settle path via its own once-off Netcash debit. Its minimum is `Math.min(R100, whatever remains owed on the period)` — a flat R100 floor with no awareness of what's still due used to make the *last* partial payment of a period, or any payment on a period already partly paid, mathematically impossible to submit; fixed 2026-08-29.
 
-**Production is running the mock gateway as of 2026-08-30** — Netcash's own registration is submitted and under vetting, no live debit has ever been processed. `selectGateway()` refuses to silently pick the real gateway without `NETCASH_SERVICE_KEY` present, independent of whether the deployment is flagged "live" — see [../architecture/04-infrastructure-deployment.md](../architecture/04-infrastructure-deployment.md) for the full mock/live cutover mechanics.
+> **This whole flow is dormant. Read this before acting on anything above.**
+>
+> The Netcash application was **declined** — the processing bank required an existing
+> debit-order book, which a new savings circle cannot have. No live debit has ever been
+> processed and none can be: a live deployment with no real gateway selects
+> `disabledGateway`, and every money operation refuses rather than pretending to succeed.
+>
+> **What actually happens today** is `docs/flows/`'s offline path: a member pays by transfer
+> or in cash, and an administrator records it against the member and the month with proof of
+> payment attached. It is reversible and never erasable.
+>
+> Production once *did* run the mock gateway against real members — a member paid R100, a
+> settled transaction was written and no bank was ever contacted. That was a `DEPLOY_ENV`
+> resolution defect, fixed, and pinned by `packages/utils/__tests__/deployment.test.ts`.
+> `selectGateway()` refuses to silently pick the real gateway without `NETCASH_SERVICE_KEY`,
+> independent of whether the deployment is flagged "live" — see
+> [../architecture/04-infrastructure-deployment.md](../architecture/04-infrastructure-deployment.md)
+> for the cutover mechanics, and
+> [../compliance/collections-application-brief.md](../compliance/collections-application-brief.md)
+> for what would have to change for this flow to run.

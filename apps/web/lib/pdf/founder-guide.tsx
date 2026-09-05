@@ -43,9 +43,9 @@ import {
  * numbers, and it forces each section to be worth its page.
  */
 
-const VERSION = '2.0'
-const RELEASED = 'August 2026'
-const NEXT_REVIEW = 'August 2027'
+const VERSION = '3.0'
+const RELEASED = 'September 2026'
+const NEXT_REVIEW = 'September 2027'
 
 const zar = (n: number) => `R${n.toLocaleString('en-ZA').replace(/,/g, ' ')}`
 
@@ -355,10 +355,11 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         <FounderGrid founders={founders} />
         <View style={{ marginTop: 13 }}>
           <Advice tone="gold" label="The rules that protect members also bind us">
-            Every leader contributes under the same rules as every other member — no special
-            privileges, no exemption from the debit order, no way to bypass the record. Every
-            action a leader takes is written against their name, permanently, where the other
-            three can see it.
+            Every leader contributes under the same rules as every other member — the same amount
+            owed on the same day, the same proof of payment required, no way to bypass the record.
+            A leader who records their own payment is recorded as having done so. Every action a
+            leader takes is written against their name, permanently, where the other three can see
+            it.
           </Advice>
         </View>
       </Section>
@@ -372,41 +373,46 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
       <Section num={4} title="How Your Contribution Works" kicker="THE MONTHLY RHYTHM"
         plain="One Amount," italic="Once a Month">
         <Lede>
-          Your amount is agreed before you join, and it does not change unless you ask. It is
-          collected from your bank on a day you chose, by a standing permission you gave your own
-          bank and can withdraw at any time.
+          Your amount is agreed before you join, and it does not change unless you ask. You pay it
+          yourself, into the Foundation{"'"}s account, and a leader records it against your name
+          with your proof of payment attached.
         </Lede>
 
         <Stats items={[
           { value: String(MIN_CONTRIBUTION_ZAR), prefix: 'R', label: 'Least you may commit' },
           { value: MAX_CONTRIBUTION_ZAR.toLocaleString('en-ZA').replace(/,/g, ' '), prefix: 'R', label: 'Most you may commit' },
           { value: String(DEFAULT_INVITE_AMOUNT), prefix: 'R', label: 'Typical commitment' },
-          { value: String(NETCASH_FEE_BUFFER), prefix: 'R', label: 'Collection fee' },
         ]} />
 
-        <H2>Why your bank statement shows a little more</H2>
+        <H2>How you pay, today</H2>
         <P>
-          Collecting a debit order costs money, and the collector takes its fee out of what it
-          collects. If we asked your bank for exactly your contribution, the pool would receive
-          slightly less than you committed every single month, and the shortfall would come out of
-          the Goals. So {zar(NETCASH_FEE_BUFFER)} is added to the amount debited, and the full
-          amount you committed reaches the pool.
+          Nothing is taken from your account automatically. <B>You send the money</B> — a transfer
+          from your banking app, or cash handed to a leader — and the Foundation{"'"}s banking
+          details are shown to you inside the app so you never have to ask for them or trust them
+          to a chat message.
+        </P>
+        <P>
+          Then you send your proof of payment, and a leader records it. Nothing is counted as
+          contributed until that record exists, which is why the proof matters: it is what turns
+          money you sent into a line on your statement that nobody can later dispute.
         </P>
 
-        <Table
-          head={['If you commit', 'Your bank shows', 'The pool receives']}
-          widths={[0.33, 0.33, 0.34]}
-          rows={[
-            [zar(DEFAULT_INVITE_AMOUNT), zar(DEFAULT_INVITE_AMOUNT + NETCASH_FEE_BUFFER), zar(DEFAULT_INVITE_AMOUNT)],
-            [zar(MIN_CONTRIBUTION_ZAR), zar(MIN_CONTRIBUTION_ZAR + NETCASH_FEE_BUFFER), zar(MIN_CONTRIBUTION_ZAR)],
-          ]}
-        />
+        <Advice tone="gold" label="Why it works this way for now">
+          We applied to collect by debit order and were turned down — not for anything we did, but
+          because a new circle has no collection history to show, and that is what was asked for.
+          So we do it by hand, correctly, and build the very history that was missing. When a
+          partner does take us on, your amount will be collected on a day you choose and{' '}
+          {zar(NETCASH_FEE_BUFFER)} will be added to cover the cost of collecting, so that the full
+          amount you committed still reaches the pool. Nothing in this guide changes when that
+          happens except the first step.
+        </Advice>
+
         <H2>What your month can say</H2>
         <Table
           head={['Your month reads', 'What it means']}
           widths={[0.22, 0.78]}
           rows={[
-            ['Pending', 'Owed, and nothing collected yet. Normal at the start of a month.'],
+            ['Pending', 'Owed, and nothing recorded yet. Normal at the start of a month.'],
             ['Partial', 'Some of it arrived. The rest is still owed, and what you did pay counts.'],
             ['Paid', 'Settled in full. Nothing more is expected.'],
             ['Overdue', 'The month passed unpaid. No interest, no penalty — it simply stays on the record until settled.'],
@@ -419,15 +425,16 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
       <Section num={5} title="The Journey of One Rand" kicker="FOLLOW THE MONEY"
         plain="The Journey of" italic="One Rand">
         <P>
-          Every rand takes exactly this path, every month, without exception. It moves bank to
-          bank. It never passes through anybody{"'"}s hands, and it never passes through the app.
+          Every rand takes exactly this path, every month, without exception. It moves from your
+          bank to the Foundation{"'"}s bank. It never passes through the app, and — apart from cash
+          handed over in person and banked the same way — never through anybody{"'"}s hands.
         </P>
 
         <JourneyRail stops={[
-          { glyph: 'bank', title: 'Your bank account', text: 'The money is yours and sits with your own bank until the agreed day.' },
-          { glyph: 'shield', title: 'Your standing permission', text: 'What you approved with your bank — for one amount, on one day.' },
-          { glyph: 'cycle', title: 'The collector', text: 'A licensed, audited company your bank pays. Never us.' },
-          { glyph: 'wallet', title: 'The Foundation account', text: 'The shared pool, held at a bank in the Foundation’s name.' },
+          { glyph: 'bank', title: 'Your bank account', text: 'The money is yours, and stays yours until you choose to send it.' },
+          { glyph: 'wallet', title: 'The Foundation account', text: 'You transfer your amount to it. One account, shown to you in the app.' },
+          { glyph: 'file', title: 'Your proof of payment', text: 'You send it. It is the evidence, and it is kept.' },
+          { glyph: 'shield', title: 'A leader records it', text: 'Against your name and your month, with the proof attached and their own name on the entry.' },
         ]} />
 
         <H2>What happens at each stage</H2>
@@ -435,17 +442,19 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           head={['Stage', 'What moves', 'What gets written down']}
           widths={[0.1, 0.44, 0.46]}
           rows={[
-            ['01', 'Nothing yet — funds sit in your account', 'The upcoming debit and its date'],
-            ['02', 'Your bank checks the instruction against the permission you approved', 'The permission, its amount and its status'],
-            ['03', 'Your bank releases the agreed amount to the collector', 'The transaction and its reference'],
-            ['04', 'The collector settles the funds into the Foundation’s account', 'Confirmation, your record entry, your receipt'],
+            ['01', 'Nothing yet — the month is opened and your amount is owed', 'What you owe, and for which month'],
+            ['02', 'You send the money to the Foundation’s account', 'Nothing yet. The app does not watch your bank'],
+            ['03', 'You send your proof of payment', 'The proof itself, kept and viewable'],
+            ['04', 'A leader checks it and records it', 'Your entry, your receipt, and who recorded it'],
           ]}
         />
 
-        <Advice tone="gold" label="If your bank says no, nothing happens">
-          A debit outside the amount or the date you approved is refused by your own bank before it
-          reaches anyone. That protection sits with your bank, not with us — which is exactly why
-          we chose this way of collecting.
+        <Advice tone="gold" label="Why a person is in the middle, and why that is safe">
+          A leader can record a payment. No leader can invent one: every entry carries proof, the
+          name of whoever made it and the moment they did, and none of them can be quietly edited
+          or deleted afterwards. The pool is also checked against the Foundation{"'"}s own bank
+          statement — so a recorded payment that never arrived would show up as a disagreement, not
+          as money.
         </Advice>
       </Section>
 
@@ -454,7 +463,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         plain="The App Never" italic="Holds Your Money">
         <HeroPanel title="Not one rand ever sits inside the app" glyph="lock">
           There is no wallet, no balance, no stored value and no account inside the software
-          holding money. Your money is with <HB>your bank</HB> until the debit date, and with the{' '}
+          holding money. Your money is with <HB>your bank</HB> until you send it, and with the{' '}
           <HB>Foundation{"'"}s bank</HB> afterwards. The app is the book that records the journey
           between the two.
         </HeroPanel>
@@ -463,8 +472,8 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           yes={{
             title: 'What the app does',
             items: [
-              'Instructs your bank to collect what you approved',
-              'Records every contribution the moment it settles',
+              'Shows you where to pay, and what you owe this month',
+              'Records every contribution, with the proof beside it',
               'Keeps the permanent record of the whole pool',
               'Tells you what is coming, what worked, what failed',
               'Tracks Goals and progress toward each target',
@@ -476,7 +485,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
             items: [
               'Hold, store or carry a balance of your money',
               'Keep your card details — there are none to keep',
-              'Take an amount you did not approve at your bank',
+              'Take a single rand out of your account by itself',
               'Move money between members’ accounts',
               'Release funds on its own, without a decision',
               'Delete or quietly rewrite anything in the record',
@@ -549,27 +558,27 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           needs and what it has, all the time.
         </P>
 
-        <H2>Three ways money reaches a Goal</H2>
+        <H2>Two ways money reaches a Goal, and a third to come</H2>
         <IconList items={[
           {
             glyph: 'cycle', title: 'Your monthly contribution',
-            text: <>Goes to the main Goal automatically. You do nothing; it is the rhythm of the Foundation.</>,
+            text: <>Goes to the main Goal. You do nothing beyond paying your month; it is the rhythm of the Foundation.</>,
           },
           {
             glyph: 'wallet', title: 'A one-off gift you direct yourself',
-            text: <>See a Goal that matters to you and put something toward it, from {zar(MIN_GOAL_PAYMENT)} up to {zar(MAX_GOAL_PAYMENT)}. It goes to the Goal you chose — not into a general pot for leadership to allocate. If you press the button twice by mistake, you are charged once.</>,
+            text: <>See a Goal that matters to you and put something toward it, from {zar(MIN_GOAL_PAYMENT)} up to {zar(MAX_GOAL_PAYMENT)}. Pay it the same way you pay your month, and say which Goal it is for. It goes to the Goal you chose — never into a general pot for leadership to allocate.</>,
           },
           {
             glyph: 'clock', title: 'A monthly plan toward one Goal',
-            text: <>Commit an amount on a day of your choosing, and it is collected every month until you stop it or the Goal closes. The app suggests what the Goal still needs spread over the months it has left; the amount is yours to decide.</>,
+            text: <>Built, and waiting on collection: commit an amount on a day of your choosing and it repeats until you stop it or the Goal closes. It needs a standing collection to draw from, so it becomes available the day a collection partner does.</>,
           },
         ]} />
 
-        <Advice tone="gold" label="If a plan stops on its own">
-          A monthly plan pauses itself if the debit order behind it goes away — there is nothing to
-          collect from. Set up a new debit order and the plan has a button to start it again, with
-          the reason it stopped shown beside it. Stopping a plan never takes back what it has
-          already put in; that money is in the Goal, and the Goal belongs to the circle.
+        <Advice tone="gold" label="A Goal only ever grows by what actually arrived">
+          Every rand shown against a Goal is a payment somebody made, with proof recorded beside
+          it. The total is not typed in and cannot be nudged — it is re-counted from the payments
+          themselves, so it is arithmetic rather than anybody{"'"}s word. Money already given to a
+          Goal is never taken back out; it is in the Goal, and the Goal belongs to the circle.
         </Advice>
 
         <Table
@@ -598,7 +607,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
             ['Am I up to date?', 'The card at the top, showing this month and where it stands. Overdue is unmissable by design.'],
             ['What have I put in altogether?', 'Your total, across every month since you joined.'],
             ['What is the circle working toward?', 'The main Goal, with what it needs and what it has.'],
-            ['Is anything waiting for me?', 'A debit order to confirm, a shortfall you can settle, an unread message.'],
+            ['Is anything waiting for me?', 'A month to pay, a shortfall you can settle, an unread message.'],
           ]}
         />
 
@@ -625,9 +634,9 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
 
         <Advice tone="green" label="A badge is never a punishment">
           A missed month because a salary landed late is not the same as a member who has stopped
-          answering, and the two are not treated the same. If something goes wrong on the
-          collector{"'"}s side or with the banking system — an outage, a timeout — that is not held
-          against you at all, and you will not even hear about it as though it were.
+          answering, and the two are not treated the same. A delay that is not yours — a transfer
+          still clearing, a proof of payment waiting for a leader to get to it — is not held
+          against you at all.
         </Advice>
 
       </Section>
@@ -656,7 +665,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           rows={[
             ['In the app', 'Everything. This is the record — a message you deleted from your email is still here.'],
             ['Email', 'Statements, receipts, and anything you will want to find again later.'],
-            ['SMS', 'Short and urgent. A collection that failed, a code you need now.'],
+            ['SMS', 'Short and urgent. A payment recorded, a month falling overdue, a code you need now.'],
             ['WhatsApp', 'Optional, and off unless you turn it on. Announcements and reminders.'],
           ]}
         />
@@ -683,10 +692,9 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           rows={[
             ['Invite a member', 'Record who they are and send the link. Section 23.'],
             ['Activate an account', 'Let a newly registered member start taking part.'],
-            ['Approve a debit order', 'Check the banking details before anything is collected. A refusal must carry a reason, and the member is told it.'],
-            ['Stop a debit order', 'Necessary when somebody changes banks. It stops future collections and reverses nothing.'],
             ['Open the month', 'Write the month’s amount for every active member at once. There is no undo, so it asks first.'],
-            ['Record a payment', 'Enter money that arrived another way — cash, a transfer — against the right member and month.'],
+            ['Record a payment', 'Enter money that arrived — a transfer, or cash — against the right member and month, with the proof attached. This is how every contribution is currently recorded.'],
+            ['Reverse a payment', 'Undo one that was recorded in error. The original entry stays visible, with the reversal beside it — nothing is erased.'],
             ['Waive a month', 'Release a member from a month. It shows on their statement as a waiver, with who granted it.'],
             ['Run the Goals', 'Open one, set its target and date, close it when it is met.'],
             ['Suspend an account', 'End somebody’s participation. It keeps their record and their place.'],
@@ -747,7 +755,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           no={{
             title: 'Your responsibilities',
             items: [
-              'Keep your agreed amount available on your debit day',
+              'Pay your agreed amount each month, and send the proof',
               'Tell us early if a month is going to be difficult',
               'Keep your contact details current',
               'Keep your password to yourself',
@@ -768,7 +776,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           head={['After you leave, you keep', 'And you stop']}
           widths={[0.5, 0.5]}
           rows={[
-            ['Your account and your sign-in', 'Contributing, and being collected from'],
+            ['Your account and your sign-in', 'Contributing, and being asked for a month'],
             ['Every statement, for every month', 'Funding Goals or running monthly plans'],
             ['Your full contribution history', 'Proposing Goals, cheering, commenting'],
             ['The ability to change your password', 'Posting to the board'],
@@ -847,6 +855,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           rows={[
             ['Somebody takes the pool', 'The account is in the Foundation’s name with all four leaders as signatories, and every movement is written down and checked against the bank daily.'],
             ['A member stops paying', 'Their standing shows it, the circle can see it, and it is a conversation long before it is a problem. There is no interest and no penalty.'],
+            ['A payment is recorded wrongly', 'Every entry carries proof, a name and a time, and can be reversed but never erased. The pool is checked against the Foundation’s bank statement, so an entry with no money behind it shows up as a disagreement.'],
             ['The pool cannot cover a Goal', 'A Goal opens with a target and a date and only pays out when the circle has agreed. Nothing is promised before it exists.'],
             ['Somebody joins who should not', 'Nobody can sign up. An invitation names a specific person and records who vouched for them.'],
             ['A leader abuses their position', 'Nothing can be done invisibly, no entry can be deleted, and no leader can remove the last other leader.'],
@@ -922,7 +931,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           { glyph: 'invite', title: 'Open your link', text: 'It is for you specifically, and it expires.' },
           { glyph: 'users', title: 'Check the details', text: 'Confirm your ID matches what was recorded.' },
           { glyph: 'key', title: 'Set a password', text: `At least ${PASSWORD_MIN_LENGTH} characters, used nowhere else.` },
-          { glyph: 'shield', title: 'Get activated', text: 'A leader lets you in. Then set up your debit order.' },
+          { glyph: 'shield', title: 'Get activated', text: 'A leader lets you in. The Foundation’s banking details are then in the app.' },
         ]} />
 
         <Advice tone="gold" label="If a detail is wrong, stop">
@@ -931,10 +940,11 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           the check working, not a fault.
         </Advice>
 
-        <Advice tone="green" label="The one thing that holds everything up">
-          Your debit order. Until your bank has your confirmation, nothing can be collected and
-          your first month will sit unpaid through no fault of anyone. It is the first thing to do
-          and the easiest to forget.
+        <Advice tone="green" label="Your first month">
+          Pay it the way you will pay every month: transfer your amount to the Foundation{"'"}s
+          account, then send your proof of payment. A leader records it, and your first entry
+          appears. Nothing is taken from your account on its own, so a month you do not pay is a
+          month that simply sits unpaid — there is no penalty, only a record.
         </Advice>
       </Section>
 
@@ -947,7 +957,10 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           rows={[
             ['Can I get my money back?', `No. Contributions are not refundable — that is the one rule, and Section 07 is entirely about it. Money leaves the pool only through a Goal.`],
             ['What if I cannot pay one month?', 'Tell us before the day. A month agreed in advance is an ordinary thing; a month discovered later is a harder conversation for everyone. There is no interest and no penalty either way.'],
-            ['Why is my bank showing more than I committed?', `${zar(NETCASH_FEE_BUFFER)} is added to cover the cost of collecting, so the full amount you committed reaches the pool. Section 04.`],
+            ['How do I actually pay?', 'Transfer your amount to the Foundation’s account — the details are in the app — or hand cash to a leader. Then send your proof of payment, and it is recorded against your month. Section 04.'],
+            ['Why is nothing taken automatically?', 'Because we were declined for debit orders: a new circle has no collection history, and that is what the bank wanted to see. Recording payments by hand is how we build it. Section 04.'],
+            ['What if a leader records it wrong?', 'Tell any leader. A wrong entry is reversed, not erased — the mistake and its correction both stay visible, with names on each.'],
+            ['What if I pay too much?', 'The money stands — the record never disagrees with the bank about money that arrived. The month shows as paid with more against it than was due, and leadership is alerted so somebody speaks to you about what to do with the difference.'],
             ['Can I change my monthly amount?', 'Yes, by speaking to a leader. It is a decision, not a slider — the circle plans around what everyone committed.'],
             ['Who can see what I contribute?', 'Leadership, and you. Other members see your name and that you are a member, not your amount.'],
             ['Can I be removed?', 'Leadership can suspend an account, which stops participation and keeps your record and your seat. It is for serious things, not for one missed month or for disagreeing with us.'],
@@ -965,8 +978,10 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
           rows={[
             ['The pool', 'One bank account in the Foundation’s name, holding everything contributed and not yet spent. Also called the collective or the circle.'],
             ['Contribution', 'The amount you agreed to put in each month.'],
-            ['Debit order', 'The standing permission you gave your own bank to release your amount on your day. You can withdraw it.'],
-            ['The collector', 'The licensed company your bank pays, which settles the money into the Foundation’s account. It never holds it.'],
+            ['Proof of payment', 'What your bank gives you when you send money. Required for every contribution, and kept with the entry it proves. For cash, a leader’s written note in front of a witness stands in its place.'],
+            ['Recording a payment', 'A leader entering money that arrived against your name and your month. Until this happens, money you sent is not yet on your record.'],
+            ['Reversal', 'Undoing a payment recorded in error. The original stays visible with the reversal beside it — nothing is deleted.'],
+            ['Debit order', 'A standing permission for your amount to be collected on a chosen day. Not in use yet — see Section 04.'],
             ['Goal', 'A named thing the circle is funding, with an amount and a date. The only way money leaves the pool.'],
             ['Monthly plan', 'A standing commitment to one Goal, collected each month until you stop it.'],
             ['Gift', 'A one-off amount you send to a Goal yourself, separate from your monthly contribution.'],

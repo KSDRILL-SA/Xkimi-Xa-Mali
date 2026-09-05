@@ -39,6 +39,15 @@ const LIVING_DOCS = [
   'docs/architecture/02-container-architecture.md',
   'docs/architecture/04-infrastructure-deployment.md',
   'docs/database/01-erd.md',
+  // Added after the decline. Each of these told a reader that collections were
+  // running or about to run: the README said "no manual collection" of a system
+  // whose only collection is manual, the payment flow said production was on the
+  // mock gateway, and the compliance pack gave a bank a collection method we do
+  // not have. All three are documents somebody acts on.
+  'README.md',
+  'docs/flows/02-payment-flow.md',
+  'docs/compliance/due-diligence-pack.md',
+  'docs/compliance/registrations.md',
 ]
 
 const read = (rel: string) => readFileSync(path.join(REPO, rel), 'utf8')
@@ -115,5 +124,65 @@ describe('living documents describe the deployment we actually have', () => {
     ]) {
       expect(read(doc), doc).toContain('Superseded on the `DEPLOY_ENV` question')
     }
+  })
+})
+
+describe('the banking details members are shown are documented', () => {
+  // ── Why this is here ──────────────────────────────────────────────────────
+  //
+  // With no gateway, a contribution arrives because a member reads an account
+  // name, a bank, an account number and a branch code off their screen and
+  // sends money to them. Those four values come from environment variables with
+  // defaults in code.
+  //
+  // Every one of them was undocumented: absent from `.env.example`, from
+  // `DEPLOYMENT.md`, and from the go-live preflight — and unset in production,
+  // so the app served the code defaults and nothing ever looked wrong. The cost
+  // was invisible until the day the account had to change, at which point what
+  // should have been a configuration change was a release.
+  //
+  // The defaults are deliberate and stay. What is not acceptable is a variable
+  // that decides where money goes being discoverable only by reading the source.
+
+  const source = read('apps/web/lib/group-account.ts')
+
+  /** Every NEXT_PUBLIC_GROUP_* variable the code actually reads. */
+  const declared = [...new Set(
+    [...source.matchAll(/process\.env\.(NEXT_PUBLIC_GROUP_[A-Z_]+)/g)].map((m) => m[1]!),
+  )]
+
+  it('reads the four it is supposed to', () => {
+    // If this fails, a variable was added or removed — which is fine, but the
+    // checks below are only as good as this list, so it is stated rather than
+    // inferred.
+    expect(declared.sort()).toEqual([
+      'NEXT_PUBLIC_GROUP_ACCOUNT_NAME',
+      'NEXT_PUBLIC_GROUP_BANK_ACCOUNT',
+      'NEXT_PUBLIC_GROUP_BANK_BRANCH',
+      'NEXT_PUBLIC_GROUP_BANK_NAME',
+    ])
+  })
+
+  const DOCS = ['.env.example', 'DEPLOYMENT.md']
+
+  it.each(DOCS)('names every one of them in %s', (doc) => {
+    const src = read(doc)
+    for (const name of declared) expect(src, `${doc} does not mention ${name}`).toContain(name)
+  })
+
+  it('the go-live preflight reports on every one of them', () => {
+    // Advisory rather than blocking — serving the default account works. But an
+    // operator going live should be told, in the build log, that the account
+    // members will pay into is the built-in one.
+    const preflight = read('apps/web/scripts/golive-preflight.mjs')
+    for (const name of declared) expect(preflight, name).toContain(name)
+  })
+
+  it('the fee buffer is documented too', () => {
+    // Dormant with no provider, and quoted in the Founder Guide and registered
+    // as part of the mandate instalment — so not a value to change casually,
+    // and not one to leave undiscoverable either.
+    expect(source).toContain('NEXT_PUBLIC_NETCASH_FEE_BUFFER')
+    expect(read('.env.example')).toContain('NEXT_PUBLIC_NETCASH_FEE_BUFFER')
   })
 })
