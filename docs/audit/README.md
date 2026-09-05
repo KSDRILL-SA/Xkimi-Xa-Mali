@@ -45,6 +45,21 @@ settles it.
 | 2 | [State machines, concurrency, security boundary](audit-02-state-machine-concurrency-security.md) | 2026-09-04 | 20 (14–33) | Documented, verified, not scheduled |
 | 3 | [Deeper money flow and API integrity](audit-03-money-flow-api-integrity.md) | 2026-09-04 | 12 (33–44) | Documented, verified, not scheduled |
 | 4 | [API, authorisation, state machine](audit-04-api-authorization-state-machine.md) | 2026-09-04 | 13 (45–57) | Documented, answered, not scheduled |
+| 5 | [The provider contract, read against our code](audit-05-provider-contract.md) | 2026-09-05 | 5 (59–63) | Documented, verified, not scheduled |
+
+## Audit 5 is not an external reviewer
+
+The first four were an auditor's reading of our code, which we then verified.
+Audit 5 is **Netcash's own service contract**, read against what the code
+actually submits — the document we would be contractually bound by.
+
+That is a stronger class of evidence, and it found the most serious defect in all
+sixty-three: a fee buffer that makes **every** collection qualify as a dispute,
+against a threshold of half a percent. Nothing in audits 1-4 saw it, because
+seeing it required reading the contract rather than the code.
+
+The lesson is recorded in the plan as a companion to the sandbox requirement:
+**read the service terms before writing the adapter, not after.**
 
 ## Some rounds ask questions rather than report defects
 

@@ -19,6 +19,7 @@ Information Regulator, and the members themselves will ask to see.
 | [`due-diligence-pack.md`](due-diligence-pack.md) | The bank; Netcash risk | **Complete**, including what has not been done |
 | [`breach-response.md`](breach-response.md) | Leadership, under pressure | **Complete** |
 | [`registrations.md`](registrations.md) | The owner | **The action list** |
+| [`collections-application-brief.md`](collections-application-brief.md) | **The sponsoring bank; Netcash risk** | **Complete** — the §1.1 risk argument for a reapplication, and what must be fixed before collecting |
 
 **Start at [`registrations.md`](registrations.md).** It is the only one with things
 to *do*, and it sequences them so they stop blocking each other.
