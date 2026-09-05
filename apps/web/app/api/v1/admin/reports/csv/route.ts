@@ -4,11 +4,11 @@ import { apiError } from '@/lib/api-response'
 import { AdminReportRequestSchema } from '@/lib/validation/report'
 import { exportAdminReportCSV } from '@/services/report.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 export const GET = withApiHandler(async (req: NextRequest) => {
-  const isTrusted = isValidInternalRequest(req)
+  const isTrusted = await verifyInternalRequest(req)
   const session   = isTrusted ? null : await auth()
   if (!isTrusted && !session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 

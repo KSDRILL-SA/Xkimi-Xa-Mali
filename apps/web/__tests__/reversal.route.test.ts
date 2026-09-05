@@ -40,6 +40,9 @@ vi.mock('@/lib/auth', () => ({ auth: mocks.auth }))
 vi.mock('@/services/contribution.service', () => ({ createReversal: mocks.createReversal }))
 vi.mock('@/lib/redis', () => ({
   apiRatelimit: { limit: vi.fn(async () => ({ success: true })) },
+  // See ledger-reconcile.route.test.ts: the trusted channel claims a nonce.
+  REDIS_CONFIGURED: true,
+  redis: { set: vi.fn(async () => 'OK') },
 }))
 
 import { POST } from '@/app/api/v1/admin/transactions/[id]/reverse/route'
@@ -65,6 +68,7 @@ function internalHeaders(adminUserId = 'admin-1') {
   return {
     'x-admin-secret': SECRET,
     'x-admin-timestamp': String(Date.now()),
+    'x-admin-nonce': `n-${Math.random().toString(36).slice(2)}-aaaaaaaa`,
     'x-admin-user-id': adminUserId,
     'x-admin-ip': ADMIN_IP,
   }

@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { correctMemberIdNumber } from '@/services/admin.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 /**
@@ -21,7 +21,7 @@ const CorrectIdSchema = z.object({
 
 export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { params }) => {
   // Two callers, two trust models — the shape the reversal route established.
-  const isTrustedInternal = isValidInternalRequest(req)
+  const isTrustedInternal = await verifyInternalRequest(req)
 
   const session = await auth()
   const sessionRoles = (session?.user?.roles as string[] | undefined) ?? []

@@ -602,11 +602,24 @@ last line is the answer to the question asked — the failure mode is *no IP*, n
 *a forged IP*, so rate-limit identity and audit records degrade to absent rather
 than to attacker-chosen.
 
-**One operational check follows from it, and is the only thing to carry:**
-confirm `TRUSTED_PROXY` is actually set in production. If it is unset, this
-function is behaving correctly and returning `undefined` everywhere — which would
-silently weaken rate-limit identity and leave audit rows without an IP. That is a
-configuration verification, not a code change.
+**Correction — no check follows from it, and this entry originally said one did.**
+When this was written we noted that `TRUSTED_PROXY` should be confirmed set in
+production, "or client IPs are silently absent everywhere". That was wrong, and
+reading `resolveTrustedProxy` rather than only `clientIpFromHeaders` settles it:
+
+```ts
+export function resolveTrustedProxy(value: string | undefined): TrustedProxy {
+  if (value === 'cloudflare' || value === 'none' || value === 'vercel') return value
+  // Unrecognised values fall back to the deployment target rather than to
+  // "trust everything", so a typo cannot widen what is believed.
+  return 'vercel'
+}
+```
+
+Unset resolves to `vercel`, which is correct for this deployment, and
+`client-ip-trust.test.ts` pins it — *"defaults to Vercel when nothing is
+declared"*. The only way to reach `undefined` is to set `TRUSTED_PROXY=none`
+deliberately. **A2-F30 is closed with no work and no configuration to verify.**
 
 ---
 
@@ -761,7 +774,7 @@ Expect overlap with the endpoint-level work already recorded in
 
 1. **A2-F16 needs a business decision, not an engineering one:** may the pool go
    negative? Nothing can be implemented until leadership answers.
-2. **A2-F30 leaves one configuration check:** confirm `TRUSTED_PROXY` is set in
-   production, or client IPs are silently absent everywhere.
+2. ~~**A2-F30 leaves one configuration check.**~~ **Withdrawn.** Unset already
+   resolves to `vercel` and is tested. See the correction under A2-F30.
 3. Audit 1's open question 1 stands — the auditor still has not run the suite;
    our measured figure is 2,154 tests green across 9 workspaces.

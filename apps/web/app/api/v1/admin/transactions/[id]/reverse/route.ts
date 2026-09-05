@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { createReversal } from '@/services/contribution.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 /**
@@ -31,7 +31,7 @@ export const POST = withApiHandler<{ id: string }>(async (req: NextRequest, { pa
   // caller that exists got a 401 and no reversal was performable by anyone.
   // `broadcast/route.ts` established this pattern; it applies here for the same
   // reason and with one addition: a reversal must name the admin who ordered it.
-  const isTrustedInternal = isValidInternalRequest(req)
+  const isTrustedInternal = await verifyInternalRequest(req)
 
   const session = await auth()
   const sessionRoles = (session?.user?.roles as string[] | undefined) ?? []

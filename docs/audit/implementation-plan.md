@@ -227,9 +227,13 @@ information.* Do not sweep both with one rule.
   **nothing alarms when a webhook is refused by IP.** The failure mode is
   legitimate webhook → 403 → settlement not processed, in silence. Silence on the
   money path is the failure this repository keeps rediscovering.
-- **A2-F30** — no code change. Confirm `TRUSTED_PROXY` is set in production. The
-  implementation is correct and fails to *no IP* rather than a forged one — but
-  if unset, rate-limit identity and audit IPs are silently absent everywhere.
+- **A2-F30** — **closed with no work.** The concern was that an unset
+  `TRUSTED_PROXY` would leave client IPs silently absent. It does not:
+  `resolveTrustedProxy` falls back to `vercel` for any unrecognised or absent
+  value, and `client-ip-trust.test.ts` pins that. Only an explicit
+  `TRUSTED_PROXY=none` produces `undefined`. Recorded rather than deleted,
+  because a withdrawn item that leaves no trace gets re-raised by the next
+  reader.
 
 ---
 

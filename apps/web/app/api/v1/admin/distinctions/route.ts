@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { apiSuccess, apiError } from '@/lib/api-response'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import {
   grantDistinction,
   removeDistinction,
@@ -46,7 +46,7 @@ const RemoveSchema = z.object({
 async function resolveAdmin(req: NextRequest): Promise<
   { ok: true; adminId: string } | { ok: false; response: ReturnType<typeof apiError> }
 > {
-  if (isValidInternalRequest(req)) {
+  if (await verifyInternalRequest(req)) {
     // Who acted, confirmed against the database rather than believed. The
     // console runs `requireAdmin` first, but a distinction is conferred by a
     // named person and kept forever — so the name is checked here too, which

@@ -7,7 +7,7 @@ import {
   generateInvite, listInvitations,
 } from '@/services/invite.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 const SA_PHONE = /^(\+27|0)[6-8][0-9]{8}$/
@@ -29,7 +29,7 @@ export const GET = withApiHandler(async (req: NextRequest) => {
 })
 
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const isTrusted = isValidInternalRequest(req)
+  const isTrusted = await verifyInternalRequest(req)
   const session   = isTrusted ? null : await auth()
   if (!isTrusted && !session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 

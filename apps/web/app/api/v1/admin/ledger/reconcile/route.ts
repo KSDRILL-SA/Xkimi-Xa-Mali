@@ -4,7 +4,7 @@ import { apiSuccess, apiError } from '@/lib/api-response'
 import { adminBulkRatelimit } from '@/lib/redis'
 import { reconcileLedger, getPoolBalance } from '@/services/ledger.service'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { writeAuditLog } from '@/services/audit.service'
 import { getClientIP } from '@/lib/request'
 
@@ -38,7 +38,7 @@ import { getClientIP } from '@/lib/request'
  * badge, so it shares their limiter rather than getting a laxer one of its own.
  */
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const isTrustedInternal = isValidInternalRequest(req)
+  const isTrustedInternal = await verifyInternalRequest(req)
 
   const session = await auth()
   const sessionRoles = (session?.user?.roles as string[] | undefined) ?? []

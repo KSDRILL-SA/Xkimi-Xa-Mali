@@ -5,7 +5,7 @@ import { adminOfflinePaymentRatelimit } from '@/lib/redis'
 import { recordOfflineGoalPayment } from '@/services/goal-payment.service'
 import { OfflineGoalPaymentSchema } from '@xxm/utils'
 import { withApiHandler } from '@/lib/api-handler'
-import { isValidInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
+import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
 /**
@@ -25,7 +25,7 @@ import { getClientIP } from '@/lib/request'
  * alternating between them.
  */
 export const POST = withApiHandler(async (req: NextRequest) => {
-  const isTrustedInternal = isValidInternalRequest(req)
+  const isTrustedInternal = await verifyInternalRequest(req)
 
   const session = await auth()
   const sessionRoles = (session?.user?.roles as string[] | undefined) ?? []
