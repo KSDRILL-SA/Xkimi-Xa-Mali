@@ -14,11 +14,19 @@ export const GET = withApiHandler<{ id: string }>(async (
   if (!session?.user?.id) return apiError('SYS_002', 'Unauthorised', 401)
 
   const { id } = await params
-  const goal = await getGoal(id)
   const roles = (session.user.roles as string[] | undefined) ?? []
-  if (goal.status === 'DRAFT' && !roles.includes('ADMIN')) {
-    return apiError('ADM_001', 'Goal not found', 404)
-  }
+
+  // `roles` passed, not re-checked afterwards.
+  //
+  // This route used to call `getGoal(id)` and then apply its own draft rule.
+  // The rule was correct and unreachable: `getGoal` defaults `roles` to `[]`
+  // and throws GoalNotFoundError for a draft before returning, so the branch
+  // below it never ran — and an admin who could see a draft in the list got
+  // "not found" when they opened it.
+  //
+  // The same rule in two places, with the copy on the path being the one that
+  // did not know about admins. One rule, one place.
+  const goal = await getGoal(id, roles)
   return apiSuccess(goal)
 })
 
