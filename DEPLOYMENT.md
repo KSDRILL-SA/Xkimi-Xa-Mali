@@ -144,12 +144,22 @@ three are addresses that *receive*.
 Because there is no gateway, **members pay by transfer into an account whose
 details the app shows them**. Those details come from four variables:
 
-| Var | Default in code |
-|-----|-----------------|
-| `NEXT_PUBLIC_GROUP_ACCOUNT_NAME` | `Xkimi Xa Mali Foundation` |
-| `NEXT_PUBLIC_GROUP_BANK_NAME` | `ABSA Bank` |
-| `NEXT_PUBLIC_GROUP_BANK_ACCOUNT` | `9385143164` |
-| `NEXT_PUBLIC_GROUP_BANK_BRANCH` | `632005` |
+| Var | What it holds |
+|-----|---------------|
+| `NEXT_PUBLIC_GROUP_ACCOUNT_NAME` | The account holder's name, as the bank has it |
+| `NEXT_PUBLIC_GROUP_BANK_NAME` | The bank |
+| `NEXT_PUBLIC_GROUP_BANK_ACCOUNT` | The account number |
+| `NEXT_PUBLIC_GROUP_BANK_BRANCH` | The branch code |
+
+> [!CAUTION]
+> **The live values are deliberately not written in this file.** This repository
+> is public, and in South Africa an account number together with a branch code
+> has been enough to attempt an unauthorised debit order against an account.
+>
+> They currently live as defaults in `apps/web/lib/group-account.ts`, which is
+> why the app works without them being set. Read them there or from the bank —
+> not from documentation, which gets shared with accountants, banks and
+> prospective partners far more often than source files do.
 
 > [!IMPORTANT]
 > **None of the four is set in Vercel today.** The app therefore serves the code

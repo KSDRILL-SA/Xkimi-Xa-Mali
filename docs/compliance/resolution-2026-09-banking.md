@@ -1,5 +1,10 @@
 # Founders' resolution — banking (amendment to clause 6.1)
 
+> **Before this is put to a meeting, write the account particulars back in.**
+> They are redacted here because this repository is public. The version that is
+> tabled and signed must name the account in full — a resolution that redacts
+> the thing it is resolving about is not a resolution.
+
 **Status:** DRAFTED, NOT YET PASSED. Nothing in this document is in force until it
 is put to a meeting, passed, and signed.
 
@@ -18,8 +23,8 @@ is put to a meeting, passed, and signed.
 Clause 6.1 as signed names a single account:
 
 > Capitec Business, account holder KSDRILL SA (Pty) Ltd, account number
-> 1055722831, branch code 450105 — held in custody for the Foundation's members
-> under clause 1.4A.
+> `[REDACTED]`, branch code `[REDACTED]` — held in custody for the Foundation's
+> members under clause 1.4A.
 
 That was correct on the assumption in force when it was signed: that the
 Foundation's collections application would be approved, and that the Capitec
@@ -75,8 +80,9 @@ following:
 >
 > **6.1.2 The settlement account.** Where the Foundation appoints a collections
 > partner, collections are settled into the Capitec Business account of KSDRILL
-> SA (Pty) Ltd, account number 1055722831, branch code 450105, held **in custody
-> for the Foundation's members** under clause 1.4A. That account is used only for
+> SA (Pty) Ltd, account number and branch code as recorded in the Treasurer's
+> register of banking particulars, held **in custody for the Foundation's
+> members** under clause 1.4A. That account is used only for
 > the Foundation's funds: never for KSDRILL SA's own income or expenses, and
 > never for any other system KSDRILL SA operates.
 >

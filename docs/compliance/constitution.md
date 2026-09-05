@@ -12,6 +12,12 @@
 | Operated through | KSDRILL SA (Pty) Ltd, registration number 2026/614917/07 — see clause 1.4A |
 | Self-regulatory body | National Stokvel Association of South Africa (NASASA) — membership application in progress, number to follow |
 
+> **The banking particulars in clause 6.1 are redacted in this copy.** This
+> repository is public. The signed original carries them in full, and they are
+> also held in the Treasurer's register — the two places entitled to them. A
+> redaction here changes nothing about what was signed; it only keeps a live
+> account number out of a public file.
+>
 > **Read this first.** This document states what the system built for this
 > collective actually does, in the form a constitution takes. It was adopted and
 > signed by all four founders on **2026-08-24**. Editing this file changes
@@ -206,8 +212,9 @@ evidenced, is described in `mandate-lifecycle.md`.
 ## 6. The pool and Goals
 
 6.1 All contributions are held in a dedicated bank account — Capitec Business,
-account holder KSDRILL SA (Pty) Ltd, account number 1055722831, branch code
-450105 — held **in custody for the Foundation's members** under clause 1.4A.
+account holder KSDRILL SA (Pty) Ltd, account number `[REDACTED IN THIS COPY]`,
+branch code `[REDACTED IN THIS COPY]` — held **in custody for the Foundation's
+members** under clause 1.4A.
 This account is used **only** for the Foundation's funds: never for KSDRILL SA's
 own income or expenses, and never for any other system KSDRILL SA operates. They
 are not held in the personal account of any member or leader.
