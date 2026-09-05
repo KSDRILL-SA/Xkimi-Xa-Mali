@@ -398,9 +398,11 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
         </P>
 
         <Advice tone="gold" label="Why it works this way for now">
-          We applied to collect by debit order and were turned down — not for anything we did, but
-          because a new circle has no collection history to show, and that is what was asked for.
-          So we do it by hand, correctly, and build the very history that was missing. When a
+          Collecting by debit order is what we are working toward, and the application for it is
+          in progress. Before a collection partner takes on any group they need to see a real
+          record of money already coming in — months of contributions, each one against a name and
+          a date with proof behind it. That record is not a formality we are waiting out. It is the
+          thing that earns the approval, and every payment you make and we record builds it. When a
           partner does take us on, your amount will be collected on a day you choose and{' '}
           {zar(NETCASH_FEE_BUFFER)} will be added to cover the cost of collecting, so that the full
           amount you committed still reaches the pool. Nothing in this guide changes when that
@@ -958,7 +960,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
             ['Can I get my money back?', `No. Contributions are not refundable — that is the one rule, and Section 07 is entirely about it. Money leaves the pool only through a Goal.`],
             ['What if I cannot pay one month?', 'Tell us before the day. A month agreed in advance is an ordinary thing; a month discovered later is a harder conversation for everyone. There is no interest and no penalty either way.'],
             ['How do I actually pay?', 'Transfer your amount to the Foundation’s account — the details are in the app — or hand cash to a leader. Then send your proof of payment, and it is recorded against your month. Section 04.'],
-            ['Why is nothing taken automatically?', 'Because we were declined for debit orders: a new circle has no collection history, and that is what the bank wanted to see. Recording payments by hand is how we build it. Section 04.'],
+            ['Why is nothing taken automatically?', 'Debit orders are still being arranged. A collection partner needs to see a proven record of contributions already coming in before they will take a group on, and recording every payment properly is how that record is built. Section 04.'],
             ['What if a leader records it wrong?', 'Tell any leader. A wrong entry is reversed, not erased — the mistake and its correction both stay visible, with names on each.'],
             ['What if I pay too much?', 'It goes toward whatever else you owe, oldest month first. Pay R900 when the month asks R450 and you are behind on an earlier one, and both settle. If nothing else is owed the extra stands on that month and leadership is told, so somebody can speak to you about it.'],
             ['Can I change my monthly amount?', 'Yes, by speaking to a leader. It is a decision, not a slider — the circle plans around what everyone committed.'],
@@ -981,7 +983,7 @@ export function FounderGuideDocument({ holder, portraits }: { holder: string; po
             ['Proof of payment', 'What your bank gives you when you send money. Required for every contribution, and kept with the entry it proves. For cash, a leader’s written note in front of a witness stands in its place.'],
             ['Recording a payment', 'A leader entering money that arrived against your name and your month. Until this happens, money you sent is not yet on your record.'],
             ['Reversal', 'Undoing a payment recorded in error. The original stays visible with the reversal beside it — nothing is deleted.'],
-            ['Debit order', 'A standing permission for your amount to be collected on a chosen day. Not in use yet — see Section 04.'],
+            ['Debit order', 'A standing permission for your amount to be collected on a chosen day. Being arranged, and not in use yet — see Section 04.'],
             ['Goal', 'A named thing the circle is funding, with an amount and a date. The only way money leaves the pool.'],
             ['Monthly plan', 'A standing commitment to one Goal. Each month on your chosen day it tells you what it asks for, and it runs until you stop it.'],
             ['Gift', 'A one-off amount you send to a Goal yourself, separate from your monthly contribution.'],
