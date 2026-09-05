@@ -148,6 +148,29 @@ export const goalRepo = {
   updatePayment(id: string, data: Prisma.GoalPaymentUncheckedUpdateInput) {
     return db.goalPayment.update({ where: { id }, data })
   },
+
+  /**
+   * Move a payment's status, but only if it still holds the one we read.
+   *
+   * The sibling of `transactionRepo.updateIfStatus`, and it exists for the same
+   * reason. Webhook deduplication stops the SAME event arriving twice; it does
+   * nothing about two DIFFERENT events racing on one payment — both read
+   * PENDING, both map to SUCCESS, and both write. Deduplication and a
+   * compare-and-swap solve different problems.
+   *
+   * `updateMany` rather than `update`, because it returns a count instead of
+   * throwing: a caller that lost the race needs to know it lost, not to fail.
+   */
+  updatePaymentIfStatus(
+    id: string,
+    expectedStatus: string,
+    data: Prisma.GoalPaymentUncheckedUpdateInput,
+  ) {
+    return db.goalPayment.updateMany({
+      where: { id, status: expectedStatus as never },
+      data: data as Prisma.GoalPaymentUpdateManyMutationInput,
+    })
+  },
 }
 
 // ─── Thin db.$transaction wrapper ───────────────────────────────────────────

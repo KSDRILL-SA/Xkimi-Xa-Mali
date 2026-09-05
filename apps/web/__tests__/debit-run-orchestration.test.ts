@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   contribCreate: vi.fn(),
   redisGet: vi.fn(),
   redisSet: vi.fn(),
+  redisDel: vi.fn(),
   submitScheduledDebit: vi.fn(),
   queueNotification: vi.fn(),
   notifyAdmins: vi.fn(),
@@ -45,7 +46,7 @@ vi.mock('@/lib/db', () => ({
     jobHeartbeat: { upsert: mocks.heartbeatUpsert },
   },
 }))
-vi.mock('@/lib/redis', () => ({ redis: { get: mocks.redisGet, set: mocks.redisSet } }))
+vi.mock('@/lib/redis', () => ({ redis: { get: mocks.redisGet, set: mocks.redisSet, del: mocks.redisDel } }))
 vi.mock('@/lib/date', () => ({ todaySAST: () => '2026-08-01' }))
 vi.mock('@/integrations/payment', () => ({
   paymentGateway: { submitScheduledDebit: mocks.submitScheduledDebit },
@@ -90,7 +91,9 @@ const slugsSent = () => mocks.queueNotification.mock.calls.map((c) => c[0].templ
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.redisGet.mockResolvedValue(null)
+  // SET NX: 'OK' when this run won the period, null when another already had it.
   mocks.redisSet.mockResolvedValue('OK')
+  mocks.redisDel.mockResolvedValue(1)
   mocks.txFindUnique.mockResolvedValue(null)
   mocks.txCreate.mockImplementation(({ data }: never) => Promise.resolve({ id: 'tx-1', ...(data as object) }))
   mocks.contribFindUnique.mockResolvedValue(null)
@@ -254,14 +257,53 @@ describe('executeDebitRun — mandates it must leave alone', () => {
     expect(summary.skipped).toBe(1)
   })
 
-  it('does not debit twice when the period was already claimed', async () => {
+  it('does not debit twice when another run already holds the period', async () => {
+    // SET NX returns null to the loser. The claim IS the write now — the run
+    // that used to read nothing, conclude the month was uncollected and submit
+    // alongside its twin cannot get that far.
     mocks.findMandates.mockResolvedValue([mandate('a')])
-    mocks.redisGet.mockResolvedValue('1')
+    mocks.redisSet.mockResolvedValue(null)
 
     const summary = await executeDebitRun(step)
 
     expect(mocks.submitScheduledDebit).not.toHaveBeenCalled()
     expect(summary.skipped).toBe(1)
+  })
+
+  it('claims with NX rather than writing over whatever was there', async () => {
+    mocks.findMandates.mockResolvedValue([mandate('a')])
+
+    await executeDebitRun(step)
+
+    expect(mocks.redisSet).toHaveBeenCalledWith(
+      expect.stringContaining('debit:run:'),
+      '1',
+      expect.objectContaining({ nx: true }),
+    )
+  })
+
+  it('skips a period the database already shows collected, even holding the claim', async () => {
+    // Redis is a cache with a TTL. If the key lapsed — or Upstash was replaced
+    // — the transaction row is the durable record that this month was already
+    // taken, and it has to win.
+    mocks.findMandates.mockResolvedValue([mandate('a')])
+    mocks.txFindUnique.mockResolvedValue({ id: 'tx-old' })
+
+    const summary = await executeDebitRun(step)
+
+    expect(mocks.submitScheduledDebit).not.toHaveBeenCalled()
+    expect(summary.skipped).toBe(1)
+  })
+
+  it('releases the claim it took when the database says no', async () => {
+    // Otherwise a run that skips on a stale key leaves its own key behind and
+    // locks out the next legitimate attempt for three days.
+    mocks.findMandates.mockResolvedValue([mandate('a')])
+    mocks.txFindUnique.mockResolvedValue({ id: 'tx-old' })
+
+    await executeDebitRun(step)
+
+    expect(mocks.redisDel).toHaveBeenCalledWith(expect.stringContaining('debit:run:'))
   })
 
   it('ignores a suspended member and one with no gateway mandate', async () => {

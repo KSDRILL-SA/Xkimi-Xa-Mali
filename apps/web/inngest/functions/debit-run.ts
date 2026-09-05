@@ -105,23 +105,54 @@ export async function executeDebitRun(step: DebitStepRunner) {
     }
 
     const idempotencyKey = `debit:run:${mandate.id}:${periodKey}`
-    const alreadyRan = await step.run(`check-idempotency-${mandate.id}`, async () => {
-      const redisCheck = await redis.get(idempotencyKey)
-      if (redisCheck) return true
-      const dbCheck = await db.transaction.findUnique({
+
+    // Claim the period, in one operation that either wins or loses.
+    //
+    // This used to read and then write: `redis.get`, a database lookup, and —
+    // in a separate step — `redis.set`. Two runs overlapping both read nothing,
+    // both concluded the month was uncollected, and both submitted:
+    //
+    //     check DB   -> none        check DB   -> none
+    //     check Redis-> none        check Redis-> none
+    //     set Redis                 set Redis
+    //     submit debit              submit debit
+    //
+    // The transaction's unique `idempotencyKey` stops the second row. It stops
+    // it *after* the second debit has already left the member's account, which
+    // is the half that matters.
+    //
+    // `SET NX` is the whole fix: the write IS the claim, and Redis decides. The
+    // loser gets null and skips. Inngest memoises steps within a run, so the
+    // realistic trigger was two overlapping runs — a manual trigger crossing
+    // the cron, a redelivery — rather than two workers inside one.
+    //
+    // The database check stays, and stays second. Redis is a cache with a TTL:
+    // if a key has expired or Upstash was replaced, the transaction row is the
+    // durable record that this period was already collected. Asking Redis first
+    // means the common case costs one round trip instead of a query.
+    const claimedPeriod = await step.run(`claim-${mandate.id}`, async () => {
+      const won = await redis.set(idempotencyKey, '1', { nx: true, ex: 60 * 60 * 72 })
+      if (won === null) return false
+
+      // We hold the claim. Now confirm no earlier run already collected this
+      // period and let its key lapse — in which case the claim is released, so
+      // a later legitimate attempt is not locked out by our own key.
+      const already = await db.transaction.findUnique({
         where: { idempotencyKey },
         select: { id: true },
       })
-      return !!dbCheck
+      if (already) {
+        await redis.del(idempotencyKey).catch(() => {})
+        return false
+      }
+
+      return true
     })
-    if (alreadyRan) {
+
+    if (!claimedPeriod) {
       tally.skipped += 1
       return
     }
-
-    await step.run(`claim-${mandate.id}`, () =>
-      redis.set(idempotencyKey, '1', { ex: 60 * 60 * 72 }),
-    )
 
     const contribution = await step.run(`upsert-contribution-${mandate.id}`, async () => {
       const existing = await db.contribution.findUnique({
