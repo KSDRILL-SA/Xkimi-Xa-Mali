@@ -2,6 +2,11 @@ import { db } from '@/lib/db'
 import { isUniqueViolation } from '@/lib/errors'
 import { SUCCESSFUL_INFLOW } from '@/repositories/transaction.repository'
 import { subtractZAR, roundZAR } from '@/lib/money'
+import { logger } from '@xxm/observability'
+import { raiseOperationalAlert } from './alert.service'
+
+/** Alert bodies are multi-line; newlines survive to the inbox and the email. */
+const NEWLINE = String.fromCharCode(10)
 
 type Direction = 'CREDIT' | 'DEBIT'
 
@@ -183,7 +188,134 @@ export async function reconcileLedger(): Promise<{ creditsPosted: number; debits
     ]),
   ])
 
+  // Check the pool against its own rules, now that everything that should be
+  // posted has been. Before the backfill a missing credit looks exactly like an
+  // orphan debit, and alarming on a gap this run was about to close would train
+  // everyone to ignore the alarm.
+  await raisePoolInvariantAlert()
+
   return { creditsPosted, debitsPosted }
+}
+
+/**
+ * Say so, loudly, if the pool is holding less than nothing.
+ *
+ * Best-effort by the same reasoning as every other post here: a failure to
+ * *report* a problem must not roll back the reconciliation that was fixing
+ * others. The log line survives either way, and `logger.error` reaches Sentry.
+ */
+async function raisePoolInvariantAlert(): Promise<void> {
+  const breaches = await auditPoolInvariants().catch((err) => {
+    logger.error('Could not check the pool invariants', { err })
+    return [] as PoolInvariantBreach[]
+  })
+  if (breaches.length === 0) return
+
+  const negative = breaches.find((b) => b.kind === 'NEGATIVE_BALANCE')
+  const orphans = breaches.filter((b) => b.kind === 'ORPHAN_DEBIT')
+
+  await raiseOperationalAlert({
+    code: 'POOL_INVARIANT_BREACHED',
+    severity: 'critical',
+    title: 'The pool ledger is holding less than nothing',
+    body: [
+      negative
+        ? `The pool balance is R${negative.balance} (credited R${negative.credited}, debited R${negative.debited}).`
+        : 'A debit was found with no matching credit.',
+      '',
+      'Every debit in this ledger undoes a credit that came before it — there are',
+      'no payouts — so this cannot happen while the records are right. The figure',
+      'members see on the Fund page is derived from these entries.',
+      '',
+      orphans.length > 0
+        ? `Debits with no matching credit (${orphans.length}): ` +
+          orphans.slice(0, 10).map((o) => `${o.refType}:${o.refId}`).join(', ')
+        : 'No orphaned debits; the shortfall is in the totals themselves.',
+    ].join(NEWLINE),
+    payload: { breaches: breaches.slice(0, 20) },
+  }).catch((err) => logger.error('Could not raise the pool invariant alert', { err }))
+}
+
+// ─── The invariant nobody had decided ─────────────────────────────────────────
+
+/**
+ * Can the pool legitimately hold less than nothing?
+ *
+ * **No — and that is a decision, recorded here because until now nobody had
+ * made it.** The balance was `credited - debited` with no floor, no assertion
+ * and no alarm, so a negative pool would have rendered on the Fund page as an
+ * ordinary figure. An undecided invariant on a money page is how a wrong number
+ * reaches members with total confidence.
+ *
+ * The answer follows from what the two directions mean *in this system today*:
+ *
+ *   - a CREDIT is money arriving — a settled contribution or goal payment;
+ *   - a DEBIT is money that arrived and was pulled back — a reversal.
+ *
+ * **There is no disbursement.** No code path debits the pool for a payout,
+ * because the Foundation has not made one yet. So every DEBIT is the undoing of
+ * a specific CREDIT that came before it, `(refType, refId, direction)` is
+ * unique, and the sum cannot legitimately fall below zero. A negative balance is
+ * therefore always a defect — never a transient state to be tolerated.
+ *
+ * `reconcileLedger` already assumes this. Its reversal query carries
+ * `processedAt: { not: null }` with the comment *"a payment that went straight
+ * from PENDING to REVERSED never credited the pool, and debiting it would drive
+ * the balance negative"* — the rule was being enforced in one query while going
+ * unstated everywhere else.
+ *
+ * ── What would change the answer ───────────────────────────────────────────
+ *
+ * Payouts. The day the pool pays money out to members, a DEBIT stops implying a
+ * prior CREDIT, and a reversal landing after a distribution could legitimately
+ * take the balance under. That is the moment to revisit this, and it is why the
+ * reasoning is written down rather than just the assertion.
+ */
+export type PoolInvariantBreach =
+  /** `credited - debited < 0`. Impossible while every debit undoes a credit. */
+  | { kind: 'NEGATIVE_BALANCE'; balance: number; credited: number; debited: number }
+  /** A DEBIT with no CREDIT for the same reference — how a balance goes under. */
+  | { kind: 'ORPHAN_DEBIT'; refType: string; refId: string; amount: number }
+
+/**
+ * Check the pool against its own rules, and say what is wrong rather than only
+ * that something is.
+ *
+ * The orphan check is the useful half. A negative balance is the *symptom*;
+ * a debit with no matching credit is the cause, and naming the reference turns
+ * an alarm into somewhere to start.
+ */
+export async function auditPoolInvariants(): Promise<PoolInvariantBreach[]> {
+  const breaches: PoolInvariantBreach[] = []
+
+  const { balance, credited, debited } = await getPoolBalance()
+  if (balance < 0) {
+    breaches.push({ kind: 'NEGATIVE_BALANCE', balance, credited, debited })
+  }
+
+  // Every DEBIT should have a CREDIT for the same reference. Read as two sets
+  // rather than a join, because the ledger is small (hundreds of rows) and the
+  // set difference is clearer than the SQL that would avoid it.
+  const [debits, credits] = await Promise.all([
+    db.ledgerEntry.findMany({
+      where: { account: 'POOL', direction: 'DEBIT' },
+      select: { refType: true, refId: true, amount: true },
+    }),
+    db.ledgerEntry.findMany({
+      where: { account: 'POOL', direction: 'CREDIT' },
+      select: { refType: true, refId: true },
+    }),
+  ])
+
+  const credited_refs = new Set(credits.map((c) => `${c.refType}:${c.refId}`))
+  for (const d of debits) {
+    if (credited_refs.has(`${d.refType}:${d.refId}`)) continue
+    breaches.push({
+      kind: 'ORPHAN_DEBIT', refType: d.refType, refId: d.refId, amount: Number(d.amount),
+    })
+  }
+
+  return breaches
 }
 
 // ─── The fund, as members see it ──────────────────────────────────────────────

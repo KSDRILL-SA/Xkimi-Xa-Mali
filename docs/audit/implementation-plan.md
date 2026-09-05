@@ -61,11 +61,61 @@ That is why every finding was verified before it entered this plan.
 These are leadership and product questions. Engineering can implement either
 answer; it cannot pick one.
 
-| ID | Question | Blocks | From |
-|---|---|---|---|
-| **D1** | **May the pool balance go legitimately negative?** If a reversal lands after money has been distributed, is that a valid transient state, or is a negative pool always a defect that must alarm? | L3 | A2-F16 |
-| **D2** | **What does a second successful payment against an already-settled period mean?** Rejected, credited to a future period, refunded, or standing as an overpayment? | L10 | A4-F56 |
-| **D3** | **Is "last day of the month" a first-class debit day?** Or should 29–31 be refused when a mandate is created? | G8 | A3-F35 |
+| ID | Question | Blocks | From | Status |
+|---|---|---|---|---|
+| **D1** | May the pool balance go legitimately negative? | L3 | A2-F16 | **Answered — no** |
+| **D2** | What does a second successful payment against a settled period mean? | L10 | A4-F56 | **Answered — it stands** |
+| **D3** | Is "last day of the month" a first-class debit day? | G8 | A3-F35 | Open |
+
+### D1 — the pool may not go negative
+
+**Decided: a negative balance is always a defect, and alarms.**
+
+It follows from what the two directions mean in this system *today*. A CREDIT is
+money arriving; a DEBIT is money that arrived and was pulled back. **There is no
+disbursement** — no code path debits the pool for a payout, because the
+Foundation has not made one. So every debit undoes a specific credit that came
+before it, and the sum cannot legitimately fall below zero.
+
+The codebase was already relying on this without saying so: `reconcileLedger`'s
+reversal query carries `processedAt: { not: null }`, commented *"a payment that
+went straight from PENDING to REVERSED never credited the pool, and debiting it
+would drive the balance negative."* The rule was enforced in one query and
+unstated everywhere else.
+
+**What would change it:** payouts. The day the pool pays money out, a debit stops
+implying a prior credit, and a reversal landing after a distribution could
+legitimately take the balance under. That is the moment to revisit — which is why
+the reasoning sits in `ledger.service.ts` beside the assertion.
+
+### D2 — an overpayment stands, and somebody is told
+
+**Decided: record it, keep it, and raise it for a human decision.**
+
+The alternatives and why not:
+
+- **Reject the second payment.** The money has physically arrived — it is cash or
+  an EFT an admin is entering. Refusing to record it would make this system
+  disagree with the bank, which is the one thing a ledger may never do.
+- **Credit it forward automatically.** That moves a member's money between months
+  with nobody deciding to. It may well be right; it is not the system's call to
+  make quietly.
+- **Refund it automatically.** Same objection, and it moves money.
+
+So it stands as an overpayment and leadership decides — carry forward or return —
+as an explicit act with a name on it. The period still reads PAID, which is true,
+so nothing else would ever mention it; hence the alert.
+
+`warning`, not `critical`: no money moved wrongly and nobody is out of pocket. It
+is a decision waiting for a person, not an incident.
+
+### Both decisions were taken by the implementer, not the owner
+
+Recorded plainly because it matters who decided. The owner delegated explicitly
+while the work continued overnight. Both are reversible — D1 by changing one
+assertion and its reasoning, D2 by changing what the alert recommends — and both
+are argued from what the system does today rather than from preference. They
+should be reviewed.
 
 **D1 and D2 are reachable today.** D1 because an admin reversing an offline
 transaction posts a `DEBIT`; D2 because an admin recording the same cash handover
