@@ -24,6 +24,7 @@ import {
   MemberNotFoundError,
   TransactionNotFoundError,
   BudgetExceededError,
+  isUniqueViolation,
 } from '@/lib/errors'
 import { assertCanAccess, canAccess, assertAdmin } from '@/lib/authorization'
 import { raiseOperationalAlert } from './alert.service'
@@ -292,35 +293,73 @@ export async function submitManualPayment(
   //
   // `userId` stays in the key, so a token chosen by one member can never
   // collide with another's.
-  const clientToken = data.idempotencyKey ?? randomUUID()
-  const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${clientToken}`
-
+  // Required, not defaulted.
+  //
+  // This was `data.idempotencyKey ?? randomUUID()` with a warning logged when
+  // the client omitted it — so an omission produced a fresh identity on every
+  // request and no protection at all, from a column named `idempotencyKey`,
+  // while the only trace was a line in a log nobody reads.
+  //
+  // The server is not entitled to invent the thing that makes a money-moving
+  // request safe to retry. A caller that cannot name its intent has not
+  // expressed one. The schema refuses it now, and this is the second lock.
   if (!data.idempotencyKey) {
-    // Not fatal — the payment is still correct, it is simply unprotected against
-    // a duplicate submission. Logged so a caller that has not been updated is
-    // visible rather than quietly less safe than the others.
-    logger.warn('Manual payment submitted without an idempotency token', { userId })
+    throw new ContributionConflictError(
+      'A payment must carry an idempotency token. Reload the page and try again.',
+      'CTR_010',
+    )
   }
 
-  // Claim before submitting, never after.
+  const idempotencyKey = `manual:${userId}:${data.periodYear}-${data.periodMonth}:${data.idempotencyKey}`
+
+  // Claim before submitting, never after — and the claim is a write.
   //
-  // The old order called the gateway first and wrote second, so two concurrent
-  // submissions produced two debits and only then collided on the unique
-  // column — by which point the member's account had been hit twice and the
-  // error came too late to prevent anything. This mirrors the debit run:
-  // check what already exists, claim, then submit.
-  const existing = await transactionRepo.findByIdempotencyKey(idempotencyKey)
-  if (existing) {
-    logger.info('Manual payment already submitted under this token — returning the first result', {
-      userId, idempotencyKey, transactionId: existing.id,
+  // ── What "claim" has to mean ──────────────────────────────────────────────
+  //
+  // The comment here used to say "check what already exists, claim, then
+  // submit". There was no claim. It read `findByIdempotencyKey`, called the
+  // gateway, and inserted afterwards — so two concurrent submissions both read
+  // nothing, both submitted, and only then collided on the unique column. By
+  // that point the member's account had been hit twice and the error came far
+  // too late to prevent anything.
+  //
+  // A read cannot reserve anything. The row is the reservation: `PENDING` goes
+  // in first, and the unique index on `idempotencyKey` decides which of two
+  // requests proceeds. The loser is refused by the database **before** it can
+  // reach the gateway, which is the entire point.
+  //
+  // A comment asserting a safety property is not evidence of one. This is the
+  // second time that exact lesson has been paid for here.
+  let claimed: { id: string } | null = null
+  try {
+    claimed = await transactionRepo.create({
+      contributionId: contribution.id,
+      mandateId: mandate.id,
+      amount: data.amount,
+      type: 'MANUAL',
+      // Not yet submitted. Nothing downstream treats PENDING as money.
+      status: 'PENDING',
+      idempotencyKey,
     })
-    return {
-      contribution,
-      transaction: existing,
-      receiptRef: `XXM-${existing.id.slice(-8).toUpperCase()}`,
-      status: existing.status,
-      duplicate: true as const,
+  } catch (err) {
+    if (!isUniqueViolation(err)) throw err
+
+    // Somebody already holds this token — an earlier request, a double tap, a
+    // retry. Return what they got rather than charging the member again.
+    const existing = await transactionRepo.findByIdempotencyKey(idempotencyKey)
+    logger.info('Manual payment already claimed under this token — returning the first result', {
+      userId, idempotencyKey, transactionId: existing?.id,
+    })
+    if (existing) {
+      return {
+        contribution,
+        transaction: existing,
+        receiptRef: `XXM-${existing.id.slice(-8).toUpperCase()}`,
+        status: existing.status,
+        duplicate: true as const,
+      }
     }
+    throw err
   }
 
   // Debit the contribution PLUS the Netcash fee buffer so the group nets the
@@ -348,17 +387,14 @@ export async function submitManualPayment(
   // them.
   const txStatus: TransactionStatus = toTransactionStatus(gatewayRes.status)
 
+  // Settle the row that was claimed, rather than inserting a second one.
   const written = await runTransaction(async (tx) => {
-    const created = await transactionRepo.create(
+    const created = await transactionRepo.update(
+      claimed.id,
       {
-        contributionId: contribution.id,
-        mandateId: mandate.id,
-        amount: data.amount,
-        type: 'MANUAL',
         status: txStatus,
         gatewayRef: gatewayRes.transactionRef ?? null,
         gatewayResponse: gatewayRes as unknown as Prisma.InputJsonValue,
-        idempotencyKey,
         processedAt: txStatus === 'SUCCESS' ? new Date() : null,
       },
       tx,
