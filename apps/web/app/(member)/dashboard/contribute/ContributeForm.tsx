@@ -289,7 +289,12 @@ export function ContributeForm() {
    * after every attempt that reached the gateway, so a member giving twice on
    * purpose is not collapsed onto their first payment.
    */
-  async function payGoal(data: GoalPaymentInput, goalId: string) {
+  /**
+   * `Omit<..., 'idempotencyKey'>` because this function owns the token, not its
+   * callers — it reads `paymentToken.current` below and rotates it on success,
+   * so the whole point is that a caller cannot supply one.
+   */
+  async function payGoal(data: Omit<GoalPaymentInput, 'idempotencyKey'>, goalId: string) {
     setServerError('')
     try {
       const res = await api.post<{ amount: number; goalTitle: string; status: string }>(

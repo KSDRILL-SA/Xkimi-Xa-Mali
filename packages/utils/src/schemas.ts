@@ -178,11 +178,16 @@ export const ManualContributionSchema = z.object({
    * carry the token that was generated when the form was opened, while a
    * genuinely new payment carries a fresh one.
    *
-   * Optional, because a caller that omits it gets the previous behaviour — a
-   * unique key per request and therefore no protection. That is stated rather
-   * than silently allowed: see `submitManualPayment`.
+   * **Required.** It was optional, and the server filled the gap with
+   * `randomUUID()` — so a caller that omitted it got a fresh identity on every
+   * request and no protection at all, from a column named `idempotencyKey`.
+   * The warning that was logged in that case went to a log nobody reads.
+   *
+   * For a money-moving request the server is not entitled to invent the thing
+   * that makes it safe to retry. A client that cannot name its intent has not
+   * expressed one, and is refused. Every client already sends this.
    */
-  idempotencyKey: z.string().uuid().optional(),
+  idempotencyKey: z.string().uuid('An idempotency token is required for a payment'),
 })
 
 /**
@@ -479,8 +484,8 @@ export const MIN_GOAL_PAYMENT = 50
 export const MAX_GOAL_PAYMENT = 50_000
 
 export const GoalPaymentSchema = z.object({
-  /** One token per payment the member intends. See ManualContributionSchema. */
-  idempotencyKey: z.string().uuid().optional(),
+  /** One token per payment the member intends. Required — see ManualContributionSchema. */
+  idempotencyKey: z.string().uuid('An idempotency token is required for a payment'),
   amount: z
     .number({ required_error: 'Amount is required' })
     .min(MIN_GOAL_PAYMENT, `The minimum payment toward a goal is R${MIN_GOAL_PAYMENT}`)

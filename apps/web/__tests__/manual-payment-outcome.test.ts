@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   findActiveByUser: vi.fn(),
   findByPeriod: vi.fn(),
   txCreate: vi.fn(),
+  txUpdate: vi.fn(),
   findByKey: vi.fn(),
   runTransaction: vi.fn(),
   checkBudget: vi.fn(),
@@ -55,7 +56,7 @@ vi.mock('@/repositories/mandate.repository', () => ({
 }))
 vi.mock('@/repositories/budget.repository', () => ({ budgetRepo: { findActiveByType: vi.fn() } }))
 vi.mock('@/repositories/transaction.repository', () => ({
-  transactionRepo: { create: mocks.txCreate, findByIdempotencyKey: mocks.findByKey, aggregate: vi.fn().mockResolvedValue({ _sum: { amount: 0 } }) },
+  transactionRepo: { create: mocks.txCreate, update: mocks.txUpdate, findByIdempotencyKey: mocks.findByKey, aggregate: vi.fn().mockResolvedValue({ _sum: { amount: 0 } }) },
   SUCCESSFUL_INFLOW: {},
 }))
 vi.mock('@/repositories/contribution.repository', () => ({
@@ -72,7 +73,13 @@ vi.mock('@/repositories/contribution.repository', () => ({
 
 import { submitManualPayment } from '@/services/contribution.service'
 
-const PAYMENT = { periodMonth: 8, periodYear: 2026, amount: 450 }
+// Every payment carries a token now — the schema requires one and the service
+// refuses without it. The fixture reflects that rather than exercising a shape
+// no client can send.
+const PAYMENT = {
+  periodMonth: 8, periodYear: 2026, amount: 450,
+  idempotencyKey: '99999999-8888-4777-8666-555555555555',
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -87,7 +94,11 @@ beforeEach(() => {
   mocks.runTransaction.mockImplementation(async (fn: (t: unknown) => Promise<unknown>) =>
     fn({ contribution: { update: vi.fn() } }),
   )
+  // The claim: a PENDING row, written before the gateway is called. The unique
+  // index on idempotencyKey is what refuses a second request, and it refuses it
+  // *before* a second debit can leave the member's account.
   mocks.txCreate.mockImplementation(async (data: { status: string }) => ({ id: 'tx-1', ...data }))
+  mocks.txUpdate.mockImplementation(async (_id: string, data: { status: string }) => ({ id: 'tx-1', ...data }))
 })
 
 describe('what the bank actually said', () => {
@@ -96,7 +107,7 @@ describe('what the bank actually said', () => {
 
     const result = await submitManualPayment('user-1', PAYMENT, 'user-1', [])
 
-    expect(mocks.txCreate.mock.calls[0][0].status).toBe('FAILED')
+    expect(mocks.txUpdate.mock.calls[0][1].status).toBe('FAILED')
     expect(result.status).toBe('FAILED')
   })
 
@@ -107,7 +118,7 @@ describe('what the bank actually said', () => {
 
     const result = await submitManualPayment('user-1', PAYMENT, 'user-1', [])
 
-    expect(mocks.txCreate.mock.calls[0][0].status).toBe('PENDING')
+    expect(mocks.txUpdate.mock.calls[0][1].status).toBe('PENDING')
     expect(result.status).toBe('PENDING')
   })
 
@@ -116,7 +127,7 @@ describe('what the bank actually said', () => {
 
     const result = await submitManualPayment('user-1', PAYMENT, 'user-1', [])
 
-    expect(mocks.txCreate.mock.calls[0][0].status).toBe('SUCCESS')
+    expect(mocks.txUpdate.mock.calls[0][1].status).toBe('SUCCESS')
     expect(result.status).toBe('SUCCESS')
   })
 
@@ -127,7 +138,7 @@ describe('what the bank actually said', () => {
 
     await submitManualPayment('user-1', PAYMENT, 'user-1', [])
 
-    expect(mocks.txCreate.mock.calls[0][0].processedAt).toBeNull()
+    expect(mocks.txUpdate.mock.calls[0][1].processedAt).toBeNull()
   })
 
   it('uses the shared mapper rather than a fourth copy of the rule', async () => {
@@ -179,10 +190,13 @@ describe('the page can tell the member which of the three happened', () => {
 describe('the same payment submitted twice', () => {
   const TOKEN = '11111111-2222-4333-8444-555555555555'
 
-  it('does not debit again when the token has already been used', async () => {
-    // The old key ended in randomUUID(), so it was unique on every request:
-    // the column named idempotencyKey provided no idempotency and its unique
-    // index could never fire. A double tap took the money twice.
+  /** What Prisma raises when the unique index refuses the claim. */
+  const uniqueViolation = Object.assign(new Error('Unique constraint failed'), { code: 'P2002' })
+
+  it('does not debit again when the database refuses the claim', async () => {
+    // The database is the arbiter now. A second request holding the same token
+    // loses the insert and never reaches the gateway.
+    mocks.txCreate.mockRejectedValue(uniqueViolation)
     mocks.findByKey.mockResolvedValue({ id: 'tx-first', status: 'SUCCESS' })
 
     const result = await submitManualPayment(
@@ -190,20 +204,54 @@ describe('the same payment submitted twice', () => {
     )
 
     expect(mocks.submitOnceOffDebit).not.toHaveBeenCalled()
-    expect(mocks.txCreate).not.toHaveBeenCalled()
     expect(result.transaction).toMatchObject({ id: 'tx-first' })
+    expect(result.duplicate).toBe(true)
   })
 
-  it('checks before calling the gateway, not after', async () => {
-    // The old order submitted first and wrote second, so two concurrent
-    // requests produced two debits and only then collided on the unique
-    // column — too late to prevent anything.
+  it('claims before calling the gateway, and the claim is a write', async () => {
+    // The comment here used to say "check what already exists, claim, then
+    // submit". There was no claim: it read, called the gateway, and inserted
+    // afterwards — so two concurrent requests both read nothing, both
+    // submitted, and only then collided. By then the member had been charged
+    // twice and the error came too late to prevent anything.
+    //
+    // A read cannot reserve anything. The row is the reservation.
     mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
 
     await submitManualPayment('user-1', { ...PAYMENT, idempotencyKey: TOKEN }, 'user-1', [])
 
-    expect(mocks.findByKey.mock.invocationCallOrder[0])
+    expect(mocks.txCreate.mock.invocationCallOrder[0])
       .toBeLessThan(mocks.submitOnceOffDebit.mock.invocationCallOrder[0])
+  })
+
+  it('claims it as PENDING, so nothing downstream reads it as money', async () => {
+    mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
+
+    await submitManualPayment('user-1', { ...PAYMENT, idempotencyKey: TOKEN }, 'user-1', [])
+
+    expect(mocks.txCreate.mock.calls[0][0]).toMatchObject({ status: 'PENDING' })
+  })
+
+  it('settles the row it claimed instead of inserting a second one', async () => {
+    mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS', transactionRef: 'ref-1' })
+
+    await submitManualPayment('user-1', { ...PAYMENT, idempotencyKey: TOKEN }, 'user-1', [])
+
+    expect(mocks.txCreate).toHaveBeenCalledOnce()
+    expect(mocks.txUpdate).toHaveBeenCalledWith('tx-1', expect.objectContaining({ status: 'SUCCESS' }), expect.anything())
+  })
+
+  it('refuses a payment that carries no token at all', async () => {
+    // It used to fill the gap with randomUUID() and log a warning — a fresh
+    // identity on every request, no protection, from a column named
+    // idempotencyKey. The server does not invent the thing that makes a
+    // money-moving request safe to retry.
+    await expect(
+      submitManualPayment('user-1', { ...PAYMENT, idempotencyKey: undefined }, 'user-1', []),
+    ).rejects.toThrow(/idempotency token/i)
+
+    expect(mocks.submitOnceOffDebit).not.toHaveBeenCalled()
+    expect(mocks.txCreate).not.toHaveBeenCalled()
   })
 
   it('namespaces the token by member, so one cannot collide with another', async () => {
@@ -211,7 +259,7 @@ describe('the same payment submitted twice', () => {
 
     await submitManualPayment('user-1', { ...PAYMENT, idempotencyKey: TOKEN }, 'user-1', [])
 
-    const key = mocks.findByKey.mock.calls[0][0]
+    const key = mocks.txCreate.mock.calls[0][0].idempotencyKey
     expect(key).toContain('user-1')
     expect(key).toContain(TOKEN)
   })
@@ -227,16 +275,15 @@ describe('the same payment submitted twice', () => {
     )
 
     expect(mocks.submitOnceOffDebit).toHaveBeenCalledTimes(2)
-    expect(mocks.findByKey.mock.calls[0][0]).not.toBe(mocks.findByKey.mock.calls[1][0])
+    expect(mocks.txCreate.mock.calls[0][0].idempotencyKey)
+      .not.toBe(mocks.txCreate.mock.calls[1][0].idempotencyKey)
   })
 
-  it('still pays, but says so, when a caller sends no token', async () => {
-    mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
-
-    const result = await submitManualPayment('user-1', PAYMENT, 'user-1', [])
-
-    expect(result.status).toBe('SUCCESS')
-  })
+  // The case that used to live here — "still pays, but says so, when a caller
+  // sends no token" — asserted the old fallback: a randomUUID() stood in, the
+  // payment went through unprotected, and a warning went to a log nobody reads.
+  // It is now refused outright; see 'refuses a payment that carries no token at
+  // all' above.
 })
 
 describe('the last bit of a period, once less than R100 remains', () => {
@@ -259,7 +306,7 @@ describe('the last bit of a period, once less than R100 remains', () => {
     mocks.submitOnceOffDebit.mockResolvedValue({ status: 'SUCCESS' })
 
     const result = await submitManualPayment(
-      'user-1', { periodMonth: 8, periodYear: 2026, amount: 60 }, 'user-1', [],
+      'user-1', { ...PAYMENT, amount: 60 }, 'user-1', [],
     )
 
     expect(result.status).toBe('SUCCESS')
