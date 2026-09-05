@@ -85,7 +85,34 @@ export async function executeDebitRun(step: DebitStepRunner) {
     }),
   )
 
-  const processableMandates = mandates.filter((mandate) => mandate.user.status === 'ACTIVE' && !!mandate.netcashMandateId)
+  // A mandate we and the bank disagree about is not collectable.
+  //
+  // `updateMandate` writes locally and tells Netcash second, deliberately — a
+  // member who asks to stop being collected from must never be collected from
+  // again by us. The cost is a window where the two hold different amounts, and
+  // the whole response to landing in it used to be an alert. Meanwhile this run
+  // read the LOCAL figure and asked the bank for money it never authorised,
+  // which the bank refuses: a failed collection caused entirely by our own
+  // bookkeeping, charged to the member's record.
+  //
+  // Skipped rather than attempted, and counted so the run says so. A known
+  // inconsistency held in a safe state beats an alert and a hope.
+  const unsynced = mandates.filter(
+    (m) => m.user.status === 'ACTIVE' && !!m.netcashMandateId && m.gatewaySync !== 'IN_SYNC',
+  )
+  if (unsynced.length > 0) {
+    logger.warn('Debit run skipped mandates that are out of step with the gateway', {
+      count: unsynced.length,
+      mandateIds: unsynced.map((m) => m.id),
+    })
+  }
+
+  const processableMandates = mandates.filter(
+    (mandate) =>
+      mandate.user.status === 'ACTIVE' &&
+      !!mandate.netcashMandateId &&
+      mandate.gatewaySync === 'IN_SYNC',
+  )
 
   // Collections that did not happen, and why. Rebuilt identically on every
   // replay: Inngest memoises step errors, so the branches below take the same

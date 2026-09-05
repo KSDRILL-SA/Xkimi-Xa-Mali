@@ -180,7 +180,7 @@ describe('cancelMandate', () => {
 
     await cancelMandate('m1', OWNER, ['MEMBER'])
 
-    expect(mandateRepo.update).toHaveBeenCalledWith('m1', { status: 'CANCELLED' })
+    expect(mandateRepo.update).toHaveBeenCalledWith('m1', expect.objectContaining({ status: 'CANCELLED' }))
     expect(paymentGateway.cancelMandate).toHaveBeenCalledWith('nc-1')
   })
 })

@@ -19,8 +19,26 @@ export type StatusSyncStepRunner = {
 export async function executeMandateStatusSync(step: StatusSyncStepRunner) {
   const mandates = await step.run('fetch-active-mandates', () =>
     db.paymentMandate.findMany({
-      where: { status: { in: ['PENDING', 'ACTIVE', 'SUSPENDED'] }, netcashMandateId: { not: null } },
-      select: { id: true, netcashMandateId: true, status: true, userId: true },
+      where: {
+        netcashMandateId: { not: null },
+        OR: [
+          { status: { in: ['PENDING', 'ACTIVE', 'SUSPENDED'] } },
+          // A cancellation the gateway refused.
+          //
+          // Cancelling writes CANCELLED locally and tells Netcash second, so a
+          // failed gateway call leaves this system saying cancelled while the
+          // authorisation still stands at the bank. This job read only the
+          // three live statuses, so a locally-cancelled mandate was never
+          // examined again — and the divergence lived nowhere but an alert
+          // somebody had to have been reading at the time.
+          //
+          // Including it here is what makes the state recoverable rather than
+          // merely recorded: the next run asks the gateway what it actually
+          // holds.
+          { gatewaySync: { not: 'IN_SYNC' } },
+        ],
+      },
+      select: { id: true, netcashMandateId: true, status: true, userId: true, gatewaySync: true },
     }),
   )
 

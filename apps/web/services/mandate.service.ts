@@ -169,7 +169,42 @@ export async function createMandate(
   } catch (dbErr) {
     // The Netcash mandate is already live; cancel it so we never orphan a debit
     // authorisation with no local record.
-    await paymentGateway.cancelMandate(netcashRes.mandateId).catch(() => {})
+    //
+    // And say so if that cancellation itself fails. `.catch(() => {})` was
+    // right about one thing — a failed compensation must not replace the real
+    // error the caller needs to see — and wrong about the other: it discarded
+    // the only evidence that a live debit authorisation now exists at the bank
+    // with nothing in this system pointing at it.
+    //
+    // Nothing else can find it. There is no local row to mark, because failing
+    // to create that row is what got us here; `mandate-status-sync` iterates
+    // local mandates, so it never asks about one it has never heard of. The
+    // alert is the only trace there will ever be, which is exactly why it must
+    // not be swallowed.
+    await paymentGateway.cancelMandate(netcashRes.mandateId).catch((cancelErr) => {
+      const reason = cancelErr instanceof Error ? cancelErr.message : String(cancelErr)
+      logger.error('Orphaned gateway mandate — created at Netcash, no local record, cancel failed', {
+        netcashMandateId: netcashRes.mandateId, userId, reason,
+      })
+      return raiseGatewayDesyncAlert({
+        mandateId: 'none — the local write failed',
+        netcashMandateId: netcashRes.mandateId,
+        operation: 'create',
+        reason,
+        detail: [
+          'A debit-order authorisation exists at Netcash with NO record in this',
+          'system. It was created, the local write failed, and the compensating',
+          'cancellation failed too.',
+          '',
+          'Nothing here will find it again: every job that reconciles mandates',
+          'iterates local rows, and there is no local row. It has to be cancelled',
+          'in the Netcash portal by hand, using the reference above.',
+          '',
+          'Until then the member has an authorisation nobody in this system knows',
+          'about.',
+        ].join(String.fromCharCode(10)),
+      }).catch(() => {})
+    })
     // A unique-violation here means a concurrent request won the race to create
     // the single allowed active/pending mandate. Return a clean conflict instead
     // of a raw Prisma error (the DB partial unique index is the race-safe backstop
@@ -229,12 +264,35 @@ export async function updateMandate(
         { amount: data.amount, debitDay: data.debitDay },
         effectiveDate,
       )
+
+      // Confirmed. Clear any earlier divergence — a mandate that was out of
+      // step and has been put right must become collectable again, or the fix
+      // silently does nothing.
+      await mandateRepo.update(mandateId, {
+        gatewaySync: 'IN_SYNC', gatewaySyncReason: null, gatewaySyncAt: null,
+      })
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
       logger.error('DB mandate updated but Netcash sync failed — manual reconciliation required', {
         mandateId, netcashMandateId: mandate.netcashMandateId, changes: data,
         error: reason,
       })
+      // Held in a safe state, not merely announced.
+      //
+      // The alert below already existed and said the right things to the right
+      // people. What it could not do is stop the next debit run reading the
+      // local amount and asking the bank for a figure it never authorised —
+      // which the bank refuses, giving the member a failed collection caused
+      // entirely by our own bookkeeping. Marking the mandate takes it out of
+      // the run until somebody has put it right.
+      await mandateRepo.update(mandateId, {
+        gatewaySync: 'FAILED',
+        gatewaySyncReason: reason,
+        gatewaySyncAt: new Date(),
+      }).catch((markErr) => logger.error('Could not mark a mandate as out of sync', {
+        mandateId, error: markErr instanceof Error ? markErr.message : String(markErr),
+      }))
+
       await raiseGatewayDesyncAlert({
         mandateId,
         netcashMandateId: mandate.netcashMandateId,
@@ -290,14 +348,42 @@ export async function cancelMandate(
   }
 
   // Cancel in DB first so we never re-bill after a member requests cancellation.
-  // Then notify Netcash; failure is logged for manual reconciliation.
-  const updated = await mandateRepo.update(mandateId, { status: 'CANCELLED' })
+  // Then notify Netcash.
+  //
+  // The ordering stays, and it is right: whatever the gateway does, this system
+  // will not collect from somebody who asked it to stop. `gatewaySync` starts
+  // PENDING rather than IN_SYNC because that is the honest description until
+  // the provider has answered — and it is what lets the member be told
+  // something true. See `describeCancellation` below.
+  const updated = await mandateRepo.update(mandateId, {
+    status: 'CANCELLED',
+    gatewaySync: mandate.netcashMandateId ? 'PENDING' : 'IN_SYNC',
+  })
+
+  let gatewayConfirmed = !mandate.netcashMandateId
 
   if (mandate.netcashMandateId) {
     try {
       await paymentGateway.cancelMandate(mandate.netcashMandateId)
+      gatewayConfirmed = true
+      await mandateRepo.update(mandateId, {
+        gatewaySync: 'IN_SYNC', gatewaySyncReason: null, gatewaySyncAt: null,
+      })
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
+
+      // The state, so it is findable, and not only an alert somebody has to be
+      // reading. `mandate-status-sync` looks at PENDING, ACTIVE and SUSPENDED
+      // mandates — a locally-cancelled one is never examined again — so
+      // without this the divergence exists nowhere queryable.
+      await mandateRepo.update(mandateId, {
+        gatewaySync: 'FAILED',
+        gatewaySyncReason: reason,
+        gatewaySyncAt: new Date(),
+      }).catch((markErr) => logger.error('Could not mark a cancelled mandate as out of sync', {
+        mandateId, error: markErr instanceof Error ? markErr.message : String(markErr),
+      }))
+
       logger.error('DB mandate cancelled but Netcash cancel failed — manual reconciliation required', {
         mandateId, netcashMandateId: mandate.netcashMandateId,
         error: reason,
@@ -332,7 +418,31 @@ export async function cancelMandate(
     ipAddress,
   })
 
-  return updated
+  return { ...updated, gatewayConfirmed, message: describeCancellation(gatewayConfirmed) }
+}
+
+/**
+ * What to tell the member, and why it is not "we will not collect from you
+ * again".
+ *
+ * That sentence is true about *us* and it was being said about *their bank
+ * account*. Local-first ordering guarantees this system never initiates
+ * another collection; it cannot guarantee the authorisation at the bank is
+ * gone, because that is the very call that just failed.
+ *
+ * The distinction sounds pedantic until somebody acts on it. A member told
+ * their debit order is cancelled stops watching their account. If the mandate
+ * is still standing at the bank, the thing they stopped watching for is
+ * exactly the thing that can still happen.
+ */
+function describeCancellation(gatewayConfirmed: boolean): string {
+  return gatewayConfirmed
+    ? 'Your debit order is cancelled. Nothing further will be collected.'
+    : [
+        'Your cancellation is recorded and we will not collect from you again.',
+        'Confirmation with your bank is still pending — if anything is collected,',
+        'tell us and we will put it right.',
+      ].join(' ')
 }
 
 export async function requestDelay(
@@ -568,7 +678,11 @@ export function planDebitWarnings(
 export async function raiseGatewayDesyncAlert(params: {
   mandateId: string
   netcashMandateId: string
-  operation: 'update' | 'cancel'
+  /**
+   * `create` is the orphan case: the authorisation exists at the gateway and
+   * no local row does, so nothing in this system can ever find it again.
+   */
+  operation: 'update' | 'cancel' | 'create'
   reason: string
   detail: string
 }): Promise<void> {
