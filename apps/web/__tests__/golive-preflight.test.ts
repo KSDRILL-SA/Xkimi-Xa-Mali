@@ -193,3 +193,70 @@ describe('go-live preflight — the backup watchdog', () => {
     expect(missing).not.toContain('BACKUP_WATCH_TOKEN')
   })
 })
+
+describe('what it says the payment gateway is', () => {
+  // ── Why this is worth a test of its own ─────────────────────────────────
+  //
+  // The line reported the environment's INTENT, not the adapter that gets
+  // selected — so a live production build printed:
+  //
+  //     deployment is LIVE; payment gateway is mock
+  //
+  // It was never true. `selectGateway` refuses the mock on a live deployment
+  // and returns the disabled adapter, which declines every money operation.
+  //
+  // But that sentence is a word-for-word description of the incident this
+  // project actually had: the stand-in selected in production, answering
+  // SUCCESS to every debit while no bank was contacted. A reader has no way to
+  // tell the false alarm from the real thing, and an alarm that cries wolf
+  // about the one failure that has already happened is worse than no alarm.
+
+  const LIVE = { VERCEL_ENV: 'production' }
+
+  it('never says "mock" on a live deployment, whatever the environment asks for', () => {
+    // The whole point. PAYMENT_GATEWAY=mock is production's actual setting.
+    expect(preflight({ ...LIVE, PAYMENT_GATEWAY: 'mock' }).gateway).toBe('disabled')
+  })
+
+  it('says disabled on a live deployment with no credentials either way', () => {
+    expect(preflight({ ...LIVE }).gateway).toBe('disabled')
+  })
+
+  it('says netcash when a real key is present', () => {
+    expect(preflight({ ...LIVE, NETCASH_SERVICE_KEY: 'k' }).gateway).toBe('netcash')
+  })
+
+  it('a mock asked for alongside a real key is still not the mock', () => {
+    // `selectGateway` checks `!wantsMock && hasNetcash` first, so asking for the
+    // mock wins here — and off a live deployment that is exactly what runs.
+    expect(preflight({ PAYMENT_GATEWAY: 'mock', NETCASH_SERVICE_KEY: 'k' }).gateway).toBe('mock')
+  })
+
+  it('still says mock where the mock can actually run', () => {
+    // Development and CI. Nothing to protect there, and the mock is the point.
+    expect(preflight({ PAYMENT_GATEWAY: 'mock' }).gateway).toBe('mock')
+  })
+
+  it('agrees with the adapter the app selects, in every combination', () => {
+    // The property, rather than five examples of it. `selectGateway` is the
+    // authority; this mirrors its decision and must not be free to disagree.
+    for (const live of [true, false]) {
+      for (const wantsMock of [true, false]) {
+        for (const hasKey of [true, false]) {
+          const env = {
+            ...(live && { VERCEL_ENV: 'production' }),
+            ...(wantsMock && { PAYMENT_GATEWAY: 'mock' }),
+            ...(hasKey && { NETCASH_SERVICE_KEY: 'k' }),
+          }
+          const expected =
+            !wantsMock && hasKey ? 'netcash'
+            : live ? 'disabled'
+            : wantsMock ? 'mock'
+            : 'none'
+
+          expect(preflight(env).gateway, JSON.stringify(env)).toBe(expected)
+        }
+      }
+    }
+  })
+})
