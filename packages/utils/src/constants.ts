@@ -32,7 +32,26 @@ export const MAX_MEMBERS = 50
  * drift apart.
  */
 export const FOUNDER_COUNT = 4
-export const MAX_TRANSACTION_RETRY = 3
+/**
+ * How many times a declined collection may be re-presented.
+ *
+ * **One, because the provider contract allows two presentments in total.**
+ * Appendix A §16.1 (DebiCheck): "Only 2 (two) presentments are allowed for the
+ * same Action Date"; §13.2.2 says the same for EFT. The original submission is
+ * the first, so one retry is the second and there is no third.
+ *
+ * This was 3, which with the original made four — twice the limit. And §10.6.5
+ * compounds it: a Dispute Request qualifies as a Dispute Action if "the Payment
+ * Instruction is a representment", so the collections that broke the limit were
+ * also the ones most likely to be upheld against us, against a 0.5% threshold.
+ *
+ * What it costs is recovery: a member whose salary lands late used to get three
+ * chances and now gets one. The contract's own answer to that is **Credit
+ * Tracking** (§9), which watches the account for up to 10 calendar days rather
+ * than re-presenting and failing. We do not implement it yet — it is a gateway
+ * item — and it is the right place to put that recovery back.
+ */
+export const MAX_TRANSACTION_RETRY = 1
 export const IDEMPOTENCY_TTL_SECONDS = 60 * 60 * 72
 
 /**

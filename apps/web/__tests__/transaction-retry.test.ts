@@ -42,6 +42,7 @@ vi.mock('@xxm/observability', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }))
 
+import { MAX_TRANSACTION_RETRY } from '@xxm/utils'
 import { executeTransactionRetry } from '@/inngest/functions/transaction-retry-failed'
 
 const step = { run: async <T>(_id: string, fn: () => Promise<T> | T): Promise<T> => fn() }
@@ -57,7 +58,10 @@ function failedTx(over: Record<string, unknown> = {}) {
     gatewayRef: null,
     contributionId: 'contrib-1',
     mandate: { id: 'mandate-1', netcashMandateId: 'nc-1', status: 'ACTIVE', userId: 'user-1' },
-    contribution: { id: 'contrib-1', status: 'PENDING' },
+    // userId is selected by the job so a retry carries the payer's own
+    // collection reference rather than a per-attempt one — see
+    // collectionReference and provider contract §18.9.
+    contribution: { id: 'contrib-1', status: 'PENDING', userId: 'user-1' },
     ...over,
   }
 }
@@ -86,7 +90,10 @@ describe('executeTransactionRetry — picking up what the debit run left', () =>
 
     const where = mocks.findMany.mock.calls[0][0].where
     expect(where.status).toBe('FAILED')
-    expect(where.retryCount).toEqual({ lt: 3 })
+    // Against the constant, not a literal. The literal was 3 and the policy is
+    // now 1 — a test that restates the number has to be edited every time the
+    // policy moves, which is how a test stops being evidence and becomes a copy.
+    expect(where.retryCount).toEqual({ lt: MAX_TRANSACTION_RETRY })
     expect(where.createdAt.gte).toBeInstanceOf(Date)
   })
 
@@ -198,5 +205,23 @@ describe('executeTransactionRetry — rows it must not touch', () => {
 
     expect(mocks.submitOnceOffDebit).toHaveBeenCalled()
     expect(mocks.submitScheduledDebit).not.toHaveBeenCalled()
+  })
+})
+
+describe('the retry policy stays inside what the provider allows', () => {
+  it('permits at most one re-presentment', () => {
+    // Appendix A §16.1: "Only 2 (two) presentments are allowed for the same
+    // Action Date". The original submission is the first, so one retry is the
+    // second and there is no third.
+    //
+    // This was 3, which with the original made four — twice the limit. And
+    // §10.6.5 makes a dispute qualify automatically when the Payment
+    // Instruction is a representment, so the collections that broke the limit
+    // were also the ones most likely to be upheld against us.
+    expect(MAX_TRANSACTION_RETRY).toBeLessThanOrEqual(1)
+  })
+
+  it('still retries at least once, or the recovery pool does nothing', () => {
+    expect(MAX_TRANSACTION_RETRY).toBeGreaterThan(0)
   })
 })

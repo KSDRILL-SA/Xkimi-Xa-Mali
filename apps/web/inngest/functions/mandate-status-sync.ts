@@ -6,6 +6,7 @@ import { writeAuditLog } from '@/services/audit.service'
 import { queueNotification } from '@/services/notification.service'
 import type { MandateStatus } from '@prisma/client'
 import { recordJobHeartbeat } from '@/lib/job-heartbeat'
+import { raiseOperationalAlert } from '@/services/alert.service'
 
 /**
  * Nightly reconciliation: pull fresh status from Netcash for every non-terminal
@@ -97,6 +98,43 @@ export async function executeMandateStatusSync(step: StatusSyncStepRunner) {
             channel: 'SMS',
             payload: { mandateId: mandate.id },
           })
+        }
+
+        // Suspended, which the member did not ask for and nobody chose.
+        //
+        // Appendix A §15.2.1: the bank suspends a mandate automatically after
+        // the seventh consecutive unsuccessful collection. The debit run only
+        // collects from ACTIVE mandates, so the effect is that the member's
+        // contributions simply stop — and until now the only trace was this
+        // job's log line.
+        //
+        // The comment above says exactly why that is not acceptable for a
+        // cancellation. It is more true here, because a cancellation is at
+        // least somebody's decision. §15.11 also puts a clock on it: thirteen
+        // months to reinstate or the mandate leaves the register entirely.
+        if (newStatus === 'SUSPENDED') {
+          await queueNotification({
+            userId: mandate.userId,
+            templateSlug: 'mandate-suspended',
+            channel: 'SMS',
+            payload: { mandateId: mandate.id },
+          })
+
+          await raiseOperationalAlert({
+            code: 'MANDATE_SUSPENDED_BY_BANK',
+            severity: 'warning',
+            title: 'A debit order was suspended by the bank',
+            entityId: mandate.id,
+            body: [
+              'The bank has suspended this debit order, which it does after seven',
+              'consecutive failed collections. Nothing further will be collected',
+              'from this member until it is reinstated.',
+              '',
+              'Reinstating needs the member to authorise it again. There are',
+              'thirteen months before the mandate leaves the register for good.',
+            ].join(String.fromCharCode(10)),
+            payload: { mandateId: mandate.id, userId: mandate.userId },
+          }).catch(() => {})
         }
 
         logger.info('Mandate status synced', {

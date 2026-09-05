@@ -70,7 +70,7 @@ answer; it cannot pick one.
 | **D1** | May the pool balance go legitimately negative? | L3 | A2-F16 | **Answered — no** |
 | **D2** | What does a second successful payment against a settled period mean? | L10 | A4-F56 | **Answered — it stands** |
 | **D3** | Is "last day of the month" a first-class debit day? | G8 | A3-F35 | Open |
-| **D4** | **Who pays the Netcash fee?** Register it into the mandate, cover it with a Maximum, or absorb it | G11 | A5-F59 | **Open — decide before any collection** |
+| ~~**D4**~~ | Who pays the Netcash fee? | G11 | A5-F59 | **Answered by implementation** — the mandate registers the fee-inclusive amount. Reversible in one function; see below |
 
 ### D1 — the pool may not go negative
 
@@ -116,7 +116,14 @@ is a decision waiting for a person, not an incident.
 
 ### D4 — who pays the Netcash fee
 
-**Open, and it has to be answered before a single collection is sent.**
+**Answered 2026-09-05 by implementation (PR #506), and reversible.** Option 1 was
+taken: the mandate registers the fee-inclusive amount, so the member
+authenticates the real figure, the Foundation nets the full contribution, and
+there is no dispute exposure. Option 3 — absorbing the fee — also removes the
+exposure but costs R10 per member per month; it is one function away if
+leadership prefers it.
+
+The reasoning is kept below because the choice is worth being able to revisit.
 
 `debitAmountWithFee()` adds R10 to every collection, while the mandate registers
 the contribution amount as **both** the Instalment Amount and the Maximum. Under
@@ -756,6 +763,8 @@ sandbox is the only thing that shows you a timeout.
 ### G1 · A unique provider-facing reference
 **Findings:** A1-F03, A2-F23, A3-F39, **A5-F62** · **Size:** S · **Blocks G4**
 
+> **Done 2026-09-05 (PR #506).** One `collectionReference(userId)`, used by all five collection paths. Permanent by construction, which is what §18.9 needs.
+
 **Raised in priority by the provider contract, and constrained by it.** Section 3.3
 requires a unique Contract Reference *per payer*; section 10.3 puts it on the
 payer's bank statement; and section 18.9 makes it **unchangeable once a Payment
@@ -853,6 +862,8 @@ regardless, because it never needed the gateway's permission. A provider that
 ### G11 · Collect no more than the mandate registers
 **Findings:** A5-F59 (needs **D4**) · **Size:** S once decided · **Do before any collection**
 
+> **Done 2026-09-05 (PR #506).** The mandate registers what the collection asks for, from the same function, with headroom on the maximum.
+
 The most serious defect across all five audits, and the smallest fix.
 
 Every collection submits `contribution + R10`, while `netcash.ts:248` registers
@@ -872,6 +883,8 @@ accident.
 ### G12 · Presentments within the limit, and Credit Tracking instead
 **Findings:** A5-F60 · **Size:** S
 
+> **Half done 2026-09-05 (PR #506).** `MAX_TRANSACTION_RETRY = 1`, pinned against the contractual limit. Credit Tracking is still to build and is where the lost recovery goes back.
+
 `MAX_TRANSACTION_RETRY = 3` plus the original is four presentments against one
 action date. Section 16.1 allows two. Section 10.6.5 compounds it: a representment
 that the payer disputes **qualifies automatically**.
@@ -884,6 +897,8 @@ not use it.
 
 ### G13 · Say when the bank suspends a mandate
 **Findings:** A5-F61 · **Size:** S · Independent of everything else
+
+> **Done 2026-09-05 (PR #506).** Member SMS plus a leadership alert, with the template inserted by migration as well as seeded.
 
 Section 15.2.1: a mandate auto-suspends after the **7th consecutive** unsuccessful
 Payment Instruction. `mandate-status-sync` records it correctly and tells nobody —
@@ -1066,7 +1081,7 @@ Established in this repository, and not up for renegotiation per item:
 | Decisions | 3 | **D1 and D2 answered** (by the implementer — see above, and review them). D3 open, blocks G8 only |
 | 1 — Live today | 10 | **Done** — L1–L10 |
 | 2 — Patterns | 8 | **Done** — P1–P8 |
-| 3 — Collections lifecycle | 13 | Planned, **not scheduled**: needs a gateway, and getting one is a business decision. Redesigned 2026-09-05 to be provider-agnostic; **G11-G13 added from audit 5**, the provider's own contract |
+| 3 — Collections lifecycle | 13 | **4 done** (G1, G11, G13, half of G12 — the contract breaches, fixed 2026-09-05). The remaining 9 need a gateway, and getting one is a business decision |
 | 4 — Certification | 2 | Planned, **not scheduled**: needs credentials |
 
 ### What Phase 1 and 2 came to

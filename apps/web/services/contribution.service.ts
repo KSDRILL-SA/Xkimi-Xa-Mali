@@ -34,6 +34,7 @@ import { debitAmountWithFee } from '@/lib/group-account'
 import { subtractZAR } from '@/lib/money'
 import type { ManualContributionInput, GenerateContributionsInput, OfflineContributionInput } from '@/lib/validation/contribution'
 import { MIN_CONTRIBUTION_ZAR, MONTHS } from '@xxm/utils'
+import { collectionReference } from '@xxm/utils/collection-reference'
 
 const MAX_OPTIMISTIC_RETRIES = 3
 
@@ -367,7 +368,9 @@ export async function submitManualPayment(
   const gatewayRes = await paymentGateway.submitOnceOffDebit({
     mandateId: mandate.netcashMandateId,
     amount: debitAmountWithFee(data.amount),
-    reference: `XXM-${data.periodYear}-${String(data.periodMonth).padStart(2, '0')}`,
+    // The payer's reference. See collectionReference — a period-based one is
+    // identical across members and changes monthly, which §18.9 forbids.
+    reference: collectionReference(userId),
     idempotencyKey,
   })
 

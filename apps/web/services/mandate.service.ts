@@ -24,6 +24,7 @@ import { userRepo } from '@/repositories/user.repository'
 import { bumpRoleVersion } from '@/lib/role-version'
 import { notifyAdmins } from './inbox.service'
 import { raiseOperationalAlert } from './alert.service'
+import { collectionReference } from '@xxm/utils/collection-reference'
 
 const mandateBankInclude = {
   bankAccount: {
@@ -137,7 +138,8 @@ export async function createMandate(
     amount: data.amount,
     debitDay: data.debitDay,
     startDate,
-    referenceNumber: `XXM-${userId.slice(-8).toUpperCase()}`,
+    // The one place this used to be right, now the one place it is defined.
+    referenceNumber: collectionReference(userId),
   })
 
   // Persist the status Netcash actually returned (a 200 response may still carry

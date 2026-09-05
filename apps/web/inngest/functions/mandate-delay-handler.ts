@@ -9,6 +9,7 @@ import { recalculateContributionStatus } from '@/services/contribution.service'
 import { queueNotification } from '@/services/notification.service'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { INFRASTRUCTURE_FAILURE_PREFIX } from '@xxm/utils'
+import { collectionReference } from '@xxm/utils/collection-reference'
 
 /**
  * Inngest's `step`, narrowed to what this job uses.
@@ -101,7 +102,10 @@ export async function executeMandateDelay(
       paymentGateway.submitScheduledDebit({
         mandateId: mandate.netcashMandateId!,
         amount: debitAmountWithFee(Number(mandate.amount)),
-        reference: `XXM-${periodYear}-${String(periodMonth).padStart(2, '0')}-DELAY`,
+        // Same reference as any other collection from this member. A delay is
+        // when we collect, not a different agreement — a distinct reference here
+        // would read to the provider as a second contract.
+        reference: collectionReference(userId),
         idempotencyKey,
       }),
     )

@@ -1,6 +1,14 @@
 # Audit 5 — The provider's own contract, read against our code
 
-**Read:** 2026-09-05 · **Findings:** 59–63 (5) · **Status:** documented and verified; not yet scheduled
+**Read:** 2026-09-05 · **Findings:** 59–63 (5) · **Status:** **all four defects fixed** (PR #506); F63 is a standing constraint
+
+> **Fixed 2026-09-05.** A5-F59, F60, F61 and F62 are closed. **D4 was answered
+> by implementation** — the mandate registers the fee-inclusive amount, so the
+> member authenticates the real figure, the Foundation still nets the full
+> contribution, and there is no dispute exposure. Absorbing the fee also removes
+> the exposure but costs R10 per member per month; the change is one function if
+> leadership prefers that. A5-F63 is not a defect and stays as a design
+> constraint on everything in Phase 3.
 
 ## What this audit is
 

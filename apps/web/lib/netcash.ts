@@ -3,6 +3,8 @@ import { env } from './env'
 import { withRetry } from './retry'
 import { ExternalServiceError } from './errors'
 import { NetcashSoapError } from './netcash/soap'
+import { debitAmountWithFee, NETCASH_FEE_BUFFER } from './group-account'
+import { sumZAR } from './money'
 import {
   debiCheckAuthenticate,
   debiCheckCancel,
@@ -160,6 +162,54 @@ function toNetcashDate(iso: string): string {
   return iso.slice(0, 10).replace(/-/g, '')
 }
 
+/**
+ * What the mandate must register, given what the member agreed to contribute.
+ *
+ * ── The defect this exists for ─────────────────────────────────────────────
+ *
+ * Every collection submits `contribution + fee` — `debitAmountWithFee` — while
+ * the mandate registered the bare contribution as BOTH the collection amount
+ * and the maximum. Appendix A §10.6.3 makes a Dispute Request qualify as a
+ * Dispute Action when
+ *
+ *     the amount collected ... is greater than the Instalment Amount in the
+ *     Mandate Register
+ *
+ * so every single collection qualified. Not "could be argued" — qualified, by
+ * the contract's own wording, against the 0.5% dispute threshold in §16.1. At
+ * fifty members that threshold is a quarter of one collection, so one member
+ * noticing is a fourfold breach, and §16.5 then forbids moving to another
+ * provider until remediated.
+ *
+ * ── Why the same function as the collection ────────────────────────────────
+ *
+ * Registered here and collected in four other places. If the two are computed
+ * separately they will disagree eventually — that is exactly how this happened,
+ * and how four different collection references came to exist. `registeredAmount`
+ * calls `debitAmountWithFee`, the same function every collection path calls, so
+ * "what we told the bank" and "what we ask for" cannot drift apart.
+ *
+ * ── The maximum, and why it is not simply the same number ──────────────────
+ *
+ * C3 §3.10 permits a Maximum Amount of up to 1.5x the Instalment. Setting the
+ * two equal, as this did, throws away the field that exists for precisely this
+ * case and leaves no room at all.
+ *
+ * The headroom is one further fee, not a percentage: the fee buffer is an
+ * environment variable, and if it is ever raised, every existing mandate would
+ * otherwise under-register and have to be re-authenticated by every member.
+ * Deliberately modest — a member authenticating this at their bank sees the
+ * ceiling, and "up to R470" against a R450 contribution is explicable in a way
+ * that 1.5x would not be.
+ */
+function registeredAmount(contributionAmount: number): number {
+  return debitAmountWithFee(contributionAmount)
+}
+
+function registeredMaximum(contributionAmount: number): number {
+  return sumZAR(registeredAmount(contributionAmount), NETCASH_FEE_BUFFER)
+}
+
 export async function createDebiCheckMandate(
   payload: NetcashCreateMandatePayload,
 ): Promise<NetcashMandateResponse> {
@@ -181,9 +231,9 @@ export async function createDebiCheckMandate(
       bankAccountType: payload.accountType,
       mobileNumber: payload.mobileNumber ?? '',
       emailAddress: payload.emailAddress ?? '',
-      collectionAmount: payload.amount,
+      collectionAmount: registeredAmount(payload.amount),
       firstCollectionDiffers: false,
-      firstCollectionAmount: payload.amount,
+      firstCollectionAmount: registeredAmount(payload.amount),
       firstCollectionDate: toNetcashDate(payload.startDate),
       collectionDayCode: String(payload.debitDay).padStart(2, '0'),
     }),
@@ -240,13 +290,16 @@ export async function updateDebiCheckMandate(
     )
   }
 
-  const cents = toCents(changes.amount)
+  // Captured after the guard above, which has already refused an undefined
+  // amount — the narrowing does not survive into the closure below.
+  const amount = changes.amount
+
   const result = await callWithRetry('updateMandate', () =>
     debiCheckAmend({
       serviceKey,
       contractReference: mandateId,
-      collectionAmountCents: cents,
-      maximumCollectionAmountCents: cents,
+      collectionAmountCents: toCents(registeredAmount(amount)),
+      maximumCollectionAmountCents: toCents(registeredMaximum(amount)),
     }),
   )
 
