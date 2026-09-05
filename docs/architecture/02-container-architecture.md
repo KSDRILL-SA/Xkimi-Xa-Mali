@@ -13,7 +13,7 @@ step — `transpilePackages`, not published to a registry). Prev:
 | `apps/admin` | Next.js 16 · React 19 · TS | Admin console — server actions, not its own REST API; reaches member data via server-to-server calls into `apps/web` (`WEB_INTERNAL_URL` + shared `ADMIN_API_SECRET`) or directly via Prisma against the same database |
 | `apps/website` | Next.js 16 · React 19 · TS | Public marketing site — no database, no auth, no payment deps at all; reads only the public stats endpoint |
 | Shared packages | `@xxm/database` · `@xxm/utils` · `@xxm/ui` · `@xxm/observability` · `@xxm/types` · `@xxm/config` | Prisma schema/migrations, business-rule helpers (money, dates, SA ID/bank validation, encryption), a hand-built component library, a structured logger wrapping Sentry, shared TS types, shared tsconfig/Tailwind/ESLint base — consumed by all 3 apps, not duplicated per app |
-| Database | Neon PostgreSQL · Prisma 6 | All persistent data (34 models, 46 migrations) |
+| Database | Neon PostgreSQL · Prisma 6 | All persistent data — see `packages/database/prisma/schema.prisma` and its `migrations/` directory |
 | Cache / limiter | Upstash Redis | Idempotency keys, rate-limit counters, delay flags |
 | Job engine | Inngest Cloud | Durable scheduled/event-driven jobs — 22 functions covering debits, rollover, reconciliation, notifications, badges, DSR deadlines, backups |
 | File storage | Vercel Blob (private access) | Member statements/signatures — access is checked against the database, not a guessable public URL |

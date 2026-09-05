@@ -1,6 +1,12 @@
 # Entity Relationship Diagram
 
-Visual map of the data model. Source of truth: [`packages/database/prisma/schema.prisma`](../../packages/database/prisma/schema.prisma) — **39 models, 21 enums, 46 migrations** (updated 2026-08-30; this doc previously undercounted at 34/17/16 — 5 models had been added since it was last checked against the schema directly: `GoalPayment`, `GoalPlan`, `JobHeartbeat`, `MemberDistinction`, `DataSubjectRequest`). Next: [02-normalization.md](./02-normalization.md) · [03-schema-design.md](./03-schema-design.md).
+Visual map of the data model. Source of truth: [`packages/database/prisma/schema.prisma`](../../packages/database/prisma/schema.prisma) — the schema and its `migrations/`
+directory. Counts are deliberately not repeated here: this doc has carried three
+different ones (34/17/16, then 39/21/46) and each was wrong within weeks of being
+written. A number that must be maintained by hand in prose is a number that goes
+stale on a timer — read it from the source instead.
+
+Next: [02-normalization.md](./02-normalization.md) · [03-schema-design.md](./03-schema-design.md).
 
 The diagrams below group the model into four areas. Auth-adapter tables (`Account`, `Session`, `VerificationToken`) and pure internal-ops config (`SystemConfig`, `LoginHistory`, `JobHeartbeat`) are omitted for clarity — see the schema.
 

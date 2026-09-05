@@ -432,7 +432,9 @@ export async function getAdminReport(month: number, year: number) {
     summary: {
       totalDue,
       totalPaid,
-      outstanding: totalDue - totalPaid,
+      // subtractZAR, not `-`. This figure is the headline of the admin's
+      // monthly report and of the PDF that goes with it.
+      outstanding: subtractZAR(totalDue, totalPaid),
       collectionRate,
       memberCount: members.length,
       paidCount,

@@ -240,7 +240,7 @@ information.* Do not sweep both with one rule.
 ### L8 · Documentation that describes a system we no longer have
 **Findings:** A1-F11, A1-F12 · **Size:** S · **Live**
 
-`DEPLOYMENT.md:128` claims 37 migrations; there are **50**. And the deployment
+`DEPLOYMENT.md:128` claims 37 migrations; there are **49**. And the deployment
 documentation still describes the old `DEPLOY_ENV`-first resolution order — which
 is almost certainly what produced A1-F12, an auditor reporting a fixed bug in
 good faith.

@@ -97,35 +97,53 @@ three are addresses that *receive*.
 > Resend rejected each send at run time and every notification stopped while the
 > app reported itself perfectly healthy.
 
-> [!WARNING]
-> **Every "build fails without it" claim in this document depends on `DEPLOY_ENV`
-> actually being set to `production`.** `apps/web/lib/env.ts`'s `isLiveDeployment()`
-> checks `DEPLOY_ENV` first, `VERCEL_ENV` second, `NODE_ENV` last — and this
-> project's real production Vercel deployment currently has **`DEPLOY_ENV=staging`**
-> set deliberately, from when infra was still being wired up. That means, as of
-> writing, **none** of `NETCASH_WEBHOOK_SECRET`, `NETCASH_API_URL`,
-> `NETCASH_DEBICHECK_TEMPLATE_ID`, `BULKSMS_USERNAME`/`_PASSWORD`, `RESEND_API_KEY`,
-> or the `RESEND_FROM_EMAIL` verified-domain check are actually enforced on the
-> live URL, whatever this document says elsewhere — the app would boot and serve
-> traffic with any of them missing.
+> [!IMPORTANT]
+> **What decides whether this deployment is "live".** `isLiveDeployment()` in
+> `@xxm/utils` asks, in order:
 >
-> One of these (the real Netcash gateway getting selected with no
-> `NETCASH_SERVICE_KEY` at all) is now closed a different way —
-> `integrations/payment/index.ts` checks for that credential directly, independent
-> of `DEPLOY_ENV` — because that specific gap could otherwise go unnoticed until an
-> actual debit attempt. **The rest are not.** Before flipping `PAYMENT_GATEWAY` away
-> from `mock` for real: set `DEPLOY_ENV=production` on `xkimi-xa-mali-web` **first**
-> (or in the same change), confirm the build actually succeeds with it set — a
-> failure there is exactly this list catching something still missing — and only
-> then remove the mock override. Doing it in the other order does not fail loudly;
-> it just quietly does nothing.
+> 1. `VERCEL_ENV === "production"` — **first, and unconditional.** Vercel sets
+>    it itself, and only for the deployment serving the production domain.
+> 2. `DEPLOY_ENV`, declared by hand. It can make a deployment *stricter* (claim
+>    live on a preview, to rehearse production rules) and can no longer make one
+>    looser.
+> 3. `VERCEL_ENV` for anything else, then `NODE_ENV` off Vercel.
+>
+> A declaration may tighten what the platform says. It must never loosen it, and
+> `packages/utils/__tests__/deployment.test.ts` pins that across every value.
+>
+> **This paragraph used to say the opposite**, and the earlier order was not
+> hypothetical. `DEPLOY_ENV` was read first and short-circuited, production had
+> it set to a non-live value, so `isLiveDeployment()` returned false, so the
+> guard refusing the mock gateway on a live deployment never fired. The mock was
+> selected in production and answered SUCCESS to every debit: a member paid R100,
+> a settled transaction was written, the pool was credited and the contribution
+> marked paid, and no bank was ever contacted.
+>
+> So there is **nothing to set before going live**, and no list of checks that
+> are silently unenforced. The env vars marked `requiredWhenLive` are enforced
+> because the platform says this is production, whatever anybody declares.
+
+> [!NOTE]
+> **There is no payment gateway.** The DebiCheck application was declined. A
+> live deployment with no real gateway selects `disabledGateway`
+> (`apps/web/integrations/payment/index.ts`): every money operation refuses, the
+> member-facing payment paths switch themselves off, and the rest of the app —
+> statements, invitations, the community board, the console — runs normally.
+>
+> Refusing the operation rather than refusing to boot is deliberate. A live
+> deployment holding `PAYMENT_GATEWAY=mock` and no Netcash credentials would
+> otherwise fail to start, taking down everything for the sake of a feature
+> deliberately not in use.
+>
+> Money is recorded the way it is actually received: cash and EFT, entered by an
+> admin in the console.
 
 ## 3. Database (Neon, production)
 
 ```bash
 # from packages/database, with prod DATABASE_URL *and* DIRECT_DATABASE_URL exported
 # (migrations run over the unpooled endpoint — see .env.example)
-npx prisma migrate deploy   # applies ALL 37 migrations (incl. ledger, inbox, webhook-dedupe, goal engagement, pledges, member distinctions)
+npx prisma migrate deploy   # applies every migration in packages/database/prisma/migrations
 npm run db:seed             # roles + founder accounts
 ```
 
@@ -145,10 +163,11 @@ npm run db:seed             # roles + founder accounts
 
 ## 5. Netcash DebiCheck (the money gate)
 
-0. **Set `DEPLOY_ENV=production` on `xkimi-xa-mali-web`, before or together
-   with the rest of this section — see the warning under §2.** Everything
-   below assumes it's set; without it, several of these checks are silently
-   inert rather than enforced.
+0. **Nothing to set first.** This step used to say to set
+   `DEPLOY_ENV=production` before anything here, because the checks below were
+   silently inert without it. They no longer are — the platform decides, see the
+   note under §2. Left in place rather than deleted, because an operator working
+   from an older copy of this file will look for it.
 1. Obtain **production** service key + webhook secret from Netcash.
 2. Register the webhook URL: `https://app.<your-domain>/api/v1/webhooks/netcash`.
 3. Confirm Netcash's source IPs match the app's IP allowlist (the webhook

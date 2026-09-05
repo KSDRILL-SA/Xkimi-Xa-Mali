@@ -35,6 +35,23 @@ export function subtractZAR(a: number, b: number): number {
 }
 
 /**
+ * A rand amount taken `times` over — a monthly figure across n months, a unit
+ * price across n units.
+ *
+ * The contract above forbids `x * n` on rand amounts and, until this existed,
+ * offered nothing to write instead. A rule with no replacement for the thing it
+ * bans is a rule people route around: the projection on the member insights
+ * page did exactly that, computing `yearToDatePaid + monthlyAmount * remaining`
+ * in the open.
+ *
+ * `times` is a count, not money — so this is deliberately not `sumZAR` called n
+ * times, which would be the same answer arrived at slowly.
+ */
+export function multiplyZAR(amount: number, times: number): number {
+  return roundZAR(amount * times)
+}
+
+/**
  * A percentage of a rand amount, rounded to the cent — e.g. a fee, a penalty, or
  * interest. `percent` is the human figure, not a fraction: percentZAR(200, 7.5)
  * is R15.00 (7.5% of R200), not 0.075%.
