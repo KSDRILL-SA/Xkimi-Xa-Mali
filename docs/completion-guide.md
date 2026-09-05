@@ -1,13 +1,42 @@
 # What's Done, and What's Left
 
-The single page to read when picking this project back up.
+> ## ⚠ Superseded — read [`stage-close-2026-09-05.md`](./stage-close-2026-09-05.md) instead
+>
+> **This page was written on 2026-07-27, before any of it was deployed, and its
+> summary is now wrong in every particular.** It says nothing is deployed and no
+> account exists. All three apps have been live on `xkimixamali.co.za` since
+> 2026-08-29, the database is on Neon, backups run and have been restore-proven,
+> and the test count below is roughly a third of the current one.
+>
+> It is kept because the sequencing and reasoning below were followed and are a
+> true record of the plan that got the system deployed. **Treat every checkbox
+> as historical.**
+>
+> The one thing worth carrying forward from the summary that follows: the
+> "biggest risk" it names — the Netcash adapter built against the wrong API
+> shape — was real, was corrected, and was then found to have a worse sibling.
+> Reading the provider's own service terms against the code found four contract
+> breaches that four separate code audits had all missed. That lesson is
+> recorded in `docs/audit/implementation-plan.md`: **read the contract before
+> writing the adapter, not after.**
 
-Where the system actually stands, what only a human can finish, and the order to
-do it in. Written 2026-07-27, with `Dev` at `39440c4`.
+## Where the project actually stands (2026-09-05)
+
+Development is **paused at a deliberate stopping point**, not abandoned and not
+finished. The Foundation collects money without a payment provider: members pay
+by transfer or cash and an administrator records each payment with proof. The
+system supports that end to end, and building it was the stage that just closed.
+
+What ends the pause is not code. It is a record of real contributions that a
+collections partner will accept — which only time and real payments produce.
+
+**[`stage-close-2026-09-05.md`](./stage-close-2026-09-05.md)** is the current
+page: what a member can do start to finish, what is switched off and why, what
+carries forward, and what to check before changing anything.
 
 ---
 
-## The short version
+## The short version *(as written 2026-07-27 — historical)*
 
 **The code is finished.** Three apps build, 782 tests pass, 28 migrations apply
 without drift, and the security audit is closed.

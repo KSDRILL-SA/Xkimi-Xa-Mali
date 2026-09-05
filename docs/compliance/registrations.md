@@ -6,6 +6,7 @@
 |---|---|
 | Owner | Kurhula Success Maluleke |
 | Status | **Superseded in practice as of 2026-08-24/29 — read this before item 1** |
+| Current phase | **Paused 2026-09-05.** Everything that can be done from a keyboard is done. What remains on this register needs a person, a meeting, or a third party to reply — see `../stage-close-2026-09-05.md` |
 | Purpose | One register, in dependency order, of every external registration, application, and professional engagement |
 
 > **The legal-form decision below (§1) was overtaken by a fact discovered

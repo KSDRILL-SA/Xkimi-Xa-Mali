@@ -7,10 +7,15 @@ monthly contribution by transfer or in cash and an administrator records it agai
 and the month, with proof of payment; every rand lands in an append-only ledger and each member
 has a live view of their standing. Built for four brothers, designed to scale to ~50 members.
 
-> **On collections.** The DebiCheck application was declined — a new savings circle has no
-> collection history, which is what the sponsoring bank required. The debit-order machinery is
-> built and dormant; a live deployment with no provider refuses every money operation rather
-> than pretending. See [`docs/compliance/collections-application-brief.md`](docs/compliance/collections-application-brief.md).
+> **Status — paused at a deliberate stopping point (2026-09-05).** All three apps are live and
+> the current operating model works end to end: members pay, an administrator records it with
+> proof. Development stopped because what the Foundation needs next is not code — it is a record
+> of real contributions a collections partner will accept, which only time and real payments
+> produce. The debit-order machinery is built, tested and dormant; a live deployment with no
+> provider refuses every money operation rather than pretending.
+>
+> Start at [`docs/stage-close-2026-09-05.md`](docs/stage-close-2026-09-05.md). The collections
+> position is in [`docs/compliance/collections-application-brief.md`](docs/compliance/collections-application-brief.md).
 
 ```mermaid
 flowchart LR

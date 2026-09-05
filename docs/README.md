@@ -20,8 +20,18 @@ flowchart TD
 
 ## Picking this up after a break?
 
-Read **[completion-guide.md](./completion-guide.md)** first — where the system
-stands, what only a human can finish, and the order to do it in.
+Read **[stage-close-2026-09-05.md](./stage-close-2026-09-05.md)** first — where
+the system stands, what a member can do end to end today, what is deliberately
+switched off, and what carries forward.
+
+Development is **paused at a deliberate stopping point** as of 2026-09-05. The
+Foundation collects without a payment provider: members pay by transfer or cash
+and an administrator records each payment with proof. What ends the pause is a
+record of real contributions a collections partner will accept — which no
+amount of code can produce.
+
+[completion-guide.md](./completion-guide.md) is the older plan-of-record and is
+**superseded**: it was written before anything was deployed and says so.
 
 ---
 
