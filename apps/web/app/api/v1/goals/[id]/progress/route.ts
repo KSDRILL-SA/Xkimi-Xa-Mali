@@ -16,11 +16,11 @@ export const GET = withApiHandler<{ id: string }>(async (
   const roles = (session.user.roles as string[] | undefined) ?? []
   const { id } = await params
 
-  // Check the goal exists and is visible to this user before returning progress
-  const goal = await getGoal(id)
-  if (goal.status === 'DRAFT' && !roles.includes('ADMIN')) {
-    return apiError('ADM_001', 'Goal not found', 404)
-  }
+  // Check the goal exists and is visible to this caller before returning
+  // progress. `roles` is passed rather than re-checked afterwards — see the
+  // sibling route: the check that followed this call could never run, because
+  // `getGoal` had already thrown for a draft.
+  await getGoal(id, roles)
 
   const { searchParams } = new URL(req.url)
   const page = Math.max(1, Number(searchParams.get('page') ?? '1'))
