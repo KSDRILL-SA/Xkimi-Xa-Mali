@@ -108,14 +108,19 @@ export async function executeMandateDelay(
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
 
-    await step.run('record-failed', () =>
+    // UNKNOWN, not FAILED — the same distinction as the debit run's, and the
+    // same reason. An exhausted retry here is a timeout or an unreachable
+    // gateway, not a decline: the submission may have landed and the money may
+    // already be gone. Recording it as FAILED put it in
+    // `transaction-retry-failed`'s query and had it submitted again.
+    await step.run('record-unknown', () =>
       db.transaction.create({
         data: {
           contributionId: contribution.id,
           mandateId: mandate.id,
           amount: Number(mandate.amount),
           type: 'DEBIT_ORDER',
-          status: 'FAILED',
+          status: 'UNKNOWN',
           idempotencyKey,
           failureReason: `${INFRASTRUCTURE_FAILURE_PREFIX}${reason}`,
           gatewayResponse: { error: reason } as unknown as Prisma.InputJsonValue,
@@ -123,7 +128,7 @@ export async function executeMandateDelay(
       }),
     )
 
-    logger.error('Delayed debit failed after retries — recorded for the retry job', {
+    logger.error('Delayed debit outcome unknown — recorded, and NOT queued for retry', {
       mandateId, userId, date: newDate, reason,
     })
     // No member message: nothing about their account went wrong.

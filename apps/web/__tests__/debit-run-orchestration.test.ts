@@ -126,28 +126,46 @@ describe('executeDebitRun — a gateway that throws', () => {
     )
   })
 
-  it('records the failure as a FAILED transaction the retry job can find', async () => {
+  it('records it as UNKNOWN, not FAILED — the bank may have taken the money', async () => {
+    // The distinction this whole status exists for. An exhausted retry is a
+    // timeout or an unreachable endpoint, not a decline: the submission may
+    // well have landed.
+    //
+    // It used to be written FAILED, and `transaction-retry-failed` collects
+    // exactly `status: 'FAILED'` — so a timeout on a debit the bank had
+    // accepted went into the recovery pool and was submitted again.
     await executeDebitRun(step)
 
-    const failed = mocks.txCreate.mock.calls
-      .map((c) => c[0].data)
-      .filter((d: { status: string }) => d.status === 'FAILED')
+    const rows = mocks.txCreate.mock.calls.map((c) => c[0].data)
 
-    expect(failed).toHaveLength(1)
-    expect(failed[0].mandateId).toBe('b')
-    // transaction-retry-failed queries status FAILED. Without this row there is
-    // no trace at all, and the mandate is not due again until next month.
-    expect(failed[0].failureReason).toContain('gateway unreachable')
+    expect(rows.filter((d: { status: string }) => d.status === 'FAILED')).toHaveLength(0)
+
+    const unknown = rows.filter((d: { status: string }) => d.status === 'UNKNOWN')
+    expect(unknown).toHaveLength(1)
+    expect(unknown[0].mandateId).toBe('b')
+    // A row still has to exist. Without one there is no trace at all, and the
+    // mandate is not due again until next month.
+    expect(unknown[0].failureReason).toContain('gateway unreachable')
   })
 
   it('marks it as infrastructure so the member is not judged for an outage', async () => {
     await executeDebitRun(step)
 
-    const failed = mocks.txCreate.mock.calls
+    const unknown = mocks.txCreate.mock.calls
       .map((c) => c[0].data)
-      .find((d: { status: string }) => d.status === 'FAILED')
+      .find((d: { status: string }) => d.status === 'UNKNOWN')
 
-    expect(failed.failureReason.startsWith('INFRASTRUCTURE: ')).toBe(true)
+    expect(unknown.failureReason.startsWith('INFRASTRUCTURE: ')).toBe(true)
+  })
+
+  it('tells leadership these are not being retried', async () => {
+    // A decline retries itself; an unknown outcome must not. The alert has to
+    // say which, or the reader assumes the usual recovery is under way.
+    await executeDebitRun(step)
+
+    const alert = mocks.raiseAlert.mock.calls.at(-1)?.[0] as { body: string }
+    expect(alert.body.split(/\s+/).join(' ')).toMatch(/NOT being retried/i)
+    expect(alert.body).toMatch(/debited twice/i)
   })
 
   it('does not tell the member their debit was declined — nothing was', async () => {

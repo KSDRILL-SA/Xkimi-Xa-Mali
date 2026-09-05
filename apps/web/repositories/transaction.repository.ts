@@ -14,6 +14,11 @@ export type TxClient = Omit<
 // nets the change to zero — leaving contributions still marked paid and the pool
 // balance overstated. Use this fragment anywhere paid amounts are summed.
 export const SUCCESSFUL_INFLOW: Prisma.TransactionWhereInput = {
+  // SUCCESS only. UNKNOWN — submitted, outcome never confirmed — is money whose
+  // fate nobody knows, and counting it would credit the pool, settle the
+  // member's period and appear in their total for a debit the bank may never
+  // have taken. The fund understates until the truth is known, which is the
+  // safe direction to be wrong in.
   status: 'SUCCESS',
   type: { not: 'REVERSAL' },
 }

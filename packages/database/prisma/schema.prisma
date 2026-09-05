@@ -74,6 +74,16 @@ enum TransactionStatus {
   SUCCESS
   FAILED
   REVERSED
+
+  /// Submitted, outcome unknown — a timeout or an unreachable gateway, where
+  /// the bank may or may not have taken the money.
+  ///
+  /// Deliberately distinct from FAILED. A decline should be retried; an unknown
+  /// outcome must be resolved before anything else is attempted, or the retry
+  /// is how a member gets debited twice. Never counted as an inflow: money
+  /// whose fate is unknown has not been received, so the fund understates
+  /// rather than overstates until the truth is known.
+  UNKNOWN
 }
 
 enum GoalType {

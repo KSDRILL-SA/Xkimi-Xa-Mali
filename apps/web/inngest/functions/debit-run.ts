@@ -237,17 +237,34 @@ export async function executeDebitRun(step: DebitStepRunner) {
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
 
-      // A FAILED row is what transaction-retry-failed looks for. Without it
-      // there is nothing to recover from: no transaction, no trace, and the
-      // mandate is not due again until next month.
-      await step.run(`record-failed-${mandate.id}`, () =>
+      // UNKNOWN, not FAILED — and that distinction is the whole of this block.
+      //
+      // Reaching here means our request to the gateway did not come back. It
+      // does NOT mean the bank refused: an exhausted retry is a timeout or an
+      // unreachable endpoint, and the submission may well have landed. The
+      // money may already have left the member's account.
+      //
+      // It was recorded as FAILED, and `transaction-retry-failed` collects
+      // exactly `status: 'FAILED'`. So a timeout on a debit the bank had
+      // accepted went into the recovery pool and was submitted again. For money
+      // movement a timeout is not a failure — it is an absence of information,
+      // and the two demand opposite responses: retry a decline, resolve an
+      // unknown before attempting anything else.
+      //
+      // A row still has to exist, for the reason the old comment gave: without
+      // one there is no trace, and the mandate is not due again until next
+      // month. UNKNOWN is that row, and it is deliberately outside both
+      // SUCCESSFUL_INFLOW and the retry job's query — so it credits nothing,
+      // settles nothing, and is retried by nobody until a person or a load
+      // report says what actually happened.
+      await step.run(`record-unknown-${mandate.id}`, () =>
         db.transaction.create({
           data: {
             contributionId: contribution.id,
             mandateId: mandate.id,
             amount: outstanding,
             type: 'DEBIT_ORDER',
-            status: 'FAILED',
+            status: 'UNKNOWN',
             idempotencyKey,
             failureReason: `${INFRASTRUCTURE_FAILURE_PREFIX}${reason}`,
             gatewayResponse: { error: reason } as unknown as Prisma.InputJsonValue,
@@ -256,7 +273,7 @@ export async function executeDebitRun(step: DebitStepRunner) {
       )
 
       notCollected.push({ mandateId: mandate.id, kind: 'infrastructure', reason })
-      logger.error('Debit submission failed after retries — recorded for the retry job', {
+      logger.error('Debit submission outcome unknown — recorded, and NOT queued for retry', {
         mandateId: mandate.id,
         userId: mandate.userId,
         period: periodKey,
@@ -405,7 +422,16 @@ export async function executeDebitRun(step: DebitStepRunner) {
         body: [
           ...lines,
           '',
-          'Declines and submission failures are retried daily for 7 days, up to 3 attempts.',
+          'Declines are retried daily for 7 days, up to 3 attempts.',
+          ...(infrastructure > 0
+            ? [
+                '',
+                `${infrastructure} did NOT come back with an answer and are NOT being`,
+                'retried. The bank may have taken that money. Retrying blind is how a',
+                'member gets debited twice, so these need a human to confirm what',
+                'happened before anything else is attempted.',
+              ]
+            : []),
         ].join('\n'),
         entityId: periodKey,
         payload: { declined, infrastructure, unexpected: outcome.failed, detail: notCollected },

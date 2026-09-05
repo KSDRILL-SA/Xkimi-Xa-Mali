@@ -125,10 +125,17 @@ describe('executeMandateDelay — when the gateway cannot be reached', () => {
     mocks.submit.mockImplementation(() => Promise.reject(new Error('gateway unreachable')))
   })
 
-  it('leaves a FAILED row the retry job can recover', async () => {
+  it('leaves an UNKNOWN row, and deliberately not one the retry job collects', async () => {
+    // This asserted FAILED, which is what the code wrote — and
+    // `transaction-retry-failed` queries exactly that, so a timeout on a debit
+    // the bank may have accepted was resubmitted.
+    //
+    // An exhausted retry here is a timeout or an unreachable gateway, not a
+    // decline. A row still has to exist or there is no trace at all; it just
+    // must not be one the recovery job picks up blind.
     const result = await executeMandateDelay(step, event)
 
-    expect(createdTx()).toMatchObject({ status: 'FAILED' })
+    expect(createdTx()).toMatchObject({ status: 'UNKNOWN' })
     expect(createdTx().failureReason.startsWith('INFRASTRUCTURE: ')).toBe(true)
     expect(result).toEqual({ outcome: 'infrastructure' })
   })

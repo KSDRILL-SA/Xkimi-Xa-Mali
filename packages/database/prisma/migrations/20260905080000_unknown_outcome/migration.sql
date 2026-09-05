@@ -1,0 +1,36 @@
+-- A status for "we submitted it and do not know what happened".
+--
+-- ── The defect this exists for ───────────────────────────────────────────────
+--
+-- A debit submission that exhausted its retries was written as FAILED, and
+-- FAILED is exactly what `transaction-retry-failed` collects. So a network
+-- timeout on a request the bank may well have accepted entered the same
+-- recovery pool as a bank decline, and was submitted again.
+--
+--     submit debit -> the gateway receives it -> our request times out
+--                  -> recorded FAILED -> retried -> possibly a second debit
+--
+-- For money movement, a timeout is not a failure. It is an absence of
+-- information, and the two demand opposite responses: a decline should be
+-- retried, an unknown outcome must be resolved before anything else is
+-- attempted.
+--
+-- The system had no way to say that. It could say SUCCESS or FAILED, so it
+-- guessed — and two schedulers guessed differently, which is the tell. The
+-- debit run called an unknown outcome FAILED and retried it; the goal plan
+-- called anything that was not FAILED collected, and reset its failure counter
+-- on a PENDING that had settled nothing.
+--
+-- ── Why a status and not a flag ──────────────────────────────────────────────
+--
+-- Every query that decides money already filters on status: SUCCESSFUL_INFLOW,
+-- the retry job's `status: 'FAILED'`, the reconciler's reversal set. A boolean
+-- beside the status would have to be remembered at each of those, and the ones
+-- that forgot would be the ones that mattered. A value in the enum is refused
+-- by the type system everywhere a status is matched exhaustively.
+--
+-- UNKNOWN is deliberately NOT in SUCCESSFUL_INFLOW: money whose fate is unknown
+-- has not been received, so it credits nothing, settles no contribution, and
+-- appears in no member's total. The fund understates rather than overstates
+-- until the truth is known, which is the safe direction to be wrong in.
+ALTER TYPE "TransactionStatus" ADD VALUE IF NOT EXISTS 'UNKNOWN';
