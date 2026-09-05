@@ -28,6 +28,15 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
   const candidates = await step.run('find-retryable', () =>
     db.transaction.findMany({
       where: {
+        // FAILED only, and UNKNOWN deliberately not.
+        //
+        // FAILED means the bank refused — nothing was taken, so submitting
+        // again is the right thing to do. UNKNOWN means the submission may
+        // have landed and we never heard back, and retrying that is how a
+        // member gets debited twice for one month.
+        //
+        // The two used to be the same value, which is exactly how an
+        // infrastructure timeout ended up in this pool.
         status: 'FAILED',
         retryCount: { lt: MAX_TRANSACTION_RETRY },
         createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },

@@ -276,12 +276,16 @@ async function clearFailures(plan: { id: string; version: number }): Promise<voi
 
 export async function collectDuePlans(now = new Date()): Promise<{
   collected: number
+  /** Sent to the gateway, not yet settled — neither collected nor failed. */
+  submitted: number
   failed: number
   completed: number
   paused: number
 }> {
   const candidates = await goalPlanRepo.findDueCandidates(now.getDate())
   let collected = 0
+  /** Sent to the gateway, not yet settled. Neither a success nor a failure. */
+  let submitted = 0
   let failed = 0
   let completed = 0
   let paused = 0
@@ -372,12 +376,36 @@ export async function collectDuePlans(now = new Date()): Promise<{
         `plan:${plan.id}:${period}`,
       )
 
+      // Three outcomes, not two.
+      //
+      // This counted anything that was not FAILED as collected, and reset
+      // `failedRuns` to zero on the strength of it. A PENDING submission has
+      // settled nothing — the money is not in the fund and may never be — so
+      // both of those were wrong, and the second is the one that bites: a plan
+      // submitting pending-and-never-settling forever never accumulates a
+      // failure and so never trips the pause-and-tell-the-member path.
+      //
+      // The debit run made the opposite guess about the same missing state,
+      // calling an unknown outcome FAILED and retrying it. Two schedulers,
+      // opposite guesses, one absent distinction — which is the tell that the
+      // system could only say SUCCESS or FAILED about something that was
+      // neither.
       if (res.status === 'FAILED') {
         failed += 1
         await recordFailure(plan)
-      } else {
+      } else if (res.status === 'SUCCESS') {
         collected += 1
         if (plan.failedRuns > 0) await clearFailures(plan)
+      } else {
+        // Submitted, not settled. Counted separately so the run's own summary
+        // stops overstating what it collected, and `failedRuns` is left exactly
+        // as it was: this is neither a failure to count nor a recovery to
+        // celebrate. The webhook settles it, or nothing does and the next run
+        // sees the period still open.
+        submitted += 1
+        logger.info('Goal plan collection submitted but not settled', {
+          planId: plan.id, goalId: plan.goalId, status: res.status,
+        })
       }
     } catch (err) {
       failed += 1
@@ -389,7 +417,7 @@ export async function collectDuePlans(now = new Date()): Promise<{
     }
   }
 
-  return { collected, failed, completed, paused }
+  return { collected, submitted, failed, completed, paused }
 }
 
 /**
