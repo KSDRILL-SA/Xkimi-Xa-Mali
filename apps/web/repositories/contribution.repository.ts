@@ -162,6 +162,29 @@ export const contributionRepo = {
     return tx.contribution.findUnique({ where: { id } })
   },
 
+  /**
+   * A member's periods that still owe something, oldest first.
+   *
+   * Used to place money that overshot the period it was recorded against.
+   * WAIVED is excluded deliberately: leadership decided that month owes
+   * nothing, and quietly filling it with somebody's overpayment would undo
+   * that decision without anybody revisiting it.
+   *
+   * Ordered oldest first because arrears come before anything else. A member
+   * who is behind on July and pays generously in September has settled July,
+   * which is what they would say they had done.
+   */
+  findUnsettledByUser(userId: string, excludeId: string, tx: TxClient = db) {
+    return tx.contribution.findMany({
+      where: {
+        userId,
+        id: { not: excludeId },
+        status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+      },
+      orderBy: [{ periodYear: 'asc' }, { periodMonth: 'asc' }],
+    })
+  },
+
   /** Optimistic-lock update: only succeeds when version matches. */
   updateByVersion(
     id: string,

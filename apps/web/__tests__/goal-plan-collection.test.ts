@@ -8,6 +8,13 @@ const mocks = vi.hoisted(() => ({
   queueNotification: vi.fn(),
 }))
 
+vi.mock('@/integrations/payment', () => ({
+  // These tests describe the world where a provider exists: a plan is honoured
+  // by collecting from a debit order, so the mandate requirement applies. The
+  // offline path — where nothing can collect and the plan asks instead — is
+  // covered in `goal-plan-offline.test.ts`.
+  GATEWAY_CAN_MOVE_MONEY: true,
+}))
 vi.mock('@/lib/env', () => ({ env: {} }))
 vi.mock('@/lib/db', () => ({ db: {} }))
 vi.mock('@xxm/observability', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))

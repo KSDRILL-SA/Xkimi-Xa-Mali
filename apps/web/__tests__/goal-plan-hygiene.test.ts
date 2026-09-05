@@ -41,6 +41,13 @@ const mocks = vi.hoisted(() => ({
   findGoal: vi.fn(),
 }))
 
+vi.mock('@/integrations/payment', () => ({
+  // These tests describe the world where a provider exists: a plan is honoured
+  // by collecting from a debit order, so the mandate requirement applies. The
+  // offline path — where nothing can collect and the plan asks instead — is
+  // covered in `goal-plan-offline.test.ts`.
+  GATEWAY_CAN_MOVE_MONEY: true,
+}))
 vi.mock('@/repositories/goal-plan.repository', () => ({
   goalPlanRepo: {
     findById: mocks.findById,

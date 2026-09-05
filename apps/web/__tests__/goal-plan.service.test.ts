@@ -18,6 +18,11 @@ vi.mock('@/lib/authorization', () => ({ assertCanAccess: vi.fn() }))
 vi.mock('@/services/audit.service', () => ({ writeAuditLog: mocks.audit }))
 vi.mock('@/integrations/payment', () => ({
   paymentGateway: { submitOnceOffDebit: vi.fn(), mapTransactionStatus: vi.fn() },
+  // These tests describe the world where a provider exists: a plan is honoured
+  // by collecting from a debit order, so the mandate requirement applies. The
+  // offline path — where nothing can collect and the plan asks instead — is
+  // covered in `goal-plan-offline.test.ts`.
+  GATEWAY_CAN_MOVE_MONEY: true,
 }))
 vi.mock('@/repositories', () => ({
   goalRepo: { findById: mocks.goalFindById },
