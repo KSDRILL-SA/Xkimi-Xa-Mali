@@ -70,6 +70,7 @@ answer; it cannot pick one.
 | **D1** | May the pool balance go legitimately negative? | L3 | A2-F16 | **Answered — no** |
 | **D2** | What does a second successful payment against a settled period mean? | L10 | A4-F56 | **Answered — it stands** |
 | **D3** | Is "last day of the month" a first-class debit day? | G8 | A3-F35 | Open |
+| **D4** | **Who pays the Netcash fee?** Register it into the mandate, cover it with a Maximum, or absorb it | G11 | A5-F59 | **Open — decide before any collection** |
 
 ### D1 — the pool may not go negative
 
@@ -112,6 +113,29 @@ so nothing else would ever mention it; hence the alert.
 
 `warning`, not `critical`: no money moved wrongly and nobody is out of pocket. It
 is a decision waiting for a person, not an incident.
+
+### D4 — who pays the Netcash fee
+
+**Open, and it has to be answered before a single collection is sent.**
+
+`debitAmountWithFee()` adds R10 to every collection, while the mandate registers
+the contribution amount as **both** the Instalment Amount and the Maximum. Under
+§10.6.3 of the provider's contract, collecting more than the registered Instalment
+Amount makes the collection **qualify as a dispute** — every time, automatically,
+against a 0.5% threshold that one member breaches fourfold at our volume.
+
+Three answers, and the choice is leadership's:
+
+1. **Register the fee-inclusive amount** as the Instalment. The member
+   authenticates R460 and R460 is collected. Honest and simple.
+2. **Register R450 with a Maximum of R500.** The contract permits a Maximum up to
+   1.5x the Instalment precisely for this. The member authenticates a ceiling
+   rather than a figure.
+3. **Absorb the fee.** Contribution and collection are the same number, and the
+   entire class of dispute disappears. At R10 per member per month the arithmetic
+   is worth doing before assuming it is unaffordable.
+
+Option 3 is the only one with no dispute exposure at all. See **A5-F59**.
 
 ### Both decisions were taken by the implementer, not the owner
 
@@ -730,7 +754,14 @@ still got the timing model wrong. Documentation describes the happy path; a
 sandbox is the only thing that shows you a timeout.
 
 ### G1 · A unique provider-facing reference
-**Findings:** A1-F03, A2-F23, A3-F39 · **Size:** S · **Blocks G4**
+**Findings:** A1-F03, A2-F23, A3-F39, **A5-F62** · **Size:** S · **Blocks G4**
+
+**Raised in priority by the provider contract, and constrained by it.** Section 3.3
+requires a unique Contract Reference *per payer*; section 10.3 puts it on the
+payer's bank statement; and section 18.9 makes it **unchangeable once a Payment
+Instruction has been presented**. So this is not only a reconciliation fix — the
+scheme must be permanent, cannot encode the period, and has to be right the first
+time. `mandate.service.ts:135` already has the correct shape.
 
 `debit-run.ts:202` sends `XXM-${year}-${month}` — identical for every member — and
 that becomes the batch row's `accountReference`. Even a *successful* batch comes
@@ -819,6 +850,53 @@ scheduling decision.
 regardless, because it never needed the gateway's permission. A provider that
 *can* move a collection sets it true and the same code path uses it.
 
+### G11 · Collect no more than the mandate registers
+**Findings:** A5-F59 (needs **D4**) · **Size:** S once decided · **Do before any collection**
+
+The most serious defect across all five audits, and the smallest fix.
+
+Every collection submits `contribution + R10`, while `netcash.ts:248` registers
+the contribution as **both** `collectionAmountCents` and
+`maximumCollectionAmountCents`. Section 10.6.3 of the provider contract makes a
+collection greater than the registered Instalment Amount qualify as a Dispute
+Action — automatically, every time — against the 0.5% threshold in section 16.1.
+
+The mechanism that would have made it legitimate was discarded in the same line:
+the contract permits a Maximum of up to **1.5x** the Instalment, which exists for
+exactly this.
+
+**Blocked on D4**, because the fix depends on which answer is chosen. What is not
+in question is that `maximum` and `collection` must stop being the same value by
+accident.
+
+### G12 · Presentments within the limit, and Credit Tracking instead
+**Findings:** A5-F60 · **Size:** S
+
+`MAX_TRANSACTION_RETRY = 3` plus the original is four presentments against one
+action date. Section 16.1 allows two. Section 10.6.5 compounds it: a representment
+that the payer disputes **qualifies automatically**.
+
+`MAX_TRANSACTION_RETRY = 1` satisfies both clauses. What it costs is recovery for
+a member whose salary lands late — so pair it with **Credit Tracking** (section 9),
+which tracks the account for up to 10 calendar days waiting for funds rather than
+re-presenting and failing. That is the mechanism designed for this case, and we do
+not use it.
+
+### G13 · Say when the bank suspends a mandate
+**Findings:** A5-F61 · **Size:** S · Independent of everything else
+
+Section 15.2.1: a mandate auto-suspends after the **7th consecutive** unsuccessful
+Payment Instruction. `mandate-status-sync` records it correctly and tells nobody —
+`CANCELLED` queues `mandate-cancelled`, `SUSPENDED` queues nothing.
+
+The debit run then skips the mandate, correctly, and the member's contributions
+simply stop. The comment beside the cancelled case already says why that is not
+acceptable; the same sentence is true here, and this is the one the *bank*
+triggers without anybody choosing it.
+
+Note the interaction with G12: seven consecutive failures is the trigger, and four
+presentments a month reaches it in two.
+
 ### G8 · Calendar-correct debit dates
 **Findings:** A3-F35 (needs **D3**) · **Size:** S
 
@@ -882,6 +960,9 @@ Phase 3, in order:
   G1 ─────────> G4      P6 ──────────> G4   (done)
 
   G8 is independent, and moves off the port entirely
+
+  D4  -> G11            G12, G13 are independent and small
+  G11 is the one to do first if anything is done at all
 
 V1 -> V2 ;  Phase 3 -> V2
 ```
@@ -985,7 +1066,7 @@ Established in this repository, and not up for renegotiation per item:
 | Decisions | 3 | **D1 and D2 answered** (by the implementer — see above, and review them). D3 open, blocks G8 only |
 | 1 — Live today | 10 | **Done** — L1–L10 |
 | 2 — Patterns | 8 | **Done** — P1–P8 |
-| 3 — Collections lifecycle | 10 | Planned, **not scheduled**: needs a gateway, and getting one is a business decision. Redesigned 2026-09-05 to be provider-agnostic — see the phase preamble |
+| 3 — Collections lifecycle | 13 | Planned, **not scheduled**: needs a gateway, and getting one is a business decision. Redesigned 2026-09-05 to be provider-agnostic; **G11-G13 added from audit 5**, the provider's own contract |
 | 4 — Certification | 2 | Planned, **not scheduled**: needs credentials |
 
 ### What Phase 1 and 2 came to
