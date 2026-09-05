@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto'
 import type { Prisma } from '@prisma/client'
 import { goalRepo } from '@/repositories/goal.repository'
+import { goalPlanRepo } from '@/repositories/goal-plan.repository'
+import { periodKey } from '@/lib/goal-plan-schedule'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { paymentGateway } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
@@ -456,6 +458,51 @@ export async function processGoalPaymentWebhook(event: GoalPaymentEvent): Promis
  * a monthly contribution and belongs on `recordOfflineContribution`, where
  * paying more than the month owes is already accepted and reported.
  */
+/**
+ * Mark a member's plan for a goal as answered for the period a payment covers.
+ *
+ * Best-effort by design. The money is already recorded and the goal already
+ * credited by the time this runs; a plan whose bookkeeping did not update is a
+ * member who gets asked again next month, which is a nuisance. Throwing here
+ * would turn that nuisance into a failed recording of money that physically
+ * arrived — the one outcome this system refuses everywhere else.
+ */
+async function satisfyPlanForPeriod(
+  userId: string,
+  goalId: string,
+  receivedAt: Date,
+): Promise<void> {
+  try {
+    const plan = await goalPlanRepo.findActive(userId, goalId)
+    if (!plan) return
+
+    const period = periodKey(receivedAt)
+    if (plan.lastCollectedPeriod === period) return // already closed for that month
+
+    // `failedRuns` reset for the same reason a successful collection resets it:
+    // the commitment was met. How it was met is not the plan's business.
+    const updated = await goalPlanRepo.updateByVersion(plan.id, plan.version, {
+      lastCollectedPeriod: period,
+      failedRuns: 0,
+    })
+
+    if (updated.count === 0) {
+      logger.warn('Goal plan not closed for the period — the plan changed mid-write', {
+        planId: plan.id, period,
+      })
+      return
+    }
+
+    logger.info('Offline payment closed a goal plan instalment', {
+      userId, goalId, planId: plan.id, period,
+    })
+  } catch (err) {
+    logger.error('Could not close the goal plan for this payment', {
+      userId, goalId, error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
 export async function recordOfflineGoalPayment(
   data: OfflineGoalPaymentInput,
   adminId: string,
@@ -530,6 +577,18 @@ export async function recordOfflineGoalPayment(
     { id: payment.id, goalId: data.goalId, userId: data.userId, amount },
     g,
   )
+
+  // Close the member's plan for this month, if they have one.
+  //
+  // This is the join between the two halves of the feature. With no provider a
+  // plan cannot collect, so it ASKS — and the member answers by paying, which
+  // arrives here. Without this the plan would go on asking every month while
+  // the member paid every month, and the two would never meet.
+  //
+  // The period is taken from when the money ARRIVED, not from today. An admin
+  // catching up on a backlog in September is closing August's instalment, and
+  // stamping it as September's would leave August unanswered for good.
+  await satisfyPlanForPeriod(data.userId, data.goalId, data.receivedAt)
 
   await writeAuditLog({
     userId: adminId,

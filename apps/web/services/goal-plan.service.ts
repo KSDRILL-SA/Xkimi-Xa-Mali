@@ -7,6 +7,7 @@ import { MIN_GOAL_PAYMENT } from '@/lib/validation/goal'
 import { logger } from '@xxm/observability'
 import { queueNotification } from '@/services/notification.service'
 import { payToGoal } from '@/services/goal-payment.service'
+import { GATEWAY_CAN_MOVE_MONEY } from '@/integrations/payment'
 import { isDueOn, periodKey, instalmentFor } from '@/lib/goal-plan-schedule'
 
 /**
@@ -122,13 +123,24 @@ export async function enrolInPlan(
     throw new GoalConflictError('This goal’s deadline has passed', 'GPL_004')
   }
 
-  // Same requirement the one-off goal payment has, asked at the right moment.
-  const mandate = await mandateRepo.findActiveByUser(userId)
-  if (!mandate?.netcashMandateId) {
-    throw new MandateConflictError(
-      'An active debit order is required before you can set up a plan',
-      'CTR_002',
-    )
+  // A mandate is required only when a mandate is what would honour the plan.
+  //
+  // This used to be unconditional, and it made the feature unreachable: the
+  // DebiCheck application was declined, no member holds a mandate, so every
+  // attempt to start a plan was refused — while the app went on offering it.
+  //
+  // A plan is a member's standing commitment to a goal. A debit order was one
+  // way of honouring it; the other is the way every rand currently arrives —
+  // the member pays and an administrator records it. So the requirement is
+  // asked only where it is true.
+  if (GATEWAY_CAN_MOVE_MONEY) {
+    const mandate = await mandateRepo.findActiveByUser(userId)
+    if (!mandate?.netcashMandateId) {
+      throw new MandateConflictError(
+        'An active debit order is required before you can set up a plan',
+        'CTR_002',
+      )
+    }
   }
 
   const existing = await goalPlanRepo.findActive(userId, goalId)
@@ -163,6 +175,14 @@ export async function getMyPlans(userId: string, requesterId: string, roles: str
     debitDay: p.debitDay,
     status: p.status,
     lastCollectedPeriod: p.lastCollectedPeriod,
+    /**
+     * The month the member was last asked for, with nothing collected against
+     * it yet. Both are sent because they are different states to a member: one
+     * is "this is done", the other is "this is waiting for you".
+     */
+    lastRequestedPeriod: p.lastRequestedPeriod,
+    awaitingPayment:
+      p.lastRequestedPeriod !== null && p.lastRequestedPeriod !== p.lastCollectedPeriod,
     startedAt: p.startedAt.toISOString(),
     endedAt: p.endedAt?.toISOString() ?? null,
     endedReason: p.endedReason,
@@ -281,6 +301,11 @@ export async function collectDuePlans(now = new Date()): Promise<{
   failed: number
   completed: number
   paused: number
+  /**
+   * Asked for, because nothing can collect. Not money: the member owes it the
+   * way a month is owed, and an administrator closes it when they pay.
+   */
+  requested: number
 }> {
   const candidates = await goalPlanRepo.findDueCandidates(now.getDate())
   let collected = 0
@@ -289,6 +314,7 @@ export async function collectDuePlans(now = new Date()): Promise<{
   let failed = 0
   let completed = 0
   let paused = 0
+  let requested = 0
 
   for (const plan of candidates) {
     if (!isDueOn(plan, now)) continue
@@ -336,6 +362,39 @@ export async function collectDuePlans(now = new Date()): Promise<{
       continue
     }
 
+    const period = periodKey(now)
+    const amount = instalmentFor(Number(plan.amount), remaining)
+    if (amount === null) continue // covered by `stop` above; belt and braces
+
+    // ── Nothing can collect: ask instead of pausing ────────────────────────
+    //
+    // With no provider there is no mandate to look for and pausing every plan
+    // would be pausing them for a condition that is now permanent — the member
+    // would be told to "set one up" when none can be had.
+    //
+    // So the plan's monthly event becomes a request. The member is told what
+    // their own standing commitment asks for, pays it the way they pay
+    // everything else, and an administrator records it against the goal — which
+    // is what stamps `lastCollectedPeriod` and closes the month properly.
+    //
+    // Stamped as *requested*, never as collected. No money has moved and the
+    // record must not imply it has.
+    if (!GATEWAY_CAN_MOVE_MONEY) {
+      const asked = await goalPlanRepo.updateByVersion(plan.id, plan.version, {
+        lastRequestedPeriod: period,
+      })
+      if (asked.count > 0) {
+        requested += 1
+        await queueNotification({
+          userId: plan.userId,
+          templateSlug: 'goal-plan-due',
+          channel: 'SMS',
+          payload: { goal: goal.title, amount: amount.toFixed(2) },
+        }).catch(() => {})
+      }
+      continue
+    }
+
     // The debit order may have been revoked since. Pausing keeps the plan so
     // the member can resume it, rather than throwing away what they set up.
     const mandate = await mandateRepo.findActiveByUser(plan.userId)
@@ -354,10 +413,6 @@ export async function collectDuePlans(now = new Date()): Promise<{
       }
       continue
     }
-
-    const period = periodKey(now)
-    const amount = instalmentFor(Number(plan.amount), remaining)
-    if (amount === null) continue // covered by `stop` above; belt and braces
 
     // Stamped before the charge, not after. A job that dies mid-collection must
     // not leave the plan looking un-collected — the idempotency key below is
@@ -417,7 +472,7 @@ export async function collectDuePlans(now = new Date()): Promise<{
     }
   }
 
-  return { collected, submitted, failed, completed, paused }
+  return { collected, submitted, failed, completed, paused, requested }
 }
 
 /**
@@ -471,12 +526,19 @@ export async function resumePlan(
 
   // Whatever paused it must be fixed first, or the next collection pauses it
   // straight back and the member learns nothing from having pressed the button.
-  const mandate = await mandateRepo.findActiveByUser(userId)
-  if (!mandate?.netcashMandateId) {
-    throw new MandateConflictError(
-      'An active debit order is required before you can resume a plan',
-      'CTR_002',
-    )
+  //
+  // Only when a collection is what would run, though. Plans paused while a
+  // provider existed are exactly the ones a member would want back once
+  // collections stopped being the mechanism, and refusing them for the absence
+  // of a mandate nothing intends to use would strand them permanently.
+  if (GATEWAY_CAN_MOVE_MONEY) {
+    const mandate = await mandateRepo.findActiveByUser(userId)
+    if (!mandate?.netcashMandateId) {
+      throw new MandateConflictError(
+        'An active debit order is required before you can resume a plan',
+        'CTR_002',
+      )
+    }
   }
 
   const goal = (await goalRepo.findById(plan.goalId)) as GoalForPlan | null

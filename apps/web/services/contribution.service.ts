@@ -31,6 +31,7 @@ import { raiseOperationalAlert } from './alert.service'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
+import { allocatePayment } from '@/lib/payment-allocation'
 import { subtractZAR } from '@/lib/money'
 import type { ManualContributionInput, GenerateContributionsInput, OfflineContributionInput } from '@/lib/validation/contribution'
 import { MIN_CONTRIBUTION_ZAR, MONTHS } from '@xxm/utils'
@@ -1110,43 +1111,77 @@ export async function recordOfflineContribution(
   const periodContribution = contribution
 
   const written = await runTransaction(async (tx) => {
-    const created = await transactionRepo.create(
-      {
-        contributionId: periodContribution.id,
-        // Null, not a placeholder. Faking a mandate would need a bank account
-        // beneath it — inventing banking details for somebody who handed over
-        // cash and never supplied any.
-        mandateId: null,
-        amount: data.amount,
-        type: 'OFFLINE',
-        // SUCCESS on write: the money is already in the account. There is no
-        // webhook coming to confirm it, so anything else would leave the row
-        // waiting forever for a settlement that already happened.
-        status: 'SUCCESS',
-        idempotencyKey,
-        offlineReference: data.reference,
-        recordedById: adminId,
-        // Exactly one of these, guaranteed by the schema. A document where
-        // there is one; otherwise a note naming who counted the cash. Stored
-        // side by side rather than collapsed into one column, so a later reader
-        // can tell at a glance whether the money is evidenced by the bank or by
-        // two people's word — those are not the same claim.
-        proofUrl: data.proofUrl ?? null,
-        proofWitness: data.proofWitness ?? null,
-        processedAt: data.receivedAt,
-      },
-      tx,
-    )
+    // Where this money goes.
+    //
+    // The named period first, then anything else the member still owes, oldest
+    // first — see `allocatePayment`. A payment that fits inside the month it
+    // was recorded against produces exactly one allocation and behaves as it
+    // always did; only a payment that overshoots produces more.
+    //
+    // Read inside the transaction so the periods cannot move underneath the
+    // split, and so two administrators recording at once cannot both allocate
+    // the same outstanding month.
+    const named = await contributionRepo.findUniqueWithVersion(periodContribution.id, tx)
+    if (!named) throw new ContributionNotFoundError()
 
-    const change = await recalculateContributionStatus(periodContribution.id, tx)
-    return { created, change }
+    const others = await contributionRepo.findUnsettledByUser(data.userId, named.id, tx)
+    const allocations = allocatePayment(data.amount, named, others)
+
+    const rows = []
+    const changes = []
+
+    for (const [index, allocation] of allocations.entries()) {
+      const created = await transactionRepo.create(
+        {
+          contributionId: allocation.contributionId,
+          // Null, not a placeholder. Faking a mandate would need a bank account
+          // beneath it — inventing banking details for somebody who handed over
+          // cash and never supplied any.
+          mandateId: null,
+          amount: allocation.amount,
+          type: 'OFFLINE',
+          // SUCCESS on write: the money is already in the account. There is no
+          // webhook coming to confirm it, so anything else would leave the row
+          // waiting forever for a settlement that already happened.
+          status: 'SUCCESS',
+          // The first row keeps the key the duplicate check was made against.
+          // The rest are parts of the same real payment and need keys of their
+          // own, derived from the period each one lands on — so re-recording
+          // the same bank reference is refused on the first row, before any of
+          // this runs, and a genuine later payment for a spilled-into month is
+          // still free to use its own reference.
+          idempotencyKey:
+            index === 0 ? idempotencyKey : `${idempotencyKey}:part:${allocation.contributionId}`,
+          offlineReference: data.reference,
+          recordedById: adminId,
+          // Exactly one of these, guaranteed by the schema. A document where
+          // there is one; otherwise a note naming who counted the cash. Stored
+          // side by side rather than collapsed into one column, so a later reader
+          // can tell at a glance whether the money is evidenced by the bank or by
+          // two people's word — those are not the same claim.
+          proofUrl: data.proofUrl ?? null,
+          proofWitness: data.proofWitness ?? null,
+          processedAt: data.receivedAt,
+        },
+        tx,
+      )
+      rows.push(created)
+
+      const change = await recalculateContributionStatus(allocation.contributionId, tx)
+      if (change) changes.push(change)
+    }
+
+    return { rows, changes, allocations }
   })
 
-  const { created: transaction, change: statusChange } = written
+  const { rows, changes, allocations } = written
+  // The row for the period the administrator named. It leads the allocation by
+  // construction, and everything downstream that says "the payment" means this.
+  const transaction = rows[0]!
 
   // After the commit, never inside it — same reason as every other payment
   // path: the announcement is an HTTP call and the transaction has a timeout.
-  if (statusChange) await emitContributionStatusChange(statusChange)
+  for (const change of changes) await emitContributionStatusChange(change)
 
   await Promise.all([
     cache.del(CACHE_KEYS.DASHBOARD_STATS),
@@ -1178,18 +1213,24 @@ export async function recordOfflineContribution(
   // double credit. Best-effort for the same reason as the gateway path: a
   // ledger hiccup must never undo a payment that has already been recorded,
   // and the nightly pass remains the backstop.
-  await postPoolCredit({
-    refType: 'TRANSACTION',
-    refId: transaction.id,
-    amount: Number(transaction.amount),
-    memberId: data.userId,
-    description: 'Contribution received',
-  }).catch((err) =>
-    logger.error('Ledger credit post failed on an offline payment', {
-      transactionId: transaction.id,
-      error: err instanceof Error ? err.message : String(err),
-    }),
-  )
+  // Every row, not just the first. A payment split across months is still one
+  // sum of money and the pool must receive all of it — crediting only the named
+  // period would leave the ledger short by exactly the spilled amount, which is
+  // the failure this whole block exists to prevent.
+  for (const row of rows) {
+    await postPoolCredit({
+      refType: 'TRANSACTION',
+      refId: row.id,
+      amount: Number(row.amount),
+      memberId: data.userId,
+      description: 'Contribution received',
+    }).catch((err) =>
+      logger.error('Ledger credit post failed on an offline payment', {
+        transactionId: row.id,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    )
+  }
 
   await writeAuditLog({
     userId: adminId,
@@ -1206,6 +1247,14 @@ export async function recordOfflineContribution(
       reference: data.reference,
       receivedAt: data.receivedAt.toISOString(),
       note: data.note ?? null,
+      // Where the money actually landed. One entry for a payment that fitted
+      // the month it was recorded against; more when it overshot and settled
+      // arrears as well. Recorded because a member asking "why does July say
+      // paid, I paid in September" deserves an answer that is written down.
+      allocations: allocations.map((a) => ({
+        contributionId: a.contributionId,
+        amount: a.amount,
+      })),
       // Which kind of evidence, never the reference itself. The audit log is
       // read by people who are not entitled to open the document, and a
       // pathname in it would be a way to ask for one.
