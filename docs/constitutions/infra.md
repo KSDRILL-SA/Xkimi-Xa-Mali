@@ -187,5 +187,5 @@ DEPLOY_ENV=                # staging | production — gates which env vars
                            # Flipping this without the 4 NETCASH_* vars in
                            # place fails loud at deploy time, by design.
 SUPPORT_EMAIL=              # member-facing support contact
-ADMIN_WHATSAPP_NUMBER=      # E.164-ish, no + — e.g. 27810780859
+ADMIN_WHATSAPP_NUMBER=      # E.164-ish, no + — e.g. 27000000000
 ```

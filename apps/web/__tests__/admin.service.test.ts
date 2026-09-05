@@ -118,7 +118,7 @@ vi.mock('@/lib/env', () => ({
     ENABLE_MANUAL_PAYMENTS: true,
     WHATSAPP_GROUP_LINK: 'https://chat.whatsapp.com/test',
     WHATSAPP_GROUP_NAME: 'Test',
-    ADMIN_WHATSAPP_NUMBER: '27810780859',
+    ADMIN_WHATSAPP_NUMBER: '27000000000',
   },
 }))
 
