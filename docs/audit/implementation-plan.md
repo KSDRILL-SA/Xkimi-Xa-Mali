@@ -1109,6 +1109,16 @@ Established in this repository, and not up for renegotiation per item:
 
 ### Where to pick up
 
+> **Development paused here on 2026-09-05.** Phases 1 and 2 are done and merged.
+> Phase 3 is not waiting on engineering time — it is waiting on a collections
+> partner accepting the Foundation, and the evidence that earns that is a record
+> of real contributions accumulating month by month. No amount of code shortens
+> it. See `docs/stage-close-2026-09-05.md`.
+>
+> **Do not start Phase 3 speculatively.** Everything in it assumes a gateway
+> that does not exist yet, and building against an imagined one is exactly how
+> the adapter came to be written against the wrong API shape the first time.
+
 **Phase 3 needs a decision before it needs engineering.** Getting a gateway is
 not a scheduling question — the DebiCheck application was declined, and which
 route to take is the owner's call. Three tracks are set out in the phase
