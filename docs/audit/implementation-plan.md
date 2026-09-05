@@ -730,13 +730,51 @@ Established in this repository, and not up for renegotiation per item:
 
 ## Status
 
-| Phase | Items | Blocked | Ready |
-|---|---|---|---|
-| Decisions | 3 | — | awaiting leadership |
-| 1 — Live today | 10 | L3 (D1), L10 (D2) | **8 ready now** |
-| 2 — Patterns | 8 | — | ready after Phase 1 |
-| 3 — Gateway | 8 | no gateway exists | planned, not scheduled |
-| 4 — Certification | 2 | no credentials | planned, not scheduled |
+**Phases 1 and 2 are complete.** Eighteen work items, thirteen pull requests
+(#490–#502), all merged with CI green.
 
-**Start with L1.** It is the only finding in 58 whose failure locks leadership out
-of their own system.
+| Phase | Items | Status |
+|---|---|---|
+| Decisions | 3 | **D1 and D2 answered** (by the implementer — see above, and review them). D3 open, blocks G8 only |
+| 1 — Live today | 10 | **Done** — L1–L10 |
+| 2 — Patterns | 8 | **Done** — P1–P8 |
+| 3 — Gateway | 8 | Planned, **not scheduled**: needs a gateway that does not exist |
+| 4 — Certification | 2 | Planned, **not scheduled**: needs credentials |
+
+### What Phase 1 and 2 came to
+
+| Item | What it closed |
+|---|---|
+| L1 | Two admins removing each other could leave zero. Plus one the audits missed: the member app's `setMemberStatus` had **no last-admin guard at all** |
+| L2 | Counting is not reserving — 51 places could be held out of fifty |
+| L3 | The pool could go negative with nothing deciding whether that was legal (**D1**) |
+| L4 | One unwrapped call could skip the ledger credit after a settlement |
+| L5 | A refusal said whether the object existed. Both patterns lived in one file |
+| L6 | Contact details reached Sentry. The logger now redacts, and the error-spread vector is covered |
+| L7 | The trusted channel was replayable; a refused webhook was silent. **A2-F30 withdrawn** — our own note was wrong |
+| L8 | Docs described the deployment that caused the phantom payment |
+| L9 | The money contract was enforced by a comment. Writing the test **found four real bugs** |
+| L10 | An overpayment was absorbed silently (**D2**) |
+| P1 | The debit-run claim was a write that followed a read |
+| P2 | The manual-payment "claim" did not exist; the comment said it did |
+| P3 | The server invented the idempotency token when a caller omitted it |
+| P4 | The goal webhook updated blind — dedupe and CAS solve different problems |
+| P5 | `PENDING → REVERSED` was reachable, and terminal |
+| P6 | Nothing could say "we do not know". Two schedulers guessed, oppositely |
+| P7 | A mandate we and the bank disagree about was still being collected on |
+| P8 | The database held an invariant the application had forgotten |
+
+### Where to pick up
+
+**Phase 3 needs a decision before it needs engineering.** Enabling a gateway is
+not a scheduling question — the DebiCheck application was declined, and the
+alternative routes (a different provider, an aggregator, NASASA) are the
+owner's call. Nothing in Phase 3 should start until that is answered.
+
+One recommendation carried from the plan: **make load-report polling the primary
+settlement mechanism and the webhook an optional accelerant**. The polling
+contract is documented and buildable; the postback contract is not established,
+and our endpoint would reject a genuine Netcash post at the signature check.
+
+**D3** (is "last day of the month" a first-class debit day?) blocks G8 and only
+G8. It can wait for the gateway decision.

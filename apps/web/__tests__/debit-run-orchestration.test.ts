@@ -82,6 +82,10 @@ function mandate(id: string) {
     debitDay: 1,
     netcashMandateId: `nc-${id}`,
     delayedUntil: null,
+    // NOT NULL with a default of IN_SYNC in the schema. A mandate this system
+    // and the bank disagree about is skipped by the run, so a fixture that
+    // omits it would silently collect from nobody.
+    gatewaySync: 'IN_SYNC',
     user: { id: `user-${id}`, status: 'ACTIVE', firstName: 'Kurhula' },
   }
 }

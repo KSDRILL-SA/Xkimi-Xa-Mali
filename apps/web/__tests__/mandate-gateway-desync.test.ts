@@ -134,11 +134,111 @@ describe('a cancellation that did not reach the bank', () => {
   })
 
   it('still cancels locally, so we never collect from them again', async () => {
+    // The ordering is deliberate and stays: whatever the gateway does, this
+    // system will not collect from somebody who asked it to stop.
     mocks.gatewayCancel.mockRejectedValue(new Error('service key rejected'))
 
     await cancelMandate('mandate-1', 'user-1', [])
 
-    expect(mocks.update).toHaveBeenCalledWith('mandate-1', { status: 'CANCELLED' })
+    expect(mocks.update).toHaveBeenCalledWith('mandate-1', expect.objectContaining({
+      status: 'CANCELLED',
+    }))
+  })
+
+  it('records the divergence on the mandate, not only in an alert', async () => {
+    // `mandate-status-sync` used to read only PENDING, ACTIVE and SUSPENDED, so
+    // a locally-cancelled mandate whose gateway cancel failed was never looked
+    // at again — the divergence existed nowhere but an alert somebody had to
+    // have been reading at the time.
+    mocks.gatewayCancel.mockRejectedValue(new Error('service key rejected'))
+
+    await cancelMandate('mandate-1', 'user-1', [])
+
+    expect(mocks.update).toHaveBeenCalledWith('mandate-1', expect.objectContaining({
+      gatewaySync: 'FAILED',
+      gatewaySyncReason: expect.stringContaining('service key rejected'),
+    }))
+  })
+
+  it('tells the member something true about their bank account', async () => {
+    // "We will not collect from you again" is true about US, and it was being
+    // said about THEIR account. Local-first guarantees this system never
+    // initiates another collection; it cannot guarantee the authorisation at
+    // the bank is gone, because that is the call that just failed.
+    //
+    // A member told their debit order is cancelled stops watching. If the
+    // mandate is still standing, that is exactly the thing they stopped
+    // watching for.
+    mocks.gatewayCancel.mockRejectedValue(new Error('service key rejected'))
+
+    const result = await cancelMandate('mandate-1', 'user-1', [])
+
+    expect(result.gatewayConfirmed).toBe(false)
+    expect(result.message).toMatch(/pending/i)
+    expect(result.message).not.toMatch(/nothing further will be collected/i)
+  })
+
+  it('says the plain thing when the gateway did confirm', async () => {
+    mocks.gatewayCancel.mockResolvedValue(undefined)
+
+    const result = await cancelMandate('mandate-1', 'user-1', [])
+
+    expect(result.gatewayConfirmed).toBe(true)
+    expect(result.message).toMatch(/nothing further will be collected/i)
+  })
+})
+
+describe('a gateway mandate that never got a local record', () => {
+  // The compensating cancel in `createMandate` was `.catch(() => {})`. Right
+  // about one thing — a failed compensation must not replace the real error the
+  // caller needs to see — and wrong about the other: it discarded the only
+  // evidence that a live debit authorisation now exists at the bank with
+  // nothing in this system pointing at it.
+  //
+  // Nothing else can find it. There is no local row to mark, because failing to
+  // write that row is what got us here, and every reconciling job iterates
+  // local rows. The alert is the only trace there will ever be.
+  //
+  // Asserted against the source rather than by driving `createMandate`: that
+  // function needs the bank-account repository, encryption and the gateway's
+  // creation path stood up, none of which this file mocks and none of which is
+  // what is being checked. What matters is that the catch reports rather than
+  // swallows, and that the original error still propagates.
+
+  const source = async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    return readFileSync(resolve(__dirname, '../services/mandate.service.ts'), 'utf8')
+  }
+
+  it('reports the orphan instead of swallowing the failure', async () => {
+    const src = await source()
+    const block = src.slice(src.indexOf('The Netcash mandate is already live'))
+
+    expect(block.slice(0, 2000)).not.toMatch(/cancelMandate\(netcashRes\.mandateId\)\.catch\(\(\) => \{\}\)/)
+    expect(block.slice(0, 2000)).toContain('raiseGatewayDesyncAlert')
+    expect(block.slice(0, 2000)).toMatch(/Orphaned gateway mandate/)
+  })
+
+  it('still lets the original error reach the caller', async () => {
+    // The reason for the old `.catch(() => {})`. The compensation's own failure
+    // must not become the error the member sees instead of the real one.
+    const src = await source()
+    const block = src.slice(src.indexOf('The Netcash mandate is already live'))
+    const rethrowAt = block.indexOf('throw dbErr')
+
+    expect(rethrowAt).toBeGreaterThan(-1)
+    expect(block.slice(0, rethrowAt)).toContain('raiseGatewayDesyncAlert')
+  })
+
+  it('names the reference somebody has to act on', async () => {
+    // An alert about an orphan without the id is a message saying something is
+    // wrong somewhere at the provider.
+    const src = await source()
+    const block = src.slice(src.indexOf('Orphaned gateway mandate'))
+
+    expect(block.slice(0, 900)).toContain('netcashMandateId: netcashRes.mandateId')
+    expect(block.slice(0, 1400)).toMatch(/Netcash portal by hand/)
   })
 })
 

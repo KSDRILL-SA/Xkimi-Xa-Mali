@@ -140,11 +140,19 @@ describe('executeMandateStatusSync — everything else', () => {
     expect(mocks.warn).toHaveBeenCalled()
   })
 
-  it('only looks at mandates that are not already terminal', async () => {
+  it('looks at live mandates, and at any the gateway disagrees about', async () => {
+    // The second half is new. A cancellation the gateway refused leaves this
+    // system saying CANCELLED while the authorisation still stands at the bank
+    // — and this job read only the three live statuses, so that mandate was
+    // never examined again. Including it is what makes the divergence
+    // recoverable rather than merely recorded.
     await executeMandateStatusSync(step)
 
     const where = mocks.findMany.mock.calls[0][0].where
-    expect(where.status).toEqual({ in: ['PENDING', 'ACTIVE', 'SUSPENDED'] })
     expect(where.netcashMandateId).toEqual({ not: null })
+    expect(where.OR).toEqual([
+      { status: { in: ['PENDING', 'ACTIVE', 'SUSPENDED'] } },
+      { gatewaySync: { not: 'IN_SYNC' } },
+    ])
   })
 })

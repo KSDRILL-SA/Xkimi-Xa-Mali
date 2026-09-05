@@ -86,6 +86,16 @@ enum TransactionStatus {
   UNKNOWN
 }
 
+/// Whether this system and the payment gateway still agree about a mandate.
+enum GatewaySyncState {
+  /// As far as we know, the bank holds what we hold.
+  IN_SYNC
+  /// A change was written locally and the gateway has not confirmed it.
+  PENDING
+  /// The gateway refused or could not be reached. A person has to resolve it.
+  FAILED
+}
+
 enum GoalType {
   MONTHLY
   YEARLY
@@ -396,6 +406,21 @@ model PaymentMandate {
   netcashMandateId String?       @unique
   delayedUntil     DateTime?
   failureReason    String?
+
+  /// Do this system and the bank still agree about this mandate?
+  ///
+  /// Orthogonal to `status`, which says what the mandate is for the member. An
+  /// ACTIVE mandate can be out of step, and so can a CANCELLED one whose
+  /// cancellation the gateway refused.
+  ///
+  /// Anything other than IN_SYNC means the debit run leaves this mandate alone:
+  /// collecting the local amount when the bank authorised a different one gets
+  /// the member a failed collection caused by our own bookkeeping.
+  gatewaySync       GatewaySyncState @default(IN_SYNC)
+  /// What went wrong, for the person who has to put it right.
+  gatewaySyncReason String?
+  /// When the two last disagreed — so a stale divergence is visible as stale.
+  gatewaySyncAt     DateTime?
   approvedAt       DateTime?
   approvedById     String?
   createdAt        DateTime      @default(now())
