@@ -18,6 +18,7 @@ import { logger } from '@xxm/observability'
 import { INFRASTRUCTURE_FAILURE_PREFIX } from '@xxm/utils'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { recordJobHeartbeat } from '@/lib/job-heartbeat'
+import { collectionReference } from '@xxm/utils/collection-reference'
 
 /**
  * Run every mandate, whatever the ones before it did.
@@ -257,7 +258,9 @@ export async function executeDebitRun(step: DebitStepRunner) {
         paymentGateway.submitScheduledDebit({
           mandateId: mandate.netcashMandateId!,
           amount: debitAmountWithFee(outstanding),
-          reference: `XXM-${yearStr}-${monthStr}`,
+          // The payer's own reference, not the period's. Contract §3.3 and
+          // §18.9: it identifies the customer and cannot change once presented.
+          reference: collectionReference(mandate.userId),
           idempotencyKey,
         }),
       )

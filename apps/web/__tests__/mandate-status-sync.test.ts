@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   getMandateStatus: vi.fn(),
   mapMandateStatus: vi.fn(),
+  raiseAlert: vi.fn().mockResolvedValue(undefined),
   writeAuditLog: vi.fn(),
   queueNotification: vi.fn(),
   error: vi.fn(),
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/env', () => ({ env: {} }))
 vi.mock('@/lib/inngest', () => ({ inngest: { createFunction: () => ({}) } }))
+vi.mock('@/services/alert.service', () => ({ raiseOperationalAlert: mocks.raiseAlert }))
 vi.mock('@/lib/db', () => ({ db: { paymentMandate: { findMany: mocks.findMany, update: mocks.update } } }))
 vi.mock('@/integrations/payment', () => ({
   paymentGateway: { getMandateStatus: mocks.getMandateStatus, mapMandateStatus: mocks.mapMandateStatus },
@@ -106,12 +108,38 @@ describe('executeMandateStatusSync — a status that changed', () => {
     )
   })
 
-  it('does not message anyone for an ordinary suspension', async () => {
+  it('tells the member when the bank suspends their debit order', async () => {
+    // This asserted the opposite — "does not message anyone for an ordinary
+    // suspension" — with no reason given, beside a cancellation test that does
+    // give one. There is nothing ordinary about it.
+    //
+    // Provider contract §15.2.1: the bank suspends a mandate automatically
+    // after the seventh consecutive unsuccessful collection. Nobody chooses it,
+    // the debit run then collects only from ACTIVE mandates, and the visible
+    // effect is that the member's contributions simply stop.
+    //
+    // Which is word for word the reason the cancellation case gives for not
+    // staying silent — and more true here, because a cancellation is at least
+    // somebody's decision.
     mocks.mapMandateStatus.mockReturnValue('SUSPENDED')
 
     await executeMandateStatusSync(step)
 
-    expect(mocks.queueNotification).not.toHaveBeenCalled()
+    expect(mocks.queueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'user-1', templateSlug: 'mandate-suspended' }),
+    )
+  })
+
+  it('raises it with leadership too, since only they can help restart it', async () => {
+    // §15.11 puts thirteen months on the clock before the mandate leaves the
+    // register entirely, and reinstating needs the member to authorise again.
+    mocks.mapMandateStatus.mockReturnValue('SUSPENDED')
+
+    await executeMandateStatusSync(step)
+
+    expect(mocks.raiseAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'MANDATE_SUSPENDED_BY_BANK', severity: 'warning' }),
+    )
   })
 })
 

@@ -11,6 +11,7 @@ import { MAX_TRANSACTION_RETRY } from '@xxm/utils'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { alertOnFailure } from '@/inngest/on-failure'
 import { recordJobHeartbeat } from '@/lib/job-heartbeat'
+import { collectionReference } from '@xxm/utils/collection-reference'
 
 /**
  * Inngest's `step`, narrowed to what this job uses.
@@ -51,7 +52,9 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
       },
       include: {
         mandate: { select: { id: true, netcashMandateId: true, status: true, userId: true } },
-        contribution: { select: { id: true, status: true } },
+        // userId so the retry carries the payer's own collection reference —
+        // see collectionReference. It is not on the transaction row.
+        contribution: { select: { id: true, status: true, userId: true } },
       },
     }),
   )
@@ -100,7 +103,10 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
         const gatewayRes = await submitFn({
           mandateId: netcashMandateId,
           amount: debitAmountWithFee(Number(tx.amount)),
-          reference: `XXM-RETRY-${tx.id.slice(-8)}`,
+          // The payer's reference, not a per-attempt one. A retry is the same
+          // agreement being collected again; §18.9 forbids the reference moving.
+          // The attempt is already distinguished by the idempotency key below.
+          reference: collectionReference(tx.contribution.userId),
           idempotencyKey: `retry:${tx.idempotencyKey}:${tx.retryCount + 1}`,
         })
 

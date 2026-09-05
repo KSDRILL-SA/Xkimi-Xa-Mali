@@ -173,6 +173,16 @@ export const NOTIFICATION_TEMPLATES: Array<{
     body: 'Xkimi Xa Mali Foundation: Your debit order has been cancelled. Please set up a new one to continue contributions.',
   },
   {
+    // The bank suspends a mandate itself after seven consecutive failures
+    // (provider contract §15.2.1). Nobody chooses it, and without this the
+    // member's contributions just stop. See the migration that also inserts it
+    // into existing databases — the seed is create-only.
+    slug: 'mandate-suspended',
+    channel: 'SMS',
+    subject: null,
+    body: 'Xkimi Xa Mali Foundation: Your bank has suspended your debit order after several failed collections. Nothing more will be collected until you authorise it again. Contact us and we will help you restart it.',
+  },
+  {
     slug: 'mandate-delayed',
     channel: 'SMS',
     subject: null,
