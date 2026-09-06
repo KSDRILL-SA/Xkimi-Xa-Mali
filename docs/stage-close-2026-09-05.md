@@ -97,6 +97,44 @@ Two decisions were taken under delegation and are worth a look when convenient:
 the pool may not go negative (**D1**), an overpayment stands and is allocated to
 what else is owed, oldest month first (**D2**/**D5**).
 
+## One deployment is outstanding
+
+**The member app's production build is one commit behind, and Vercel refused it
+in words worth quoting:**
+
+```
+Resource is limited - try again in 1 day
+(more than 100, code: "api-deployments-free-per-day")
+```
+
+That is the **Hobby plan's 100-deployments-per-day ceiling**, reached on
+2026-09-05. It is not a build failure and not a code problem: three projects
+deploy on every push, so a busy day spends the allowance quickly.
+
+| App | Production is on | Needs |
+|---|---|---|
+| `admin.xkimixamali.co.za` | current — promoted 2026-09-05 | nothing |
+| `xkimixamali.co.za` | current | nothing |
+| `member.xkimixamali.co.za` | one commit behind | one promote, once the day rolls over |
+
+**What the member app is missing is two low-severity hardening changes** — the
+`X-Powered-By` header removal and a version string dropped from the health
+endpoint. Nothing functional, nothing a member can see. It is safe to leave.
+
+**To finish it**, once the limit resets:
+
+1. Vercel → `xkimi-xa-mali-web` → **Deployments**
+2. Find the newest **Ready** build whose commit matches `main`
+3. Its `…` menu → **Promote to Production** → confirm
+
+The dialog says *"a new deployment will be built using your production
+environment"*, so it rebuilds with production variables rather than reusing
+preview ones — which is why promoting is safe here and not a shortcut.
+
+A push to `main` works too, but only if the allowance has room. **Pushing while
+the limit is spent does nothing — Vercel drops the deployment rather than
+queuing it**, so extra pushes are wasted rather than banked.
+
 ## The state it is being left in
 
 | | |
