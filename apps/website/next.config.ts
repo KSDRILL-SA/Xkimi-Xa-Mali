@@ -1,6 +1,10 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Next.js advertises itself in an X-Powered-By response header by default.
+  // It tells an attacker which framework and therefore which advisories to try
+  // first, and buys nothing in return. Off.
+  poweredByHeader: false,
   transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/config', 'geist'],
   images: {
     formats: ['image/avif', 'image/webp'],

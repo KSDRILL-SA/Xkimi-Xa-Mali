@@ -31,6 +31,26 @@ const playfairDisplay = localFont({
 // initial-scale=1`) is close, but without `viewportFit: 'cover'` the safe
 // area on a notch/Dynamic-Island phone is unaccounted for, and there's no
 // theme-color for the browser chrome.
+/**
+ * Every page renders per request.
+ *
+ * This is the cost of the nonce-based CSP, and it is not optional. The nonce in
+ * `Content-Security-Policy` changes on every request, so Next can only stamp it
+ * onto its inline bootstrap script while rendering that request. A page
+ * prerendered at build time has its HTML fixed long before the nonce exists —
+ * its inline scripts carry no nonce, the browser refuses them, React never
+ * hydrates, and the page renders blank.
+ *
+ * The member app hit this exactly (see `apps/web/app/layout.tsx`) and so did
+ * this one: with the policy moved into the proxy and this line absent, `/login`
+ * served three unnonced inline scripts under a policy demanding a nonce. Every
+ * other route here is already dynamic — this is an authenticated console behind
+ * a session — so the price is `/login` and `/too-many-requests` rendering per
+ * request, against leaving `script-src 'unsafe-inline'` on the page where an
+ * administrator types the password to an account that can move money.
+ */
+export const dynamic = 'force-dynamic'
+
 export const viewport: Viewport = {
   themeColor: '#1B4332',
   width: 'device-width',

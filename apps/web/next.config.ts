@@ -2,6 +2,10 @@ import type { NextConfig } from 'next'
 import { withSentryConfig } from '@sentry/nextjs'
 
 const nextConfig: NextConfig = {
+  // Next.js advertises itself in an X-Powered-By response header by default.
+  // It tells an attacker which framework and therefore which advisories to try
+  // first, and buys nothing in return. Off.
+  poweredByHeader: false,
   transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/types', '@xxm/config', '@xxm/observability', 'geist'],
   typedRoutes: true,
   serverExternalPackages: ['@prisma/client'],
