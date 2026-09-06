@@ -4,6 +4,10 @@ import { withSentryConfig } from '@sentry/nextjs'
 const WEB_URL = process.env['WEB_INTERNAL_URL'] ?? process.env['NEXTAUTH_URL'] ?? 'http://localhost:3000'
 
 const nextConfig: NextConfig = {
+  // Next.js advertises itself in an X-Powered-By response header by default.
+  // It tells an attacker which framework and therefore which advisories to try
+  // first, and buys nothing in return. Off.
+  poweredByHeader: false,
   transpilePackages: ['@xxm/ui', '@xxm/utils', '@xxm/types', '@xxm/config', '@xxm/observability', 'geist'],
   serverExternalPackages: ['@prisma/client'],
   // Signature uploads (drawn PNGs / images) are sent through a server action;
@@ -29,46 +33,16 @@ const nextConfig: NextConfig = {
         { key: 'Referrer-Policy',            value: 'strict-origin-when-cross-origin' },
         { key: 'Strict-Transport-Security',  value: 'max-age=63072000; includeSubDomains; preload' },
         { key: 'Permissions-Policy',         value: 'camera=(), microphone=(), geolocation=()' },
-        {
-          key: 'Content-Security-Policy',
-          value: [
-            "default-src 'self'",
-            // base-uri and form-action have no default-src fallback — lock both
-            // to same-origin to block <base> injection and form hijacking.
-            "base-uri 'self'",
-            "form-action 'self'",
-            "object-src 'none'",
-            `script-src 'self' 'unsafe-inline' https://browser.sentry-cdn.com${process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''}`,
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob:",
-            "font-src 'self'",
-            // Sentry ingestion, or reports are blocked by the policy that is
-            // meant to protect this app. `data:` is not a network origin —
-            // it's what SignaturePadCard.tsx converts a drawn signature
-            // through (`fetch(canvas.toDataURL(...))` into a Blob before
-            // upload). Chrome enforces connect-src against `fetch()` calls to
-            // data: URIs same as any other origin, so without it here that
-            // fetch throws "Failed to fetch" before the signature ever
-            // reaches the server action — this is that bug's actual cause.
-            //
-            // `*.sentry.io`, NOT `o*.ingest.sentry.io`. A CSP wildcard must be
-            // a whole leftmost label; a partial one is invalid syntax and the
-            // browser discards the entire source silently ("contains an
-            // invalid source ... It will be ignored"). So the ingest host was
-            // never actually in connect-src, and every client-side error
-            // report from this console was blocked by our own policy while
-            // appearing fully configured. Identical bug was found and fixed in
-            // the member app (`apps/web/proxy.ts` buildCsp) and never carried
-            // across to here — exactly the one-app-not-its-sibling drift that
-            // `packages/utils/src/csrf-origin.ts` was extracted to stop.
-            // A bare `*.sentry.io` rather than an exact host because the
-            // ingest hostname carries the org id and region
-            // (`o123.ingest.sentry.io`, `o123.ingest.us.sentry.io`), so a
-            // pinned list breaks the day the DSN's region changes.
-            `connect-src 'self' data: ${WEB_URL} https://*.sentry.io`,
-            "frame-ancestors 'none'",
-          ].join('; '),
-        },
+        // Content-Security-Policy is NOT here. It carries a per-request nonce
+        // so an injected <script> cannot execute, and a nonce cannot be a
+        // static header — see `buildCsp` in proxy.ts.
+        //
+        // It used to be here, with `script-src 'unsafe-inline'`, which is the
+        // directive that decides whether a policy stops an XSS or merely
+        // records that one happened. The member app was moved to a nonce and
+        // this console was not, which left the weaker policy on the app that
+        // reverses transactions, changes roles and suspends members — the same
+        // one-app-not-its-sibling drift the Sentry note above describes.
       ],
     },
   ],

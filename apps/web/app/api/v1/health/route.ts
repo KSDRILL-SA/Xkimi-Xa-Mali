@@ -62,7 +62,10 @@ export async function GET() {
   return NextResponse.json(
     {
       status:  healthy ? 'ok' : 'degraded',
-      version: process.env.npm_package_version ?? '0.1.0',
+      // No version string. Every other field here earns its place by being
+      // something a monitor asserts on; a version number is not, and naming a
+      // release to an anonymous reader only narrows which advisories to try
+      // first. The deployed commit is knowable to the operator from Vercel.
       uptime:  Math.floor((Date.now() - startTime) / 1000),
       checks: {
         db:    dbOk ? 'ok' : 'error',

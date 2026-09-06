@@ -92,7 +92,15 @@ describe('no live banking particulars in documentation', () => {
       'NEXT_PUBLIC_GROUP_BANK_BRANCH',
       'NEXT_PUBLIC_GROUP_BANK_NAME',
     ]) {
-      const line = src.split(String.fromCharCode(10)).find((l) => l.startsWith(`${key}=`))
+      // Trimmed, because this file is checked out with CRLF on Windows and a
+      // trailing \r made the comparison fail for a reason that has nothing to
+      // do with what is being asserted. The repository's other document tests
+      // trim for the same reason.
+      const line = src
+        .split(String.fromCharCode(10))
+        .map((l) => l.trimEnd())
+        .find((l) => l.startsWith(`${key}=`))
+
       expect(line, `${key} is missing from .env.example`).toBeDefined()
       expect(line, `${key} carries a value`).toBe(`${key}=`)
     }
