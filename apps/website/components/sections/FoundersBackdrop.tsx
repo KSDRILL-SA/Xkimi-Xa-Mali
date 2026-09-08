@@ -37,19 +37,34 @@ import { ArrowRight } from 'lucide-react'
 export function FoundersBackdrop() {
   return (
     <div className="absolute inset-0 z-0" aria-hidden>
-      {/* One image, two crops: mobile is a much narrower/taller slice of
-          this landscape photo than desktop, so it keeps its own focal
-          point (`68% 38%`, tuned by rendering the actual crop offline
-          before shipping — it keeps the group, skyline and sun together)
-          rather than desktop's `object-right`, which on a narrow phone
-          would crop straight through the middle of the group. */}
+      {/* Two separate photos, not one crop shared across breakpoints: the
+          desktop shot is landscape (a narrow phone cropping it always lost
+          either the group or the skyline), so mobile gets its own
+          purpose-shot portrait photo of the same scene instead — 768×1376,
+          close enough to a real phone's aspect ratio that `object-cover`
+          barely has to crop it at all.
+
+          Both stay mounted with CSS `hidden`/`md:hidden` toggling which one
+          paints, rather than a client-side matchMedia check that mounts
+          only one: that would delay this image's fetch until after
+          hydration, which costs LCP far more than the bandwidth this
+          approach spends fetching the breakpoint that isn't shown. */}
+      <Image
+        src="/hero/brotherhood-terrace-mobile.jpg"
+        alt=""
+        fill
+        priority
+        quality={85}
+        className="object-cover md:hidden"
+        sizes="100vw"
+      />
       <Image
         src="/hero/brotherhood-terrace.jpg"
         alt=""
         fill
         priority
         quality={85}
-        className="object-cover object-[68%_38%] md:object-right"
+        className="hidden md:block object-cover object-right"
         sizes="100vw"
       />
 
