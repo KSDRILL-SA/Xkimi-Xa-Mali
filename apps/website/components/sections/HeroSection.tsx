@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
 import { adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
-import { FoundersBackdrop } from './FoundersBackdrop'
+import { FoundersBackdrop, FoundersLinkDesktop } from './FoundersBackdrop'
 import { AmbientOrbs } from './AmbientOrbs'
 import { FOUNDERS } from '@/lib/founders'
 import { FACTS } from '@xxm/utils'
@@ -21,6 +21,7 @@ export async function HeroSection() {
           Mobile gets a plain brand gradient instead; see FoundersBackdrop's
           own docstring for why. ─────────────────────────────────────── */}
       <FoundersBackdrop />
+      <FoundersLinkDesktop />
 
       {/* ── Ambient light + grain, above the portraits ────────────── */}
       <AmbientOrbs />
