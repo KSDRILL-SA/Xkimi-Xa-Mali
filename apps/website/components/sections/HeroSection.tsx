@@ -285,6 +285,35 @@ export async function HeroSection() {
               ))
             })()}
           </div>
+
+          {/* ── Photo — mobile only, in normal document flow ─────────
+              Desktop's FoundersBackdrop puts this same photograph behind
+              the headline because the headline sits left and the photo's
+              subject sits right — different halves of the screen, so text
+              never lands on top of it. On a single narrow column there is
+              no "beside," only "on top of": an earlier version of this
+              hero put a photo directly behind the mobile text for exactly
+              this reason, and the stat pills ended up sitting on top of a
+              printed name three separate times. That's why mobile has
+              carried no photographic background at all up to now.
+
+              This sits the same photo in NORMAL FLOW instead — a plain
+              block after the stat pills, not `absolute`/`fixed` behind
+              anything — so nothing can ever land on top of it by
+              construction, regardless of how much text this column grows
+              to hold. */}
+          <div className="md:hidden mt-6 relative aspect-[4/3] rounded-2xl overflow-hidden animate-fade-in-up" style={{ animationDelay: '1.1s' }}>
+            <Image
+              src="/hero/brotherhood-terrace.jpg"
+              alt=""
+              fill
+              quality={80}
+              className="object-cover"
+              style={{ objectPosition: '68% 38%' }}
+              sizes="100vw"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-xxm-green-950/50 via-transparent to-transparent" />
+          </div>
         </div>
       </div>
 
