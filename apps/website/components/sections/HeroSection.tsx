@@ -44,7 +44,7 @@ export async function HeroSection() {
 
           {/* badge */}
           <div
-            className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-2 mb-6 md:mb-8 animate-fade-in-down"
+            className="inline-flex items-center gap-2 glass-gold rounded-full px-4 py-2 mb-7 md:mb-8 animate-fade-in-down"
             style={{ animationDelay: '0.1s' }}
           >
             <span className="w-2 h-2 rounded-full bg-xxm-gold animate-pulse-ring shrink-0" />
@@ -95,18 +95,18 @@ export async function HeroSection() {
               rendered once near the top of this file for every breakpoint
               rather than duplicated per-breakpoint here. */}
 
-          {/* subheadline — desktop only.
-              A phone hero showing badge, three-line headline, this
-              paragraph, two buttons and three stat pills before the fold is
-              too much competing for the same few hundred pixels of height —
-              it reads as crowded rather than considered, which is the exact
-              opposite of the first impression this section exists to make.
-              Cut here, not lost: Mission and Features further down carry the
-              same explanation, a scroll away, and the Sign In link this
-              paragraph used to sit above stays reachable from the nav's own
-              mobile pill row regardless. Desktop has the room and keeps it. */}
+          {/* subheadline — used to be desktop-only. That decision was made
+              when a phone hero also carried a four-card founders grid and
+              two CTA buttons in the same column; against badge, headline,
+              this paragraph, two buttons and three stat pills, it read as
+              crowded rather than considered. Both of those are gone now —
+              one button, no founders grid — so the column has the room
+              this needs, and skipping straight from headline to a WhatsApp
+              button gave a first-time visitor zero context for what they'd
+              be joining. Mobile gets a slightly smaller size and a tighter
+              max-width than desktop; the copy itself is identical. */}
           <p
-            className="hidden md:block text-white/65 md:text-xl leading-relaxed max-w-xl mb-10 animate-fade-in-up"
+            className="text-white/65 text-base md:text-xl leading-relaxed max-w-md md:max-w-xl mb-8 md:mb-10 animate-fade-in-up"
             style={{ animationDelay: '0.65s' }}
           >
             Xkimi Xa Mali Foundation is a private, invite-only collective financial platform built
@@ -136,7 +136,7 @@ export async function HeroSection() {
               drop shadow, and `.btn-shine` for a single sweep of light on
               hover/focus rather than anything that runs on a loop. */}
           <div
-            className="flex flex-wrap gap-4 mb-8 md:mb-16 animate-fade-in-up"
+            className="flex flex-wrap gap-4 mb-10 md:mb-16 animate-fade-in-up"
             style={{ animationDelay: '0.8s' }}
           >
             <div className="relative w-full sm:w-auto">

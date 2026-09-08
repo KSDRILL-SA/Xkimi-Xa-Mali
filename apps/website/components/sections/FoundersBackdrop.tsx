@@ -18,9 +18,12 @@ import { ArrowRight } from 'lucide-react'
  *
  * Desktop can afford a scrim that's heavy on the left and nearly clear on
  * the right because the headline only ever sits on the left half. Mobile's
- * text occupies the *entire* column top to bottom, so its scrim stays dark
- * everywhere rather than fading out anywhere — the photograph shows through
- * as texture and warmth rather than as a showcase image in its own right.
+ * scrim is top-weighted instead: strong behind the badge and headline,
+ * which genuinely need the contrast, and lighter from roughly the CTA
+ * button downward — the button is solid gold and the stat pills carry
+ * their own translucent panel, so neither depends on the scrim, and
+ * leaving that area lighter lets the actual photograph show through
+ * rather than reading as a dark texture behind everything.
  *
  * ── Why one static photo instead of the four founders rotating ───────────
  *
@@ -68,18 +71,23 @@ export function FoundersBackdrop() {
         sizes="100vw"
       />
 
-      {/* Mobile scrim — heavy and fairly uniform top to bottom, since text
-          (badge, headline, CTA, stat pills) runs the full height of the
-          column, not just the top. The photo reads as rich
-          dark texture behind everything rather than a scene competing with
-          the text sitting on it. */}
-      <div className="absolute inset-0 md:hidden bg-xxm-green-950/80" />
-      <div className="absolute inset-0 md:hidden bg-gradient-to-b from-xxm-green-950/60 via-xxm-green-950/75 to-xxm-green-950/90" />
+      {/* Mobile scrim — one gradient, not two stacked layers. An earlier
+          version put a flat 80%-opacity layer *underneath* a 60-90%
+          gradient, and the two compounded into a uniformly dark, muddy
+          wash that buried the photo rather than showing it through. This
+          is deliberately top-weighted instead: strong where the badge and
+          headline actually need the contrast, easing off by the point the
+          CTA button sits (solid gold, needs no scrim help) and staying
+          moderate rather than heavy past that, since the stat pills carry
+          their own `.glass` backdrop-blur panel and don't depend on this
+          scrim either. The photo reads as an actual photo in its lower
+          two-thirds instead of dark texture. */}
+      <div className="absolute inset-0 md:hidden bg-gradient-to-b from-xxm-green-950/82 from-0% via-xxm-green-950/50 via-52% to-xxm-green-950/56" />
       {/* Quiet golden-hour glow, upper-right — echoes the photo's own sun
           rather than fighting it, and sits where the badge/headline's
           shortest lines leave the most breathing room. */}
       <div
-        className="absolute inset-0 md:hidden opacity-50"
+        className="absolute inset-0 md:hidden opacity-40"
         style={{ background: 'radial-gradient(ellipse 65% 45% at 88% 8%, #D4AF37 0%, transparent 65%)' }}
       />
 
