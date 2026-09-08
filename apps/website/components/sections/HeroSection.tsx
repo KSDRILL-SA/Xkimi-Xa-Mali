@@ -1,11 +1,8 @@
-import Image from 'next/image'
-import Link from 'next/link'
-import { ArrowRight, ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
+import { ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
 import { adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
-import { FoundersBackdrop, FoundersLinkDesktop } from './FoundersBackdrop'
+import { FoundersBackdrop, FoundersLink } from './FoundersBackdrop'
 import { AmbientOrbs } from './AmbientOrbs'
-import { FOUNDERS } from '@/lib/founders'
 import { FACTS } from '@xxm/utils'
 
 export async function HeroSection() {
@@ -17,11 +14,11 @@ export async function HeroSection() {
       className="relative min-h-screen flex flex-col overflow-hidden bg-xxm-green-950"
       aria-labelledby="hero-headline"
     >
-      {/* ── Background: the four founders, rotating — desktop only.
-          Mobile gets a plain brand gradient instead; see FoundersBackdrop's
-          own docstring for why. ─────────────────────────────────────── */}
+      {/* ── Background: a golden-hour photograph, behind everything on
+          every breakpoint — see FoundersBackdrop's own docstring for how
+          mobile's scrim differs from desktop's. ─────────────────────── */}
       <FoundersBackdrop />
-      <FoundersLinkDesktop />
+      <FoundersLink />
 
       {/* ── Ambient light + grain, above the portraits ────────────── */}
       <AmbientOrbs />
@@ -32,13 +29,14 @@ export async function HeroSection() {
           the top bar and, below `lg:`, the second row of section pills —
           this padding only needs a small buffer past it, not a guessed one. */}
       {/* `justify-start` on mobile, not `justify-center`. On desktop the
-          founder's portrait sits to the right (`object-right`) and this text
-          block to the left — different halves of the screen, so vertical
-          centring never brings them near each other. Mobile has no photo
-          behind this text at all any more (see FoundersBackdrop), so a
-          plain top-anchored stack is all this needs — nothing here can land
-          on top of anything else, because there is nothing behind it to
-          land on. */}
+          photo sits to the right (`object-right`) and this text block to
+          the left — different halves of the screen, so vertical centring
+          never brings them near each other. Mobile's version of the same
+          photo sits full-bleed behind the whole column instead (see
+          FoundersBackdrop's much heavier mobile scrim), so this stays
+          top-anchored rather than centred — a long column of badge,
+          headline, CTA and stat pills centred vertically would push its
+          first lines uncomfortably far down a tall phone screen. */}
       <div
         className="relative z-10 flex-1 flex flex-col justify-start md:justify-center px-4 md:px-8 max-w-screen-xl mx-auto w-full pb-16 md:pb-12 pt-[calc(var(--nav-height)+1rem)] md:pt-[calc(var(--nav-height)+2.5rem)]"
       >
@@ -86,58 +84,16 @@ export async function HeroSection() {
             </span>
           </h1>
 
-          {/* ── Founders — mobile only ───────────────────────────────
-              Desktop's headline sits beside the rotating photo
-              (FoundersBackdrop); mobile has no photo behind this content at
-              all any more, so the founders get their own presentation
-              instead of a background nobody can safely put anything on top
-              of.
-
-              Real photo cards, not a decorative image: `object-contain`
-              (never crop the name-and-title band baked into each portrait
-              off the foot — the same reason the About page's founder grid
-              uses it) and an `alt` that states the name and title as actual
-              text — legible to a screen reader and to search engines,
-              where the artwork's own printed caption is neither. No second,
-              visible name/title printed over the image in HTML: the About
-              page tried exactly that once, it double-printed every
-              caption — the overlay dulling the one already in the artwork —
-              and removed it. This follows that same, already-learned
-              precedent rather than repeating it.
-
-              Four small cards fit one row on a phone without wrapping or
-              scrolling (each ring colour is the same one the About page's
-              founder grid uses per founder, so the two presentations read
-              as the same set of people rather than two different systems)
-              — "Meet the founders" underneath links to that fuller
-              treatment for anyone who wants the actual bios, which belong
-              on the About page, not crowded into a hero. */}
-          <div className="md:hidden mb-8">
-            <div className="grid grid-cols-4 gap-2.5">
-              {FOUNDERS.map(({ photo, name, title, ring }, i) => (
-                <div
-                  key={name}
-                  className={`relative aspect-[3/4] overflow-hidden rounded-xl bg-xxm-green-900 ring-1 ${ring}`}
-                >
-                  <Image
-                    src={photo}
-                    alt={`${name} — ${title}`}
-                    fill
-                    priority={i === 0}
-                    sizes="25vw"
-                    className="object-contain object-center"
-                  />
-                </div>
-              ))}
-            </div>
-            <Link
-              href="/about#founders"
-              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold tracking-wide text-xxm-gold/70 transition-colors hover:text-xxm-gold"
-            >
-              Meet the founders
-              <ArrowRight size={12} aria-hidden />
-            </Link>
-          </div>
+          {/* A mobile-only founders mini-grid used to sit here — four small
+              portrait cards plus a "Meet the founders" link. Removed: mobile
+              now shares the same photographic backdrop as desktop
+              (FoundersBackdrop), so a grid of real portrait cards on top of
+              it would compete with that photo rather than complement it —
+              and the About page's own founder grid already carries the real
+              faces and bios, so this was a second, redundant presentation
+              of the same four people. The link survives as `FoundersLink`,
+              rendered once near the top of this file for every breakpoint
+              rather than duplicated per-breakpoint here. */}
 
           {/* subheadline — desktop only.
               A phone hero showing badge, three-line headline, this
@@ -284,35 +240,6 @@ export async function HeroSection() {
               </div>
               ))
             })()}
-          </div>
-
-          {/* ── Photo — mobile only, in normal document flow ─────────
-              Desktop's FoundersBackdrop puts this same photograph behind
-              the headline because the headline sits left and the photo's
-              subject sits right — different halves of the screen, so text
-              never lands on top of it. On a single narrow column there is
-              no "beside," only "on top of": an earlier version of this
-              hero put a photo directly behind the mobile text for exactly
-              this reason, and the stat pills ended up sitting on top of a
-              printed name three separate times. That's why mobile has
-              carried no photographic background at all up to now.
-
-              This sits the same photo in NORMAL FLOW instead — a plain
-              block after the stat pills, not `absolute`/`fixed` behind
-              anything — so nothing can ever land on top of it by
-              construction, regardless of how much text this column grows
-              to hold. */}
-          <div className="md:hidden mt-6 relative aspect-[4/3] rounded-2xl overflow-hidden animate-fade-in-up" style={{ animationDelay: '1.1s' }}>
-            <Image
-              src="/hero/brotherhood-terrace.jpg"
-              alt=""
-              fill
-              quality={80}
-              className="object-cover"
-              style={{ objectPosition: '68% 38%' }}
-              sizes="100vw"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-xxm-green-950/50 via-transparent to-transparent" />
           </div>
         </div>
       </div>
