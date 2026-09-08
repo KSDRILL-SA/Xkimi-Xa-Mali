@@ -1,129 +1,92 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { FOUNDERS } from '@/lib/founders'
-
-/** How long each brother holds the hero before the next fades in. */
-const ROTATE_MS = 7_000
-/** Cross-fade duration — long enough to read as a dissolve, not a cut. */
-const FADE_MS = 1_200
+import Link from 'next/link'
+import { ArrowRight } from 'lucide-react'
 
 /**
- * The four founders, rotating behind the hero — desktop only.
+ * The hero's photographic backdrop — desktop only.
  *
- * ── Why this is desktop-only now ─────────────────────────────────────────
+ * ── Why this is desktop-only ──────────────────────────────────────────────
  *
- * On desktop the portrait sits to the right (`object-right`) and the
- * headline sits to the left — different halves of the screen, so the text
- * never sits *on* a founder, only ever beside one.
+ * On desktop the photo sits to the right (`object-right`) and the headline
+ * sits to the left — different halves of the screen, so the text never sits
+ * *on* the photo, only ever beside it.
  *
- * On a single narrow column there is no "beside." The mobile treatment this
- * replaces put the text directly on top of the photo instead, and the stat
- * pills ended up on top of a founder's own printed name three separate
- * times — three different fixes, each patching where the pills sat rather
- * than the arrangement that made a collision possible at all. The one that
- * actually holds is not putting text over a decorative background photo on
- * a phone in the first place.
+ * On a single narrow column there is no "beside." An earlier version of this
+ * component put a founder portrait behind the mobile text directly, and the
+ * stat pills ended up on top of a printed name three separate times — three
+ * different fixes, each patching where the pills sat rather than the
+ * arrangement that made a collision possible at all. The one that actually
+ * held was not putting text over a decorative background photo on a phone in
+ * the first place. So mobile carries no photo at all — a plain brand
+ * gradient with a quiet glow instead — and stays that way here.
  *
- * So mobile carries no photo at all now — a plain brand gradient instead —
- * and the founders get their own dedicated, accessible presentation in the
- * hero's own content (real photo cards with real `alt` text, in
- * HeroSection.tsx), the same treatment the About page's founder grid
- * already uses. Nothing about who they are was lost by removing the
- * backdrop; it moved to a place it can't collide with anything.
+ * ── Why one static photo instead of the four founders rotating ───────────
  *
- * ── What's kept, and why ─────────────────────────────────────────────────
- *
- * Each desktop portrait still renders twice: a blurred, scaled copy fills
- * the frame edge to edge so the brother's own colours bleed into the
- * background, and the sharp copy sits on top under `object-contain` so the
- * card is shown whole — the name and title are baked into the artwork, and
- * cropping to fill the frame would cut that band off. The blur also
- * absorbs the difference between a dark studio card and a light grey one,
- * which as a hard cut would flash on every rotation.
- *
- * The rotation timer itself still runs regardless of viewport — gating a
- * `setInterval` by a `matchMedia` check would be one more thing to keep in
- * sync with the CSS breakpoints below for a cost (one idle timer) not worth
- * the risk of the two disagreeing.
+ * The previous version cross-faded the four founders' own portrait cards
+ * behind this same scrim. That doubled up against the mobile founders grid
+ * further down the page (HeroSection.tsx) and the About page's founder
+ * grid — three separate places claiming to be "the" founder presentation.
+ * This backdrop is now purely atmospheric — a single golden-hour photograph
+ * that carries the "Brotherhood" headline's mood without standing in for
+ * anyone's actual likeness — and the "Meet the founders" link below points
+ * at the one place that still shows their real faces and names.
  */
 export function FoundersBackdrop() {
-  const [index, setIndex] = useState(0)
-
-  useEffect(() => {
-    // Honour a reduced-motion preference by not auto-advancing at all: the
-    // rotation is decorative, and motion nobody asked for is exactly what that
-    // setting exists to stop.
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-
-    const id = setInterval(() => setIndex((i) => (i + 1) % FOUNDERS.length), ROTATE_MS)
-    return () => clearInterval(id)
-  }, [])
-
   return (
     <div className="absolute inset-0 z-0" aria-hidden>
-      {/* Plain brand gradient — mobile's entire background now, since the
-          photo no longer renders there. Kept simple and dark rather than
-          matching the desktop scrim's lopsided treatment, which was
-          balancing text-contrast against a photo that mobile doesn't
-          show; nothing here needs balancing against. */}
+      {/* Plain brand gradient — mobile's entire background, since the photo
+          below never renders there. Kept simple and dark rather than
+          matching the desktop scrim's lopsided treatment, which balances
+          text-contrast against a photo mobile doesn't show; nothing here
+          needs balancing against. */}
       <div className="absolute inset-0 md:hidden bg-gradient-to-b from-xxm-green-950 via-xxm-green-900 to-xxm-green-950" />
+      {/* Quiet golden-hour glow, upper-right — mobile's headline and stat
+          pills sit in the upper-left two-thirds, so the warmth lives where
+          nothing needs to stay legible against it. */}
+      <div
+        className="absolute inset-0 md:hidden opacity-60"
+        style={{ background: 'radial-gradient(ellipse 65% 45% at 88% 8%, #D4AF37 0%, transparent 65%)' }}
+      />
 
-      {/* Everything below is desktop-only: the rotating portraits, their
-          scrims, and the rotation dots that indicate which one is showing. */}
+      {/* Everything below is desktop-only: the photograph and its scrims. */}
       <div className="hidden md:block absolute inset-0">
-        {FOUNDERS.map((founder, i) => (
-          <div
-            key={founder.photo}
-            className="absolute inset-0 transition-opacity ease-in-out"
-            style={{ opacity: i === index ? 1 : 0, transitionDuration: `${FADE_MS}ms` }}
-          >
-            {/* Ambient fill — the portrait blown out and blurred to the edges. */}
-            <Image
-              src={founder.photo}
-              alt=""
-              fill
-              priority={i === 0}
-              quality={40}
-              className="object-cover scale-125 blur-2xl opacity-70"
-              sizes="55vw"
-            />
-            {/* The card itself, whole and uncropped. Held clear of the hero's
-                bottom bleed into the next section, which otherwise washes out
-                the name band printed across the foot of each portrait. */}
-            <div className="absolute inset-x-0 top-0 bottom-32">
-              <Image
-                src={founder.photo}
-                alt=""
-                fill
-                priority={i === 0}
-                quality={85}
-                className="object-contain object-right"
-                sizes="55vw"
-              />
-            </div>
-          </div>
-        ))}
+        <Image
+          src="/hero/brotherhood-terrace.jpg"
+          alt=""
+          fill
+          priority
+          quality={85}
+          className="object-cover object-right"
+          sizes="100vw"
+        />
 
         {/* Readability scrim. Heavy on the left where the headline sits, let
-            almost all the way up on the right so the brother is actually
-            seen — the whole point of putting him there. */}
+            almost all the way up on the right so the photograph is actually
+            seen — the whole point of putting it there. */}
         <div className="absolute inset-0 bg-gradient-to-r from-xxm-green-950 from-25% via-xxm-green-950/70 via-55% to-xxm-green-950/5" />
         <div className="absolute inset-0 bg-gradient-to-b from-xxm-green-950/45 via-transparent to-xxm-green-950/75" />
-
-        {/* Which brother is showing — the only thing the artwork doesn't say. */}
-        <div className="absolute bottom-8 right-10 flex gap-1.5">
-          {FOUNDERS.map((founder, i) => (
-            <span
-              key={founder.photo}
-              className={`h-1 rounded-full transition-all duration-500 ${
-                i === index ? 'w-6 bg-xxm-gold' : 'w-1.5 bg-white/30'
-              }`}
-            />
-          ))}
-        </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * "Meet the founders" — desktop's own link to the real faces behind the
+ * brotherhood, now that the backdrop above is a photograph rather than the
+ * founders' own portraits. Sits where the old rotation dots used to,
+ * `pointer-events-auto` because its parent tree is `aria-hidden`/decorative
+ * up to the hero section, not because this link itself is decorative.
+ */
+export function FoundersLinkDesktop() {
+  return (
+    <Link
+      href="/about#founders"
+      className="hidden md:inline-flex absolute bottom-8 right-10 z-10 items-center gap-1.5 glass rounded-full px-4 py-2 text-xs font-semibold tracking-wide text-white/80 transition-colors hover:text-xxm-gold"
+    >
+      Meet the founders
+      <ArrowRight size={12} aria-hidden />
+    </Link>
   )
 }
