@@ -1,5 +1,4 @@
 import { logger } from '@xxm/observability'
-import { escapeHtml } from '@xxm/utils'
 import { db } from '@/lib/db'
 import { env } from '@/lib/env'
 import { emailProvider } from '@/integrations/email'
@@ -165,14 +164,17 @@ async function deliverToFallback(alert: OperationalAlert): Promise<boolean> {
   if (!to) return false
 
   const sent = await attempt('fallback-email', () =>
-    emailProvider.sendGenericEmail(
+    // The same branded template the queued `admin-alert-email` path uses
+    // (see notification.service.ts's dispatchEmail switch) — this used to
+    // hand-roll its own bare `<div style="font-family:sans-serif">` HTML,
+    // so the one channel that exists for when everything else is broken
+    // was also the one email in the whole system with no branding, no
+    // heading, and no styling at all. Same content, same escaping (done
+    // inside `sendAdminAlertEmail` itself now), properly branded.
+    emailProvider.sendAdminAlertEmail(
       to,
-      `Action needed: ${alert.title}`,
-      `<div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px 24px;">` +
-        `<h2 style="margin:0 0 16px;">${escapeHtml(alert.title)}</h2>` +
-        `<pre style="white-space:pre-wrap;font-family:inherit;margin:0 0 24px;">${escapeHtml(alert.body)}</pre>` +
-        `<p style="color:#666;font-size:13px;margin:0;">Automated operational alert (${escapeHtml(alert.code)}) ` +
-        `from the Xkimi Xa Mali Foundation system.</p></div>`,
+      alert.title,
+      alert.body,
       // Not an idempotency key Resend can dedupe on across runs — the code and
       // the entity are what make two alerts the same alert.
       `alert:${alert.code}:${alert.entityId ?? ''}`,

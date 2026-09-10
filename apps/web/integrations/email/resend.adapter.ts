@@ -6,6 +6,11 @@ import {
   sendPaymentFailedEmail,
   sendInviteEmail,
   sendOverdueReminderEmail,
+  sendContributionReversedEmail,
+  sendStatementReadyEmail,
+  sendBadgeLevelUpEmail,
+  sendFounderBadgeGrantedEmail,
+  sendAdminAlertEmail,
   sendBroadcastEmail,
   sendGenericEmail,
 } from '@/lib/email'
@@ -19,6 +24,11 @@ export const resendProvider: IEmailProvider = {
   sendPaymentFailedEmail,
   sendInviteEmail,
   sendOverdueReminderEmail,
+  sendContributionReversedEmail,
+  sendStatementReadyEmail,
+  sendBadgeLevelUpEmail,
+  sendFounderBadgeGrantedEmail,
+  sendAdminAlertEmail,
   sendBroadcastEmail,
   sendGenericEmail,
 }
