@@ -31,6 +31,11 @@ import {
   sendPaymentFailedEmail,
   sendInviteEmail,
   sendOverdueReminderEmail,
+  sendContributionReversedEmail,
+  sendStatementReadyEmail,
+  sendBadgeLevelUpEmail,
+  sendFounderBadgeGrantedEmail,
+  sendAdminAlertEmail,
 } from '@/lib/email'
 
 const PAYLOAD_NAME = '<img src=x onerror=alert(1)>'
@@ -84,6 +89,46 @@ describe('every named email template escapes the first name in its HTML body', (
     await sendOverdueReminderEmail('a@test.com', PAYLOAD_NAME, '100.00', 'August 2026', 'https://x.test/dash')
     expect(sentHtml()).not.toContain(PAYLOAD_NAME)
     expect(sentHtml()).toContain(ESCAPED_NAME)
+  })
+
+  it('sendContributionReversedEmail', async () => {
+    await sendContributionReversedEmail(
+      'a@test.com', PAYLOAD_NAME, '100.00', 'August 2026', 'reason text', 'https://x.test/history',
+    )
+    expect(sentHtml()).not.toContain(PAYLOAD_NAME)
+    expect(sentHtml()).toContain(ESCAPED_NAME)
+  })
+
+  it('sendStatementReadyEmail', async () => {
+    await sendStatementReadyEmail('a@test.com', PAYLOAD_NAME, 'August 2026', 'https://x.test/statement')
+    expect(sentHtml()).not.toContain(PAYLOAD_NAME)
+    expect(sentHtml()).toContain(ESCAPED_NAME)
+  })
+
+  it('sendBadgeLevelUpEmail', async () => {
+    await sendBadgeLevelUpEmail('a@test.com', PAYLOAD_NAME, 'WORLD_CLASS')
+    expect(sentHtml()).not.toContain(PAYLOAD_NAME)
+    expect(sentHtml()).toContain(ESCAPED_NAME)
+  })
+
+  it('sendFounderBadgeGrantedEmail', async () => {
+    await sendFounderBadgeGrantedEmail('a@test.com', PAYLOAD_NAME)
+    expect(sentHtml()).not.toContain(PAYLOAD_NAME)
+    expect(sentHtml()).toContain(ESCAPED_NAME)
+  })
+})
+
+describe('sendAdminAlertEmail escapes title and detail — neither is authored by a person', () => {
+  it('escapes an XSS payload in both the title and the detail', async () => {
+    await sendAdminAlertEmail(
+      'ops@test.com',
+      'gateway said <script>alert(1)</script>',
+      'reason: "5 & 6" <b>bold</b>',
+    )
+    const html = sentHtml()
+    expect(html).not.toContain('<script>')
+    expect(html).toContain('&lt;script&gt;')
+    expect(html).toContain('&amp;')
   })
 })
 

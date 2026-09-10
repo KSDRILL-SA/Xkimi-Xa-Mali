@@ -58,7 +58,7 @@ type QueuedNotification = {
   payload: unknown
   createdAt: Date
   template: { id: string; slug: string; channel: string; body: string; subject: string | null }
-  user: { email: string | null; phone: string | null }
+  user: { email: string | null; phone: string | null; firstName: string }
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +181,10 @@ async function dispatchEmail(
   const amount = String(payload.amount ?? '0')
   const period = String(payload.period ?? payload.month ?? '')
   const dashboardUrl = String(payload.url ?? env.NEXTAUTH_URL ?? '')
+  const reason = String(payload.reason ?? '')
+  const tier = String(payload.tier ?? '')
+  const title = String(payload.title ?? '')
+  const detail = String(payload.detail ?? '')
 
   // The notification id is a stable idempotency key: if this row is recovered
   // and re-dispatched after a worker crash, Resend returns the original send
@@ -199,6 +203,27 @@ async function dispatchEmail(
       break
     case 'overdue-reminder-email':
       await emailProvider.sendOverdueReminderEmail(to, firstName, amount, period, dashboardUrl, key)
+      break
+    // These five real, actively-queued slugs (contribution.service.ts,
+    // badge.service.ts, distinction.service.ts, monthly-statement-notice.ts,
+    // alert.service.ts) used to match none of the cases above and fall to
+    // `default` below — the branded shell, but the template's own raw
+    // plain-text `body` dropped in unstyled: no heading, no paragraph
+    // spacing, no styled button, just interpolated text and a bare URL.
+    case 'contribution-reversed-email':
+      await emailProvider.sendContributionReversedEmail(to, firstName, amount, period, reason, dashboardUrl, key)
+      break
+    case 'badge-level-up-email':
+      await emailProvider.sendBadgeLevelUpEmail(to, firstName, tier, key)
+      break
+    case 'founder-badge-granted':
+      await emailProvider.sendFounderBadgeGrantedEmail(to, firstName, key)
+      break
+    case 'statement-ready-email':
+      await emailProvider.sendStatementReadyEmail(to, firstName, period, dashboardUrl, key)
+      break
+    case 'admin-alert-email':
+      await emailProvider.sendAdminAlertEmail(to, title, detail, key)
       break
     default:
       // The template's own `subject` column, when it has one. Every email used
@@ -345,7 +370,9 @@ export async function sendNotificationNow(params: {
     payload: params.payload as Prisma.InputJsonValue,
   })
 
-  const payload = params.payload
+  // Same fallback as the flush path below: a caller-supplied `firstName`
+  // still wins, this just covers the ones that forgot to pass it.
+  const payload = { firstName: user.firstName, ...params.payload }
 
   try {
     if (params.channel === 'EMAIL' && user.email) {
@@ -385,7 +412,7 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
     {
       include: {
         template: true,
-        user: { select: { email: true, phone: true } },
+        user: { select: { email: true, phone: true, firstName: true } },
       },
     },
   )
@@ -401,7 +428,14 @@ export async function flushQueuedNotifications(batchSize = 100): Promise<FlushRe
   await Promise.all(
     (claimed as unknown as QueuedNotification[]).map(async (notification) => {
       const prefs = prefsMap.get(notification.userId)
-      const payload = notification.payload as Record<string, unknown>
+      // `firstName` first, so a caller who *did* pass one in the explicit
+      // payload still wins — this is a fallback, not an override. Every
+      // caller that queues a slug whose body says `{{firstName}}` used to
+      // have to remember to pass it themselves; most did, one didn't
+      // (`badge-level-up-email`, silently sending "Hi ,"), and the fix
+      // belongs here once rather than at every call site that could forget
+      // it again.
+      const payload = { firstName: notification.user.firstName, ...(notification.payload as Record<string, unknown>) }
       const slug = notification.template.slug
 
       // User opted out — mark silently sent (preference respected, not a failure)

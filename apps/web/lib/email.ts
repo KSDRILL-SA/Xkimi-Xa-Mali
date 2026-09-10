@@ -43,44 +43,60 @@ const SERIF = `Georgia,'Times New Roman',serif`
  * Every key that existed before is kept, because each is referenced by name
  * from the individual email bodies further down this file — changing the
  * design means changing these values, not renaming the tokens.
+ *
+ * -- The pass that widened this scale ----------------------------------------
+ *
+ * The system was already sound — real hierarchy, a serif/sans pairing that
+ * survives every client, a real list and a real details table instead of
+ * bullet-character paragraphs. What it lacked was confidence: a 26px heading
+ * reads as a large paragraph rather than a moment, and every block sat at the
+ * same 22px gap regardless of how much it needed to be set apart from its
+ * neighbour. `heading` gets a genuine hero size and a tighter line-height to
+ * match; the eyebrow above it gets a touch more tracking, since a wider gap
+ * between it and a bigger heading now needs a stronger, not weaker, label to
+ * announce it. `h2` gets more air above it — 30px was barely more than a
+ * paragraph gap for a line whose entire job is to say "new section here."
  */
 const S = {
   // -- Type scale ------------------------------------------------------------
-  eyebrow: `margin:0 0 10px;color:${BRAND.gold};font-size:11px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;`,
-  heading: `margin:0 0 14px;color:${BRAND.green};font-family:${SERIF};font-size:26px;line-height:1.25;font-weight:700;letter-spacing:-0.3px;`,
-  body:    `margin:0 0 22px;color:${BRAND.body};font-size:15px;line-height:1.65;`,
-  lead:    `margin:0 0 22px;color:${BRAND.ink};font-size:16px;line-height:1.6;`,
-  small:   `margin:22px 0 0;color:${BRAND.muted};font-size:13px;line-height:1.6;`,
+  eyebrow: `margin:0 0 12px;color:${BRAND.gold};font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;`,
+  heading: `margin:0 0 18px;color:${BRAND.green};font-family:${SERIF};font-size:30px;line-height:1.2;font-weight:700;letter-spacing:-0.4px;`,
+  body:    `margin:0 0 24px;color:${BRAND.body};font-size:15px;line-height:1.7;`,
+  lead:    `margin:0 0 26px;color:${BRAND.ink};font-size:16px;line-height:1.65;`,
+  small:   `margin:24px 0 0;color:${BRAND.muted};font-size:13px;line-height:1.65;`,
 
   // A second heading level. There was only one, so an email with more than a
   // single idea in it had no way to say where the next one started.
-  h2:      `margin:30px 0 12px;color:${BRAND.ink};font-size:15px;font-weight:800;letter-spacing:-0.1px;`,
+  h2:      `margin:36px 0 14px;color:${BRAND.ink};font-size:15px;font-weight:800;letter-spacing:-0.1px;`,
   // List items as a real list. These used to be a single paragraph of bullet
   // characters separated by <br/>, which reads as one block of text and is
   // announced as one sentence by a screen reader.
-  ul:      `margin:0 0 22px;padding:0 0 0 20px;color:${BRAND.body};font-size:15px;line-height:1.65;`,
-  li:      `margin:0 0 8px;`,
+  ul:      `margin:0 0 24px;padding:0 0 0 20px;color:${BRAND.body};font-size:15px;line-height:1.7;`,
+  li:      `margin:0 0 9px;`,
 
   // -- Call to action --------------------------------------------------------
   // `mso-padding-alt` is ignored everywhere except Outlook, where it is the
-  // only padding that applies to a link.
-  btn:     `display:inline-block;background:${BRAND.green};color:#ffffff;text-decoration:none;padding:15px 34px;border-radius:10px;font-weight:700;font-size:15px;line-height:1;mso-padding-alt:15px 34px;`,
-  rawUrl:  `margin:14px 0 0;color:${BRAND.faint};font-size:12px;line-height:1.5;word-break:break-all;`,
+  // only padding that applies to a link. Rounder and roomier than before —
+  // 10px on a 15px/34px button reads as barely-rounded at email scale; 13px
+  // is the point a pill-shaped button actually looks intentional rather than
+  // like an un-styled link with padding.
+  btn:     `display:inline-block;background:${BRAND.green};color:#ffffff;text-decoration:none;padding:16px 38px;border-radius:13px;font-weight:700;font-size:15px;line-height:1;letter-spacing:0.2px;mso-padding-alt:16px 38px;`,
+  rawUrl:  `margin:16px 0 0;color:${BRAND.faint};font-size:12px;line-height:1.5;word-break:break-all;`,
 
   // -- Structural ------------------------------------------------------------
-  hr:      `border:none;border-top:1px solid ${BRAND.hairline};margin:30px 0;`,
-  panel:   `background:${BRAND.canvasSoft};border:1px solid ${BRAND.hairline};border-radius:12px;padding:18px 20px;margin:0 0 22px;`,
+  hr:      `border:none;border-top:1px solid ${BRAND.hairline};margin:34px 0;`,
+  panel:   `background:${BRAND.canvasSoft};border:1px solid ${BRAND.hairline};border-radius:12px;padding:20px 22px;margin:0 0 24px;`,
   panelLabel: `margin:0 0 4px;color:${BRAND.faint};font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;`,
   panelValue: `margin:0;color:${BRAND.ink};font-size:15px;font-weight:700;line-height:1.4;`,
 
   // -- Footer ----------------------------------------------------------------
-  footer:  `margin:0;color:${BRAND.faint};font-size:12px;line-height:1.65;`,
+  footer:  `margin:0;color:${BRAND.faint};font-size:12px;line-height:1.7;`,
   flink:   `color:${BRAND.green};text-decoration:none;font-weight:600;`,
 
   // -- Alert block -----------------------------------------------------------
-  danger:  `background:#FEF2F2;border:1px solid #FECACA;border-left:4px solid #DC2626;border-radius:10px;padding:15px 17px;margin-top:22px;`,
+  danger:  `background:#FEF2F2;border:1px solid #FECACA;border-left:4px solid #DC2626;border-radius:10px;padding:16px 18px;margin-top:24px;`,
   dtxt:    `margin:0;color:#991B1B;font-size:13px;font-weight:700;`,
-  dbody:   `margin:8px 0 0;color:#7F1D1D;font-size:13px;line-height:1.55;`,
+  dbody:   `margin:8px 0 0;color:#7F1D1D;font-size:13px;line-height:1.6;`,
 }
 
 /**
@@ -144,7 +160,7 @@ export function layout(content: string, preheader: string): string {
     <tr><td style="background:${BRAND.gold};font-size:0;line-height:0;height:3px;">&nbsp;</td></tr>
 
     <tr>
-      <td style="background:${BRAND.surface};padding:36px 30px 34px;font-family:${FONT};">
+      <td style="background:${BRAND.surface};padding:40px 32px 38px;font-family:${FONT};">
         ${content}
       </td>
     </tr>
@@ -233,12 +249,12 @@ export function details(rows: Array<[label: string, value: string]>): string {
   const cells = rows.map(([label, value], i) => {
     const edge = i === rows.length - 1 ? '' : `border-bottom:1px solid ${BRAND.hairline};`
     return `<tr>
-      <td style="padding:12px 0;${edge}color:${BRAND.muted};font-size:14px;">${escapeHtml(label)}</td>
-      <td style="padding:12px 0;${edge}color:${BRAND.ink};font-weight:700;font-size:15px;text-align:right;">${value}</td>
+      <td style="padding:14px 0;${edge}color:${BRAND.muted};font-size:14px;">${escapeHtml(label)}</td>
+      <td style="padding:14px 0;${edge}color:${BRAND.ink};font-weight:700;font-size:15px;text-align:right;">${value}</td>
     </tr>`
   }).join('')
 
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${BRAND.canvasSoft};border:1px solid ${BRAND.hairline};border-radius:12px;padding:2px 18px;margin:0 0 22px;">${cells}</table>`
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;background:${BRAND.canvasSoft};border:1px solid ${BRAND.hairline};border-radius:12px;padding:4px 20px;margin:0 0 24px;">${cells}</table>`
 }
 
 /** A horizontal rule before the fine print, so it reads as a footnote. */
@@ -252,8 +268,13 @@ export function note(html: string): string {
 }
 
 export function cta(url: string, label: string): string {
+  // The wrapping `<td>`'s own radius has to match `S.btn`'s — it's the cell
+  // that actually shows a corner in Outlook, where the `<a>`'s own
+  // border-radius is ignored. Left at the old 10px while `S.btn` moved to
+  // 13px, the two would show as two different curves stacked on each
+  // other in exactly the client this table exists to support.
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-      <td style="background:${BRAND.green};border-radius:10px;">
+      <td style="background:${BRAND.green};border-radius:13px;">
         <a href="${url}" style="${S.btn}">${label}</a>
       </td>
     </tr></table>
@@ -447,6 +468,153 @@ export async function sendOverdueReminderEmail(
       ${note('You can pay in full or make a partial payment toward the balance — both are recorded against this period.')}
       ${note(`If money is tight this month, speak to us at <a href="mailto:${SUPPORT}" style="${S.flink}">${SUPPORT}</a> rather than going quiet.`)}
     `, `R${amount} outstanding for ${period}.`),
+  }, idempotencyKey)
+}
+
+/**
+ * A reversal takes back money the member was already told had arrived —
+ * the message they are most likely to need and least likely to expect, so
+ * it says plainly that nothing was deleted: the original payment and the
+ * reversing entry both stay on record. `MANDATORY_SLUGS` in
+ * notification.service.ts backs that with a preference an opt-out cannot
+ * silence, and this is the styled version of that promise rather than a
+ * raw template string dropped into the shell unstyled.
+ */
+export async function sendContributionReversedEmail(
+  to: string, firstName: string, amount: string, period: string, reason: string, url: string, idempotencyKey?: string,
+): Promise<void> {
+  const safeName = escapeHtml(firstName)
+  await send({
+    from: FROM, to,
+    subject: `A payment has been reversed — ${APP_NAME}`,
+    html: layout(`
+      ${eyebrow('Reversal')}
+      <h1 style="${S.heading}">A payment has been reversed</h1>
+      ${lead(`Hi ${safeName}, your contribution for <strong>${period}</strong> has been reversed by leadership. Nothing has been deleted — the original payment and the reversing entry both remain in your history.`)}
+      ${details([
+        ['Amount', `R${amount}`],
+        ['Period', escapeHtml(period)],
+        ['Reason given', escapeHtml(reason)],
+      ])}
+      ${cta(url, 'View your history')}
+      ${divider()}
+      ${note(`Questions about this reversal? Contact us at <a href="mailto:${SUPPORT}" style="${S.flink}">${SUPPORT}</a>.`)}
+    `, `A R${amount} contribution for ${period} has been reversed.`),
+  }, idempotencyKey)
+}
+
+/**
+ * A member's own standing statement, ready to download. Distinct from
+ * `sendGenericEmail`'s bare template path: this is genuinely queued news
+ * rather than money moving (`MANDATORY_SLUGS`'s own comment draws that
+ * line), so it earns the same eyebrow/heading treatment as a receipt
+ * without implying anything urgent the way a payment email's styling would.
+ */
+export async function sendStatementReadyEmail(
+  to: string, firstName: string, period: string, url: string, idempotencyKey?: string,
+): Promise<void> {
+  const safeName = escapeHtml(firstName)
+  await send({
+    from: FROM, to,
+    subject: `Your ${period} statement is ready — ${APP_NAME}`,
+    html: layout(`
+      ${eyebrow('Statement ready')}
+      <h1 style="${S.heading}">Your statement is ready</h1>
+      ${lead(`Hi ${safeName}, your contribution statement for <strong>${period}</strong> is ready to download.`)}
+      ${cta(url, 'Download your statement')}
+      ${divider()}
+      ${note('Every statement stays available from your dashboard at any time — this one is not time-limited.')}
+    `, `Your ${period} statement is ready to download.`),
+  }, idempotencyKey)
+}
+
+/** `AMATEUR` / `SEMI_PRO` / `WORLD_CLASS` → `Amateur` / `Semi Pro` / `World Class`. */
+function formatTier(tier: string): string {
+  return tier
+    .toLowerCase()
+    .split('_')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
+}
+
+/**
+ * A promotion, earned by consistent contributions rather than announced by
+ * an admin — the one piece of good news this system sends unprompted, and
+ * the styled version is the difference between that landing as a genuine
+ * moment and as the same grey paragraph as every other notification.
+ */
+export async function sendBadgeLevelUpEmail(
+  to: string, firstName: string, tier: string, idempotencyKey?: string,
+): Promise<void> {
+  const safeName = escapeHtml(firstName)
+  const tierLabel = formatTier(tier)
+  await send({
+    from: FROM, to,
+    subject: `You have been promoted — ${APP_NAME}`,
+    html: layout(`
+      ${eyebrow('Promotion')}
+      <h1 style="${S.heading}">You have been promoted</h1>
+      ${lead(`Hi ${safeName}, congratulations! Your consistent contributions have earned you <strong>${escapeHtml(tierLabel)}</strong> status.`)}
+      ${cta(`${APP_URL}/dashboard`, 'View your dashboard')}
+      ${divider()}
+      ${note('Badge status reflects consistency and timeliness over time — keep contributing on schedule to hold it.')}
+    `, `You have been promoted to ${tierLabel} status.`),
+  }, idempotencyKey)
+}
+
+/**
+ * A founder badge is granted by hand, so it appears on an account without
+ * the member having done anything — unannounced, that reads as a bug
+ * rather than an honour. Email only, per the badge's own original intent:
+ * it is not money moving and not urgent.
+ */
+export async function sendFounderBadgeGrantedEmail(
+  to: string, firstName: string, idempotencyKey?: string,
+): Promise<void> {
+  const safeName = escapeHtml(firstName)
+  await send({
+    from: FROM, to,
+    subject: `Your Founder badge — ${APP_NAME}`,
+    html: layout(`
+      ${eyebrow('Founder badge')}
+      <h1 style="${S.heading}">A Founder badge, for you</h1>
+      ${lead(`Hi ${safeName}, the Founder badge has been added to your account. It marks you as one of the four who started this collective.`)}
+      ${bullets([
+        'It sits alongside whatever contribution badge you have earned — it does not replace it',
+        'It stays with your account for good, regardless of how your contribution badge changes',
+      ])}
+      ${cta(`${APP_URL}/dashboard`, 'View your dashboard')}
+    `, 'The Founder badge has been added to your account.'),
+  }, idempotencyKey)
+}
+
+/**
+ * Operational alerts to leadership — not a member notification. Deliberately
+ * plainer than the emails above it: no greeting (it is not addressed to a
+ * person, it is addressed to whoever is on call), and `detail` renders as
+ * real paragraphs the same way a broadcast's composer text does, since an
+ * alert's detail is free text that may carry its own line breaks.
+ */
+export async function sendAdminAlertEmail(
+  to: string, title: string, detail: string, idempotencyKey?: string,
+): Promise<void> {
+  const paragraphs = detail
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p style="${S.body}">${escapeHtml(p).replace(/\n/g, '<br/>')}</p>`)
+    .join('') || `<p style="${S.body}">${escapeHtml(detail)}</p>`
+
+  await send({
+    from: FROM, to,
+    subject: `Action needed: ${title}`,
+    html: layout(`
+      ${eyebrow('Operational alert')}
+      <h1 style="${S.heading}">${escapeHtml(title)}</h1>
+      ${paragraphs}
+      ${divider()}
+      ${note(`This is an automated operational alert from the ${APP_NAME} system. Full detail is in your admin inbox.`)}
+    `, title),
   }, idempotencyKey)
 }
 

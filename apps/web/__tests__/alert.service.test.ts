@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   notifyAdmins: vi.fn(),
   queueNotification: vi.fn(),
   writeAuditLog: vi.fn(),
-  sendGenericEmail: vi.fn(),
+  sendAdminAlertEmail: vi.fn(),
   loggerError: vi.fn(),
   loggerWarn: vi.fn(),
   env: {} as { ALERT_FALLBACK_EMAIL?: string },
@@ -26,7 +26,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/env', () => ({ env: mocks.env }))
 vi.mock('@/integrations/email', () => ({
-  emailProvider: { sendGenericEmail: mocks.sendGenericEmail },
+  emailProvider: { sendAdminAlertEmail: mocks.sendAdminAlertEmail },
 }))
 vi.mock('@/lib/db', () => ({ db: { user: { findMany: mocks.findAdmins } } }))
 vi.mock('@/services/inbox.service', () => ({ notifyAdmins: mocks.notifyAdmins }))
@@ -56,7 +56,7 @@ const queuedOn = (channel: string) =>
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.env.ALERT_FALLBACK_EMAIL = undefined
-  mocks.sendGenericEmail.mockResolvedValue(undefined)
+  mocks.sendAdminAlertEmail.mockResolvedValue(undefined)
   mocks.findAdmins.mockResolvedValue([{ id: 'admin-1' }, { id: 'admin-2' }])
   mocks.notifyAdmins.mockResolvedValue(2)
   mocks.queueNotification.mockResolvedValue(undefined)
@@ -227,10 +227,10 @@ describe('the destination that does not depend on an account', () => {
 
     expect(result.admins).toBe(0)
     expect(result.fallback).toBe(true)
-    const [to, subject, html] = mocks.sendGenericEmail.mock.calls[0]
+    const [to, title, detail] = mocks.sendAdminAlertEmail.mock.calls[0]
     expect(to).toBe('ops@example.test')
-    expect(subject).toContain(CRITICAL.title)
-    expect(html).toContain('9 declined by the bank')
+    expect(title).toBe(CRITICAL.title)
+    expect(detail).toContain('9 declined by the bank')
   })
 
   it('sends directly rather than queueing — the queue may be what broke', async () => {
@@ -240,7 +240,7 @@ describe('the destination that does not depend on an account', () => {
 
     // Putting the alert about a dead notification worker into that worker's
     // queue is not a plan.
-    expect(mocks.sendGenericEmail).toHaveBeenCalledOnce()
+    expect(mocks.sendAdminAlertEmail).toHaveBeenCalledOnce()
     expect(queuedOn('EMAIL').map((a) => a.userId)).toEqual(['admin-1', 'admin-2'])
   })
 
@@ -249,35 +249,25 @@ describe('the destination that does not depend on an account', () => {
 
     await raiseOperationalAlert(WARNING)
 
-    expect(mocks.sendGenericEmail).not.toHaveBeenCalled()
+    expect(mocks.sendAdminAlertEmail).not.toHaveBeenCalled()
   })
 
   it('is a no-op when unset, leaving the admin fan-out as the whole story', async () => {
     const result = await raiseOperationalAlert(CRITICAL)
 
-    expect(mocks.sendGenericEmail).not.toHaveBeenCalled()
+    expect(mocks.sendAdminAlertEmail).not.toHaveBeenCalled()
     expect(result).toMatchObject({ fallback: false, email: true, sms: true })
   })
 
-  it('escapes what it interpolates — none of it is authored by a person', async () => {
-    mocks.env.ALERT_FALLBACK_EMAIL = 'ops@example.test'
-
-    // A gateway failure string or a Prisma error goes straight into this body.
-    await raiseOperationalAlert({
-      ...CRITICAL,
-      title: 'gateway said <script>alert(1)</script>',
-      body: 'reason: "5 & 6" <b>bold</b>',
-    })
-
-    const html = mocks.sendGenericEmail.mock.calls[0][2]
-    expect(html).not.toContain('<script>')
-    expect(html).toContain('&lt;script&gt;')
-    expect(html).toContain('&amp;')
-  })
+  // Escaping itself is `sendAdminAlertEmail`'s own responsibility now — it
+  // builds real HTML from `title`/`detail` internally — so that guarantee
+  // is tested against the real implementation in email-html-escaping.test.ts
+  // rather than here, where the provider is mocked and would only prove the
+  // mock passes its arguments through unchanged.
 
   it('does not let its own failure cost the admin channels', async () => {
     mocks.env.ALERT_FALLBACK_EMAIL = 'ops@example.test'
-    mocks.sendGenericEmail.mockRejectedValue(new Error('resend down'))
+    mocks.sendAdminAlertEmail.mockRejectedValue(new Error('resend down'))
 
     const result = await raiseOperationalAlert(CRITICAL)
 

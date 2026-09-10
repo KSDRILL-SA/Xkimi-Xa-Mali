@@ -34,6 +34,11 @@ vi.mock('@/integrations/email', () => ({
     sendPaymentSuccessEmail: vi.fn(),
     sendPaymentFailedEmail: vi.fn(),
     sendOverdueReminderEmail: vi.fn(),
+    sendContributionReversedEmail: vi.fn(),
+    sendStatementReadyEmail: vi.fn(),
+    sendBadgeLevelUpEmail: vi.fn(),
+    sendFounderBadgeGrantedEmail: vi.fn(),
+    sendAdminAlertEmail: vi.fn(),
     sendGenericEmail: vi.fn(),
   },
 }))
