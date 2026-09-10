@@ -1,8 +1,6 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
 
 /**
  * The hero's photographic backdrop.
@@ -32,10 +30,12 @@ import { ArrowRight } from 'lucide-react'
  * grid of the same four cards further down the page — on top of the About
  * page's own founder grid, that was three separate places claiming to be
  * "the" founder presentation. Both are gone now. This backdrop is purely
- * atmospheric — a single golden-hour photograph
- * that carries the "Brotherhood" headline's mood without standing in for
- * anyone's actual likeness — and the "Meet the founders" link below points
- * at the one place that still shows their real faces and names.
+ * atmospheric — a single golden-hour photograph that carries the
+ * "Brotherhood" headline's mood without standing in for anyone's actual
+ * likeness. The real founders' faces and names live on the About page,
+ * which the site's own primary navigation already links to — the hero
+ * itself carried a "Meet the founders" link pointing at that page too at
+ * one point; removed, since the nav link already does that job.
  */
 export function FoundersBackdrop() {
   return (
@@ -112,29 +112,5 @@ export function FoundersBackdrop() {
       <div className="hidden md:block absolute inset-0 bg-gradient-to-r from-xxm-green-950 from-25% via-xxm-green-950/70 via-[55%] to-xxm-green-950/5" />
       <div className="hidden md:block absolute inset-0 bg-gradient-to-b from-xxm-green-950/45 via-transparent to-xxm-green-950/75" />
     </div>
-  )
-}
-
-/**
- * "Meet the founders" — the hero's own link to the real faces behind the
- * brotherhood, now that the backdrop above is a photograph rather than the
- * founders' own portraits. Renders on every breakpoint: mobile used to
- * carry a small grid of the founders' actual portrait cards instead, but
- * that duplicated the About page's own founder grid (the real bios live
- * there, not in the hero) and would have competed with this same photo for
- * attention. This link is the one thing that survived that trim — sized
- * and positioned the same on mobile and desktop rather than getting a
- * separate mobile treatment, since there's no longer a grid layout to
- * differ from.
- */
-export function FoundersLink() {
-  return (
-    <Link
-      href="/about#founders"
-      className="inline-flex absolute bottom-8 right-4 sm:right-10 z-10 items-center gap-1.5 glass rounded-full px-4 py-2 text-xs font-semibold tracking-wide text-white/80 transition-colors hover:text-xxm-gold"
-    >
-      Meet the founders
-      <ArrowRight size={12} aria-hidden />
-    </Link>
   )
 }

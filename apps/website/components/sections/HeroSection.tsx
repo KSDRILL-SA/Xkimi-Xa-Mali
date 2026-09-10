@@ -1,7 +1,7 @@
 import { ChevronDown, MessageCircle, Shield, TrendingUp, Users } from 'lucide-react'
 import { adminWhatsAppUrl } from '@/lib/utils'
 import { getPublicStats } from '@/lib/stats'
-import { FoundersBackdrop, FoundersLink } from './FoundersBackdrop'
+import { FoundersBackdrop } from './FoundersBackdrop'
 import { AmbientOrbs } from './AmbientOrbs'
 import { FACTS } from '@xxm/utils'
 
@@ -18,7 +18,6 @@ export async function HeroSection() {
           every breakpoint — see FoundersBackdrop's own docstring for how
           mobile's scrim differs from desktop's. ─────────────────────── */}
       <FoundersBackdrop />
-      <FoundersLink />
 
       {/* ── Ambient light + grain, above the portraits ────────────── */}
       <AmbientOrbs />
@@ -85,15 +84,15 @@ export async function HeroSection() {
           </h1>
 
           {/* A mobile-only founders mini-grid used to sit here — four small
-              portrait cards plus a "Meet the founders" link. Removed: mobile
-              now shares the same photographic backdrop as desktop
+              portrait cards — and later a "Meet the founders" link sat near
+              the top of this file, on every breakpoint. Both removed:
+              mobile now shares the same photographic backdrop as desktop
               (FoundersBackdrop), so a grid of real portrait cards on top of
-              it would compete with that photo rather than complement it —
-              and the About page's own founder grid already carries the real
-              faces and bios, so this was a second, redundant presentation
-              of the same four people. The link survives as `FoundersLink`,
-              rendered once near the top of this file for every breakpoint
-              rather than duplicated per-breakpoint here. */}
+              it would compete with that photo rather than complement it,
+              and the About page's own founder grid already carries the
+              real faces and bios — reachable from the site's primary nav —
+              so both were a second, redundant path to the same four
+              people. */}
 
           {/* subheadline — used to be desktop-only. That decision was made
               when a phone hero also carried a four-card founders grid and
