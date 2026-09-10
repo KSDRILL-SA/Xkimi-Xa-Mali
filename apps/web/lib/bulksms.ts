@@ -69,14 +69,27 @@ function authHeader(): string {
   return `Basic ${Buffer.from(`${env.BULKSMS_USERNAME}:${env.BULKSMS_PASSWORD}`).toString('base64')}`
 }
 
+/**
+ * Every BulkSMS error this system has actually logged in production reads
+ * "BulkSMS 403: " — the status code, then nothing. Not because BulkSMS sent
+ * no detail: `body.detail ?? body.type ?? res.statusText` only falls
+ * through on `null`/`undefined`, and BulkSMS returns `detail: ""` for at
+ * least this error class, so the empty string won every time and the
+ * actual reason was thrown away before anyone could read it. `||` treats
+ * that empty string as absent, same as a missing field would be, and the
+ * raw response body is kept as a last-resort fallback so an error shape
+ * this doesn't anticipate is still visible rather than reduced to a bare
+ * "Forbidden".
+ */
 async function parseResponse<T>(res: Response): Promise<T> {
   if (res.ok) return res.json() as Promise<T>
 
-  let detail = res.statusText
+  const raw = await res.text().catch(() => '')
+  let detail = raw || res.statusText
   try {
-    const body = (await res.json()) as { type?: string; detail?: string }
-    detail = body.detail ?? body.type ?? res.statusText
-  } catch { /* non-JSON body */ }
+    const body = JSON.parse(raw) as { type?: string; detail?: string; title?: string }
+    detail = body.detail || body.type || body.title || raw || res.statusText
+  } catch { /* non-JSON body — `raw` (or statusText if empty) is already the best available */ }
 
   throw new BulkSMSError(res.status, detail)
 }
