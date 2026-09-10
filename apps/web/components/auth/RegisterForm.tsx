@@ -204,8 +204,19 @@ export function RegisterForm() {
           <Input id="phoneDisplay" value={prefilled?.phone ?? ''} readOnly disabled />
         </FormGroup>
 
-        <FormGroup label="SA ID number" htmlFor="idNumber" hint="Optional" error={e2.idNumber?.message}>
-          <Input id="idNumber" placeholder="13-digit ID number" icon={IdCard} maxLength={13} {...reg2('idNumber')} />
+        {/* Confirmed, not supplied.
+            The admin who invited you recorded this because they know you. Typing
+            it back proves you are the person that invitation was for — and it
+            catches an admin's mistyped digit, from the one person who would
+            notice. */}
+        <FormGroup
+          label="Confirm your SA ID number"
+          htmlFor="idNumber"
+          required
+          hint="The admin who invited you has this on file"
+          error={e2.idNumber?.message}
+        >
+          <Input id="idNumber" placeholder="13-digit ID number" icon={IdCard} maxLength={13} inputMode="numeric" {...reg2('idNumber')} />
         </FormGroup>
 
         <FormGroup label="Password" htmlFor="password" required error={e2.password?.message} hint="At least 12 characters. A short phrase you will remember works well.">
