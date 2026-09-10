@@ -468,6 +468,34 @@ describe('broadcastNotification', () => {
     )
   })
 
+  it('still emails a BOTH recipient whose SMS leg failed on quota', async () => {
+    // The actual production incident: SMS and email used to share one
+    // try/catch for a BOTH broadcast, so a BulkSMS 403 on the SMS leg threw
+    // before the email send below it ever ran. One member, one broadcast,
+    // SMS quota exhausted — and the console reported reaching nobody even
+    // though the recipient's email was never even attempted, let alone down.
+    const mockSendBroadcast = emailProvider.sendBroadcastEmail as MockedFunction<typeof emailProvider.sendBroadcastEmail>
+    mockDb.user.findMany.mockResolvedValue([
+      { id: 'u1', email: 'a@x.co.za', phone: '+27821000001', firstName: 'A' },
+    ] as never)
+    mockSendSMS.mockRejectedValue(new Error('BulkSMS 403: https://developer.bulksms.com/json/v1/errors#insufficient-quota'))
+    mockSendBroadcast.mockResolvedValue(undefined)
+    mockWriteAuditLog.mockResolvedValue(undefined)
+
+    const result = await broadcastNotification('admin1', ADMIN_ROLES, 'Test msg', 'BOTH', 'ALL')
+
+    expect(mockSendBroadcast).toHaveBeenCalledOnce()
+    expect(result.emailSent).toBe(1)
+    expect(result.smsSent).toBe(0)
+    expect(result.failed).toBe(1)
+
+    const mockLoggerError = logger.error as MockedFunction<typeof logger.error>
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      'Broadcast send failed for one recipient',
+      expect.objectContaining({ userId: 'u1', channel: 'SMS' }),
+    )
+  })
+
   it('hands the name, subject and body to the email layer unrendered', async () => {
     // Both are attacker-reachable in different ways: a member sets their own
     // first name, an admin (or a compromised admin account) types the message

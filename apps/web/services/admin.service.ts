@@ -511,37 +511,50 @@ export async function broadcastNotification(
 
   const sends = members.map(async (m) => {
     const counts = { sms: 0, email: 0, failed: false }
-    try {
-      if ((channel === 'SMS' || channel === 'BOTH') && m.phone) {
+
+    // SMS and email are attempted independently — each in its own try/catch —
+    // because `BOTH` used to run them in one block. A `BOTH` broadcast whose
+    // SMS leg threw (a BulkSMS 403, most often) never reached the email send
+    // below it: the `await` rejected straight into the shared catch, so a
+    // recipient with a perfectly good email address got nothing, "failed"
+    // looked identical to a total outage, and the console reported reaching
+    // nobody on a broadcast the audit log still called sent. A quota problem
+    // on one channel must not cost a channel that was never short on anything.
+    if ((channel === 'SMS' || channel === 'BOTH') && m.phone) {
+      try {
         const phone = smsProvider.normalisePhone(m.phone)
         if (phone) {
           await smsProvider.send({ to: phone, body: message })
           counts.sms++
         }
+      } catch (err) {
+        counts.failed = true
+        logger.error('Broadcast send failed for one recipient', {
+          userId: m.id,
+          channel: 'SMS',
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
-      if ((channel === 'EMAIL' || channel === 'BOTH') && m.email) {
+    }
+
+    if ((channel === 'EMAIL' || channel === 'BOTH') && m.email) {
+      try {
         // Through the same shell and the same type scale as every other email.
         // This used to hand-roll a bare div with grey paragraphs, so the one
         // email a member is most likely to read was the only one that looked
         // undesigned.
         await emailProvider.sendBroadcastEmail(m.email, m.firstName, heading, message)
         counts.email++
+      } catch (err) {
+        counts.failed = true
+        logger.error('Broadcast send failed for one recipient', {
+          userId: m.id,
+          channel: 'EMAIL',
+          error: err instanceof Error ? err.message : String(err),
+        })
       }
-    } catch (err) {
-      // This used to be a bare `catch { counts.failed = true }` — the actual
-      // reason (a BulkSMS 403, a Resend rejection, whatever it was) never
-      // reached a log anyone could read, and the admin console showed
-      // "Broadcast sent" regardless, since the route only checked whether the
-      // HTTP call itself succeeded, never the delivery counts it returned. An
-      // admin sending a broadcast that silently reached nobody had no way to
-      // find out except a member telling them it never arrived.
-      counts.failed = true
-      logger.error('Broadcast send failed for one recipient', {
-        userId: m.id,
-        channel,
-        error: err instanceof Error ? err.message : String(err),
-      })
     }
+
     return counts
   })
 
