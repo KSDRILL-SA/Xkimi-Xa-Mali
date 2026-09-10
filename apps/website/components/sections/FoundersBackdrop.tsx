@@ -74,15 +74,25 @@ export function FoundersBackdrop() {
       {/* Mobile scrim — one gradient, not two stacked layers. An earlier
           version put a flat 80%-opacity layer *underneath* a 60-90%
           gradient, and the two compounded into a uniformly dark, muddy
-          wash that buried the photo rather than showing it through. This
-          is deliberately top-weighted instead: strong where the badge and
-          headline actually need the contrast, easing off by the point the
-          CTA button sits (solid gold, needs no scrim help) and staying
-          moderate rather than heavy past that, since the stat pills carry
-          their own `.glass` backdrop-blur panel and don't depend on this
-          scrim either. The photo reads as an actual photo in its lower
-          two-thirds instead of dark texture. */}
-      <div className="absolute inset-0 md:hidden bg-gradient-to-b from-xxm-green-950/82 from-0% via-xxm-green-950/50 via-52% to-xxm-green-950/56" />
+          wash that buried the photo rather than showing it through.
+          Successive attempts to lighten that never actually rendered
+          correctly: Tailwind's bare `/N` opacity and `-N%` position
+          modifiers only generate CSS when `N` is on the theme's default
+          scale (multiples of 5, plus a handful of others) — 68, 56, 82,
+          55 and 52 are NOT on that scale, so `to-xxm-green-950/68` and
+          its predecessors silently compiled to *no rule at all*, leaving
+          that gradient stop at its default, fully transparent. Confirmed
+          by reading the actual computed `backgroundImage` in a real
+          browser, not by re-deriving intended values from the class
+          names — that's what let this go unnoticed through two prior
+          "fixes" that never took effect. Every non-standard number below
+          uses bracket syntax (`/[N%]`), which always compiles regardless
+          of the theme scale. Top-weighted as before — strong behind the
+          badge and headline — with a genuinely darker, held-not-fading
+          floor through the CTA/stat-pills zone, so the photo reads as
+          atmosphere behind a moody hero rather than a bright, literal
+          snapshot the copy doesn't match. */}
+      <div className="absolute inset-0 md:hidden bg-gradient-to-b from-xxm-green-950/[82%] from-0% via-xxm-green-950/[68%] via-45% to-xxm-green-950/[78%]" />
       {/* Quiet golden-hour glow, upper-right — echoes the photo's own sun
           rather than fighting it, and sits where the badge/headline's
           shortest lines leave the most breathing room. */}
@@ -93,8 +103,13 @@ export function FoundersBackdrop() {
 
       {/* Desktop scrim — heavy on the left where the headline sits, let
           almost all the way up on the right so the photograph is actually
-          seen — the whole point of putting it there. */}
-      <div className="hidden md:block absolute inset-0 bg-gradient-to-r from-xxm-green-950 from-25% via-xxm-green-950/70 via-55% to-xxm-green-950/5" />
+          seen — the whole point of putting it there. `via-55%` below was
+          the same silent-failure pattern as the mobile scrim (55 is not
+          on Tailwind's default position scale) — it happened to cost
+          desktop almost nothing, since the `via` stop just fell back to
+          its 50% default instead of 55%, but it's bracketed now so it
+          stops being an accident that this one barely mattered. */}
+      <div className="hidden md:block absolute inset-0 bg-gradient-to-r from-xxm-green-950 from-25% via-xxm-green-950/70 via-[55%] to-xxm-green-950/5" />
       <div className="hidden md:block absolute inset-0 bg-gradient-to-b from-xxm-green-950/45 via-transparent to-xxm-green-950/75" />
     </div>
   )
