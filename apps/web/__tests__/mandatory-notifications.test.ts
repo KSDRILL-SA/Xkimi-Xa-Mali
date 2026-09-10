@@ -54,11 +54,18 @@ describe('a member cannot switch off news that their money stopped', () => {
     }
   })
 
-  it('still includes the operational alerts that reach admins', () => {
-    // An admin who switched SMS off for badge news would otherwise stop being
-    // told that a debit run collected nothing.
-    expect(MANDATORY_SLUGS.has('admin-alert-sms')).toBe(true)
+  it('still includes the operational alert email that reaches admins', () => {
+    // An admin who switched email off for badge news would otherwise stop
+    // being told that a debit run collected nothing.
     expect(MANDATORY_SLUGS.has('admin-alert-email')).toBe(true)
+  })
+
+  it('never sends the operational alert by SMS', () => {
+    // The alert most likely to fire is the one saying SMS delivery itself is
+    // failing (NOTIFICATIONS_ABANDONED). Sending it by SMS would compete with
+    // real traffic for the same exhausted quota, so it was dropped from the
+    // channel list rather than kept mandatory. See `services/alert.service.ts`.
+    expect(MANDATORY_SLUGS.has('admin-alert-sms')).toBe(false)
   })
 })
 
