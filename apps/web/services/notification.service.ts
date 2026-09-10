@@ -137,11 +137,13 @@ export const MANDATORY_SLUGS = new Set([
   // likely to expect, so it is not opt-out-able either.
   'contribution-reversed-sms',
   'contribution-reversed-email',
-  // Operational alerts to admins. These are not member notifications and the
-  // opt-out was never meant to cover them: an admin who switched SMS off for
-  // badge news would otherwise stop being told that a debit run collected
-  // nothing. See `services/alert.service.ts`.
-  'admin-alert-sms',
+  // Operational alerts to admins. Not a member notification, and the opt-out
+  // was never meant to cover it: an admin who switched email off for badge
+  // news would otherwise stop being told that a debit run collected nothing.
+  // SMS was dropped from this alert entirely (see `services/alert.service.ts`)
+  // rather than added here mandatorily, because the alert most likely to fire
+  // is the one saying SMS delivery itself is failing — sending that by SMS
+  // just competes with real traffic for the same exhausted quota.
   'admin-alert-email',
   // The two messages that say money will stop moving and nothing else will.
   //

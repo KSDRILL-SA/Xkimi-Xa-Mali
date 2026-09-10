@@ -20,12 +20,24 @@ import { writeAuditLog } from '@/services/audit.service'
  * runbook's own P1 definition is "money not moving on debit day — respond
  * immediately". An alert that waits for someone to log in cannot support that.
  *
- * So severity here decides *how far the message travels*, not how it is worded:
+ * So severity here decides *how urgent the wording is*, not how many channels
+ * fire — both severities reach the same two:
  *
  * - `critical` — money did not move, or the records disagree about money.
- *   Inbox, email **and** SMS. SMS costs, which is the point: it is reserved for
- *   the things worth waking someone for.
- * - `warning` — worth seeing today, not tonight. Inbox and email.
+ *   Inbox and email, marked 🔴.
+ * - `warning` — worth seeing today, not tonight. Inbox and email, marked ⚠️.
+ *
+ * SMS is deliberately not a channel here, even for critical alerts. It used to
+ * be, on the reasoning that SMS costs are the point — reserved for the things
+ * worth waking someone for. That reasoning stopped holding the moment the SMS
+ * account itself is what is degraded or rate-limited: `NOTIFICATIONS_ABANDONED`
+ * (raised, at `critical`, specifically because SMS deliveries are failing) was
+ * itself going out as an SMS, so the alert that a scarce SMS quota was
+ * exhausted was competing with real traffic for that same exhausted quota.
+ * An admin console session already surfaces the inbox in real time, so there
+ * is no wait being traded away by dropping SMS — only the ability for an
+ * alert to fail because the channel reporting failures is the channel that is
+ * failing.
  *
  * Every alert is also written to the audit log and to the logger, so there is a
  * durable record independent of whether any channel actually delivered.
@@ -37,7 +49,7 @@ export interface OperationalAlert {
   /** Stable machine name, e.g. `DEBIT_RUN_INCOMPLETE`. Also the audit action. */
   code: string
   severity: AlertSeverity
-  /** One line. Becomes the SMS and the email subject, so keep it short. */
+  /** One line. Becomes the email subject, so keep it short. */
   title: string
   /** The detail. Newlines survive to the inbox and the email. */
   body: string
@@ -50,8 +62,7 @@ export interface OperationalAlert {
   payload?: Record<string, unknown>
 }
 
-/** Admin-facing templates. Seeded, and inserted by migration for existing databases. */
-const ADMIN_ALERT_SMS = 'admin-alert-sms'
+/** Admin-facing template. Seeded, and inserted by migration for existing databases. */
 const ADMIN_ALERT_EMAIL = 'admin-alert-email'
 
 /**
@@ -60,17 +71,16 @@ const ADMIN_ALERT_EMAIL = 'admin-alert-email'
  * Never throws. An alert is raised *because* something already went wrong, and
  * a failure to deliver it must not become a second failure that takes down the
  * job reporting the first. Each channel is attempted independently, so a
- * BulkSMS outage does not also cost the email.
+ * Resend outage does not also cost the inbox message.
  */
 export async function raiseOperationalAlert(alert: OperationalAlert): Promise<{
   admins: number
   inbox: boolean
   email: boolean
-  sms: boolean
   /** Whether the account-independent destination took it. Critical alerts only. */
   fallback: boolean
 }> {
-  const result = { admins: 0, inbox: false, email: false, sms: false, fallback: false }
+  const result = { admins: 0, inbox: false, email: false, fallback: false }
 
   // The log line first, and unconditionally. It is the only channel that does
   // not depend on the database being readable or a provider being reachable,
@@ -132,11 +142,7 @@ export async function raiseOperationalAlert(alert: OperationalAlert): Promise<{
   // placeholders as literal braces, so both keys are always present.
   const payload = { title: alert.title, detail: alert.body }
 
-  result.email = await fanOut(admins, ADMIN_ALERT_EMAIL, 'EMAIL', payload)
-
-  if (alert.severity === 'critical') {
-    result.sms = await fanOut(admins, ADMIN_ALERT_SMS, 'SMS', payload)
-  }
+  result.email = await fanOut(admins, ADMIN_ALERT_EMAIL, payload)
 
   return result
 }
@@ -193,13 +199,12 @@ async function deliverToFallback(alert: OperationalAlert): Promise<boolean> {
 async function fanOut(
   admins: Array<{ id: string }>,
   templateSlug: string,
-  channel: 'SMS' | 'EMAIL',
   payload: Record<string, unknown>,
 ): Promise<boolean> {
   const results = await Promise.all(
     admins.map((admin) =>
-      attempt(`${channel.toLowerCase()}-${admin.id}`, () =>
-        queueNotification({ userId: admin.id, templateSlug, channel, payload }),
+      attempt(`email-${admin.id}`, () =>
+        queueNotification({ userId: admin.id, templateSlug, channel: 'EMAIL', payload }),
       ),
     ),
   )

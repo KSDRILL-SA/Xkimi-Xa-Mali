@@ -64,22 +64,28 @@ beforeEach(() => {
 })
 
 describe('how far an alert travels', () => {
-  it('sends a critical one to the inbox, by email and by SMS — to every admin', async () => {
+  it('sends a critical one to the inbox and by email — to every admin', async () => {
     const result = await raiseOperationalAlert(CRITICAL)
 
     expect(mocks.notifyAdmins).toHaveBeenCalledOnce()
     expect(queuedOn('EMAIL').map((a) => a.userId)).toEqual(['admin-1', 'admin-2'])
-    expect(queuedOn('SMS').map((a) => a.userId)).toEqual(['admin-1', 'admin-2'])
-    expect(result).toMatchObject({ admins: 2, inbox: true, email: true, sms: true })
+    expect(result).toMatchObject({ admins: 2, inbox: true, email: true })
   })
 
-  it('stops a warning at the inbox and email — SMS is reserved', async () => {
-    // SMS costs money on every send. Spending it on everything is how people
-    // learn to ignore it, which costs more.
+  it('reaches the same two channels for a warning — severity changes the wording, not the travel', async () => {
     await raiseOperationalAlert(WARNING)
 
     expect(mocks.notifyAdmins).toHaveBeenCalledOnce()
     expect(queuedOn('EMAIL')).toHaveLength(2)
+  })
+
+  it('never queues an SMS, whatever the severity — that channel is the one that is already exhausted', async () => {
+    // This is the alert most likely to fire *because* SMS is failing
+    // (NOTIFICATIONS_ABANDONED). Sending it by SMS would compete with real
+    // traffic for the same exhausted quota.
+    await raiseOperationalAlert(CRITICAL)
+    await raiseOperationalAlert(WARNING)
+
     expect(queuedOn('SMS')).toHaveLength(0)
   })
 
@@ -100,12 +106,11 @@ describe('what the channels are given', () => {
   it('sends the plain title, without the marker the inbox gets', async () => {
     await raiseOperationalAlert(CRITICAL)
 
-    // The 🔴 makes an inbox row scannable and costs nothing there. In an SMS it
-    // forces UCS-2 and halves the characters per segment, so it must not reach
-    // the payload the templates render.
-    const [sms] = queuedOn('SMS')
-    expect(sms.payload).toEqual({ title: CRITICAL.title, detail: CRITICAL.body })
-    expect(JSON.stringify(sms.payload)).not.toContain('🔴')
+    // The 🔴 makes an inbox row scannable and costs nothing there. It is not
+    // part of the data the email template renders.
+    const [email] = queuedOn('EMAIL')
+    expect(email.payload).toEqual({ title: CRITICAL.title, detail: CRITICAL.body })
+    expect(JSON.stringify(email.payload)).not.toContain('🔴')
 
     expect(mocks.notifyAdmins.mock.calls[0][0].title).toContain('🔴')
   })
@@ -139,38 +144,35 @@ describe('what the channels are given', () => {
 })
 
 describe('a channel that fails does not silence the rest', () => {
-  it('still emails and texts when the inbox write throws', async () => {
+  it('still emails when the inbox write throws', async () => {
     mocks.notifyAdmins.mockRejectedValue(new Error('inbox table locked'))
 
     const result = await raiseOperationalAlert(CRITICAL)
 
     expect(result.inbox).toBe(false)
     expect(queuedOn('EMAIL')).toHaveLength(2)
-    expect(queuedOn('SMS')).toHaveLength(2)
   })
 
-  it('still texts when email queueing throws', async () => {
-    mocks.queueNotification.mockImplementation(({ channel }: { channel: string }) =>
-      channel === 'EMAIL' ? Promise.reject(new Error('resend down')) : Promise.resolve(),
-    )
+  it('still writes the inbox row when email queueing throws', async () => {
+    mocks.queueNotification.mockRejectedValue(new Error('resend down'))
 
     const result = await raiseOperationalAlert(CRITICAL)
 
     expect(result.email).toBe(false)
-    expect(result.sms).toBe(true)
+    expect(result.inbox).toBe(true)
   })
 
   it('reaches the other admins when one of them cannot be queued', async () => {
     // Four founders. The one with a malformed row must not be the reason the
     // other three hear nothing.
     mocks.queueNotification.mockImplementation(({ userId }: { userId: string }) =>
-      userId === 'admin-1' ? Promise.reject(new Error('no phone number')) : Promise.resolve(),
+      userId === 'admin-1' ? Promise.reject(new Error('no email address')) : Promise.resolve(),
     )
 
     const result = await raiseOperationalAlert(CRITICAL)
 
-    expect(result.sms).toBe(true)
-    expect(queuedOn('SMS')).toHaveLength(2)
+    expect(result.email).toBe(true)
+    expect(queuedOn('EMAIL')).toHaveLength(2)
   })
 
   it('never throws, whatever fails', async () => {
@@ -186,7 +188,6 @@ describe('a channel that fails does not silence the rest', () => {
       admins: 0,
       inbox: false,
       email: false,
-      sms: false,
     })
     // And it is still on the record, because the log line does not touch the database.
     expect(mocks.loggerError).toHaveBeenCalled()
@@ -256,7 +257,7 @@ describe('the destination that does not depend on an account', () => {
     const result = await raiseOperationalAlert(CRITICAL)
 
     expect(mocks.sendAdminAlertEmail).not.toHaveBeenCalled()
-    expect(result).toMatchObject({ fallback: false, email: true, sms: true })
+    expect(result).toMatchObject({ fallback: false, email: true })
   })
 
   // Escaping itself is `sendAdminAlertEmail`'s own responsibility now — it
@@ -273,7 +274,6 @@ describe('the destination that does not depend on an account', () => {
 
     expect(result.fallback).toBe(false)
     expect(result.email).toBe(true)
-    expect(result.sms).toBe(true)
   })
 
   it('records whether the fallback caught it when no admin could be reached', async () => {
