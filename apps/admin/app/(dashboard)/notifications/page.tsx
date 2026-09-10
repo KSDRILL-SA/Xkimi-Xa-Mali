@@ -16,7 +16,7 @@ type Filter  = 'ALL' | 'ACTIVE' | 'PENDING' | 'SUSPENDED'
 export default async function NotificationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sent?: string; failed?: string }>
+  searchParams: Promise<{ sent?: string; failed?: string; total?: string; smsSent?: string; emailSent?: string; deliveryFailed?: string }>
 }) {
   const session = await auth()
   const roles   = (session?.user?.roles as string[] | undefined) ?? []
@@ -25,6 +25,16 @@ export default async function NotificationsPage({
   const params = await searchParams
   const sent   = params.sent   === '1'
   const failed = params.failed === '1'
+  // Real delivery counts from the route's response — not just whether the
+  // HTTP call itself succeeded. The API call succeeding (`sent=1`) used to
+  // be the only signal shown here, so a broadcast that reached the route,
+  // then failed to actually deliver to a single member, still showed
+  // "Broadcast sent" with no indication anything was wrong.
+  const total          = Number(params.total ?? 0)
+  const deliveryFailed = Number(params.deliveryFailed ?? 0)
+  const smsSent        = Number(params.smsSent ?? 0)
+  const emailSent      = Number(params.emailSent ?? 0)
+  const partialFailure = sent && deliveryFailed > 0
 
   async function broadcast(fd: FormData) {
     'use server'
@@ -44,12 +54,31 @@ export default async function NotificationsPage({
     // already forward them; this one did not, which is why every broadcast
     // failed. `adminIp` matters for the same reason: without it the audit trail
     // records our own server as the origin rather than the admin who clicked.
-    const result = await internalAdminPost(
+    const result = await internalAdminPost<{
+      total: number
+      smsSent: number
+      emailSent: number
+      inAppSent: number
+      failed: number
+    }>(
       '/api/v1/admin/notifications/broadcast',
       { subject, message, channel, filter },
       { adminUserId: userId, adminIp: ip },
     )
-    redirect(result.ok ? '/notifications?sent=1' : '/notifications?failed=1')
+
+    if (!result.ok) redirect('/notifications?failed=1')
+
+    // The HTTP call succeeding only ever meant the route accepted the
+    // request — not that any message actually reached anyone. It used to be
+    // the only thing checked, so a broadcast that reached zero of its
+    // members (a BulkSMS or Resend failure on every send) still redirected
+    // to the same "Broadcast sent" banner as one that reached all of them.
+    // The route's real per-channel counts travel through the redirect now,
+    // so the banner can say what actually happened.
+    const { total, smsSent, emailSent, failed } = result.data ?? { total: 0, smsSent: 0, emailSent: 0, failed: 0 }
+    redirect(
+      `/notifications?sent=1&total=${total}&smsSent=${smsSent}&emailSent=${emailSent}&deliveryFailed=${failed}`,
+    )
   }
 
   const channels: { value: Channel; label: string; icon: React.FC<{ size?: number; className?: string }>; description: string }[] = [
@@ -86,8 +115,26 @@ export default async function NotificationsPage({
         </div>
       </Reveal>
 
-      {sent   && <Alert variant="success" title="Broadcast sent">Your message has been dispatched to the selected members.</Alert>}
-      {failed && <Alert variant="error"   title="Broadcast failed">Something went wrong. Please check your message and try again.</Alert>}
+      {/* Three real outcomes, not two: the route call succeeding used to be
+          the only thing checked, so a broadcast that reached zero of its
+          members (every send failing — a provider outage, a revoked API
+          key, an account issue) redirected to the exact same "Broadcast
+          sent" banner as one that reached everybody. `deliveryFailed`
+          carries the route's actual per-recipient failure count, so a
+          total loss and a full success no longer look identical here. */}
+      {sent && !partialFailure && (
+        <Alert variant="success" title="Broadcast sent">
+          {smsSent > 0 || emailSent > 0
+            ? `Delivered — ${smsSent} SMS, ${emailSent} email, across ${total} member${total === 1 ? '' : 's'}.`
+            : 'Your message has been dispatched to the selected members.'}
+        </Alert>
+      )}
+      {partialFailure && (
+        <Alert variant={deliveryFailed >= total ? 'error' : 'warning'} title={deliveryFailed >= total ? 'Broadcast did not reach anyone' : 'Broadcast partially failed'}>
+          {`${deliveryFailed} of ${total} member${total === 1 ? '' : 's'} did not receive it (${smsSent} SMS and ${emailSent} email delivered). Check the audit log or server logs for the reason before resending.`}
+        </Alert>
+      )}
+      {failed && <Alert variant="error" title="Broadcast failed">Something went wrong. Please check your message and try again.</Alert>}
 
       <div className="max-w-2xl">
         <form action={broadcast} className="space-y-6">

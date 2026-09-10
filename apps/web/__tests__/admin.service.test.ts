@@ -136,11 +136,16 @@ vi.mock('@/lib/cache', () => ({
   },
 }))
 
+vi.mock('@xxm/observability', () => ({
+  logger: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}))
+
 import { db } from '@/lib/db'
 import { writeAuditLog } from '@/services/audit.service'
 import { generateMonthlyContributions } from '@/services/contribution.service'
 import { smsProvider } from '@/integrations/sms'
 import { emailProvider } from '@/integrations/email'
+import { logger } from '@xxm/observability'
 import { ForbiddenError, AdminNotFoundError, AdminConflictError } from '@/lib/errors'
 import {
   listMembers,
@@ -436,15 +441,31 @@ describe('broadcastNotification', () => {
     expect(result.failed).toBe(0)
   })
 
-  it('counts failed deliveries without throwing', async () => {
+  it('counts failed deliveries without throwing, and logs the real reason', async () => {
+    // This used to be a bare `catch { counts.failed = true }` — the actual
+    // provider error (a BulkSMS 403, a Resend rejection, whatever it was)
+    // never reached a log anyone could read, and the admin console showed
+    // "Broadcast sent" regardless, since the caller only checked whether the
+    // HTTP call itself succeeded. What's asserted here is that the specific
+    // reason is not just swallowed into a boolean.
     mockDb.user.findMany.mockResolvedValue([
       { id: 'u1', email: null, phone: '+27821000001', firstName: 'A' },
     ] as never)
-    mockSendSMS.mockRejectedValue(new Error('Network error'))
+    mockSendSMS.mockRejectedValue(new Error('BulkSMS 403: account suspended'))
     mockWriteAuditLog.mockResolvedValue(undefined)
 
     const result = await broadcastNotification('admin1', ADMIN_ROLES, 'Test msg', 'SMS', 'ALL')
     expect(result.failed).toBe(1)
+
+    const mockLoggerError = logger.error as MockedFunction<typeof logger.error>
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      'Broadcast send failed for one recipient',
+      expect.objectContaining({
+        userId: 'u1',
+        channel: 'SMS',
+        error: 'BulkSMS 403: account suspended',
+      }),
+    )
   })
 
   it('hands the name, subject and body to the email layer unrendered', async () => {
