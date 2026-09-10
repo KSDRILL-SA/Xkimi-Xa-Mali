@@ -527,8 +527,20 @@ export async function broadcastNotification(
         await emailProvider.sendBroadcastEmail(m.email, m.firstName, heading, message)
         counts.email++
       }
-    } catch {
+    } catch (err) {
+      // This used to be a bare `catch { counts.failed = true }` — the actual
+      // reason (a BulkSMS 403, a Resend rejection, whatever it was) never
+      // reached a log anyone could read, and the admin console showed
+      // "Broadcast sent" regardless, since the route only checked whether the
+      // HTTP call itself succeeded, never the delivery counts it returned. An
+      // admin sending a broadcast that silently reached nobody had no way to
+      // find out except a member telling them it never arrived.
       counts.failed = true
+      logger.error('Broadcast send failed for one recipient', {
+        userId: m.id,
+        channel,
+        error: err instanceof Error ? err.message : String(err),
+      })
     }
     return counts
   })
