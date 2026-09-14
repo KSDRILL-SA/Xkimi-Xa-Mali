@@ -70,6 +70,7 @@ import {
   updateSMSDeliveryStatus,
   flushQueuedNotifications,
   recoverStalledNotifications,
+  requeueFailedNotifications,
   countAbandonedNotifications,
 } from '@/services/notification.service'
 
@@ -385,6 +386,58 @@ describe('recoverStalledNotifications', () => {
     const ageMs = Date.now() - call.where.updatedAt.lt.getTime()
     expect(ageMs).toBeGreaterThan(10 * 60 * 1000)
     expect(ageMs).toBeLessThan(20 * 60 * 1000)
+  })
+})
+
+describe('requeueFailedNotifications', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('promotes rows that have not exhausted their retries', async () => {
+    ;(db.notification.updateMany as MockedFunction<typeof db.notification.updateMany>)
+      .mockResolvedValueOnce({ count: 3 } as never)
+      .mockResolvedValueOnce({ count: 0 } as never)
+
+    const total = await requeueFailedNotifications()
+
+    expect(total).toBe(3)
+    expect(db.notification.updateMany).toHaveBeenNthCalledWith(1,
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'FAILED', retryCount: { lt: 3 } }),
+        data: { status: 'QUEUED' },
+      }),
+    )
+  })
+
+  it('revives SMS rows abandoned only because the BulkSMS quota was exhausted', async () => {
+    // A quota running dry is the provider's account, not the message — the same
+    // send succeeds once the account has quota again. Every other exhausted
+    // retry (a malformed phone number, a suspended account) must stay
+    // abandoned; only this one specific, now-understood cause is revived.
+    ;(db.notification.updateMany as MockedFunction<typeof db.notification.updateMany>)
+      .mockResolvedValueOnce({ count: 0 } as never)
+      .mockResolvedValueOnce({ count: 26 } as never)
+
+    const total = await requeueFailedNotifications()
+
+    expect(total).toBe(26)
+    expect(db.notification.updateMany).toHaveBeenNthCalledWith(2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: 'FAILED',
+          retryCount: { gte: 3 },
+          errorMessage: { contains: 'insufficient-quota' },
+        }),
+        data: { status: 'QUEUED', retryCount: 0 },
+      }),
+    )
+  })
+
+  it('sums both revivals into a single reported count', async () => {
+    ;(db.notification.updateMany as MockedFunction<typeof db.notification.updateMany>)
+      .mockResolvedValueOnce({ count: 4 } as never)
+      .mockResolvedValueOnce({ count: 2 } as never)
+
+    expect(await requeueFailedNotifications()).toBe(6)
   })
 })
 
