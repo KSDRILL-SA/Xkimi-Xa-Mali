@@ -188,6 +188,17 @@ export const ManualContributionSchema = z.object({
    * expressed one, and is refused. Every client already sends this.
    */
   idempotencyKey: z.string().uuid('An idempotency token is required for a payment'),
+}).superRefine((v, ctx) => {
+  // This path is a member paying forward through a live gateway mandate, so
+  // `BEFORE_FOUNDING` should never actually be reachable through it — nobody
+  // can owe a period before the Foundation had contributions at all. Checked
+  // anyway, the same way `OfflineContributionSchema` and
+  // `GenerateContributionsSchema` are: one rule, everywhere a period is
+  // accepted, rather than three copies that could each drift separately.
+  const reason = refusePeriod({ month: v.periodMonth, year: v.periodYear })
+  if (reason === 'BEFORE_FOUNDING') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: PERIOD_REFUSAL_MESSAGE[reason], path: ['periodYear'] })
+  }
 })
 
 /**
@@ -293,10 +304,12 @@ export const OfflineContributionSchema = z.object({
     .min(10, 'Say who counted the money and where — one name is not a witness')
     .max(300, 'Witness note cannot exceed 300 characters')
     .optional(),
+}).superRefine((v, ctx) => {
+  const reason = refusePeriod({ month: v.periodMonth, year: v.periodYear })
+  if (reason) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: PERIOD_REFUSAL_MESSAGE[reason], path: ['periodYear'] })
+  }
 }).refine(
-  (v) => refusePeriod({ month: v.periodMonth, year: v.periodYear }) === null,
-  { message: PERIOD_REFUSAL_MESSAGE.OUTSIDE_WINDOW, path: ['periodYear'] },
-).refine(
   // Exactly one. Neither means an unevidenced claim about money, which is the
   // thing this whole field exists to stop. Both means the witness note is
   // decoration on a row that already has a document, and a later reader cannot
@@ -312,14 +325,17 @@ export const OfflineContributionSchema = z.object({
 export const GenerateContributionsSchema = z.object({
   month: z.number().int().min(1, 'Month must be 1–12').max(12, 'Month must be 1–12'),
   year:  z.number().int().min(2024, 'Year must be 2024 or later'),
-}).refine(
-  // A year of 2024-or-later still accepts 2099. Generating is the widest action
-  // there is — one press writes an obligation for every active member, with no
-  // undo — so the period has to be one somebody could plausibly mean. Shared
-  // with the console, which had no check at all.
-  (v) => refusePeriod(v) === null,
-  { message: PERIOD_REFUSAL_MESSAGE.OUTSIDE_WINDOW, path: ['year'] },
-)
+}).superRefine((v, ctx) => {
+  // A year of 2024-or-later still accepts 2099, and on its own would still
+  // accept a month before the Foundation had contributions at all. Generating
+  // is the widest action there is — one press writes an obligation for every
+  // active member, with no undo — so the period has to be one somebody could
+  // plausibly mean. Shared with the console, which had no check at all.
+  const reason = refusePeriod(v)
+  if (reason) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: PERIOD_REFUSAL_MESSAGE[reason], path: ['year'] })
+  }
+})
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 

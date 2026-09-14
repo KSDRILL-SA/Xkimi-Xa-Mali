@@ -119,6 +119,7 @@ import {
   selectDueSoonReminders,
 } from '@/services/contribution.service'
 import { ContributionNotFoundError, ForbiddenError, ContributionConflictError, TransactionNotFoundError } from '@/lib/errors'
+import { endOfMonth } from '@xxm/utils/contribution-period'
 
 const mockFn = <T extends (...a: never[]) => unknown>(fn: unknown) => fn as MockedFunction<T>
 
@@ -387,6 +388,31 @@ describe('generateMonthlyContributions', () => {
     expect(db.contribution.findMany).toHaveBeenCalledOnce()
     expect(db.contribution.createMany).toHaveBeenCalledOnce()
     expect(db.contribution.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('falls due at the end of the month for every member, whatever their own mandate’s debit day', async () => {
+    // Opening the month used to write each member's dueDate from their own
+    // mandate's debitDay — a debit-order scheduling choice, not a payment
+    // deadline, and one that gave members different real deadlines for a
+    // system collecting nobody automatically. Everybody's deadline is the
+    // same now: the end of the month itself.
+    const mandates = [
+      { userId: 'u1', amount: 500, debitDay: 1, user: { id: 'u1', status: 'ACTIVE' } },
+      { userId: 'u2', amount: 500, debitDay: 28, user: { id: 'u2', status: 'ACTIVE' } },
+    ]
+    ;(db.paymentMandate.findMany as MockedFunction<typeof db.paymentMandate.findMany>)
+      .mockResolvedValue(mandates as never)
+    ;(db.contribution.findMany as MockedFunction<typeof db.contribution.findMany>)
+      .mockResolvedValue([])
+    ;(db.contribution.createMany as MockedFunction<typeof db.contribution.createMany>)
+      .mockResolvedValue({ count: 2 } as never)
+
+    await generateMonthlyContributions({ month: 6, year: 2026 }, 'admin-1', ['ADMIN'])
+
+    const { data } = (db.contribution.createMany as MockedFunction<typeof db.contribution.createMany>)
+      .mock.calls[0]![0] as { data: { dueDate: Date }[] }
+    expect(data).toHaveLength(2)
+    for (const row of data) expect(row.dueDate).toEqual(endOfMonth(2026, 6))
   })
 
   it('skips users who already have a contribution for the period', async () => {

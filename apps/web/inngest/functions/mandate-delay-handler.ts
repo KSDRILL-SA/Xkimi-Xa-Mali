@@ -10,6 +10,7 @@ import { queueNotification } from '@/services/notification.service'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { INFRASTRUCTURE_FAILURE_PREFIX } from '@xxm/utils'
 import { collectionReference } from '@xxm/utils/collection-reference'
+import { endOfMonth } from '@xxm/utils/contribution-period'
 
 /**
  * Inngest's `step`, narrowed to what this job uses.
@@ -76,7 +77,7 @@ export async function executeMandateDelay(
     })
     if (existing) return existing
 
-    const dueDate = new Date(periodYear, periodMonth - 1, debitDate.getUTCDate())
+    const dueDate = endOfMonth(periodYear, periodMonth)
     return db.contribution.create({
       data: {
         userId,

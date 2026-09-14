@@ -28,6 +28,7 @@ import {
 } from '@/lib/errors'
 import { assertCanAccess, canAccess, assertAdmin } from '@/lib/authorization'
 import { raiseOperationalAlert } from './alert.service'
+import { endOfMonth } from '@xxm/utils/contribution-period'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee } from '@/lib/group-account'
@@ -201,7 +202,7 @@ export async function submitManualPayment(
     )
   }
 
-  const dueDate = new Date(data.periodYear, data.periodMonth - 1, mandate.debitDay)
+  const dueDate = endOfMonth(data.periodYear, data.periodMonth)
   let contribution = await contributionRepo.findByPeriod(
     userId,
     data.periodMonth,
@@ -1084,7 +1085,6 @@ export async function recordOfflineContribution(
   if (!contribution) {
     const mandate = await mandateRepo.findFirst({ userId: data.userId, status: 'ACTIVE' })
     const amountDue = mandate ? Number(mandate.amount) : (data.amountDue ?? data.amount)
-    const debitDay = mandate?.debitDay ?? 1
 
     contribution = await contributionRepo.create({
       userId: data.userId,
@@ -1092,7 +1092,7 @@ export async function recordOfflineContribution(
       periodYear: data.periodYear,
       amountDue,
       amountPaid: 0,
-      dueDate: new Date(data.periodYear, data.periodMonth - 1, debitDay),
+      dueDate: endOfMonth(data.periodYear, data.periodMonth),
       status: 'PENDING',
     })
 
@@ -1390,7 +1390,7 @@ export async function generateMonthlyContributions(
         periodYear: data.year,
         amountDue: m.amount,
         amountPaid: 0,
-        dueDate: new Date(data.year, data.month - 1, m.debitDay),
+        dueDate: endOfMonth(data.year, data.month),
         status: 'PENDING' as const,
       })),
       true,
