@@ -117,6 +117,7 @@ import {
   getContributionSummary,
   createReversal,
   selectDueSoonReminders,
+  findFeeBufferRetroCandidates,
 } from '@/services/contribution.service'
 import { ContributionNotFoundError, ForbiddenError, ContributionConflictError, TransactionNotFoundError } from '@/lib/errors'
 import { endOfMonth } from '@xxm/utils/contribution-period'
@@ -485,6 +486,63 @@ describe('generateMonthlyContributions', () => {
     await expect(
       generateMonthlyContributions({ month: 6, year: 2025 }, 'user-1', ['MEMBER']),
     ).rejects.toBeInstanceOf(ForbiddenError)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// findFeeBufferRetroCandidates — read-only, for the one-time historical
+// correction. Finds candidates, changes nothing.
+// ---------------------------------------------------------------------------
+
+describe('findFeeBufferRetroCandidates', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  const paidRow = (over: Record<string, unknown> = {}) => ({
+    id: 'c1', userId: 'u1', periodMonth: 6, periodYear: 2026,
+    amountDue: 100, amountPaid: 110,
+    user: { firstName: 'Kurhula', lastName: 'Maluleke', email: 'k@example.test' },
+    ...over,
+  })
+
+  it('includes a period overpaid by no more than the buffer', async () => {
+    ;(db.contribution.findMany as MockedFunction<typeof db.contribution.findMany>)
+      .mockResolvedValue([paidRow()] as never)
+
+    const result = await findFeeBufferRetroCandidates()
+
+    expect(result).toEqual([
+      {
+        contributionId: 'c1', userId: 'u1', name: 'Kurhula Maluleke', email: 'k@example.test',
+        period: '2026-06', amountDue: 100, amountPaid: 110, excess: 10,
+      },
+    ])
+  })
+
+  it('excludes a period paid exactly, with nothing over', async () => {
+    ;(db.contribution.findMany as MockedFunction<typeof db.contribution.findMany>)
+      .mockResolvedValue([paidRow({ amountPaid: 100 })] as never)
+
+    expect(await findFeeBufferRetroCandidates()).toEqual([])
+  })
+
+  it('excludes a genuine over-payment bigger than the buffer', async () => {
+    // A real gift or catch-up, not bank-charge padding — this list is only
+    // ever the small ones the new rule would have carved out automatically.
+    ;(db.contribution.findMany as MockedFunction<typeof db.contribution.findMany>)
+      .mockResolvedValue([paidRow({ amountPaid: 200 })] as never)
+
+    expect(await findFeeBufferRetroCandidates()).toEqual([])
+  })
+
+  it('only ever queries PAID periods', async () => {
+    ;(db.contribution.findMany as MockedFunction<typeof db.contribution.findMany>)
+      .mockResolvedValue([] as never)
+
+    await findFeeBufferRetroCandidates()
+
+    expect(db.contribution.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'PAID' } }),
+    )
   })
 })
 

@@ -33,7 +33,7 @@ import { toTransactionStatus } from '@/lib/transaction-status'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
 import { debitAmountWithFee, NETCASH_FEE_BUFFER } from '@/lib/group-account'
 import { allocatePayment, outstandingOn } from '@/lib/payment-allocation'
-import { subtractZAR, sumZAR } from '@/lib/money'
+import { subtractZAR, sumZAR, roundZAR } from '@/lib/money'
 import type { ManualContributionInput, GenerateContributionsInput, OfflineContributionInput } from '@/lib/validation/contribution'
 import { MIN_CONTRIBUTION_ZAR, MONTHS } from '@xxm/utils'
 import { collectionReference } from '@xxm/utils/collection-reference'
@@ -1530,4 +1530,55 @@ export async function findRemindedContributionIds(
   contributionIds: readonly string[],
 ): Promise<string[]> {
   return findNotifiedContributionIds('contribution-due-reminder', contributionIds)
+}
+
+// ─── Admin: fee-buffer retroactive audit (read-only) ───────────────────────
+
+export type FeeBufferCandidate = {
+  contributionId: string
+  userId: string
+  name: string
+  email: string
+  period: string
+  amountDue: number
+  amountPaid: number
+  excess: number
+}
+
+/**
+ * Contributions recorded overpaid by no more than NETCASH_FEE_BUFFER, from
+ * before `recordOfflineContribution` carved that out as bank-charge padding
+ * rather than a member's over-payment.
+ *
+ * Read-only — finds candidates, changes nothing. A one-time historical
+ * correction is meant to read this list, be looked at by a person, and only
+ * then decide what to do about each row. It does not decide that itself.
+ *
+ * `status: 'PAID'` because `deriveContributionStatus` already reports an
+ * overpaid period as PAID — an over-payment is not a different status, it is
+ * a PAID period whose `amountPaid` is more than its `amountDue`.
+ */
+export async function findFeeBufferRetroCandidates(): Promise<FeeBufferCandidate[]> {
+  const rows = await db.contribution.findMany({
+    where: { status: 'PAID' },
+    select: {
+      id: true, userId: true, periodMonth: true, periodYear: true,
+      amountDue: true, amountPaid: true,
+      user: { select: { firstName: true, lastName: true, email: true } },
+    },
+    orderBy: [{ periodYear: 'asc' }, { periodMonth: 'asc' }],
+  })
+
+  return rows
+    .map((r) => ({
+      contributionId: r.id,
+      userId: r.userId,
+      name: `${r.user.firstName} ${r.user.lastName}`,
+      email: r.user.email,
+      period: `${r.periodYear}-${String(r.periodMonth).padStart(2, '0')}`,
+      amountDue: Number(r.amountDue),
+      amountPaid: Number(r.amountPaid),
+      excess: roundZAR(subtractZAR(Number(r.amountPaid), Number(r.amountDue))),
+    }))
+    .filter((r) => r.excess > 0 && r.excess <= NETCASH_FEE_BUFFER)
 }
