@@ -16,6 +16,7 @@ import { cache, CACHE_KEYS } from '@/lib/cache'
 import { env } from '@/lib/env'
 import { logger } from '@xxm/observability'
 import { INFRASTRUCTURE_FAILURE_PREFIX } from '@xxm/utils'
+import { endOfMonth } from '@xxm/utils/contribution-period'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { recordJobHeartbeat } from '@/lib/job-heartbeat'
 import { collectionReference } from '@xxm/utils/collection-reference'
@@ -194,7 +195,7 @@ export async function executeDebitRun(step: DebitStepRunner) {
       })
       if (existing) return existing
 
-      const dueDate = new Date(periodYear, periodMonth - 1, mandate.debitDay)
+      const dueDate = endOfMonth(periodYear, periodMonth)
       return db.contribution.create({
         data: {
           userId: mandate.userId,

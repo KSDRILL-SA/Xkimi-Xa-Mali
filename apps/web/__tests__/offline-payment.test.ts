@@ -81,6 +81,7 @@ vi.mock('@/repositories/contribution.repository', () => ({
 
 import { recordOfflineContribution } from '@/services/contribution.service'
 import { postPoolCredit } from '@/services/ledger.service'
+import { endOfMonth } from '@xxm/utils/contribution-period'
 
 const ADMIN = 'admin-1'
 const ROLES = ['ADMIN']
@@ -136,6 +137,21 @@ describe('what a period is created owing', () => {
 
     expect(mocks.contribCreate).toHaveBeenCalledWith(
       expect.objectContaining({ amountDue: 500, amountPaid: 0 }),
+    )
+  })
+
+  it('falls due at the end of the month, not on a mandate’s debit day', async () => {
+    // A period's deadline used to follow whatever day a member's mandate
+    // happened to specify — a debit-order scheduling choice for a system with
+    // no automatic collection running at all. There being no debit order yet
+    // is exactly why everybody's real deadline is the same one: the end of
+    // the month itself, whatever `debitDay` says.
+    mocks.findMandate.mockResolvedValue({ id: 'm-1', amount: 750, debitDay: 25 })
+
+    await recordOfflineContribution(payment() as never, ADMIN, ROLES)
+
+    expect(mocks.contribCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ dueDate: endOfMonth(2026, 6) }),
     )
   })
 
