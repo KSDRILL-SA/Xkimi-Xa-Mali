@@ -61,7 +61,7 @@ function failedTx(over: Record<string, unknown> = {}) {
     // userId is selected by the job so a retry carries the payer's own
     // collection reference rather than a per-attempt one — see
     // collectionReference and provider contract §18.9.
-    contribution: { id: 'contrib-1', status: 'PENDING', userId: 'user-1' },
+    contribution: { id: 'contrib-1', status: 'PENDING', userId: 'user-1', periodMonth: 8, periodYear: 2026 },
     ...over,
   }
 }
@@ -132,6 +132,9 @@ describe('executeTransactionRetry — what each gateway answer means', () => {
 
     expect(mocks.txUpdate.mock.calls[0][0].data).toMatchObject({ status: 'SUCCESS', retryCount: 1 })
     expect(mocks.queueNotification.mock.calls[0][0].templateSlug).toBe('debit-success')
+    // The template reads "contribution for {{period}}" — unsupplied, `interpolate`
+    // would send the literal placeholder text rather than dropping it silently.
+    expect(mocks.queueNotification.mock.calls[0][0].payload.period).toBe('August 2026')
     expect(summary.retried).toBe(1)
   })
 
