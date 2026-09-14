@@ -31,9 +31,9 @@ import { raiseOperationalAlert } from './alert.service'
 import { endOfMonth } from '@xxm/utils/contribution-period'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { paymentGateway, type TransactionEvent } from '@/integrations/payment'
-import { debitAmountWithFee } from '@/lib/group-account'
-import { allocatePayment } from '@/lib/payment-allocation'
-import { subtractZAR } from '@/lib/money'
+import { debitAmountWithFee, NETCASH_FEE_BUFFER } from '@/lib/group-account'
+import { allocatePayment, outstandingOn } from '@/lib/payment-allocation'
+import { subtractZAR, sumZAR } from '@/lib/money'
 import type { ManualContributionInput, GenerateContributionsInput, OfflineContributionInput } from '@/lib/validation/contribution'
 import { MIN_CONTRIBUTION_ZAR, MONTHS } from '@xxm/utils'
 import { collectionReference } from '@xxm/utils/collection-reference'
@@ -1125,7 +1125,26 @@ export async function recordOfflineContribution(
     if (!named) throw new ContributionNotFoundError()
 
     const others = await contributionRepo.findUnsettledByUser(data.userId, named.id, tx)
-    const allocations = allocatePayment(data.amount, named, others)
+
+    // A member padding an EFT so the Foundation still nets the full amount
+    // after their own bank's transfer fee — the offline mirror of
+    // `debitAmountWithFee`, which does the same padding on the gateway side
+    // for exactly the same reason. What is genuinely owed, across the named
+    // period and everything else still outstanding, is real money and gets
+    // allocated as real money always has. Only the piece nobody owed anything
+    // for — and only up to NETCASH_FEE_BUFFER of it — is fee padding rather
+    // than a member's overpayment: still credited to the pool in full further
+    // down (the bank statement will show all of it, so the ledger must too),
+    // just not attributed to this member as money they put toward a period.
+    // A pad bigger than the buffer is not explained by a transfer fee, so only
+    // the buffer's worth is ever carved out — the rest allocates exactly as an
+    // overpayment always has, landing back on the named period.
+    const totalOutstanding = sumZAR(outstandingOn(named), ...others.map((o) => outstandingOn(o)))
+    const rawExcess = subtractZAR(data.amount, totalOutstanding)
+    const feeBuffer = rawExcess > 0 ? Math.min(rawExcess, NETCASH_FEE_BUFFER) : 0
+    const allocatable = feeBuffer > 0 ? subtractZAR(data.amount, feeBuffer) : data.amount
+
+    const allocations = allocatePayment(allocatable, named, others)
 
     const rows = []
     const changes = []
@@ -1171,10 +1190,10 @@ export async function recordOfflineContribution(
       if (change) changes.push(change)
     }
 
-    return { rows, changes, allocations }
+    return { rows, changes, allocations, feeBuffer }
   })
 
-  const { rows, changes, allocations } = written
+  const { rows, changes, allocations, feeBuffer } = written
   // The row for the period the administrator named. It leads the allocation by
   // construction, and everything downstream that says "the payment" means this.
   const transaction = rows[0]!
@@ -1232,6 +1251,26 @@ export async function recordOfflineContribution(
     )
   }
 
+  // The fee-padding piece, if there was one: still credited to the pool in
+  // full — the bank statement shows all of it, so the ledger must too — just
+  // under its own refType, so it is never mistaken for a member's own money
+  // toward a period. `refId` keyed to the leading transaction, not a part of
+  // it, so a spilled multi-month payment cannot also post this a second time.
+  if (feeBuffer > 0) {
+    await postPoolCredit({
+      refType: 'FEE_BUFFER',
+      refId: transaction.id,
+      amount: feeBuffer,
+      memberId: data.userId,
+      description: 'Collection fee reserve — bank-deduction padding on an offline payment',
+    }).catch((err) =>
+      logger.error('Ledger credit post failed for an offline payment’s fee buffer', {
+        transactionId: transaction.id,
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    )
+  }
+
   await writeAuditLog({
     userId: adminId,
     action: 'OFFLINE_PAYMENT_RECORDED',
@@ -1244,6 +1283,11 @@ export async function recordOfflineContribution(
       periodYear: data.periodYear,
       amount: data.amount,
       amountDue: data.amountDue ?? null,
+      // How much of `amount` was fee padding rather than money toward this
+      // period — 0 unless the payment overshot every real obligation by no
+      // more than NETCASH_FEE_BUFFER. Recorded so a later reader can see
+      // exactly why the allocations below do not sum to the full amount.
+      feeBuffer,
       reference: data.reference,
       receivedAt: data.receivedAt.toISOString(),
       note: data.note ?? null,
@@ -1288,6 +1332,9 @@ export async function recordOfflineContribution(
       (outstanding <= 0
         ? 'That month is now settled in full.'
         : `R${outstanding.toFixed(2)} is still outstanding.`) +
+      (feeBuffer > 0
+        ? ` R${feeBuffer.toFixed(2)} of that covers bank charges on the money arriving, so it is not counted toward your contribution.`
+        : '') +
       ` Reference: ${data.reference}.` +
       ' If you do not recognise this, contact leadership.',
     category: 'PAYMENT',
@@ -1322,6 +1369,7 @@ export async function recordOfflineContribution(
     memberId: data.userId,
     contributionId: periodContribution.id,
     amount: data.amount,
+    feeBuffer,
     period: `${data.periodYear}-${data.periodMonth}`,
     status,
     outstanding,
@@ -1349,6 +1397,8 @@ export async function recordOfflineContribution(
      * can decide whether it was a mistake worth reversing.
      */
     overpaid: outstanding < 0,
+    /** How much of `amount` was fee padding, carved out before allocation. 0 when none was. */
+    feeBuffer,
   }
 }
 

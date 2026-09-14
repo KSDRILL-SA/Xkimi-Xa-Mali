@@ -572,10 +572,11 @@ describe('a payment bigger than the month it was recorded against', () => {
     ])
   })
 
-  it('still leaves a genuine over-payment on the named month', async () => {
-    // Nothing to absorb it. The month reads over-paid and leadership is
-    // alerted, exactly as before — the record says money arrived that nothing
-    // was owed for, which is what happened.
+  it('still leaves a genuine over-payment on the named month, past the fee buffer', async () => {
+    // Nothing to absorb it. Once the first NETCASH_FEE_BUFFER (R10) is carved
+    // out as fee padding, the rest is not explained by a transfer fee — it is
+    // a real over-payment, and the month reads over-paid and leadership is
+    // alerted exactly as before.
     mocks.findUnsettled.mockResolvedValue([])
 
     await recordOfflineContribution(
@@ -584,6 +585,95 @@ describe('a payment bigger than the month it was recorded against', () => {
 
     expect(mocks.txCreate).toHaveBeenCalledTimes(1)
     const [written] = mocks.txCreate.mock.calls[0]
-    expect(written.amount).toBe(900)
+    expect(written.amount).toBe(890) // 900 - the R10 fee buffer
+  })
+})
+
+describe('the fee-buffer carve-out', () => {
+  // A member padding an EFT so the Foundation still nets the full contribution
+  // after their own bank's transfer fee — the offline mirror of
+  // `debitAmountWithFee`, which does the same padding for the same reason on
+  // the gateway side. Up to NETCASH_FEE_BUFFER (R10) of an amount nobody owed
+  // anything for is fee padding, not a member's over-payment: it must still
+  // reach the pool ledger in full (the bank statement will show all of it),
+  // just not attributed to the member as money toward a period.
+  beforeEach(() => {
+    mocks.findByPeriod.mockResolvedValue({ id: 'contrib-1', amountDue: 100, amountPaid: 0, status: 'PENDING' })
+    mocks.findUniqueWithVersion.mockResolvedValue({
+      id: 'contrib-1', amountDue: 100, amountPaid: 0, version: 1, status: 'PENDING',
+    })
+    mocks.findUnsettled.mockResolvedValue([])
+  })
+
+  it('excludes a top-up of exactly the buffer from the contribution', async () => {
+    await recordOfflineContribution(payment({ amount: 110 }) as never, ADMIN, ROLES)
+
+    expect(mocks.contribCreate).not.toHaveBeenCalled()
+    const [written] = mocks.txCreate.mock.calls[0]
+    expect(written.amount).toBe(100) // not 110 — the R10 stays off the period
+  })
+
+  it('excludes a top-up under the buffer the same way', async () => {
+    await recordOfflineContribution(payment({ amount: 105 }) as never, ADMIN, ROLES)
+
+    const [written] = mocks.txCreate.mock.calls[0]
+    expect(written.amount).toBe(100)
+  })
+
+  it('never carves anything out of an exact payment', async () => {
+    await recordOfflineContribution(payment({ amount: 100 }) as never, ADMIN, ROLES)
+
+    const [written] = mocks.txCreate.mock.calls[0]
+    expect(written.amount).toBe(100)
+    // Nothing to post — a FEE_BUFFER credit here would be inventing money.
+    expect(vi.mocked(postPoolCredit)).not.toHaveBeenCalledWith(
+      expect.objectContaining({ refType: 'FEE_BUFFER' }),
+    )
+  })
+
+  it('never carves anything out of an under-payment', async () => {
+    await recordOfflineContribution(payment({ amount: 60 }) as never, ADMIN, ROLES)
+
+    const [written] = mocks.txCreate.mock.calls[0]
+    expect(written.amount).toBe(60)
+  })
+
+  it('still credits the buffer amount to the pool, under its own refType', async () => {
+    await recordOfflineContribution(payment({ amount: 110 }) as never, ADMIN, ROLES)
+
+    expect(postPoolCredit).toHaveBeenCalledWith(
+      expect.objectContaining({ refType: 'FEE_BUFFER', amount: 10, memberId: 'member-1' }),
+    )
+    // And the whole R110 still reaches the pool — the named transaction's
+    // R100 plus this R10 — so the bank statement and the ledger still agree.
+    const credited = vi.mocked(postPoolCredit).mock.calls
+      .reduce((sum, [c]) => sum + (c as { amount: number }).amount, 0)
+    expect(credited).toBe(110)
+  })
+
+  it('records how much was carved out in the audit log', async () => {
+    await recordOfflineContribution(payment({ amount: 110 }) as never, ADMIN, ROLES)
+
+    const [entry] = mocks.writeAuditLog.mock.calls[0]
+    expect(entry.payload.feeBuffer).toBe(10)
+  })
+
+  it('reports the buffer on what it returns to the caller', async () => {
+    const result = await recordOfflineContribution(payment({ amount: 110 }) as never, ADMIN, ROLES)
+
+    expect(result.feeBuffer).toBe(10)
+    expect(result.overpaid).toBe(false)
+  })
+
+  it('carves out only the buffer, not the whole excess, once a genuine over-payment is also present', async () => {
+    // R100 due, R10 fee padding, and a real R15 gift on top — three different
+    // amounts that must not be conflated into one.
+    await recordOfflineContribution(payment({ amount: 125 }) as never, ADMIN, ROLES)
+
+    const [written] = mocks.txCreate.mock.calls[0]
+    expect(written.amount).toBe(115) // 125 - the R10 buffer; the R15 stays a real over-payment
+    expect(postPoolCredit).toHaveBeenCalledWith(
+      expect.objectContaining({ refType: 'FEE_BUFFER', amount: 10 }),
+    )
   })
 })
