@@ -127,6 +127,11 @@ export function shortSuppliedId(notificationId: string): string {
  */
 export const MANDATORY_SLUGS = new Set([
   'debit-success',
+  // Added alongside the SMS slug once `recordOfflineContribution` started
+  // queueing both: an offline payment is the only path that moves real money
+  // right now, so its confirmation belongs on the same footing as the
+  // reversal below, not switchable off by a member who wants goal news quiet.
+  'debit-success-email',
   'debit-pending',
   'payment-failed-sms',
   'payment-failed-email',

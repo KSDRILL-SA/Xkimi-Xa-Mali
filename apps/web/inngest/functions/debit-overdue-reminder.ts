@@ -1,5 +1,7 @@
 import { inngest } from '@/lib/inngest'
 import { db } from '@/lib/db'
+import { env } from '@/lib/env'
+import { MONTHS } from '@xxm/utils'
 import { queueNotification } from '@/services/notification.service'
 import { findNotifiedContributionIds } from '@/services/contribution.service'
 
@@ -36,17 +38,29 @@ export const debitOverdueReminder = inngest.createFunction(
     for (const contribution of active) {
       if (remindedToday.has(contribution.id)) continue
 
+      // The SMS template interpolates {{amount}}; this used to send `amountDue`
+      // instead, which `interpolate` leaves as the literal string "{{amount}}"
+      // when a key it needs is missing rather than throwing — so every overdue
+      // reminder went out reading "...contribution of R{{amount}} is still
+      // outstanding" instead of the real figure.
+      const amount = Number(contribution.amountDue).toString()
+      const period = `${MONTHS[contribution.periodMonth - 1] ?? contribution.periodMonth} ${contribution.periodYear}`
+      const url = `${env.NEXTAUTH_URL ?? ''}/dashboard/contributions`
+
       await step.run(`notify-${contribution.id}`, () =>
         queueNotification({
           userId: contribution.userId,
           templateSlug: 'overdue-reminder',
           channel: 'SMS',
-          payload: {
-            contributionId: contribution.id,
-            periodMonth: contribution.periodMonth,
-            periodYear: contribution.periodYear,
-            amountDue: Number(contribution.amountDue).toString(),
-          },
+          payload: { contributionId: contribution.id, amount },
+        }),
+      )
+      await step.run(`notify-email-${contribution.id}`, () =>
+        queueNotification({
+          userId: contribution.userId,
+          templateSlug: 'overdue-reminder-email',
+          channel: 'EMAIL',
+          payload: { contributionId: contribution.id, amount, period, url },
         }),
       )
     }
