@@ -70,7 +70,7 @@ beforeEach(() => {
 })
 
 describe('goal-deadline-checker — the circle is told', () => {
-  it('tells every member who pledged, in-app and by SMS', async () => {
+  it('tells every member who pledged, in-app and by email', async () => {
     const { runner } = memoisingStep()
 
     const result = await executeGoalDeadlineCheck(runner)
@@ -80,7 +80,10 @@ describe('goal-deadline-checker — the circle is told', () => {
       expect.objectContaining({ category: 'GOAL' }),
     )
     expect(mocks.queueNotification.mock.calls.map((c) => c[0].userId)).toEqual(['u1', 'u2'])
-    expect(mocks.queueNotification.mock.calls.every((c) => c[0].templateSlug === 'goal-failed')).toBe(true)
+    // Email only — news about a goal, not money moving; SMS is reserved for
+    // offline payment confirmations and overdue reminders.
+    expect(mocks.queueNotification.mock.calls.every((c) => c[0].templateSlug === 'goal-failed-email')).toBe(true)
+    expect(mocks.queueNotification.mock.calls.every((c) => c[0].channel === 'EMAIL')).toBe(true)
     expect(result).toEqual({ expiredGoalsMarkedFailed: 1, membersNotified: 2 })
   })
 

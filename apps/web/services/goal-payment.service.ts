@@ -97,8 +97,10 @@ async function applySettledPayment(
     paymentId: payment.id, error: err instanceof Error ? err.message : String(err),
   }))
 
+  // Email only — a thank-you note, not money moving or a deadline. See the
+  // channel policy note on `badge-level-down` in badge.service.ts.
   await queueNotification({
-    userId: payment.userId, templateSlug: 'goal-payment-thanks', channel: 'SMS',
+    userId: payment.userId, templateSlug: 'goal-payment-thanks-email', channel: 'EMAIL',
     payload: { amount: amount.toString(), goal: goal.title },
   }).catch(() => {})
 }

@@ -334,4 +334,47 @@ export const NOTIFICATION_TEMPLATES: Array<{
     subject: 'Action needed: {{title}}',
     body: '{{title}}\n\n{{detail}}\n\nThis is an automated operational alert from the Xkimi Xa Mali Foundation system.',
   },
+  // ── Email counterparts added for the channel rebalance ──────────────────
+  //
+  // The SMS versions beside each of these were the only channel a member
+  // could hear this news on, with no email fallback at all — and SMS is the
+  // one channel with a hard, paid quota. These move the news itself to email,
+  // where the budget does not run out, and the SMS calls that used to send
+  // them were changed to queue these slugs instead.
+  {
+    slug: 'badge-level-down-email',
+    channel: 'EMAIL',
+    subject: 'Your badge tier has changed — Xkimi Xa Mali Foundation',
+    body: 'Hi {{firstName}}, your badge tier has changed to {{tier}}. Keep contributing on time to climb back up.',
+  },
+  {
+    slug: 'goal-payment-thanks-email',
+    channel: 'EMAIL',
+    subject: 'Thank you for your goal contribution — Xkimi Xa Mali Foundation',
+    body: 'Hi {{firstName}}, thank you! Your R{{amount}} toward "{{goal}}" has been received — your badge points just got a boost.',
+  },
+  {
+    slug: 'goal-plan-completed-email',
+    channel: 'EMAIL',
+    subject: 'Your goal plan has ended — Xkimi Xa Mali Foundation',
+    body: 'Hi {{firstName}}, your monthly plan for "{{goal}}" has ended. {{reason}}. Nothing further will be collected for it.',
+  },
+  {
+    slug: 'goal-plan-due-email',
+    channel: 'EMAIL',
+    subject: 'Your goal plan asks for a payment this month — Xkimi Xa Mali Foundation',
+    body: 'Hi {{firstName}}, your monthly plan for "{{goal}}" asks for R{{amount}} this month. Pay it into the group account and send your proof of payment, and we will record it against the goal.',
+  },
+  {
+    slug: 'goal-plan-paused-email',
+    channel: 'EMAIL',
+    subject: 'Your goal plan is paused — Xkimi Xa Mali Foundation',
+    body: 'Hi {{firstName}}, your monthly plan for "{{goal}}" is paused — we could not find an active debit order to collect from. Set one up and you can resume it.',
+  },
+  {
+    slug: 'goal-failed-email',
+    channel: 'EMAIL',
+    subject: 'A goal did not reach its target — Xkimi Xa Mali Foundation',
+    body: 'Hi {{firstName}}, "{{goal}}" did not reach its target by its deadline and has been marked Failed. No funds were released — nothing has left the pool. View it here: {{url}}',
+  },
 ]

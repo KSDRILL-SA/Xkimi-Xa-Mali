@@ -216,7 +216,7 @@ describe('generosity rewards paying above the minimum', () => {
 // ---------------------------------------------------------------------------
 
 describe('promotion', () => {
-  it('records the move and tells the member on two channels', async () => {
+  it('records the move and tells the member by email', async () => {
     givenExistingScore({ currentBadge: 'SEMI_PRO', progressToNext: 50, graceUntil: null })
     givenContributions(perfectHistory(6))
 
@@ -225,8 +225,13 @@ describe('promotion', () => {
     expect(badgeRepo.createHistoryEntry).toHaveBeenCalledWith(
       expect.objectContaining({ fromBadge: 'SEMI_PRO', toBadge: 'PRO', trigger: 'monthly' }),
     )
+    // Email only — badge news is not money moving or a deadline, and SMS is
+    // reserved for offline payment confirmations and overdue reminders.
+    expect(queueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ templateSlug: 'badge-level-up-email', channel: 'EMAIL' }),
+    )
     const slugs = mock(queueNotification).mock.calls.map((c) => (c[0] as { templateSlug: string }).templateSlug)
-    expect(slugs).toEqual(expect.arrayContaining(['badge-level-up', 'badge-level-up-email']))
+    expect(slugs).not.toContain('badge-level-up')
   })
 
   it('holding the same tier is not a promotion and raises no notification', async () => {
@@ -291,8 +296,9 @@ describe('checkGraceExpiry', () => {
     expect(badgeRepo.createHistoryEntry).toHaveBeenCalledWith(
       expect.objectContaining({ fromBadge: 'PRO', toBadge: 'SEMI_PRO', trigger: 'grace_expired' }),
     )
+    // Email only — see the promotion test above for why.
     expect(queueNotification).toHaveBeenCalledWith(
-      expect.objectContaining({ templateSlug: 'badge-level-down' }),
+      expect.objectContaining({ templateSlug: 'badge-level-down-email', channel: 'EMAIL' }),
     )
     expect(written().graceUntil).toBeNull()
   })
