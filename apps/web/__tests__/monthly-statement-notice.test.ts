@@ -60,7 +60,7 @@ beforeEach(() => {
 })
 
 describe('monthly-statement-notice — every channel the member chose', () => {
-  it('queues SMS and email as well as writing the inbox message', async () => {
+  it('queues email as well as writing the inbox message', async () => {
     const { runner } = memoisingStep()
 
     const result = await executeMonthlyStatementNotice(runner)
@@ -72,13 +72,14 @@ describe('monthly-statement-notice — every channel the member chose', () => {
       expect.objectContaining({ category: 'SYSTEM' }),
     )
 
-    // These two are the gap: a member who chose SMS or email heard nothing.
+    // The gap this job was built to close: a member who chose email heard
+    // nothing. SMS is not queued here — it is reserved for offline payment
+    // confirmations and overdue reminders, which the quota cannot absorb on
+    // top of a monthly notice to the whole circle.
     const slugs = mocks.queueNotification.mock.calls.map((c) => c[0].templateSlug)
-    expect(slugs).toEqual([
-      'statement-ready-sms', 'statement-ready-email',
-      'statement-ready-sms', 'statement-ready-email',
-    ])
-    expect(result).toMatchObject({ notified: 2, queued: 4 })
+    expect(slugs).toEqual(['statement-ready-email', 'statement-ready-email'])
+    expect(mocks.queueNotification.mock.calls.every((c) => c[0].channel === 'EMAIL')).toBe(true)
+    expect(result).toMatchObject({ notified: 2, queued: 2 })
   })
 
   it('addresses the member by name and links to the page that has the statement', async () => {
@@ -111,9 +112,9 @@ describe('monthly-statement-notice — every channel the member chose', () => {
       },
     })
 
-    expect(replay).toMatchObject({ notified: 2, queued: 4 })
+    expect(replay).toMatchObject({ notified: 2, queued: 2 })
     // And nobody was told twice.
-    expect(mocks.queueNotification).toHaveBeenCalledTimes(4)
+    expect(mocks.queueNotification).toHaveBeenCalledTimes(2)
     expect(mocks.createInboxMessages).toHaveBeenCalledTimes(1)
   })
 

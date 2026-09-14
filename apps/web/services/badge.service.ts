@@ -248,20 +248,14 @@ export async function recalculateOne(userId: string, trigger: string) {
       score: metrics.overallScore,
     })
 
-    await Promise.all([
-      queueNotification({
-        userId,
-        templateSlug: 'badge-level-up',
-        channel: 'SMS',
-        payload: { tier: newBadge },
-      }),
-      queueNotification({
-        userId,
-        templateSlug: 'badge-level-up-email',
-        channel: 'EMAIL',
-        payload: { tier: newBadge },
-      }),
-    ])
+    // Email only. Badge news is not money moving and not urgent — see the
+    // channel policy note on `badge-level-down` below, which applies here too.
+    await queueNotification({
+      userId,
+      templateSlug: 'badge-level-up-email',
+      channel: 'EMAIL',
+      payload: { tier: newBadge },
+    })
   }
 
   if (
@@ -328,10 +322,15 @@ export async function checkGraceExpiry() {
         score: metrics.overallScore,
       })
 
+      // Email only, not SMS. This is informational — a member's own tier
+      // changing, not money moving or a deadline to act on — and SMS is a
+      // scarce, paid channel with a limited daily quota. Everything that is
+      // not urgent or about money moving now goes by email; that budget is
+      // reserved for offline payment confirmations and overdue reminders.
       await queueNotification({
         userId: score.userId,
-        templateSlug: 'badge-level-down',
-        channel: 'SMS',
+        templateSlug: 'badge-level-down-email',
+        channel: 'EMAIL',
         payload: { tier: eligibleTier },
       })
 

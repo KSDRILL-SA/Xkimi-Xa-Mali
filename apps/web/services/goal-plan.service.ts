@@ -351,10 +351,13 @@ export async function collectDuePlans(now = new Date()): Promise<{
       })
       if (ended.count > 0) {
         completed += 1
+        // Email only — news about a plan, not money moving or a deadline to
+        // act on. See the channel policy note on `badge-level-down` in
+        // badge.service.ts.
         await queueNotification({
           userId: plan.userId,
-          templateSlug: 'goal-plan-completed',
-          channel: 'SMS',
+          templateSlug: 'goal-plan-completed-email',
+          channel: 'EMAIL',
           // `goal`, not `goalTitle` — the name every other goal template uses.
           payload: { goal: goal.title, reason: stop },
         }).catch(() => {})
@@ -385,10 +388,14 @@ export async function collectDuePlans(now = new Date()): Promise<{
       })
       if (asked.count > 0) {
         requested += 1
+        // Email only. This is a live, recurring monthly ask (the gateway is
+        // off, so this branch fires for every active plan every month) —
+        // exactly the kind of volume the limited SMS quota cannot absorb, and
+        // it is a request to act, not a confirmation that money already moved.
         await queueNotification({
           userId: plan.userId,
-          templateSlug: 'goal-plan-due',
-          channel: 'SMS',
+          templateSlug: 'goal-plan-due-email',
+          channel: 'EMAIL',
           payload: { goal: goal.title, amount: amount.toFixed(2) },
         }).catch(() => {})
       }
@@ -404,10 +411,11 @@ export async function collectDuePlans(now = new Date()): Promise<{
       })
       if (stopped.count > 0) {
         paused += 1
+        // Email only — see the channel policy note above.
         await queueNotification({
           userId: plan.userId,
-          templateSlug: 'goal-plan-paused',
-          channel: 'SMS',
+          templateSlug: 'goal-plan-paused-email',
+          channel: 'EMAIL',
           payload: { goal: goal.title },
         }).catch(() => {})
       }

@@ -50,13 +50,12 @@ export async function executeGoalDeadlineCheck(step: GoalDeadlineStepRunner) {
         category: 'GOAL',
       })
 
-      // And on SMS, which is where most of the circle actually reads things.
-      // Not in MANDATORY_SLUGS: this is news about a goal, not about money
-      // moving out of a member's own balance, so a member who has switched
-      // SMS off is entitled to not receive it.
+      // Email only. This is news about a goal, not money moving out of a
+      // member's own balance, and SMS is a scarce, paid channel — reserved
+      // for offline payment confirmations and overdue reminders instead.
       for (const userId of goal.pledgerIds) {
         await queueNotification({
-          userId, templateSlug: 'goal-failed', channel: 'SMS', payload,
+          userId, templateSlug: 'goal-failed-email', channel: 'EMAIL', payload,
         })
       }
     })

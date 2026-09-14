@@ -1299,6 +1299,24 @@ export async function recordOfflineContribution(
     }),
   )
 
+  // And on SMS and email both. This is the only payment path that moves real
+  // money right now — the gateway is off — so an in-app inbox message is not
+  // enough: it reaches nobody who has not opened the app. Both channels,
+  // unconditionally: same reasoning as `contribution-reversed-sms`, this is
+  // still money moving on a member's own record.
+  const notifyPayload = { amount: data.amount.toFixed(2), period }
+  await Promise.all([
+    queueNotification({
+      userId: data.userId, templateSlug: 'debit-success', channel: 'SMS', payload: notifyPayload,
+    }),
+    queueNotification({
+      userId: data.userId, templateSlug: 'debit-success-email', channel: 'EMAIL', payload: notifyPayload,
+    }),
+  ]).catch((err) => logger.error('Payment notify failed after an offline payment', {
+    error: err instanceof Error ? err.message : String(err),
+    userId: data.userId,
+  }))
+
   logger.info('Offline payment recorded', {
     adminId,
     memberId: data.userId,

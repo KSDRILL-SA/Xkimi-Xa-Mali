@@ -15,10 +15,13 @@ import { env } from '@/lib/env'
  * was never told at all; the message sat in an inbox they had no reason to open.
  *
  * Going through `queueNotification` puts this back under the member's own
- * choice. These slugs are deliberately not in `MANDATORY_SLUGS`: a statement
- * being ready is an invitation to look, not money moving, so a member who has
- * switched a channel off should not be overridden. The in-app copy is written
+ * choice. The slug is deliberately not in `MANDATORY_SLUGS`: a statement being
+ * ready is an invitation to look, not money moving, so a member who has
+ * switched email off should not be overridden. The in-app copy is written
  * unconditionally, which is the one channel nobody opts out of.
+ *
+ * Email only, not SMS — see the channel-policy comment at the queueNotification
+ * call below.
  */
 export type StatementNoticeStepRunner = {
   run<T>(id: string, fn: () => Promise<T> | T): Promise<T>
@@ -59,10 +62,10 @@ export async function executeMonthlyStatementNotice(step: StatementNoticeStepRun
     await step.run(`queue-${i}`, async () => {
       for (const member of batch) {
         const payload = { firstName: member.firstName ?? '', period: label, url }
-        await queueNotification({
-          userId: member.id, templateSlug: 'statement-ready-sms',
-          channel: 'SMS', payload,
-        })
+        // Email only. A statement being ready is a convenience notice, not
+        // money moving or a deadline — SMS is reserved for offline payment
+        // confirmations and overdue reminders, which the quota cannot absorb
+        // on top of a monthly notice to the whole circle.
         await queueNotification({
           userId: member.id, templateSlug: 'statement-ready-email',
           channel: 'EMAIL', payload,
@@ -72,7 +75,7 @@ export async function executeMonthlyStatementNotice(step: StatementNoticeStepRun
 
     // Outside the step: a completed step is not re-executed on re-entry, so a
     // total accumulated inside one comes back as zero on the pass that returns.
-    queued += batch.length * 2
+    queued += batch.length
   }
 
   logger.info('Monthly statement notices sent', {

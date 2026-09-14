@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   inbox: vi.fn(),
   findUnsettled: vi.fn(),
   findUniqueWithVersion: vi.fn(),
+  queueNotification: vi.fn(),
 }))
 
 vi.mock('@/lib/env', () => ({ env: { ENABLE_MANUAL_PAYMENTS: true } }))
@@ -39,7 +40,7 @@ vi.mock('@/services/ledger.service', () => ({
   postPoolCredit: vi.fn().mockResolvedValue(undefined),
   postPoolDebit: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/services/notification.service', () => ({ queueNotification: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/services/notification.service', () => ({ queueNotification: mocks.queueNotification }))
 vi.mock('@/services/inbox.service', () => ({ createInboxMessages: mocks.inbox }))
 vi.mock('@/lib/cache', () => ({
   cache: { del: vi.fn().mockResolvedValue(undefined), get: vi.fn().mockResolvedValue(null), set: vi.fn().mockResolvedValue(undefined) },
@@ -114,6 +115,7 @@ beforeEach(() => {
   // service reports from.
   mocks.findById.mockResolvedValue({ id: 'contrib-1', amountDue: 500, amountPaid: 200, status: 'PARTIAL' })
   mocks.inbox.mockResolvedValue(undefined)
+  mocks.queueNotification.mockResolvedValue(undefined)
   mocks.findUnsettled.mockResolvedValue([])
   mocks.findUniqueWithVersion.mockResolvedValue({
     id: 'contrib-1', amountDue: 500, amountPaid: 0, dueDate: new Date(), version: 1, status: 'PENDING',
@@ -368,6 +370,30 @@ describe('what it reports back', () => {
       expect.objectContaining({
         title: expect.stringContaining('June 2026'),
         body: expect.stringContaining('R300.00 is still outstanding'),
+      }),
+    )
+  })
+
+  it('confirms the payment by SMS and email, not just the inbox', async () => {
+    // This is the only payment path that moves real money right now — the
+    // gateway is off — so an in-app message alone reaches nobody who has not
+    // opened the app. Both channels, unconditionally, same as a reversal.
+    await recordOfflineContribution(
+      payment({ amount: 200, amountDue: 500 }) as never,
+      ADMIN,
+      ROLES,
+    )
+
+    expect(mocks.queueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'member-1', templateSlug: 'debit-success', channel: 'SMS',
+        payload: expect.objectContaining({ amount: '200.00', period: 'June 2026' }),
+      }),
+    )
+    expect(mocks.queueNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'member-1', templateSlug: 'debit-success-email', channel: 'EMAIL',
+        payload: expect.objectContaining({ amount: '200.00', period: 'June 2026' }),
       }),
     )
   })

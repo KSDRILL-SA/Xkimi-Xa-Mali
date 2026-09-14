@@ -119,7 +119,7 @@ describe('the monthly run asks when it cannot collect', () => {
 
   it('tells the member what to do, with the amount', () => {
     const s = src()
-    expect(s).toContain("templateSlug: 'goal-plan-due'")
+    expect(s).toContain("templateSlug: 'goal-plan-due-email'")
     expect(s).toMatch(/payload: \{ goal: goal\.title, amount:/)
   })
 
