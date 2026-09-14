@@ -7,7 +7,7 @@ import { debitAmountWithFee } from '@/lib/group-account'
 import { recalculateContributionStatus, emitContributionStatusChange } from '@/services/contribution.service'
 import { writeAuditLog } from '@/services/audit.service'
 import { queueNotification } from '@/services/notification.service'
-import { MAX_TRANSACTION_RETRY } from '@xxm/utils'
+import { MAX_TRANSACTION_RETRY, MONTHS } from '@xxm/utils'
 import { toTransactionStatus } from '@/lib/transaction-status'
 import { alertOnFailure } from '@/inngest/on-failure'
 import { recordJobHeartbeat } from '@/lib/job-heartbeat'
@@ -54,7 +54,7 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
         mandate: { select: { id: true, netcashMandateId: true, status: true, userId: true } },
         // userId so the retry carries the payer's own collection reference —
         // see collectionReference. It is not on the transaction row.
-        contribution: { select: { id: true, status: true, userId: true } },
+        contribution: { select: { id: true, status: true, userId: true, periodMonth: true, periodYear: true } },
       },
     }),
   )
@@ -174,6 +174,7 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
       )
 
       if ('newStatus' in result && result.newStatus === 'SUCCESS') {
+        const period = `${MONTHS[tx.contribution.periodMonth - 1] ?? tx.contribution.periodMonth} ${tx.contribution.periodYear}`
         await step.run(`notify-${tx.id}`, () =>
           queueNotification({
             userId: mandate.userId,
@@ -183,6 +184,7 @@ export async function executeTransactionRetry(step: RetryStepRunner) {
               mandateId: mandate.id,
               amount: Number(tx.amount).toString(),
               transactionId: tx.id,
+              period,
             },
           }),
         )

@@ -105,7 +105,7 @@ export const NOTIFICATION_TEMPLATES: Array<{
     slug: 'debit-success',
     channel: 'SMS',
     subject: null,
-    body: 'Xkimi Xa Mali Foundation: R{{amount}} contribution received. Thank you, {{firstName}}!',
+    body: 'Xkimi Xa Mali Foundation: R{{amount}} contribution for {{period}} received. Thank you, {{firstName}}!',
   },
   {
     slug: 'debit-pending',
