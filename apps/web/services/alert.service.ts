@@ -1,46 +1,36 @@
 import { logger } from '@xxm/observability'
 import { db } from '@/lib/db'
-import { env } from '@/lib/env'
-import { emailProvider } from '@/integrations/email'
 import { notifyAdmins } from '@/services/inbox.service'
-import { queueNotification } from '@/services/notification.service'
 import { writeAuditLog } from '@/services/audit.service'
 
 /**
- * Telling a person that money did not move.
+ * Telling a person that money did not move — in-app, and only in-app.
  *
  * Alerts already existed before this — the debit run announced an incomplete
  * collection, the morning sweep announced anomalies — but every one of them
- * ended at `notifyAdmins`, which writes an in-app inbox message and stops. On
- * debit night at 18:00, "nine contributions were not collected" was filed in a
- * web page nobody had a reason to open. The alert was raised; nobody was told.
+ * ended at `notifyAdmins`, which writes an in-app inbox message and stops.
  *
- * That is the same defect the statement notice had (#286) and it is worse here,
- * because the audience is four people who are not looking at a dashboard and the
- * runbook's own P1 definition is "money not moving on debit day — respond
- * immediately". An alert that waits for someone to log in cannot support that.
+ * This used to also queue an email to every admin, and a critical alert to a
+ * standing fallback address besides, on the reasoning that a page nobody has
+ * a reason to open is the same as not being told. It stopped being that once
+ * the same channel-exhaustion problem this alert exists to report started
+ * showing up *in* the alert: `requeueFailedNotifications`'s BulkSMS-quota
+ * revival (see notification.service.ts) resurrected a batch of stale,
+ * days-old `admin-alert-sms` rows queued under the pre-SMS-removal design,
+ * and they went out — alongside their still-live `admin-alert-email`
+ * sibling — the moment the quota came back. The owner got a text about an
+ * incident that may already be resolved, with no context and no way to tell
+ * it apart from a current one. Email and SMS are both queued, both retried,
+ * both able to sit around and fire later than the thing they describe is
+ * still true. The inbox is written directly, right now, by this call, or not
+ * at all — it cannot arrive stale.
  *
- * So severity here decides *how urgent the wording is*, not how many channels
- * fire — both severities reach the same two:
+ * By explicit owner decision: operational alerts are in-app only. No SMS, no
+ * email, for any severity. Severity still decides how the inbox row reads —
+ * 🔴 for `critical`, ⚠️ for `warning` — just not how many channels fire.
  *
- * - `critical` — money did not move, or the records disagree about money.
- *   Inbox and email, marked 🔴.
- * - `warning` — worth seeing today, not tonight. Inbox and email, marked ⚠️.
- *
- * SMS is deliberately not a channel here, even for critical alerts. It used to
- * be, on the reasoning that SMS costs are the point — reserved for the things
- * worth waking someone for. That reasoning stopped holding the moment the SMS
- * account itself is what is degraded or rate-limited: `NOTIFICATIONS_ABANDONED`
- * (raised, at `critical`, specifically because SMS deliveries are failing) was
- * itself going out as an SMS, so the alert that a scarce SMS quota was
- * exhausted was competing with real traffic for that same exhausted quota.
- * An admin console session already surfaces the inbox in real time, so there
- * is no wait being traded away by dropping SMS — only the ability for an
- * alert to fail because the channel reporting failures is the channel that is
- * failing.
- *
- * Every alert is also written to the audit log and to the logger, so there is a
- * durable record independent of whether any channel actually delivered.
+ * Every alert is also written to the audit log and to the logger, so there is
+ * a durable record independent of whether the inbox write itself succeeds.
  */
 
 export type AlertSeverity = 'critical' | 'warning'
@@ -49,9 +39,9 @@ export interface OperationalAlert {
   /** Stable machine name, e.g. `DEBIT_RUN_INCOMPLETE`. Also the audit action. */
   code: string
   severity: AlertSeverity
-  /** One line. Becomes the email subject, so keep it short. */
+  /** One line, shown as the inbox row's title. */
   title: string
-  /** The detail. Newlines survive to the inbox and the email. */
+  /** The detail. Newlines survive to the inbox. */
   body: string
   /**
    * What the alert is about — a period key, a job id, a date. Only used to
@@ -62,29 +52,22 @@ export interface OperationalAlert {
   payload?: Record<string, unknown>
 }
 
-/** Admin-facing template. Seeded, and inserted by migration for existing databases. */
-const ADMIN_ALERT_EMAIL = 'admin-alert-email'
-
 /**
- * Raise an alert through every channel its severity warrants.
+ * Raise an alert: log it, audit it, and write it to every active admin's inbox.
  *
  * Never throws. An alert is raised *because* something already went wrong, and
  * a failure to deliver it must not become a second failure that takes down the
- * job reporting the first. Each channel is attempted independently, so a
- * Resend outage does not also cost the inbox message.
+ * job reporting the first.
  */
 export async function raiseOperationalAlert(alert: OperationalAlert): Promise<{
   admins: number
   inbox: boolean
-  email: boolean
-  /** Whether the account-independent destination took it. Critical alerts only. */
-  fallback: boolean
 }> {
-  const result = { admins: 0, inbox: false, email: false, fallback: false }
+  const result = { admins: 0, inbox: false }
 
   // The log line first, and unconditionally. It is the only channel that does
-  // not depend on the database being readable or a provider being reachable,
-  // and `logger.error` is what puts a critical alert into Sentry.
+  // not depend on the database being readable, and `logger.error` is what
+  // puts a critical alert into Sentry.
   const log = alert.severity === 'critical' ? logger.error : logger.warn
   log(`Operational alert: ${alert.title}`, {
     code: alert.code,
@@ -121,94 +104,16 @@ export async function raiseOperationalAlert(alert: OperationalAlert): Promise<{
       notifyAdmins({ title: `${marker} ${alert.title}`, body: alert.body }),
     )) !== null
 
-  // The standing destination, attempted for every critical alert regardless of
-  // how the admin fan-out goes. See {@link deliverToFallback}.
-  if (alert.severity === 'critical') {
-    result.fallback = await deliverToFallback(alert)
-  }
-
   if (!admins || admins.length === 0) {
     // Nothing to escalate to. Worth its own line: an alerting system with no
     // recipients looks identical to a quiet night from the outside.
     logger.error('Operational alert has no active admin to reach', {
       code: alert.code,
       severity: alert.severity,
-      reachedFallback: result.fallback,
     })
-    return result
   }
 
-  // The payload every admin template renders. `interpolate` emits unsupplied
-  // placeholders as literal braces, so both keys are always present.
-  const payload = { title: alert.title, detail: alert.body }
-
-  result.email = await fanOut(admins, ADMIN_ALERT_EMAIL, payload)
-
   return result
-}
-
-/**
- * The destination that does not depend on anybody's account.
- *
- * Every other channel routes through a `User` row: find the active admins, queue
- * a notification against each, let the flush worker deliver it. That chain has
- * three links that can each be the reason nothing arrives — no active admin, a
- * suspended account, a flush worker that is itself the thing that died — and
- * this system currently runs with **one** admin, so none of those links has a
- * spare.
- *
- * `ALERT_FALLBACK_EMAIL` is a standing address: a shared operations mailbox, a
- * WhatsApp-to-email bridge, whatever is monitored by more than one person. It is
- * sent **directly**, not queued, for the same reason — if the queue is what
- * broke, putting the alert about it into the queue is not a plan.
- *
- * Optional. Unset, this is a no-op and the admin fan-out is the whole story,
- * which is exactly the behaviour before this existed.
- */
-async function deliverToFallback(alert: OperationalAlert): Promise<boolean> {
-  const to = env.ALERT_FALLBACK_EMAIL
-  if (!to) return false
-
-  const sent = await attempt('fallback-email', () =>
-    // The same branded template the queued `admin-alert-email` path uses
-    // (see notification.service.ts's dispatchEmail switch) — this used to
-    // hand-roll its own bare `<div style="font-family:sans-serif">` HTML,
-    // so the one channel that exists for when everything else is broken
-    // was also the one email in the whole system with no branding, no
-    // heading, and no styling at all. Same content, same escaping (done
-    // inside `sendAdminAlertEmail` itself now), properly branded.
-    emailProvider.sendAdminAlertEmail(
-      to,
-      alert.title,
-      alert.body,
-      // Not an idempotency key Resend can dedupe on across runs — the code and
-      // the entity are what make two alerts the same alert.
-      `alert:${alert.code}:${alert.entityId ?? ''}`,
-    ),
-  )
-
-  return sent !== null
-}
-
-/**
- * Queue one template to every admin, reporting whether any were queued.
- *
- * One admin's failure does not stop the others: with four founders, the one
- * whose row is malformed must not be the reason the other three hear nothing.
- */
-async function fanOut(
-  admins: Array<{ id: string }>,
-  templateSlug: string,
-  payload: Record<string, unknown>,
-): Promise<boolean> {
-  const results = await Promise.all(
-    admins.map((admin) =>
-      attempt(`email-${admin.id}`, () =>
-        queueNotification({ userId: admin.id, templateSlug, channel: 'EMAIL', payload }),
-      ),
-    ),
-  )
-  return results.some((r) => r !== null)
 }
 
 /** Run a delivery attempt, logging and swallowing its failure. Null on failure. */

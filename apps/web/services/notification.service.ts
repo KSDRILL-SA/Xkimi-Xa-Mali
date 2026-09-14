@@ -142,14 +142,12 @@ export const MANDATORY_SLUGS = new Set([
   // likely to expect, so it is not opt-out-able either.
   'contribution-reversed-sms',
   'contribution-reversed-email',
-  // Operational alerts to admins. Not a member notification, and the opt-out
-  // was never meant to cover it: an admin who switched email off for badge
-  // news would otherwise stop being told that a debit run collected nothing.
-  // SMS was dropped from this alert entirely (see `services/alert.service.ts`)
-  // rather than added here mandatorily, because the alert most likely to fire
-  // is the one saying SMS delivery itself is failing — sending that by SMS
-  // just competes with real traffic for the same exhausted quota.
-  'admin-alert-email',
+  // `admin-alert-email` and `admin-alert-sms` are deliberately absent, not
+  // merely unlisted. Operational alerts to admins are in-app only, by owner
+  // decision — see `services/alert.service.ts`, which no longer queues either
+  // channel for them at all. Listing a slug here as mandatory would only
+  // matter if something still queued it.
+  //
   // The two messages that say money will stop moving and nothing else will.
   //
   // `mandate-cancelled` is sent by `mandate-status-sync` when a member's
@@ -567,11 +565,23 @@ export async function requeueFailedNotifications(): Promise<number> {
   // system ever re-examines a row once it has reached MAX_RETRIES. This is
   // the only errorMessage abandoned rows are revived for — every other
   // exhausted retry stays abandoned, on purpose, for a human to read.
+  //
+  // `admin-alert-*` rows are excluded on purpose, whatever their error. These
+  // are this system's own internal noise, not a message owed to a member, and
+  // resending an old one is not a recovery — it is a stale alert landing on
+  // the owner's phone out of context, possibly days later, about a problem
+  // that may already be resolved. `docs/production-readiness/03-notification-
+  // delivery-recovery.md` §21.1 hit exactly this with 114 stuck admin-alert
+  // rows and the owner's call was to delete them, never to resend them blind.
+  // A slug check rather than a template-channel check, because the point
+  // holds even for `admin-alert-email` if the SMS-removal precedent here is
+  // ever mirrored for email too.
   const revived = await notificationRepo.updateMany(
     {
       status: 'FAILED',
       retryCount: { gte: MAX_RETRIES },
       errorMessage: { contains: 'insufficient-quota' },
+      template: { slug: { not: { startsWith: 'admin-alert' } } },
     },
     { status: 'QUEUED', retryCount: 0 },
   )
