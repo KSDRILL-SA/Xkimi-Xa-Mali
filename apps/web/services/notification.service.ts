@@ -554,7 +554,24 @@ export async function requeueFailedNotifications(): Promise<number> {
     },
     { status: 'QUEUED' },
   )
-  return result.count
+
+  // A BulkSMS quota exhaustion is the provider's account running dry, not a
+  // defect in the message — the exact same send succeeds once the account has
+  // quota again. Treating it like a malformed phone number left these rows
+  // FAILED forever even after the quota was topped up: nothing else in the
+  // system ever re-examines a row once it has reached MAX_RETRIES. This is
+  // the only errorMessage abandoned rows are revived for — every other
+  // exhausted retry stays abandoned, on purpose, for a human to read.
+  const revived = await notificationRepo.updateMany(
+    {
+      status: 'FAILED',
+      retryCount: { gte: MAX_RETRIES },
+      errorMessage: { contains: 'insufficient-quota' },
+    },
+    { status: 'QUEUED', retryCount: 0 },
+  )
+
+  return result.count + revived.count
 }
 
 // ---------------------------------------------------------------------------
