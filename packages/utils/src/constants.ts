@@ -4,7 +4,7 @@ export const MIN_CONTRIBUTION_ZAR  = 100
 export const MAX_CONTRIBUTION_ZAR  = 10_000
 export const CONTRIBUTION_STEP_ZAR = 50
 export const DEFAULT_DEBIT_DAY     = 1
-export const DEFAULT_INVITE_AMOUNT = 200
+export const DEFAULT_INVITE_AMOUNT = MIN_CONTRIBUTION_ZAR
 
 /**
  * The size of the circle. Fifty, and not a number we are working toward
