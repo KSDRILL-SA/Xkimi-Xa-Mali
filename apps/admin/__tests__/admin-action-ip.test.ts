@@ -57,6 +57,7 @@ const TAKES_IP = [
   'recordPayment',
   'rejectGoal',
   'rejectMandate',
+  'resendMemberVerification',
   'revokeInvitation',
   'setMemberRole',
   'setMemberStatus',

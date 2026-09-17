@@ -47,7 +47,7 @@ export async function listMembers(
       orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
       select: {
         id: true, firstName: true, lastName: true, email: true,
-        phone: true, status: true, createdAt: true,
+        phone: true, status: true, createdAt: true, emailVerified: true,
         roles: { select: { role: true } },
         // So the list can show who holds the Founder badge without opening each
         // member. At most four rows across the whole table.
@@ -78,7 +78,7 @@ export async function getMemberDetail(adminRoles: string[], memberId: string) {
     select: {
       id: true, firstName: true, lastName: true, email: true,
       phone: true, status: true, createdAt: true, updatedAt: true,
-      popiaConsentAt: true, loginAttempts: true, lockedUntil: true,
+      popiaConsentAt: true, loginAttempts: true, lockedUntil: true, emailVerified: true,
       roles:      { select: { role: true } },
       bankAccounts: { select: { id: true, bankName: true, accountType: true, createdAt: true } },
       mandates: {
@@ -255,4 +255,30 @@ export async function correctMemberIdNumber(
     throw new AdminConflictError(res.error?.message ?? 'Could not update this ID number')
   }
   return { corrected: true as const }
+}
+
+/**
+ * Send a stuck member a fresh verification link on an admin's say-so.
+ *
+ * A member who accepted an invite and never clicked their verification email —
+ * the link dead after 24 hours, same as one caught by a spam filter — used to
+ * have no way back in an admin's sight except force-activating them straight
+ * past verification, which confirms nothing about the address on file. Handed
+ * to the member app, which owns the token store and the sending domain, same
+ * reason as {@link correctMemberIdNumber}.
+ */
+export async function resendMemberVerification(
+  adminId: string, adminRoles: string[],
+  memberId: string, ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const res = await internalAdminPost(`/api/v1/admin/members/${memberId}/resend-verification`, {}, {
+    adminUserId: adminId, adminIp: ip,
+  })
+
+  if (!res.ok) {
+    throw new AdminConflictError(res.error?.message ?? 'Could not resend the verification email')
+  }
+  return { sent: true as const }
 }

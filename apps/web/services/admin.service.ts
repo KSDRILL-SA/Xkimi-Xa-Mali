@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client'
+import { createHash, randomBytes } from 'crypto'
 import { writeAuditLog } from './audit.service'
 import { queueNotification } from './notification.service'
 import { createInboxMessages } from './inbox.service'
@@ -19,6 +20,7 @@ import { bumpRoleVersion } from '@/lib/role-version'
 import { refuseStatusChange, STATUS_CHANGE_REFUSAL_MESSAGE } from '@xxm/utils/status-policy'
 import { lockAdminInvariant } from '@xxm/utils/invariant-locks'
 import { userRepo, runTransaction } from '@/repositories/user.repository'
+import { authTokenRepo } from '@/repositories/auth-token.repository'
 import { mandateRepo } from '@/repositories/mandate.repository'
 import { contributionRepo } from '@/repositories/contribution.repository'
 import { auditRepo } from '@/repositories/audit.repository'
@@ -58,6 +60,9 @@ export type ListAuditParams = {
   page?: number
   limit?: number
 }
+
+/** Matches the window registration issues its first link for. */
+const VERIFICATION_RESEND_TTL_MS = 24 * 60 * 60 * 1000
 
 export type BroadcastChannel = 'SMS' | 'EMAIL' | 'BOTH' | 'IN_APP'
 export type BroadcastFilter = 'ALL' | 'ACTIVE' | 'PENDING' | 'SUSPENDED'
@@ -867,4 +872,61 @@ export async function correctMemberIdNumber(
   })
 
   return { corrected: true as const }
+}
+
+/**
+ * Send a fresh verification link on an admin's say-so, rather than waiting on
+ * the member to ask for one themselves.
+ *
+ * `resendVerificationEmail` in auth.service already does this, but it is keyed
+ * by email and answers every caller the same way on purpose — silence is the
+ * point when the caller might not be who they claim, which is exactly wrong
+ * here: an admin looking at a specific stuck member needs to know whether
+ * "already verified" or "already active" is why nothing happened, not get the
+ * same blank success either way. Reimplemented rather than reused so this can
+ * say what actually occurred.
+ *
+ * Before this existed, a member who accepted an invite and then never clicked
+ * — the link dead after 24 hours, same as one lost to a spam filter — had no
+ * way back in sight of an admin except force-activating them straight past
+ * verification, which confirms nothing about the address on file.
+ */
+export async function adminResendVerification(
+  adminId: string,
+  adminRoles: string[],
+  memberId: string,
+  baseUrl: string,
+  ip?: string,
+) {
+  assertAdmin(adminRoles)
+
+  const member = await userRepo.findById(memberId, {
+    select: { id: true, email: true, firstName: true, status: true, emailVerified: true },
+  })
+  if (!member) throw new AdminNotFoundError('Member not found')
+  if (member.emailVerified) throw new AdminConflictError('This member has already verified their email')
+  if (member.status !== 'PENDING') throw new AdminConflictError('Only a pending member is waiting on verification')
+
+  await authTokenRepo.invalidateVerificationTokens(member.id)
+
+  const rawToken  = randomBytes(32).toString('hex')
+  const tokenHash = createHash('sha256').update(rawToken).digest('hex')
+
+  await authTokenRepo.createVerificationToken({
+    userId: member.id,
+    tokenHash,
+    expiresAt: new Date(Date.now() + VERIFICATION_RESEND_TTL_MS),
+  })
+
+  await emailProvider.sendVerificationEmail(member.email, member.firstName, rawToken, baseUrl)
+
+  await writeAuditLog({
+    userId: adminId,
+    action: 'ADMIN_VERIFICATION_RESENT',
+    entity: 'User',
+    entityId: memberId,
+    ipAddress: ip,
+  })
+
+  return { sent: true as const }
 }

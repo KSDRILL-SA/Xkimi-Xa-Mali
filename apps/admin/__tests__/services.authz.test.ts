@@ -66,6 +66,7 @@ const CALLS: Array<[string, (roles: string[]) => Promise<unknown>]> = [
   })],
   ['getBroadcastAudience',     (r) => services.getBroadcastAudience(r)],
   ['correctMemberIdNumber',    (r) => services.correctMemberIdNumber('a1', r, 'm1', '9001015800088', 'Captured wrong at registration')],
+  ['resendMemberVerification', (r) => services.resendMemberVerification('a1', r, 'm1')],
   ['listAllGoals',             (r) => services.listAllGoals(r)],
   ['getGoalById',              (r) => services.getGoalById(r, 'g1')],
   ['updateGoal',               (r) => services.updateGoal('a1', r, 'g1', { title: 'x' })],

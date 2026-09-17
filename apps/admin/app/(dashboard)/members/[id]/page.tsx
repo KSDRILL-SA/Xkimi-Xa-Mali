@@ -1,9 +1,9 @@
 import type { Metadata } from 'next'
 import { notFound, redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory, correctMemberIdNumber } from '@/lib/services'
+import { getMemberDetail, setMemberStatus, unlockMember, setMemberRole, getMemberLoginHistory, correctMemberIdNumber, resendMemberVerification } from '@/lib/services'
 import { setFounderBadge } from '@/lib/founder-badge'
-import { formatDate, formatZAR, formatMonth, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
+import { formatDate, formatZAR, formatMonth, daysSince, STATUS_STYLES as SHARED_STATUS_STYLES } from '@xxm/utils'
 import { Breadcrumb, Card, CardHeader, CardBody, PageHeader, Reveal } from '@xxm/ui'
 import { UserCircle, Gem } from 'lucide-react'
 import { revalidatePath } from 'next/cache'
@@ -36,6 +36,14 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   const isAdmin  = member.roles.some((r) => r.role.name === 'ADMIN')
   const founderBadge = member.distinctions.find((d) => d.kind === 'FOUNDER') ?? null
 
+  // PENDING covers two very different waits: a fresh registration still inside
+  // its own 24-hour verification window, and somebody who accepted an invite
+  // and went silent, with no automatic way back short of an admin noticing.
+  // Both look identical in the list — this is the one place that tells them
+  // apart, by the one signal that actually distinguishes them.
+  const isUnverified    = member.status === 'PENDING' && !member.emailVerified
+  const daysSinceSignup = daysSince(member.createdAt)
+
   async function handleStatusChange(fd: FormData) {
     'use server'
     const { userId, roles: r, ip } = await requireAdmin('member.changeStatus')
@@ -60,6 +68,13 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     'use server'
     const { userId, roles: r, ip } = await requireAdmin('member.unlock')
     await unlockMember(userId, r, id, ip)
+    revalidatePath(`/members/${id}`)
+  }
+
+  async function handleResendVerification() {
+    'use server'
+    const { userId, roles: r, ip } = await requireAdmin('member.resendVerification')
+    await resendMemberVerification(userId, r, id, ip)
     revalidatePath(`/members/${id}`)
   }
 
@@ -212,6 +227,30 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
               confirmLabel="Unlock account"
             >
               Unlock account
+            </ConfirmSubmitButton>
+          </form>
+        </div>
+      )}
+
+      {isUnverified && (
+        <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-amber-700">Email not verified</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              {daysSinceSignup <= 0
+                ? 'Registered today. Their own verification link is still open for up to 24 hours.'
+                : `Registered ${daysSinceSignup} day${daysSinceSignup === 1 ? '' : 's'} ago and still hasn't verified — their own link expired after 24 hours.`}
+              {' '}They cannot sign in until they do.
+            </p>
+          </div>
+          <form action={handleResendVerification}>
+            <ConfirmSubmitButton
+              className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors shrink-0"
+              title="Resend the verification email?"
+              message={`This sends ${member.firstName} ${member.lastName} a fresh verification link, valid for 24 hours, and retires any link already sent.`}
+              confirmLabel="Resend email"
+            >
+              Resend verification email
             </ConfirmSubmitButton>
           </form>
         </div>
