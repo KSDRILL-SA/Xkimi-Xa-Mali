@@ -7,6 +7,17 @@ import { withApiHandler } from '@/lib/api-handler'
 import { verifyInternalRequest, resolveInternalAdmin } from '@/lib/internal-request'
 import { getClientIP } from '@/lib/request'
 
+/**
+ * Rendering pulls every active member's contribution rows, optionally reads
+ * and embeds a signature image from blob storage, and runs @react-pdf's own
+ * layout pass — real work, not a lookup. Left at the platform default (10s on
+ * most plans), a real render past that point was killed mid-flight, and the
+ * admin console's proxy — which waits on this route — had nothing to forward
+ * but a platform timeout body. Vercel clamps this to whatever the plan
+ * actually allows, so setting it higher than necessary here is safe.
+ */
+export const maxDuration = 60
+
 export const GET = withApiHandler(async (req: NextRequest) => {
   const isTrusted = await verifyInternalRequest(req)
   const session   = isTrusted ? null : await auth()

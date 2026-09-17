@@ -6,6 +6,39 @@ import { auth } from '@/lib/auth'
 import { WEB_BASE_URL } from '@/lib/env'
 
 /**
+ * Rendering a PDF and forwarding it through this proxy is slower than an
+ * ordinary request, and this route chains two serverless functions — this
+ * one waits on the web app's, so it needs at least as much room. Left at the
+ * platform default (10s on most plans), a real render past that point was
+ * killed mid-flight and the admin saw a raw platform timeout body instead of
+ * a PDF. Vercel clamps this to whatever the plan actually allows, so setting
+ * it higher than necessary here is safe.
+ */
+export const maxDuration = 60
+
+/**
+ * What actually failed, in words an admin can act on.
+ *
+ * The raw response body was being handed straight to the browser: our own
+ * API envelope's JSON on an ordinary failure, or a platform timeout body
+ * (also JSON-shaped) when the render ran past the function's time limit.
+ * Either way, clicking "Download PDF" and getting a JSON blob on screen told
+ * an admin nothing about what to do next.
+ */
+function friendlyExportError(detail: string, status: number): string {
+  if (status === 504 || /timeout/i.test(detail)) {
+    return 'The report took too long to generate and the request timed out. Please try again — if it keeps happening, try a smaller period.'
+  }
+  try {
+    const parsed = JSON.parse(detail) as { error?: { message?: string } }
+    if (parsed?.error?.message) return parsed.error.message
+  } catch {
+    // Not JSON — fall through to the generic message below.
+  }
+  return 'The report could not be generated. Please try again.'
+}
+
+/**
  * Streams the monthly contribution report PDF.
  *
  * The PDF is rendered by the web app's trusted admin endpoint, which requires
@@ -67,7 +100,7 @@ export async function GET(req: NextRequest) {
 
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
-    return new NextResponse(detail || 'The report could not be generated.', { status: res.status })
+    return new NextResponse(friendlyExportError(detail, res.status), { status: res.status })
   }
 
   const buffer = Buffer.from(await res.arrayBuffer())
