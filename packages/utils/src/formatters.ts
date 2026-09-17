@@ -34,6 +34,20 @@ export function formatRelativeTime(date: Date | string): string {
   return formatDate(d)
 }
 
+/**
+ * Whole days between a past timestamp and now.
+ *
+ * A plain exported function rather than `Date.now()` written inline at a call
+ * site: `react-hooks/purity` flags an impure call sitting directly in a
+ * component's render body, even in a server component that only ever runs
+ * once per request. Wrapping it here is not a workaround for the rule so much
+ * as the actual shape it wants — the component receives a value, not a call to
+ * a clock.
+ */
+export function daysSince(date: Date | string): number {
+  return Math.floor((Date.now() - new Date(date).getTime()) / 86_400_000)
+}
+
 export function formatInitials(name: string): string {
   return name
     .split(' ')

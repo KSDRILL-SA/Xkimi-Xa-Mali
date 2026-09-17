@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { listMembers } from '@/lib/services'
 import { Reveal, RouterPagination } from '@xxm/ui'
-import { formatSAPhone } from '@xxm/utils'
+import { formatSAPhone, daysSince } from '@xxm/utils'
 import { Search, Users, CheckCircle2, Clock, Ban, ArrowRight, Gem } from 'lucide-react'
 
 export const metadata: Metadata = { title: 'Members' }
@@ -30,7 +30,7 @@ function getAvatarColor(name: string) {
 
 type RawMember = {
   id: string; firstName: string; lastName: string; email: string;
-  phone: string; status: string; createdAt: Date;
+  phone: string; status: string; createdAt: Date; emailVerified: Date | null;
   /** Conferred, never earned. Managed on the member's own page. */
   distinctions: { kind: string }[]
   _count: { contributions: number; mandates: number }
@@ -165,6 +165,14 @@ export default async function MembersPage({
               const initials = `${m.firstName[0] ?? ''}${m.lastName[0] ?? ''}`.toUpperCase()
               const avatarColor = getAvatarColor(m.firstName)
               const sc = STATUS_CONFIG[m.status as UserStatus] ?? { label: m.status, dot: 'bg-gray-400', badge: 'bg-gray-100 text-gray-700' }
+              // A fresh registration and one stuck for weeks both read PENDING —
+              // this is the one thing on the row that tells them apart without
+              // opening the member. Their own verification link is only good
+              // for 24 hours, so past that this is a member an admin has to act
+              // on, not one still inside their own window.
+              const unverifiedDays = m.status === 'PENDING' && !m.emailVerified
+                ? daysSince(m.createdAt)
+                : null
 
               return (
                 <div
@@ -199,11 +207,19 @@ export default async function MembersPage({
                   <span className="text-xs font-mono text-xxm-gray-600 hidden sm:block">{formatSAPhone(m.phone)}</span>
 
                   {/* Status */}
-                  <div className="hidden md:flex justify-center">
+                  <div className="hidden md:flex flex-col items-center gap-0.5">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold ${sc.badge}`}>
                       <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} aria-hidden />
                       {sc.label}
                     </span>
+                    {unverifiedDays !== null && unverifiedDays >= 1 && (
+                      <span
+                        className="text-[9px] font-semibold text-amber-600"
+                        title={`Registered ${unverifiedDays} day${unverifiedDays === 1 ? '' : 's'} ago, email still not verified`}
+                      >
+                        unverified {unverifiedDays}d
+                      </span>
+                    )}
                   </div>
 
                   {/* Contributions */}
