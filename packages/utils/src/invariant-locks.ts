@@ -110,12 +110,22 @@ export interface AdvisoryLockClient {
  * Uses the two-integer form of `pg_advisory_xact_lock` deliberately — the
  * single-argument form takes a bigint, and a JavaScript number crossing that
  * boundary is a cast waiting to be got wrong.
+ *
+ * `::int4` on both parameters, or this breaks the exact way it was written to
+ * avoid: Postgres has `pg_advisory_xact_lock(int4, int4)` and
+ * `pg_advisory_xact_lock(int8)`, but no `(int8, int8)` overload — and an
+ * unadorned `$1`/`$2` placeholder is bound as `int8` by default, which
+ * resolves to neither overload and fails on every call with "function
+ * pg_advisory_xact_lock(bigint, bigint) does not exist". Found live,
+ * 2026-09-15: every invitation ever issued through this lock had failed
+ * with exactly that error — the two-integer form was chosen to dodge a
+ * bigint cast and picked one up anyway, one layer further out.
  */
 export async function holdInvariant(
   tx: AdvisoryLockClient,
   lock: InvariantLock,
 ): Promise<void> {
-  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${XXM_LOCK_NAMESPACE}, ${lock})`
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${XXM_LOCK_NAMESPACE}::int4, ${lock}::int4)`
 }
 
 /** Hold the admin-availability invariant. See {@link INVARIANT_LOCK}. */

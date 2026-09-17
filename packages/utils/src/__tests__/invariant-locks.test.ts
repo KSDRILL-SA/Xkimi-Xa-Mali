@@ -41,6 +41,24 @@ describe('lockAdminInvariant', () => {
     expect(tx.calls[0]!.sql).not.toContain('try_advisory')
   })
 
+  it('casts both parameters to int4 explicitly', async () => {
+    // The regression this guards: Postgres has pg_advisory_xact_lock(int4, int4)
+    // and pg_advisory_xact_lock(int8), but no (int8, int8) overload — and an
+    // unadorned bound parameter is sent as int8 by default, which matches
+    // neither and fails on every single call with "function
+    // pg_advisory_xact_lock(bigint, bigint) does not exist". Every real
+    // invitation failed on exactly this before the cast was added, 2026-09-15,
+    // and the mocked $executeRaw in this file could not have caught it — only
+    // a real Postgres connection can, which is how it shipped broken in the
+    // first place. This test only proves the SQL text still asks for the cast;
+    // it is not a substitute for testing against a real database.
+    const tx = fakeTx()
+
+    await lockAdminInvariant(tx)
+
+    expect(tx.calls[0]!.sql).toBe('SELECT pg_advisory_xact_lock(?::int4, ?::int4)')
+  })
+
   it('passes both keys as parameters rather than interpolating them', async () => {
     // The two-integer form, so no bigint cast is needed at the boundary.
     const tx = fakeTx()

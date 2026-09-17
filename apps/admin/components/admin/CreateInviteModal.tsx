@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Button, Input, Label, Alert } from '@xxm/ui'
 import { Check, Copy, X, UserPlus } from 'lucide-react'
 import { MIN_CONTRIBUTION_ZAR, CONTRIBUTION_STEP_ZAR, DEFAULT_INVITE_AMOUNT } from '@xxm/utils'
+import { ConfirmSubmitButton } from '@/components/ConfirmSubmitButton'
 
 type CreatedInvite = { code: string; firstName: string; lastName: string; email: string }
 type InviteState   = { data?: CreatedInvite; error?: string }
@@ -41,7 +42,7 @@ function ModalContent({
   const [state, formAction, isPending] = useActionState(createAction, {})
 
   /**
-   * What is about to be sent, shown back before it is.
+   * What is about to be sent, read fresh and shown back before it goes.
    *
    * An invitation is a credential: whoever receives the code can register into
    * a circle that holds real money, and the invite carries the intended
@@ -49,21 +50,23 @@ function ModalContent({
    * hands all of that to a stranger, and the admin's first hint is somebody
    * they do not know appearing in the members list.
    *
-   * The fields stay mounted while this shows — hidden inputs are still
-   * submitted, only disabled ones are not — so the form the review describes is
-   * exactly the form that gets sent.
+   * `ConfirmSubmitButton` owns the actual gate — see its own docblock for why
+   * a *separate* dialog, rather than swapping this button for a real submit
+   * button in the same spot, is what a confirmation step has to be.
    */
-  const [review, setReview] = useState<null | { name: string; email: string; phone: string; idNumber: string }>(null)
-
-  function openReview(form: HTMLFormElement) {
-    if (!form.reportValidity()) return
+  function reviewMessage(form: HTMLFormElement | null): string {
+    if (!form) return 'Review the details before sending.'
     const fd = new FormData(form)
-    setReview({
-      name: `${String(fd.get('firstName') ?? '')} ${String(fd.get('lastName') ?? '')}`.trim(),
-      email: String(fd.get('email') ?? ''),
-      phone: String(fd.get('phone') ?? ''),
-      idNumber: String(fd.get('idNumber') ?? ''),
-    })
+    const name = `${String(fd.get('firstName') ?? '')} ${String(fd.get('lastName') ?? '')}`.trim()
+    const email = String(fd.get('email') ?? '')
+    const phone = String(fd.get('phone') ?? '')
+    const idNumber = String(fd.get('idNumber') ?? '')
+    return (
+      `The code goes to ${email} and ${phone}. Whoever receives it can register as ` +
+      `${name}, ID ${idNumber}, and join the Foundation. Check the address before ` +
+      'sending — an invitation sent to the wrong person can be revoked, but only ' +
+      'once somebody notices.'
+    )
   }
 
   // Portal target only exists on the client — wait for mount before rendering.
@@ -90,8 +93,8 @@ function ModalContent({
   if (!mounted) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 animate-fade-in">
-      <div className="bg-white rounded-2xl shadow-xxm-lg w-full max-w-md p-6 space-y-5 animate-scale-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-xxm-lg w-full max-w-md max-h-full overflow-y-auto p-6 space-y-5 animate-scale-in">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-xxm-green">Create Invitation</h2>
           <button
@@ -183,43 +186,26 @@ function ModalContent({
               />
             </div>
 
-            {review && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 space-y-2">
-                <p className="text-sm font-semibold text-amber-900">Send this invitation?</p>
-                <p className="text-xs text-amber-800">
-                  The code goes to <span className="font-bold">{review.email}</span> and{' '}
-                  <span className="font-bold">{review.phone}</span>. Whoever receives it can
-                  register as <span className="font-bold">{review.name}</span>, ID{' '}
-                  <span className="font-bold">{review.idNumber}</span>, and join the
-                  Foundation. Check the address before sending — an invitation sent to the
-                  wrong person can be revoked, but only once somebody notices.
-                </p>
-              </div>
-            )}
-
             <div className="flex gap-3 pt-1">
               <Button
                 type="button"
                 variant="outline"
                 fullWidth
-                onClick={() => (review ? setReview(null) : onClose())}
+                onClick={onClose}
                 disabled={isPending}
               >
-                {review ? 'Back' : 'Cancel'}
+                Cancel
               </Button>
-              {review ? (
-                <Button type="submit" fullWidth loading={isPending}>
-                  Send invitation
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  fullWidth
-                  onClick={(e) => openReview((e.currentTarget as HTMLElement).closest('form') as HTMLFormElement)}
-                >
-                  Review
-                </Button>
-              )}
+              <ConfirmSubmitButton
+                className="w-full inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold bg-xxm-green text-white transition-all duration-fast ease-smooth hover:bg-xxm-canopy hover:-translate-y-0.5 shadow-xxm-sm hover:shadow-xxm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-xxm-gold focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
+                title="Send this invitation?"
+                message="Review the details before sending."
+                getMessage={reviewMessage}
+                confirmLabel="Send invitation"
+                disabled={isPending}
+              >
+                {isPending ? 'Sending…' : 'Review & Send'}
+              </ConfirmSubmitButton>
             </div>
           </form>
         )}
