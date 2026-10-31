@@ -31,7 +31,7 @@
   "_overrides_note": "Adding an entry here does not apply it. Overrides take effect during dependency resolution, and npm skips resolution when node_modules already exists — it reports 'up to date' and rebuilds the lockfile from the tree. brace-expansion and js-yaml sat unpatched that way while this block looked like it was protecting them. To add or change an entry: remove node_modules, delete package-lock.json, run `npm install --package-lock-only`, then verify with `npm ls <pkg>` — never by reading this file.",
   "overrides": {
     "sharp": "^0.35.3",
-    "undici": "^6.28.0",
+    "undici": "^6.29.1",
     "brace-expansion": "^2.1.4",
     "js-yaml": "^4.3.1",
     "nanoid": "^3.3.18",
